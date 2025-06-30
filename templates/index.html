@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Recipe Collection</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>My Recipe Collection</h1>
+    <ul class="recipe-list">
+        {% for recipe in recipes %}
+        <li>
+            <a href="{{ url_for('show_recipe', filename=recipe.filename) }}">{{ recipe.name }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{
+  "name": "Easy Vegan Strawberry Sauce",
+  "description": "A simple and delicious vegan strawberry sauce made with frozen organic strawberries, perfect for topping desserts, breakfast, and more.",
+  "prepTime": 5,
+  "cookTime": 15,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "water",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "lemon juice",
+        "amount": 1,
+        "units": "tablespoon"
+      },
+      {
+        "name": "vanilla extract",
+        "amount": 0.5,
+        "units": "teaspoon"
+      }
+    ],
+    "dry": [
+      {
+        "name": "organic frozen strawberries",
+        "amount": 16,
+        "units": "oz"
+      },
+      {
+        "name": "granulated sugar",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "You can adjust to your desired sweetness."
+      },
+      {
+        "name": "cornstarch",
+        "amount": 1,
+        "units": "tablespoon"
+      }
+    ]
+  },
+  "instructions": [
+    "In a small bowl, whisk together the cornstarch and water to create a slurry. Set aside.",
+    "In a medium saucepan, combine the frozen strawberries and sugar. Cook over medium heat, stirring occasionally, until the strawberries start to break down and release their juices (about 5-7 minutes).",
+    "Stir in the lemon juice and vanilla extract.",
+    "Pour the cornstarch slurry into the saucepan and whisk to combine.",
+    "Bring the sauce to a simmer and cook for another 2-3 minutes, stirring constantly, until the sauce has thickened.",
+    "Remove from heat and let it cool slightly. The sauce will continue to thicken as it cools.",
+    "For a smoother sauce, you can use an immersion blender or transfer it to a regular blender."
+  ],
+  "notes": "This sauce can be stored in an airtight container in the refrigerator for up to a week. It's excellent on pancakes, waffles, ice cream, or yogurt.",
+  "tags": [
+    "vegan",
+    "strawberry",
+    "sauce",
+    "dessert",
+    "topping",
+    "easy",
+    "frozen fruit"
+  ]
+}

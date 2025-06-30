@@ -1,0 +1,85 @@
+{
+  "name": "Crispy Vegan Pan-Fried Gnocchi with Garlic & Herbs",
+  "description": "A quick and delicious vegan meal featuring crispy, pan-fried gnocchi tossed with garlic, fresh herbs, and cherry tomatoes. This recipe uses pre-cooked, vacuum-sealed gnocchi for a perfect weeknight dinner.",
+  "prepTime": 5,
+  "cookTime": 15,
+  "servings": 2,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive Oil",
+        "amount": 2,
+        "units": "Tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Vacuum-Sealed Potato Gnocchi",
+        "amount": 16,
+        "units": "oz",
+        "notes": "Ensure it's a vegan variety (egg-free)."
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Black Pepper",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Red Pepper Flakes",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "Optional, for a little heat."
+      }
+    ],
+    "other": [
+      {
+        "name": "Garlic",
+        "amount": 4,
+        "units": "qty",
+        "notes": "minced"
+      },
+      {
+        "name": "Cherry Tomatoes",
+        "amount": 1,
+        "units": "cup",
+        "notes": "halved"
+      },
+      {
+        "name": "Fresh Basil",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "chopped"
+      },
+      {
+        "name": "Fresh Parsley",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "chopped"
+      }
+    ]
+  },
+  "instructions": [
+    "Heat the olive oil in a large non-stick skillet or frying pan over medium-high heat.",
+    "Carefully add the gnocchi from the package directly to the hot pan in a single layer. Do not boil them first.",
+    "Pan-fry for 5-7 minutes, tossing occasionally, until the gnocchi are golden brown and crispy on all sides.",
+    "Add the minced garlic and halved cherry tomatoes to the skillet. Cook for another 2-3 minutes, until the garlic is fragrant and the tomatoes begin to soften.",
+    "Remove the skillet from the heat. Season with salt, black pepper, and a pinch of red pepper flakes if using.",
+    "Stir in the fresh chopped basil and parsley.",
+    "Serve immediately, garnished with extra fresh herbs if desired."
+  ],
+  "notes": "For extra richness, you can add a tablespoon of vegan butter along with the olive oil. Ensure your skillet is hot before adding the gnocchi to achieve the best crispy texture. No need to boil this type of gnocchi beforehand; they cook perfectly in the pan.",
+  "tags": [
+    "vegan",
+    "gnocchi",
+    "pan-fried",
+    "quick",
+    "weeknight",
+    "italian",
+    "pasta"
+  ]
+}

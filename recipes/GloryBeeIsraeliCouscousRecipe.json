@@ -1,0 +1,61 @@
+
+{
+  "name": "Glory Bee Israeli Couscous Recipe",
+  "description": "Prepare a delicious and simple Israeli couscous dish with this easy-to-follow recipe.",
+  "prepTime": 2,
+  "cookTime": 10,
+  "servings": 3,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "Israeli Couscous",
+        "amount": 1,
+        "units": "cup"
+      }
+    ],
+    "wet": [
+      {
+        "name": "water",
+        "amount": 2,
+        "units": "cups"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Measure and prepare the ingredients."
+    },
+    {
+      "step": 2,
+      "description": "In a large pot, bring 2 cups of water to a boil."
+    },
+    {
+      "step": 3,
+      "description": "Once the water is boiling, add 1 cup of Israeli couscous."
+    },
+    {
+      "step": 4,
+      "description": "Stir the couscous gently to prevent it from clumping."
+    },
+    {
+      "step": 5,
+      "description": "Cover the pot with a lid and reduce the heat to a simmer."
+    },
+    {
+      "step": 6,
+      "description": "Let the couscous cook for 8-10 minutes, or until it's tender and the liquid has been absorbed."
+    },
+    {
+      "step": 7,
+      "description": "Turn off the heat and let the couscous rest for a few minutes before serving."
+    }
+  ],
+  "notes": "This recipe is adapted from the packaging of Glory Bee Israeli Couscous.",
+  "tags": [
+    "Israeli couscous",
+    "side dish",
+    "easy recipe"
+  ],
+  "image": "uploaded:IMG_1733.jpg-47ee5727-8099-4a47-b513-8f419dbc2165"
+}

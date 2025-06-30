@@ -1,0 +1,12 @@
+Index: api_key_manager.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/api_key_manager.py b/api_key_manager.py
+new file mode 100644
+--- /dev/null	(date 1751202082346)
++++ b/api_key_manager.py	(date 1751202082346)
+@@ -0,0 +1,1 @@
++api_key.py
+\ No newline at end of file

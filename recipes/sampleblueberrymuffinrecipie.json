@@ -1,0 +1,114 @@
+{
+  "name": "Vegan Blueberry Muffins (No Banana)",
+  "description": "A quick and easy recipe for delicious vegan blueberry muffins without banana, using egg replacer.",
+  "prepTime": 20,
+  "cookTime": 30,
+  "servings": 12,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "unsweetened applesauce",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "almond milk",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "maple syrup",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "vegetable oil",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "vanilla extract",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "apple cider vinegar",
+        "amount": 1,
+        "units": "tablespoon"
+      },
+      {
+        "name": "egg replacer",
+        "amount": 2,
+        "units": "qty",
+        "notes": "equivalent to 2 eggs (plus water as per instructions)"
+      }
+    ],
+    "dry": [
+      {
+        "name": "whole wheat flour (red)",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "white whole wheat flour",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "all-purpose flour",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "sugar",
+        "amount": 0.75,
+        "units": "cup"
+      },
+      {
+        "name": "baking powder",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "baking soda",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "salt",
+        "amount": 0.5,
+        "units": "teaspoon"
+      },
+      {
+        "name": "ground cinnamon",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "blueberries",
+        "amount": 1,
+        "units": "cup"
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat oven to 350°F (175°C). Grease a 12-cup muffin tin or line with paper liners.",
+    "Prepare the egg replacer according to the package instructions and set aside.",
+    "In a large bowl, combine the applesauce, plant-based milk, maple syrup, oil, vanilla extract, and apple cider vinegar. Whisk until well combined.",
+    "Add the prepared egg replacer and whisk until incorporated.",
+    "In a separate bowl, whisk together the whole wheat flour, white whole wheat flour, all-purpose flour, sugar, baking powder, baking soda, salt, and cinnamon (if using).",
+    "Gradually add the dry ingredients to the wet ingredients, mixing gently with a spatula or wooden spoon until just combined. Do not overmix.",
+    "Gently fold in the blueberries.",
+    "Fill each muffin cup about ¾ full. Bake for 25-30 minutes, or until a toothpick inserted into the center comes out clean.",
+    "Let the muffins cool in the pan for 10-15 minutes before transferring to a wire rack to cool completely."
+  ],
+  "notes": "Store leftover muffins in an airtight container at room temperature for up to 3 days or in the refrigerator for up to a week.",
+  "tags": [
+    "vegan",
+    "muffins",
+    "baking",
+    "breakfast",
+    "snack",
+    "blueberry"
+  ]
+}
