@@ -1,0 +1,232 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Crispy and delicious vegan polenta fries.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  },
+  "name": "Vegan Polenta Fries",
+  "prepTime": 20,
+  "cookTime": 25,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Water",
+        "amount": 4,
+        "units": "cups"
+      },
+      {
+        "name": "Vegetable broth",
+        "amount": 1,
+        "units": "cup"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Polenta",
+        "amount": 2,
+        "units": "cups"
+      },
+      {
+        "name": "Nutritional yeast",
+        "amount": 2,
+        "units": "tablespoons"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Onion powder",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 0.5,
+        "units": "teaspoon"
+      }
+    ],
+    "other": [
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "tablespoons"
+      }
+    ]
+  },
+  "instructions": [
+    "Combine water and vegetable broth in a saucepan. Bring to a boil.",
+    "Slowly whisk in polenta, stirring constantly to prevent lumps. Reduce heat to low and simmer for 15-20 minutes, or until thick and creamy, stirring frequently.",
+    "Stir in nutritional yeast, garlic powder, onion powder, salt, and pepper.",
+    "Spread polenta mixture onto a baking sheet lined with parchment paper. Let cool completely.",
+    "Once cooled, cut the polenta into fry shapes.",
+    "Heat olive oil in a large skillet over medium heat.",
+    "Fry polenta fries in batches for 3-4 minutes per side, or until golden brown and crispy.",
+    "Serve immediately."
+  ],
+  "notes": "For extra crispy fries, you can bake them in the oven at 400\u00b0F (200\u00b0C) for 15-20 minutes after frying.",
+  "tags": [
+    "vegan",
+    "polenta",
+    "fries",
+    "appetizer",
+    "side dish"
+  ]
+}
