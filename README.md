@@ -23,3 +23,27 @@ This project is a simple web application designed to display recipes. It provide
 
 *   **Backend:** Python (likely with a web framework like Flask)
 *   **Frontend:** HTML, CSS, JavaScript
+
+## Getting Started
+
+1.  Create and activate a Python virtual environment (optional but recommended).
+2.  Install the dependencies:
+
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  Export your Google API key so the Gemini client can authenticate:
+
+    ```bash
+    export GOOGLE_API_KEY="your_google_api_key_here"
+    ```
+
+4.  Start the Flask development server:
+
+    ```bash
+    python app.py
+    ```
+
+5.  Open your browser to `http://localhost:5000` to view the recipes or generate a new one.
+

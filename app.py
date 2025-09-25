@@ -1,12 +1,8 @@
 import os
 import json
-import sys
 
 import google.generativeai as genai
 from flask import Flask, render_template, abort, request, redirect, url_for
-
-# Import the API key
-from api_key import GOOGLE_API_KEY
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -15,8 +11,12 @@ app = Flask(__name__)
 RECIPES_DIR = 'recipes'
 
 # --- NEW: Configure the generative model ---
-genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-2.5-pro')
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+model = None
+
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel('gemini-2.5-pro')
 
 
 def get_all_recipes():
@@ -82,6 +82,12 @@ def show_recipe_json(filename):
 def generate_recipe():
     """Handles both displaying the form and processing the generation request."""
     if request.method == 'POST':
+        if model is None:
+            return (
+                "Recipe generation is not configured. Set the GOOGLE_API_KEY environment variable and restart the application.",
+                500,
+            )
+
         prompt = request.form['prompt']
 
         # The JSON schema to guide the model's output
@@ -95,6 +101,9 @@ def generate_recipe():
             f"{schema}"
             f"Do not include any text before or after the JSON object."
         )
+
+        recipe_json_str = ""
+        response = None
 
         try:
             # Generate the content
