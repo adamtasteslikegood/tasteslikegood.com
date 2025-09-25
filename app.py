@@ -1,5 +1,7 @@
 import os
 import json
+import sys
+
 import google.generativeai as genai
 from flask import Flask, render_template, abort, request, redirect, url_for
 
@@ -14,7 +16,7 @@ RECIPES_DIR = 'recipes'
 
 # --- NEW: Configure the generative model ---
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+model = genai.GenerativeModel('gemini-2.5-pro')
 
 
 def get_all_recipes():
@@ -88,7 +90,7 @@ def generate_recipe():
 
         # Create the full prompt for the model
         full_prompt = (
-            f"Generate a recipe based on the following request: '{prompt}'. "
+            f"Generate a Vegan recipe based on the following request: '{prompt}'. "
             f"The output must be a valid JSON object that strictly follows this schema:\n"
             f"{schema}"
             f"Do not include any text before or after the JSON object."
@@ -115,10 +117,31 @@ def generate_recipe():
             # Redirect to the new recipe's page
             return redirect(url_for('show_recipe', filename=filename))
 
+        except json.JSONDecodeError as e:
+            # Handle JSON parsing errors
+            error_message = f"JSON parsing error: {e}"
+        except FileNotFoundError as e:
+            # Handle file I/O errors
+            error_message = f"File error: {e}"
         except Exception as e:
-            # If anything goes wrong, show an error
-            print(f"Error generating recipe: {e}")
-            return "Sorry, there was an error generating the recipe. Please try again.", 500
+            # Handle all other unexpected errors
+            error_message = f"Unexpected error: {e}"
+
+        # Log the error details securely
+        try:
+            with open('recipe_error.json', 'a+') as f:
+                f.write(f"{recipe_json_str}\n")
+            with open('recipe_error.txt', 'a') as f:
+                f.write(
+                    f"Full prompt:\n{full_prompt}\n\n"
+                    f"Response:\n{getattr(response, 'text', 'No response')}\n"
+                    f"Error: {error_message}\n"
+                )
+        except Exception as logging_error:
+            print(f"Error while logging: {logging_error}")
+
+        # Show the error response to the user
+        return "Sorry, there was an error generating the recipe. Please try again.", 500
 
     # For a GET request, just show the form
     return render_template('generate_recipe.html')

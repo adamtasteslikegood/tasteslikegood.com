@@ -4,14 +4,10 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="&quot;Add Flask recipe app with functionality to view recipes, raw JSON data, and ingredient resizing. Include sample recipes, schema, templates, and styling.&quot;">
-      <change afterPath="$PROJECT_DIR$/requirements.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/templates/generate_recipe.html" afterDir="false" />
+    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation.">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/static/css/style.css" beforeDir="false" afterPath="$PROJECT_DIR$/static/css/style.css" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/index.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/index.html" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/templates/json_viewer.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/json_viewer.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/recipes/vegan_polenta_fries.json" beforeDir="false" afterPath="$PROJECT_DIR$/recipes/vegan_polenta_fries.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -203,7 +199,7 @@
       <workItem from="1752938133908" duration="485000" />
       <workItem from="1753542435382" duration="945000" />
       <workItem from="1758037907024" duration="711000" />
-      <workItem from="1758170019041" duration="9176000" />
+      <workItem from="1758170019041" duration="17536000" />
     </task>
     <task id="LOCAL-00001" summary="&quot;Add Flask app to manage and display recipe collection&quot;">
       <option name="closed" value="true" />
@@ -261,7 +257,15 @@
       <option name="project" value="LOCAL" />
       <updated>1751245623474</updated>
     </task>
-    <option name="localTasksCounter" value="8" />
+    <task id="LOCAL-00008" summary="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation.">
+      <option name="closed" value="true" />
+      <created>1758260778502</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1758260778502</updated>
+    </task>
+    <option name="localTasksCounter" value="9" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -297,6 +301,8 @@
     <MESSAGE value="&quot;Integrate Gemini API for vegan recipe assistant, add crispy vegan gnocchi JSON recipe, and update .gitignore&quot;" />
     <MESSAGE value="&quot;Add crispy vegan pan-fried gnocchi recipe and README for Recipe Viewer&quot;" />
     <MESSAGE value="&quot;Add Flask recipe app with functionality to view recipes, raw JSON data, and ingredient resizing. Include sample recipes, schema, templates, and styling.&quot;" />
-    <option name="LAST_COMMIT_MESSAGE" value="&quot;Add Flask recipe app with functionality to view recipes, raw JSON data, and ingredient resizing. Include sample recipes, schema, templates, and styling.&quot;" />
+    <MESSAGE value="Add new vegan recipes and update project configuration files&#10;&#10;- Add recipes: vegan dinner rolls, cornbread, polenta fries&#10;- Setup .idea config with Python 3.13 and Flask integration&#10;- Update CSS with initial styles for recipe generation page" />
+    <MESSAGE value="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation." />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation." />
   </component>
 </project>
