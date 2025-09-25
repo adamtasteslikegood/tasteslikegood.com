@@ -1,12 +1,22 @@
 import os
 import json
-from flask import Flask, render_template, abort
+
+import google.generativeai as genai
+from flask import Flask, render_template, abort, request, redirect, url_for
 
 # Initialize the Flask application
 app = Flask(__name__)
 
 # The folder where the recipe .json files are stored
 RECIPES_DIR = 'recipes'
+
+# --- NEW: Configure the generative model ---
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+model = None
+
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+    model = genai.GenerativeModel('gemini-2.5-pro')
 
 
 def get_all_recipes():
@@ -33,7 +43,7 @@ def index():
     recipes = get_all_recipes()
     return render_template('index.html', recipes=recipes)
 
-# --- THIS FUNCTION HAS BEEN CORRECTED ---
+
 @app.route('/recipe/<filename>')
 def show_recipe(filename):
     """The route to display a single recipe."""
@@ -43,18 +53,12 @@ def show_recipe(filename):
     try:
         with open(filepath, 'r') as f:
             recipe_data = json.load(f)
-
-        # THE FIX: Add the filename to the dictionary before rendering.
-        # This makes `recipe.filename` available in the template.
         recipe_data['filename'] = filename
-
         return render_template('recipe.html', recipe=recipe_data)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
         abort(500)
 
-
-# --- NEW ROUTE ADDED BELOW ---
 
 @app.route('/recipe/<filename>/json')
 def show_recipe_json(filename):
@@ -64,21 +68,93 @@ def show_recipe_json(filename):
         abort(404)
     try:
         with open(filepath, 'r') as f:
-            # Load the recipe data into a Python dictionary
             recipe_data = json.load(f)
-
-        # Add the filename to the recipe data so the template can link back
         recipe_data['filename'] = filename
-
         pretty_json = json.dumps(recipe_data, indent=2)
-
-        # Pass both the recipe object (for the title) and the JSON string to the new template
         return render_template('json_viewer.html', recipe=recipe_data, recipe_json_str=pretty_json)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
         abort(500)
 
 
+# --- NEW: Route for generating recipes ---
+@app.route('/generate_recipe', methods=['GET', 'POST'])
+def generate_recipe():
+    """Handles both displaying the form and processing the generation request."""
+    if request.method == 'POST':
+        if model is None:
+            return (
+                "Recipe generation is not configured. Set the GOOGLE_API_KEY environment variable and restart the application.",
+                500,
+            )
+
+        prompt = request.form['prompt']
+
+        # The JSON schema to guide the model's output
+        with open('recipe_schema.json', 'r') as f:
+            schema = f.read()
+
+        # Create the full prompt for the model
+        full_prompt = (
+            f"Generate a Vegan recipe based on the following request: '{prompt}'. "
+            f"The output must be a valid JSON object that strictly follows this schema:\n"
+            f"{schema}"
+            f"Do not include any text before or after the JSON object."
+        )
+
+        recipe_json_str = ""
+        response = None
+
+        try:
+            # Generate the content
+            response = model.generate_content(full_prompt)
+            # Extract the JSON string from the response
+            recipe_json_str = response.text.strip().replace('```json', '').replace('```', '').strip()
+
+            # Parse the JSON string into a Python dictionary
+            recipe_data = json.loads(recipe_json_str)
+
+            # Create a filename from the recipe name
+            safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
+            filename = safe_filename.replace(' ', '_').lower() + '.json'
+            filepath = os.path.join(RECIPES_DIR, filename)
+
+            # Save the new recipe to a file
+            with open(filepath, 'w') as f:
+                json.dump(recipe_data, f, indent=2)
+
+            # Redirect to the new recipe's page
+            return redirect(url_for('show_recipe', filename=filename))
+
+        except json.JSONDecodeError as e:
+            # Handle JSON parsing errors
+            error_message = f"JSON parsing error: {e}"
+        except FileNotFoundError as e:
+            # Handle file I/O errors
+            error_message = f"File error: {e}"
+        except Exception as e:
+            # Handle all other unexpected errors
+            error_message = f"Unexpected error: {e}"
+
+        # Log the error details securely
+        try:
+            with open('recipe_error.json', 'a+') as f:
+                f.write(f"{recipe_json_str}\n")
+            with open('recipe_error.txt', 'a') as f:
+                f.write(
+                    f"Full prompt:\n{full_prompt}\n\n"
+                    f"Response:\n{getattr(response, 'text', 'No response')}\n"
+                    f"Error: {error_message}\n"
+                )
+        except Exception as logging_error:
+            print(f"Error while logging: {logging_error}")
+
+        # Show the error response to the user
+        return "Sorry, there was an error generating the recipe. Please try again.", 500
+
+    # For a GET request, just show the form
+    return render_template('generate_recipe.html')
+
+
 if __name__ == '__main__':
-    app.run(debug=True)
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)

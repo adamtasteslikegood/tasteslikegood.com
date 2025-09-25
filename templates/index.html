@@ -8,6 +8,7 @@
 </head>
 <body>
     <h1>Welcome to TastesLikeGood.com!!!</h1>
+    <a href="{{ url_for('generate_recipe') }}" class="generate-link">Generate a New Recipe with AI</a>
     <ul class="recipe-list">
         {% for recipe in recipes %}
         <li>

@@ -1,0 +1,225 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Easy yeast-based vegan dinner rolls.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  },
+  "name": "Simple Vegan Dinner Rolls",
+  "prepTime": 20,
+  "cookTime": 20,
+  "servings": 12,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Water",
+        "amount": 1,
+        "units": "cup",
+        "notes": "warm"
+      },
+      {
+        "name": "Vegan Butter",
+        "amount": 2,
+        "units": "tablespoons",
+        "notes": "melted"
+      },
+      {
+        "name": "Maple Syrup",
+        "amount": 1,
+        "units": "tablespoon"
+      }
+    ],
+    "dry": [
+      {
+        "name": "All-purpose Flour",
+        "amount": 2.5,
+        "units": "cups"
+      },
+      {
+        "name": "Sugar",
+        "amount": 1,
+        "units": "tablespoon"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Yeast",
+        "amount": 2.25,
+        "units": "teaspoons"
+      }
+    ]
+  },
+  "instructions": [
+    "In a large bowl, combine warm water, melted vegan butter, and maple syrup.",
+    "Add yeast and let stand for 5 minutes until foamy.",
+    "Add flour and salt to the wet ingredients. Mix until a soft dough forms.",
+    "Turn the dough out onto a lightly floured surface and knead for 5-7 minutes until smooth and elastic.",
+    "Place the dough in a lightly oiled bowl, turning to coat. Cover and let rise in a warm place for 1 hour, or until doubled in size.",
+    "Punch down the dough and divide it into 12 equal pieces.",
+    "Shape each piece into a ball and place them on a baking sheet lined with parchment paper.",
+    "Cover and let rise for another 15-20 minutes.",
+    "Preheat oven to 375\u00b0F (190\u00b0C).",
+    "Bake for 15-20 minutes, or until golden brown.",
+    "Let cool slightly before serving."
+  ],
+  "notes": "For a richer flavor, use a plant-based milk instead of water.",
+  "tags": [
+    "vegan",
+    "dinner rolls",
+    "yeast",
+    "easy",
+    "bread"
+  ]
+}

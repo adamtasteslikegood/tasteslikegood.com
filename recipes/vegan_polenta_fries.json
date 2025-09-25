@@ -1,0 +1,142 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Crispy on the outside, soft and creamy on the inside, these easy vegan polenta fries are a delicious and gluten-free alternative to traditional potato fries. Using a store-bought polenta roll makes them incredibly simple to prepare.",
+  "name": "Vegan Polenta Fries",
+  "prepTime": 10,
+  "cookTime": 30,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Nutritional yeast",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "for a cheesy flavor"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Italian seasoning",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "tsp",
+        "notes": "or to taste"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 0.25,
+        "units": "tsp",
+        "notes": "freshly ground, or to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Prepared polenta roll",
+        "amount": 18,
+        "units": "oz"
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat your oven to 425\u00b0F (220\u00b0C). Line a large baking sheet with parchment paper.",
+    "Carefully remove the polenta roll from its packaging and pat it dry with a paper towel. Slice the roll into fry shapes, about 1/2-inch thick.",
+    "Place the sliced polenta into a large bowl and drizzle with olive oil. Gently toss until all the fries are lightly coated.",
+    "In a small bowl, combine the nutritional yeast, garlic powder, smoked paprika, Italian seasoning, salt, and black pepper.",
+    "Sprinkle the seasoning mixture over the oiled polenta fries. Toss gently again to ensure the fries are evenly coated with the spices.",
+    "Arrange the seasoned polenta fries on the prepared baking sheet in a single layer, making sure they are not touching. This helps them get crispy.",
+    "Bake for 25-30 minutes, flipping the fries halfway through the cooking time, until they are golden brown and crispy on the edges.",
+    "Remove from the oven and let them cool for a minute before serving. They will firm up slightly as they cool. Serve hot with your favorite dipping sauce."
+  ],
+  "notes": "For extra crispy fries, you can use an air fryer. Cook at 400\u00b0F (200\u00b0C) for 15-20 minutes, shaking the basket halfway through. Serve with marinara sauce, vegan aioli, or ketchup. Feel free to experiment with other spices like onion powder, cayenne pepper, or dried rosemary.",
+  "tags": [
+    "vegan",
+    "gluten-free",
+    "appetizer",
+    "side dish",
+    "polenta",
+    "easy"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}

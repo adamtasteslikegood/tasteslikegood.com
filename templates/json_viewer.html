@@ -5,59 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JSON: {{ recipe.name }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        /* --- NEW STYLES FOR THE CODE VIEWER --- */
-
-        /* The main container for the code block */
-        .code-container {
-            background-color: #2d2d2d; /* Dark background */
-            border-radius: 8px;      /* Rounded corners */
-            margin-top: 20px;
-            position: relative;
-            border: 1px solid #444;
-        }
-
-        /* The header bar for the viewer */
-        .code-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 8px 15px;
-            background-color: #3a3a3a;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            border-bottom: 1px solid #444;
-        }
-
-        .code-header span {
-            color: #ccc;
-            font-size: 0.9em;
-            font-family: monospace;
-        }
-
-        /* The copy button in the corner */
-        .code-header button {
-            background-color: #4a4a4a;
-            color: #eee;
-            border: 1px solid #666;
-            border-radius: 5px;
-            padding: 5px 10px;
-            cursor: pointer;
-            font-size: 0.8em;
-        }
-        .code-header button:hover {
-            background-color: #5a5a5a;
-        }
-
-        /* The <pre> tag holding the actual code */
-        pre {
-            padding: 20px;
-            margin: 0; /* Reset default margin */
-            color: #f8f8f2;
-            white-space: pre-wrap;
-            word-wrap: break-word;
-        }
-    </style>
 </head>
 <body>
 

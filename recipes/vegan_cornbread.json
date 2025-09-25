@@ -1,0 +1,237 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A delicious and easy vegan cornbread recipe.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "type": "string"
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  },
+  "name": "Vegan Cornbread",
+  "prepTime": 5,
+  "cookTime": 20,
+  "servings": 8,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Plant-based milk",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Vegetable oil",
+        "amount": 1,
+        "units": "tablespoon"
+      },
+      {
+        "name": "Apple cider vinegar",
+        "amount": 1,
+        "units": "tablespoon"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Cornmeal",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "All-purpose flour",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Sugar",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "Baking powder",
+        "amount": 2,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Baking soda",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "teaspoon"
+      }
+    ],
+    "other": [
+      {
+        "name": "Corn",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Frozen or canned, drained"
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat oven to 375\u00b0F (190\u00b0C). Grease an 8-inch square baking pan.",
+    "In a large bowl, whisk together the dry ingredients: cornmeal, flour, sugar, baking powder, baking soda, and salt.",
+    "In a separate bowl, combine the wet ingredients: plant-based milk, oil, and apple cider vinegar.",
+    "Add the wet ingredients to the dry ingredients and stir until just combined. Do not overmix.",
+    "Stir in the corn.",
+    "Pour batter into the prepared pan and bake for 20-25 minutes, or until a toothpick inserted into the center comes out clean.",
+    "Let cool slightly before serving."
+  ],
+  "notes": "For a sweeter cornbread, add 1/4 cup more sugar. You can also add 1/2 cup of chopped vegetables, such as bell peppers or zucchini.",
+  "tags": [
+    "vegan",
+    "cornbread",
+    "baking",
+    "easy",
+    "gluten-free"
+  ]
+}
