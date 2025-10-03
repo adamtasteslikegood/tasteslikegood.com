@@ -42,7 +42,9 @@ def validate_recipe_data(recipe_data):
     if RECIPE_VALIDATOR is None:
         raise RuntimeError("Recipe schema is not available for validation.")
 
-    errors = sorted(RECIPE_VALIDATOR.iter_errors(recipe_data), key=lambda e: e.path)
+    errors = sorted(
+        RECIPE_VALIDATOR.iter_errors(recipe_data), key=lambda e: tuple(e.path)
+    )
     if errors:
         first_error = errors[0]
         location = " -> ".join(str(part) for part in first_error.absolute_path)
