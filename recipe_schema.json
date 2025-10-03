@@ -63,7 +63,29 @@
       "type": "array",
       "description": "Ordered list of instructions",
       "items": {
-        "type": "string"
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
       }
     },
     "notes": {
