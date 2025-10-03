@@ -3,12 +3,30 @@ import json
 
 import google.generativeai as genai
 from flask import Flask, render_template, abort, request, redirect, url_for
+from jsonschema import Draft7Validator, ValidationError
 
 # Initialize the Flask application
 app = Flask(__name__)
 
 # The folder where the recipe .json files are stored
 RECIPES_DIR = 'recipes'
+RECIPE_SCHEMA_PATH = 'recipe_schema.json'
+
+# Ensure the recipes directory exists so list/save operations do not fail
+os.makedirs(RECIPES_DIR, exist_ok=True)
+
+
+def _load_recipe_schema():
+    try:
+        with open(RECIPE_SCHEMA_PATH, 'r') as schema_file:
+            return json.load(schema_file)
+    except (FileNotFoundError, json.JSONDecodeError) as exc:
+        print(f"Warning: Unable to load recipe schema. Error: {exc}")
+        return None
+
+
+RECIPE_SCHEMA = _load_recipe_schema()
+RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
 # --- NEW: Configure the generative model ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -17,6 +35,23 @@ model = None
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
     model = genai.GenerativeModel('gemini-2.5-pro')
+
+
+def validate_recipe_data(recipe_data):
+    """Validate recipe data against the JSON schema."""
+    if RECIPE_VALIDATOR is None:
+        raise RuntimeError("Recipe schema is not available for validation.")
+
+    errors = sorted(
+        RECIPE_VALIDATOR.iter_errors(recipe_data), key=lambda e: tuple(e.path)
+    )
+    if errors:
+        first_error = errors[0]
+        location = " -> ".join(str(part) for part in first_error.absolute_path)
+        message = first_error.message
+        if location:
+            message = f"{message} (at {location})"
+        raise ValidationError(message)
 
 
 def get_all_recipes():
@@ -88,10 +123,15 @@ def generate_recipe():
                 500,
             )
 
-        prompt = request.form['prompt']
+        prompt = request.form.get('prompt', '').strip()
+        if not prompt:
+            return "A prompt describing the desired recipe is required.", 400
+
+        if RECIPE_SCHEMA is None or RECIPE_VALIDATOR is None:
+            return "Recipe schema is unavailable; cannot validate generated recipes.", 500
 
         # The JSON schema to guide the model's output
-        with open('recipe_schema.json', 'r') as f:
+        with open(RECIPE_SCHEMA_PATH, 'r') as f:
             schema = f.read()
 
         # Create the full prompt for the model
@@ -114,6 +154,9 @@ def generate_recipe():
             # Parse the JSON string into a Python dictionary
             recipe_data = json.loads(recipe_json_str)
 
+            # Validate the recipe before saving it
+            validate_recipe_data(recipe_data)
+
             # Create a filename from the recipe name
             safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
             filename = safe_filename.replace(' ', '_').lower() + '.json'
@@ -129,6 +172,10 @@ def generate_recipe():
         except json.JSONDecodeError as e:
             # Handle JSON parsing errors
             error_message = f"JSON parsing error: {e}"
+        except ValidationError as e:
+            error_message = f"Schema validation error: {e.message}"
+        except RuntimeError as e:
+            error_message = str(e)
         except FileNotFoundError as e:
             # Handle file I/O errors
             error_message = f"File error: {e}"
