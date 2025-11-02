@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A classic, creamy, and savory vegan 'egg' salad sandwich made with firm tofu. This easy, no-cook recipe is perfect for a quick lunch or picnic, served on Dave's Killer Bread or soft Vegan Hawaiian Style Rolls.",
+  "name": "No Tariff Tofu-Salad Sandwiches",
+  "prepTime": 25,
+  "cookTime": 0,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Extra-Firm Tofu",
+        "amount": 14,
+        "units": "oz",
+        "notes": "Pressed for at least 15 minutes and drained well"
+      },
+      {
+        "name": "Vegan Mayonnaise",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "Dijon Mustard",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Sweet Pickle Relish",
+        "amount": 2,
+        "units": "Tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Nutritional Yeast",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Kala Namak (Indian Black Salt)",
+        "amount": 0.5,
+        "units": "tsp",
+        "notes": "Essential for the 'eggy' flavor"
+      },
+      {
+        "name": "Ground Turmeric",
+        "amount": 0.25,
+        "units": "tsp",
+        "notes": "For color"
+      },
+      {
+        "name": "Black Pepper",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "Freshly ground, or to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Celery",
+        "amount": 1,
+        "units": "qty",
+        "notes": "Stalk, finely chopped"
+      },
+      {
+        "name": "Red Onion",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "Finely chopped"
+      },
+      {
+        "name": "Fresh Dill",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "Chopped"
+      },
+      {
+        "name": "Dave's Killer Bread or Vegan Hawaiian Style Rolls",
+        "amount": 8,
+        "units": "qty",
+        "notes": "Slices or rolls"
+      },
+      {
+        "name": "Vegan Cheese Slices",
+        "amount": 4,
+        "units": "qty",
+        "notes": "Optional"
+      },
+      {
+        "name": "Lettuce or Greens",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Optional, for serving"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Prepare the Tofu: Press the block of tofu for at least 15-20 minutes to remove as much water as possible. This is key for a non-watery salad with a firm texture. Pat dry after pressing."
+    },
+    {
+      "step": 2,
+      "description": "Crumble the Tofu: In a medium mixing bowl, crumble the pressed tofu with your hands or a fork to your desired consistency. Leave some larger chunks for a texture similar to traditional egg salad."
+    },
+    {
+      "step": 3,
+      "description": "Combine Ingredients: Add the vegan mayonnaise, Dijon mustard, sweet pickle relish, nutritional yeast, kala namak, turmeric, and black pepper to the crumbled tofu. Stir gently until everything is well combined."
+    },
+    {
+      "step": 4,
+      "description": "Add Veggies & Herbs: Fold in the finely chopped celery, red onion, and fresh dill. Mix until just incorporated."
+    },
+    {
+      "step": 5,
+      "description": "Taste and Chill: Taste the tofu salad and adjust seasonings as needed. For the best flavor, cover the bowl and refrigerate for at least 30 minutes to allow the flavors to meld together."
+    },
+    {
+      "step": 6,
+      "description": "Assemble Sandwiches: When ready to serve, toast your bread or rolls if desired. Layer on your optional vegan cheese slices, lettuce, and any other desired toppings onto four of the bread slices/rolls."
+    },
+    {
+      "step": 7,
+      "description": "Serve: Spoon a generous amount of the chilled tofu salad onto the prepared bread. Top with the remaining bread slices, slice in half if you wish, and serve immediately."
+    }
+  ],
+  "notes": "The key to an authentic 'eggy' flavor is the kala namak (Indian black salt), which has a sulfuric taste. It can be found at most international grocery stores or online. The tofu salad can be made ahead and stored in an airtight container in the refrigerator for up to 4 days; the flavor improves over time!",
+  "tags": [
+    "vegan",
+    "sandwich",
+    "tofu",
+    "lunch",
+    "easy",
+    "no-cook",
+    "egg-free",
+    "plant-based"
+  ]
+}

@@ -4,10 +4,13 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation.">
+    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="**Update IDE configs and enhance recipe management**  &#10;- Updated `.idea` workspace configuration with Python 3.13 and improved IDE settings.  &#10;- Enhanced vegan recipes by refining `vegan_polenta_fries.json`.  &#10;- Improved error logging in `app.py` with detailed exception handling.  &#10;- Upgraded generative model to `gemini-2.5-pro`.  &#10;- Refined placeholder styles for recipe generation page.">
+      <change afterPath="$PROJECT_DIR$/docs/AgenticCodexPrompt.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/agentcodexpromtreal222.md" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/docs/betteragentcodexpromt333.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/app.py" beforeDir="false" afterPath="$PROJECT_DIR$/app.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/recipes/vegan_polenta_fries.json" beforeDir="false" afterPath="$PROJECT_DIR$/recipes/vegan_polenta_fries.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -21,6 +24,9 @@
         <option value="Python Script" />
         <option value="Dockerfile" />
         <option value="HTML File" />
+        <option value="Copy of Markdown File" />
+        <option value="test Markdown File" />
+        <option value="Markdown File - with Header" />
       </list>
     </option>
   </component>
@@ -51,22 +57,40 @@
     </excluded-from-favorite>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
-        <entry key="$PROJECT_DIR$" value="main" />
+        <entry key="$PROJECT_DIR$" value="main2222" />
       </map>
     </option>
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
     <option name="RESET_MODE" value="HARD" />
   </component>
-  <component name="GitHubPullRequestSearchHistory">{
-  &quot;lastFilter&quot;: {
-    &quot;state&quot;: &quot;OPEN&quot;,
-    &quot;assignee&quot;: &quot;adamtasteslikegood&quot;
-  }
-}</component>
+  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
+  "lastFilter": {}
+}]]></component>
+  <component name="GitHubPullRequestState"><![CDATA[{
+  "prStates": [
+    {
+      "id": {
+        "id": "PR_kwDOPEDAhc6qcFZT",
+        "number": 1
+      },
+      "lastSeen": 1762064202770
+    }
+  ]
+}]]></component>
   <component name="GithubPullRequestsUISettings">{
   &quot;selectedUrlAndAccountId&quot;: {
     &quot;url&quot;: &quot;https://github.com/adamtasteslikegood/tasteslikegood.com.git&quot;,
     &quot;accountId&quot;: &quot;65cf1865-0475-4b9d-bd79-eee4a5c05d9e&quot;
+  },
+  &quot;recentNewPullRequestHead&quot;: {
+    &quot;server&quot;: {
+      &quot;useHttp&quot;: false,
+      &quot;host&quot;: &quot;github.com&quot;,
+      &quot;port&quot;: null,
+      &quot;suffix&quot;: null
+    },
+    &quot;owner&quot;: &quot;adamtasteslikegood&quot;,
+    &quot;repository&quot;: &quot;tasteslikegood.com&quot;
   }
 }</component>
   <component name="HighlightingSettingsPerFile">
@@ -88,28 +112,28 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "ASKED_SHARE_PROJECT_CONFIGURATION_FILES": "true",
-    "DefaultHtmlFileTemplate": "HTML File",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "com.google.cloudcode.ide_session_index": "20250629_0000",
-    "git-widget-placeholder": "main2222",
-    "last_opened_file_path": "/Users/chelandogg/PycharmProjects/tasteslikegood/strawberryflask",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "run.code.analysis.last.selected.profile": "aDefault",
-    "settings.editor.selected.configurable": "preferences.pluginManager",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;ASKED_SHARE_PROJECT_CONFIGURATION_FILES&quot;: &quot;true&quot;,
+    &quot;DefaultHtmlFileTemplate&quot;: &quot;HTML File&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;com.google.cloudcode.ide_session_index&quot;: &quot;20250629_0000&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main2222&quot;,
+    &quot;last_opened_file_path&quot;: &quot;/Users/chelandogg/PycharmProjects/tasteslikegood/strawberryflask&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;run.code.analysis.last.selected.profile&quot;: &quot;aDefault&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;terminal&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="$PROJECT_DIR$/" />
@@ -171,7 +195,7 @@
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
       <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="WORKING_DIRECTORY" value="" />
       <option name="IS_MODULE_SDK" value="false" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
@@ -183,8 +207,8 @@
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-js-predefined-d6986cc7102b-b598e85cdad2-JavaScript-PY-252.25557.178" />
-        <option value="bundled-python-sdk-ce6832f46686-7b97d883f26b-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.25557.178" />
+        <option value="bundled-js-predefined-d6986cc7102b-3aa1da707db6-JavaScript-PY-252.27397.106" />
+        <option value="bundled-python-sdk-4e2b1448bda8-9a97661f3031-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.27397.106" />
       </set>
     </attachedChunks>
   </component>
@@ -199,7 +223,12 @@
       <workItem from="1752938133908" duration="485000" />
       <workItem from="1753542435382" duration="945000" />
       <workItem from="1758037907024" duration="711000" />
-      <workItem from="1758170019041" duration="17536000" />
+      <workItem from="1758170019041" duration="25273000" />
+      <workItem from="1759922604401" duration="509000" />
+      <workItem from="1759923127195" duration="1429000" />
+      <workItem from="1760490630991" duration="17340000" />
+      <workItem from="1761658072316" duration="183000" />
+      <workItem from="1761912715507" duration="2334000" />
     </task>
     <task id="LOCAL-00001" summary="&quot;Add Flask app to manage and display recipe collection&quot;">
       <option name="closed" value="true" />
@@ -265,7 +294,15 @@
       <option name="project" value="LOCAL" />
       <updated>1758260778502</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="**Update IDE configs and enhance recipe management**  &#10;- Updated `.idea` workspace configuration with Python 3.13 and improved IDE settings.  &#10;- Enhanced vegan recipes by refining `vegan_polenta_fries.json`.  &#10;- Improved error logging in `app.py` with detailed exception handling.  &#10;- Upgraded generative model to `gemini-2.5-pro`.  &#10;- Refined placeholder styles for recipe generation page.">
+      <option name="closed" value="true" />
+      <created>1758785186183</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1758785186183</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -282,7 +319,7 @@
                   <entry key="branch">
                     <value>
                       <list>
-                        <option value="origin/main" />
+                        <option value="main2222" />
                       </list>
                     </value>
                   </entry>
@@ -303,6 +340,7 @@
     <MESSAGE value="&quot;Add Flask recipe app with functionality to view recipes, raw JSON data, and ingredient resizing. Include sample recipes, schema, templates, and styling.&quot;" />
     <MESSAGE value="Add new vegan recipes and update project configuration files&#10;&#10;- Add recipes: vegan dinner rolls, cornbread, polenta fries&#10;- Setup .idea config with Python 3.13 and Flask integration&#10;- Update CSS with initial styles for recipe generation page" />
     <MESSAGE value="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation." />
-    <option name="LAST_COMMIT_MESSAGE" value="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation." />
+    <MESSAGE value="**Update IDE configs and enhance recipe management**  &#10;- Updated `.idea` workspace configuration with Python 3.13 and improved IDE settings.  &#10;- Enhanced vegan recipes by refining `vegan_polenta_fries.json`.  &#10;- Improved error logging in `app.py` with detailed exception handling.  &#10;- Upgraded generative model to `gemini-2.5-pro`.  &#10;- Refined placeholder styles for recipe generation page." />
+    <option name="LAST_COMMIT_MESSAGE" value="**Update IDE configs and enhance recipe management**  &#10;- Updated `.idea` workspace configuration with Python 3.13 and improved IDE settings.  &#10;- Enhanced vegan recipes by refining `vegan_polenta_fries.json`.  &#10;- Improved error logging in `app.py` with detailed exception handling.  &#10;- Upgraded generative model to `gemini-2.5-pro`.  &#10;- Refined placeholder styles for recipe generation page." />
   </component>
 </project>

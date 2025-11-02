@@ -1,0 +1,111 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A chaotic, one-pot vegan chili made from whatever you can find in the back of your pantry. It's a testament to survival, resourcefulness, and the fact that you really need to go grocery shopping. Surprisingly delicious.",
+  "name": "Kitchen Catastrophe Chili",
+  "prepTime": 15,
+  "cookTime": 30,
+  "servings": 6,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Diced tomatoes",
+        "amount": 28,
+        "units": "oz",
+        "notes": "canned, undrained"
+      },
+      {
+        "name": "Vegetable broth",
+        "amount": 2,
+        "units": "cups",
+        "notes": "or water from a hopefully safe source"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Kidney beans",
+        "amount": 15,
+        "units": "oz",
+        "notes": "canned, rinsed and drained"
+      },
+      {
+        "name": "Black beans",
+        "amount": 15,
+        "units": "oz",
+        "notes": "canned, rinsed and drained"
+      },
+      {
+        "name": "Corn kernels",
+        "amount": 15,
+        "units": "oz",
+        "notes": "canned or frozen, whatever survived"
+      },
+      {
+        "name": "Chili powder",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "the dusty one from the back"
+      },
+      {
+        "name": "Ground cumin",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt and black pepper",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Yellow onion",
+        "amount": 1,
+        "units": "qty",
+        "notes": "medium, roughly chopped"
+      },
+      {
+        "name": "Garlic",
+        "amount": 3,
+        "units": "qty",
+        "notes": "cloves, minced or smashed in a panic"
+      },
+      {
+        "name": "Bell pepper",
+        "amount": 1,
+        "units": "qty",
+        "notes": "any color, looking a bit wrinkly, chopped"
+      }
+    ]
+  },
+  "instructions": [
+    "Forage for your ingredients in the wilds of your pantry and refrigerator. Chop the onion, bell pepper, and garlic with the urgency of a survivor. Don't aim for perfection.",
+    "Heat the oil in a large pot or Dutch oven over medium-high heat. Throw in the onion and bell pepper and cook until they soften, about 5-7 minutes. A little charring adds character.",
+    "Add the frantically minced garlic and cook for another minute until you can smell it. This is your signal that things are about to get serious.",
+    "Dump in the chili powder, cumin, and smoked paprika. Stir it all together for about 30 seconds, creating a fragrant cloud of dust, a ghost of spices past.",
+    "Pour in the diced tomatoes and vegetable broth, scraping the bottom of the pot to unstick any flavorful casualties.",
+    "Rinse your canned beans and corn as if you're decontaminating them. Add them to the pot. Bring the whole mess to a boil, then reduce the heat to a simmer.",
+    "Let the chili simmer, partially covered, for at least 20-30 minutes, stirring occasionally. The longer it simmers, the more the desperate flavors will meld into something coherent.",
+    "Season with salt and pepper until it tastes less like a disaster and more like a deliberate meal. Serve hot in whatever clean-ish bowls you can find."
+  ],
+  "notes": "This recipe is a blueprint for chaos. Any beans will do. Got a can of lentils? In they go. Found a sad-looking zucchini? Chop it up and add it. There are no rules when you're cooking to survive... the week.",
+  "tags": [
+    "vegan",
+    "chili",
+    "pantry",
+    "one-pot",
+    "emergency",
+    "gluten-free",
+    "disaster"
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Delicate toasted coconut nests with a sparkling sugar crust, filled with warm, spiced apple-pear compote. A cozy and elegant vegan dessert inspired by a crystal dune in winter.",
+  "name": "Winter Crystal Nests",
+  "prepTime": 20,
+  "cookTime": 25,
+  "servings": 6,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "Unsweetened shredded coconut",
+        "amount": 2.5,
+        "units": "cups"
+      },
+      {
+        "name": "All-purpose flour",
+        "amount": 3,
+        "units": "Tbsp",
+        "notes": "Or a 1:1 gluten-free baking flour"
+      },
+      {
+        "name": "Ground cinnamon",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground nutmeg",
+        "amount": 0.25,
+        "units": "tsp"
+      },
+      {
+        "name": "Fine sea salt",
+        "amount": 1,
+        "units": "pinch"
+      },
+      {
+        "name": "Turbinado sugar",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "For the 'crystal' topping"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Maple syrup",
+        "amount": 0.33,
+        "units": "cup"
+      },
+      {
+        "name": "Melted coconut oil",
+        "amount": 3,
+        "units": "Tbsp",
+        "notes": "Plus extra for greasing"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 1,
+        "units": "tsp"
+      }
+    ],
+    "filling": [
+      {
+        "name": "Firm apples",
+        "amount": 2,
+        "units": "qty",
+        "notes": "Peeled, cored, and finely diced"
+      },
+      {
+        "name": "Firm pear",
+        "amount": 1,
+        "units": "qty",
+        "notes": "Peeled, cored, and finely diced"
+      },
+      {
+        "name": "Lemon juice",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Brown sugar",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "Packed"
+      },
+      {
+        "name": "Water",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "Cinnamon stick",
+        "amount": 1,
+        "units": "qty"
+      },
+      {
+        "name": "Cornstarch",
+        "amount": 1,
+        "units": "tsp"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Preheat your oven to 350\u00b0F (175\u00b0C). Generously grease a 6-cup standard muffin tin with coconut oil."
+    },
+    {
+      "step": 2,
+      "description": "In a large bowl, whisk together the dry nest ingredients: shredded coconut, flour, ground cinnamon, ground nutmeg, and salt. Set aside."
+    },
+    {
+      "step": 3,
+      "description": "In a separate smaller bowl, whisk together the wet nest ingredients: maple syrup, melted coconut oil, and vanilla extract until well combined."
+    },
+    {
+      "step": 4,
+      "description": "Pour the wet mixture over the dry mixture and stir until everything is evenly moistened and clumpy."
+    },
+    {
+      "step": 5,
+      "description": "Divide the mixture evenly among the 6 prepared muffin cups. Use your fingers or the back of a spoon to press the mixture firmly against the bottom and up the sides of each cup, forming a 'nest' shape. Sprinkle the top edges with turbinado sugar for the crystal effect."
+    },
+    {
+      "step": 6,
+      "description": "Bake for 18-22 minutes, or until the edges are golden brown and firm. Let the nests cool completely in the muffin tin before gently running a knife around the edges and removing them."
+    },
+    {
+      "step": 7,
+      "description": "While the nests are baking, prepare the filling. In a small saucepan, combine the diced apples, pear, lemon juice, brown sugar, water, and cinnamon stick. Bring to a simmer over medium heat."
+    },
+    {
+      "step": 8,
+      "description": "Cook for 10-15 minutes, stirring occasionally, until the fruit is tender. In a tiny bowl, mix the cornstarch with 1 tablespoon of cold water to make a slurry. Stir the slurry into the fruit mixture and cook for 1 more minute until the sauce has thickened. Remove the cinnamon stick."
+    },
+    {
+      "step": 9,
+      "description": "Once the nests are cooled and removed from the tin, carefully spoon the warm apple-pear filling into the center of each nest."
+    },
+    {
+      "step": 10,
+      "description": "Serve immediately while the filling is warm and the nests are crisp."
+    }
+  ],
+  "notes": "The coconut nests can be made a day in advance and stored in an airtight container at room temperature. Reheat the filling just before serving for the best experience. You can use any winter fruits for the filling, such as cranberries or persimmons.",
+  "tags": [
+    "vegan",
+    "dessert",
+    "winter",
+    "holiday",
+    "coconut",
+    "apple",
+    "gluten-free option",
+    "fancy"
+  ]
+}

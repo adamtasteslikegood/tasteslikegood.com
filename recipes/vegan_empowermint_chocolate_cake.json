@@ -1,0 +1,118 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A rich and decadent vegan chocolate cake with a refreshing, uplifting mint frosting. This cake is a celebration of strength and sweetness, perfect for sharing and creating positive moments.",
+  "name": "Vegan Empower-Mint Chocolate Cake",
+  "prepTime": 20,
+  "cookTime": 35,
+  "servings": 12,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 1.5,
+        "units": "cups"
+      },
+      {
+        "name": "Granulated sugar",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Unsweetened cocoa powder",
+        "amount": 0.33,
+        "units": "cup"
+      },
+      {
+        "name": "Baking soda",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "tsp"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Plant-based milk",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Such as almond, soy, or oat milk"
+      },
+      {
+        "name": "Vegetable oil",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "White vinegar",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 1,
+        "units": "tsp"
+      }
+    ],
+    "Frosting": [
+      {
+        "name": "Vegan butter",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Softened to room temperature"
+      },
+      {
+        "name": "Powdered sugar",
+        "amount": 2,
+        "units": "cups",
+        "notes": "Sifted"
+      },
+      {
+        "name": "Peppermint extract",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Plant-based milk",
+        "amount": [
+          1,
+          2
+        ],
+        "units": "Tbsp"
+      },
+      {
+        "name": "Vegan chocolate chips",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "For garnish (optional)"
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat your oven to 350\u00b0F (175\u00b0C). Grease and flour an 8-inch round cake pan.",
+    "In a large bowl, whisk together all the dry ingredients: flour, sugar, cocoa powder, baking soda, and salt.",
+    "In a separate medium bowl, combine all the wet ingredients: plant-based milk, vegetable oil, white vinegar, and vanilla extract.",
+    "Pour the wet ingredients into the dry ingredients. Stir until just combined, being careful not to overmix. A few small lumps are okay.",
+    "Pour the batter into the prepared cake pan and spread it out evenly.",
+    "Bake for 30-35 minutes, or until a toothpick inserted into the center of the cake comes out clean.",
+    "Allow the cake to cool in the pan for 10-15 minutes before carefully inverting it onto a wire rack to cool completely.",
+    "While the cake cools, prepare the frosting. In a mixing bowl, beat the softened vegan butter with an electric mixer until light and fluffy.",
+    "Gradually add the sifted powdered sugar and beat on low speed until combined, then increase to medium-high and beat until smooth.",
+    "Beat in the peppermint extract. Add 1 tablespoon of plant-based milk and mix. If the frosting is too thick, add the second tablespoon until you reach a smooth, spreadable consistency.",
+    "Once the cake is completely cool, spread the mint frosting evenly over the top.",
+    "If desired, sprinkle with vegan chocolate chips for garnish. Slice, serve, and enjoy the uplifting flavor."
+  ],
+  "notes": "For an even richer chocolate flavor, you can substitute 1/2 cup of the plant-based milk with 1/2 cup of cooled, strong-brewed coffee. Ensure the cake is fully cooled before frosting to prevent melting.",
+  "tags": [
+    "vegan",
+    "dessert",
+    "cake",
+    "chocolate",
+    "mint",
+    "baking",
+    "plant-based"
+  ]
+}
