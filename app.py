@@ -1,7 +1,7 @@
 import os
 import json
 
-import google.generativeai as genai
+from google import genai
 from flask import Flask, render_template, abort, request, redirect, url_for
 from jsonschema import Draft7Validator, ValidationError
 
@@ -30,11 +30,10 @@ RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
 # --- NEW: Configure the generative model ---
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-model = None
+client = None
 
 if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-pro')
+    client = genai.Client(api_key=GOOGLE_API_KEY)
 
 
 def validate_recipe_data(recipe_data):
@@ -117,7 +116,7 @@ def show_recipe_json(filename):
 def generate_recipe():
     """Handles both displaying the form and processing the generation request."""
     if request.method == 'POST':
-        if model is None:
+        if client is None:
             return (
                 "Recipe generation is not configured. Set the GOOGLE_API_KEY environment variable and restart the application.",
                 500,
@@ -147,7 +146,10 @@ def generate_recipe():
 
         try:
             # Generate the content
-            response = model.generate_content(full_prompt)
+            response = client.models.generate_content(
+                model='gemini-2.5-pro',
+                contents=full_prompt,
+            )
             # Extract the JSON string from the response
             recipe_json_str = response.text.strip().replace('```json', '').replace('```', '').strip()
 
