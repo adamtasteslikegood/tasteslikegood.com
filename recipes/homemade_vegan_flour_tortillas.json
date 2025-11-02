@@ -1,0 +1,86 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "name": "Homemade Vegan Flour Tortillas",
+  "description": "Soft, pliable, and delicious homemade flour tortillas that are naturally vegan and perfect for tacos, burritos, or wraps. Much better than store-bought!",
+  "prepTime": 45,
+  "cookTime": 20,
+  "servings": 12,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 3,
+        "units": "cups",
+        "notes": "plus more for dusting"
+      },
+      {
+        "name": "Baking powder",
+        "amount": 1.5,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "teaspoon"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Warm water",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Olive oil",
+        "amount": 5,
+        "units": "tablespoons",
+        "notes": "or melted coconut oil"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "In a large bowl, whisk together the flour, baking powder, and salt."
+    },
+    {
+      "step": 2,
+      "description": "Add the warm water and olive oil to the dry ingredients. Mix with a spoon or your hands until a shaggy dough forms."
+    },
+    {
+      "step": 3,
+      "description": "Turn the dough out onto a lightly floured surface and knead for 5-7 minutes, until it's smooth and elastic. If it's too sticky, add a tablespoon of flour at a time."
+    },
+    {
+      "step": 4,
+      "description": "Place the dough back in the bowl, cover it with a clean kitchen towel or plastic wrap, and let it rest for at least 30 minutes. This allows the gluten to relax, making the tortillas easier to roll out."
+    },
+    {
+      "step": 5,
+      "description": "Divide the dough into 12 equal-sized balls. On a lightly floured surface, use a rolling pin to roll each ball into a thin circle, about 7-8 inches in diameter."
+    },
+    {
+      "step": 6,
+      "description": "Heat a large, un-greased skillet or comal over medium-high heat. You'll know it's ready when a drop of water sizzles and evaporates quickly."
+    },
+    {
+      "step": 7,
+      "description": "Place a rolled-out tortilla onto the hot skillet. Cook for about 45-60 seconds, until it starts to bubble and gets light brown spots. Flip and cook the other side for another 30-45 seconds."
+    },
+    {
+      "step": 8,
+      "description": "As each tortilla is cooked, transfer it to a plate and cover it with a clean kitchen towel. This will trap the steam and keep them soft and pliable. Repeat with the remaining dough."
+    }
+  ],
+  "notes": "Store leftover tortillas in a sealed bag or container at room temperature for up to 2 days, or in the refrigerator for up to a week. Reheat them briefly in a dry skillet or microwave before serving.",
+  "tags": [
+    "vegan",
+    "tortilla",
+    "homemade",
+    "mexican",
+    "bread",
+    "wrap",
+    "pantry-friendly"
+  ],
+  "image": "https://example.com/images/vegan-flour-tortillas.jpg"
+}

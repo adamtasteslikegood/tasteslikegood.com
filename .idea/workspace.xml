@@ -4,12 +4,8 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="**Update IDE configs and enhance recipe management**  &#10;- Updated `.idea` workspace configuration with Python 3.13 and improved IDE settings.  &#10;- Enhanced vegan recipes by refining `vegan_polenta_fries.json`.  &#10;- Improved error logging in `app.py` with detailed exception handling.  &#10;- Upgraded generative model to `gemini-2.5-pro`.  &#10;- Refined placeholder styles for recipe generation page.">
-      <change afterPath="$PROJECT_DIR$/docs/AgenticCodexPrompt.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/agentcodexpromtreal222.md" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/docs/betteragentcodexpromt333.md" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/misc.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/misc.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" afterDir="false" />
+    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="migrated google.genrativeai too google 'genai'">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -55,6 +51,11 @@
         </map>
       </branch-storage>
     </excluded-from-favorite>
+    <option name="PREVIOUS_COMMIT_AUTHORS">
+      <list>
+        <option value="adamtasteslikegood &lt;adam@tasteslikegood.com&gt;" />
+      </list>
+    </option>
     <option name="RECENT_BRANCH_BY_REPOSITORY">
       <map>
         <entry key="$PROJECT_DIR$" value="main2222" />
@@ -228,7 +229,7 @@
       <workItem from="1759923127195" duration="1429000" />
       <workItem from="1760490630991" duration="17340000" />
       <workItem from="1761658072316" duration="183000" />
-      <workItem from="1761912715507" duration="2334000" />
+      <workItem from="1761912715507" duration="7337000" />
     </task>
     <task id="LOCAL-00001" summary="&quot;Add Flask app to manage and display recipe collection&quot;">
       <option name="closed" value="true" />
@@ -302,7 +303,15 @@
       <option name="project" value="LOCAL" />
       <updated>1758785186183</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="migrated google.genrativeai too google 'genai'">
+      <option name="closed" value="true" />
+      <created>1762084753603</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1762084753603</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -341,6 +350,8 @@
     <MESSAGE value="Add new vegan recipes and update project configuration files&#10;&#10;- Add recipes: vegan dinner rolls, cornbread, polenta fries&#10;- Setup .idea config with Python 3.13 and Flask integration&#10;- Update CSS with initial styles for recipe generation page" />
     <MESSAGE value="Updated IDE config and added new vegan recipes: dinner rolls, cornbread, and polenta fries. Added placeholder styles for recipe generation." />
     <MESSAGE value="**Update IDE configs and enhance recipe management**  &#10;- Updated `.idea` workspace configuration with Python 3.13 and improved IDE settings.  &#10;- Enhanced vegan recipes by refining `vegan_polenta_fries.json`.  &#10;- Improved error logging in `app.py` with detailed exception handling.  &#10;- Upgraded generative model to `gemini-2.5-pro`.  &#10;- Refined placeholder styles for recipe generation page." />
-    <option name="LAST_COMMIT_MESSAGE" value="**Update IDE configs and enhance recipe management**  &#10;- Updated `.idea` workspace configuration with Python 3.13 and improved IDE settings.  &#10;- Enhanced vegan recipes by refining `vegan_polenta_fries.json`.  &#10;- Improved error logging in `app.py` with detailed exception handling.  &#10;- Upgraded generative model to `gemini-2.5-pro`.  &#10;- Refined placeholder styles for recipe generation page." />
+    <MESSAGE value="Fix validation issues for JSON schema in vegan recipe generation. Address missing required properties and incorrect unit enumerations." />
+    <MESSAGE value="migrated google.genrativeai too google 'genai'" />
+    <option name="LAST_COMMIT_MESSAGE" value="migrated google.genrativeai too google 'genai'" />
   </component>
 </project>
