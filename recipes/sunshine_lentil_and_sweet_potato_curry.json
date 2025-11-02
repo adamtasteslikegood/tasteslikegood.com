@@ -1,0 +1,145 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A vibrant and comforting curry packed with plant-based protein and wholesome vegetables, perfect for a hearty vegan meal to fuel your new obsession.",
+  "type": "object",
+  "name": "Sunshine Lentil and Sweet Potato Curry",
+  "prepTime": 15,
+  "cookTime": 30,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Coconut oil",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Full-fat coconut milk",
+        "amount": 400,
+        "units": "ml",
+        "notes": "from a can"
+      },
+      {
+        "name": "Vegetable broth",
+        "amount": 2,
+        "units": "cups"
+      },
+      {
+        "name": "Diced tomatoes",
+        "amount": 400,
+        "units": "g",
+        "notes": "canned, with juice"
+      },
+      {
+        "name": "Lime juice",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "freshly squeezed"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Red lentils",
+        "amount": 1,
+        "units": "cup",
+        "notes": "rinsed and drained"
+      },
+      {
+        "name": "Ground cumin",
+        "amount": 2,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Ground turmeric",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Ground coriander",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 0.5,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Red pepper flakes",
+        "amount": 0.25,
+        "units": "teaspoon",
+        "notes": "or to taste"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Onion",
+        "amount": 1,
+        "units": "qty",
+        "notes": "large, finely chopped"
+      },
+      {
+        "name": "Garlic cloves",
+        "amount": 3,
+        "units": "qty",
+        "notes": "minced"
+      },
+      {
+        "name": "Fresh ginger",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "grated"
+      },
+      {
+        "name": "Sweet potatoes",
+        "amount": 2,
+        "units": "qty",
+        "notes": "medium, peeled and cubed into 1-inch pieces"
+      },
+      {
+        "name": "Fresh spinach",
+        "amount": 4,
+        "units": "cups",
+        "notes": "loosely packed"
+      },
+      {
+        "name": "Fresh cilantro",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "chopped, for garnish"
+      }
+    ]
+  },
+  "instructions": [
+    "Heat coconut oil in a large pot or Dutch oven over medium heat. Add the chopped onion and cook until softened, about 5-7 minutes.",
+    "Add the minced garlic and grated ginger, and cook for another minute until fragrant.",
+    "Stir in the cumin, turmeric, coriander, smoked paprika, and red pepper flakes. Cook for 30 seconds, stirring constantly, to toast the spices.",
+    "Add the cubed sweet potatoes, rinsed red lentils, canned diced tomatoes (with their juice), and vegetable broth. Stir everything to combine.",
+    "Bring the mixture to a boil, then reduce the heat to a simmer. Cover and cook for 15-20 minutes, or until the sweet potatoes are tender and the lentils are cooked through.",
+    "Stir in the full-fat coconut milk and the fresh spinach. Cook for another 2-3 minutes, until the spinach has wilted into the curry.",
+    "Remove from heat and stir in the fresh lime juice. Season with salt and black pepper to taste.",
+    "Serve hot, garnished with fresh cilantro. Delicious with a side of brown rice or vegan naan bread."
+  ],
+  "notes": "For a full vegan day of food and drink, start your morning with overnight oats and a frothy oat milk latte. For a refreshing drink to pair with this curry, try a simple Vegan Mango Lassi: blend 1 cup of mango pulp with 1/2 cup of silken tofu or vegan yogurt, a splash of plant-based milk, and a pinch of cardamom. This curry is also great for meal prep as the flavors deepen overnight.",
+  "tags": [
+    "vegan",
+    "curry",
+    "lentil",
+    "sweet potato",
+    "gluten-free",
+    "one-pot",
+    "dinner",
+    "meal prep"
+  ]
+}

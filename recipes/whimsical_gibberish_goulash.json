@@ -1,0 +1,101 @@
+{
+  "name": "Whimsical Gibberish Goulash",
+  "description": "A bafflingly delicious stew born from pure nonsense. When the request makes no sense, the recipe follows suit. This dish tastes like a cozy, confusing dream.",
+  "prepTime": 15,
+  "cookTime": 25,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Morning Dew",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "or lemon juice"
+      },
+      {
+        "name": "Chuckling Water",
+        "amount": 2,
+        "units": "cups",
+        "notes": "vegetable broth or any bubbly water"
+      },
+      {
+        "name": "Crimson Elixir",
+        "amount": 400,
+        "units": "g",
+        "notes": "canned crushed tomatoes"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Ground Laughter",
+        "amount": 2,
+        "units": "tsp",
+        "notes": "sweet paprika"
+      },
+      {
+        "name": "Whispering Salt",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "or to taste"
+      },
+      {
+        "name": "Cracked Riddles",
+        "amount": 0.5,
+        "units": "tsp",
+        "notes": "freshly ground black pepper"
+      },
+      {
+        "name": "Stardust",
+        "amount": 2,
+        "units": "Tbs",
+        "notes": "all-purpose flour"
+      }
+    ],
+    "other": [
+      {
+        "name": "Sun-kissed Orb",
+        "amount": 1,
+        "units": "qty",
+        "notes": "a yellow onion, finely diced"
+      },
+      {
+        "name": "Giggleberries",
+        "amount": 3,
+        "units": "qty",
+        "notes": "cloves of garlic, minced"
+      },
+      {
+        "name": "Moonbeans",
+        "amount": 425,
+        "units": "g",
+        "notes": "a can of cannellini beans, rinsed and drained"
+      },
+      {
+        "name": "Essence of Joy",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "olive oil"
+      }
+    ]
+  },
+  "instructions": [
+    "In a large, bewildered pot, warm the Essence of Joy over medium heat.",
+    "Add the diced Sun-kissed Orb and cook until it softens and shares its secrets, about 5 minutes.",
+    "Stir in the Giggleberries and Ground Laughter, and cook for another minute until fragrant with nonsense.",
+    "Sprinkle the Stardust over the mixture and stir for one minute to create a roux of pure absurdity.",
+    "Gradually pour in the Chuckling Water, whisking constantly to prevent any clumps of logic from forming.",
+    "Stir in the Crimson Elixir, the rinsed Moonbeans, the Whispering Salt, and the Cracked Riddles.",
+    "Bring the goulash to a simmer, then reduce the heat, cover, and let it ponder its own existence for 15 minutes, stirring occasionally.",
+    "Finally, stir in the Morning Dew to brighten the flavors.",
+    "Serve hot, garnished with a sprinkle of confusion and a side of toasted bread for dipping into the unknown."
+  ],
+  "notes": "This recipe works best if you hum a nonsensical tune while cooking. Don't question the ingredients, just trust the process. The goulash can sense doubt.",
+  "tags": [
+    "whimsical",
+    "fantasy",
+    "stew",
+    "vegetarian",
+    "creative",
+    "nonsense"
+  ]
+}

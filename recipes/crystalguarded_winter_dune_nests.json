@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Hearty shredded root vegetable 'nests' form a crispy guard for a savory, dune-colored lentil filling. A super dish for a cold winter day, finished with a surprising kick of crystalized ginger.",
+  "name": "Crystal-Guarded Winter Dune Nests",
+  "prepTime": 25,
+  "cookTime": 35,
+  "servings": 4,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "Red lentils",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Cornstarch",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Nutritional yeast",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Ground cumin",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground coriander",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Turmeric powder",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Vegetable broth",
+        "amount": 2,
+        "units": "cups"
+      },
+      {
+        "name": "Olive oil",
+        "amount": 3,
+        "units": "Tbsp",
+        "notes": "divided"
+      },
+      {
+        "name": "Lemon juice",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Full-fat coconut cream",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "chilled, from the top of a can of coconut milk"
+      }
+    ],
+    "other": [
+      {
+        "name": "Sweet potatoes",
+        "amount": 2,
+        "units": "qty",
+        "notes": "medium, peeled and coarsely shredded"
+      },
+      {
+        "name": "Parsnips",
+        "amount": 2,
+        "units": "qty",
+        "notes": "medium, peeled and coarsely shredded"
+      },
+      {
+        "name": "Yellow onion",
+        "amount": 1,
+        "units": "qty",
+        "notes": "small, finely chopped"
+      },
+      {
+        "name": "Garlic",
+        "amount": 2,
+        "units": "qty",
+        "notes": "cloves, minced"
+      },
+      {
+        "name": "Crystalized ginger",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "finely chopped, for garnish"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Preheat oven to 400\u00b0F (200\u00b0C). Grease a 6-cup standard muffin tin."
+    },
+    {
+      "step": 2,
+      "description": "In a large bowl, combine the shredded sweet potatoes and parsnips. Squeeze out as much moisture as possible using a clean kitchen towel. Return to the bowl and toss with cornstarch, 2 Tbs of olive oil, salt, and pepper until evenly coated."
+    },
+    {
+      "step": 3,
+      "description": "Divide the vegetable mixture among 4-6 cups of the muffin tin, pressing firmly into the bottom and up the sides to form 'nest' shapes. Bake for 30-35 minutes, or until the edges are golden brown and crispy. This is your 'guard'."
+    },
+    {
+      "step": 4,
+      "description": "While the nests bake, prepare the 'dune' filling. Heat the remaining 1 Tbs of olive oil in a saucepan over medium heat. Saut\u00e9 the onion until translucent, about 5 minutes. Add the garlic and cook for another minute until fragrant."
+    },
+    {
+      "step": 5,
+      "description": "Stir in the red lentils, cumin, coriander, turmeric, and smoked paprika. Add the vegetable broth, bring to a boil, then reduce heat and simmer for 15-20 minutes, or until the lentils are very soft and have absorbed most of the liquid."
+    },
+    {
+      "step": 6,
+      "description": "Remove from heat and stir in the lemon juice and nutritional yeast. Season with salt and pepper to taste. You can lightly mash the mixture with a fork for a more rustic texture or use an immersion blender for a smoother pur\u00e9e."
+    },
+    {
+      "step": 7,
+      "description": "Once the nests are baked, let them cool in the tin for a few minutes before carefully removing them. Fill each nest with the warm lentil mixture. Top with a dollop of chilled coconut cream and a generous sprinkle of the 'crystal' chopped ginger before serving."
+    }
+  ],
+  "notes": "The rustic, slightly messy look of the nests is part of the 'disastaspect' charm! This recipe is naturally gluten-free. For a different flavor profile, try using carrots or celeriac in the nests.",
+  "tags": [
+    "vegan",
+    "winter",
+    "comfort food",
+    "root vegetables",
+    "lentils",
+    "gluten-free",
+    "savory"
+  ]
+}

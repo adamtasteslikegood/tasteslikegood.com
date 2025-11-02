@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A vibrant, geometric fruit salad featuring a mosaic of colorful fruit 'tiles', all brought together with a zesty lime-mint dressing. Resistance to this refreshing dish is, indeed, futile.",
+  "name": "Resistance Is Fruit-Tile Salad",
+  "prepTime": 30,
+  "cookTime": 0,
+  "servings": 6,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Lime juice",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "freshly squeezed"
+      },
+      {
+        "name": "Agave nectar",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "or maple syrup, adjust to taste"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Toasted coconut flakes",
+        "amount": 2,
+        "units": "tablespoons",
+        "notes": "for garnish (optional)"
+      }
+    ],
+    "other": [
+      {
+        "name": "Watermelon",
+        "amount": 2,
+        "units": "cups",
+        "notes": "seedless, cut into 1-inch thick slabs"
+      },
+      {
+        "name": "Cantaloupe",
+        "amount": 2,
+        "units": "cups",
+        "notes": "cut into 1-inch thick slabs"
+      },
+      {
+        "name": "Honeydew melon",
+        "amount": 1.5,
+        "units": "cups",
+        "notes": "cut into 1-inch thick slabs"
+      },
+      {
+        "name": "Kiwi",
+        "amount": 4,
+        "units": "qty",
+        "notes": "peeled and sliced into thick rounds"
+      },
+      {
+        "name": "Fresh mint",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "loosely packed, finely chopped, plus more leaves for garnish"
+      }
+    ]
+  },
+  "instructions": [
+    "In a small bowl, whisk together the freshly squeezed lime juice, agave nectar, and finely chopped mint. Set aside to allow the flavors to meld.",
+    "Prepare the fruit. Lay the thick slabs of watermelon, cantaloupe, and honeydew on a cutting board. Using a sharp knife or a 1-inch square cookie cutter, cut the fruit into uniform 'tiles'. Trim the kiwi slices into squares as well.",
+    "On a large, flat platter or shallow dish, begin arranging the fruit tiles. Create a mosaic, checkerboard, or any geometric pattern you like, alternating colors for a visually stunning effect.",
+    "Once your pattern is complete, gently drizzle the lime-mint dressing evenly over the fruit tiles.",
+    "Garnish with fresh mint leaves and a sprinkle of toasted coconut flakes (if using).",
+    "Serve immediately for the best texture and flavor. The resistance has been assimilated."
+  ],
+  "notes": "For the most uniform tiles, use a small square cookie cutter. Feel free to substitute with other firm fruits like pineapple, mango, or firm peaches. The key is to choose fruits that hold their shape well when cut.",
+  "tags": [
+    "vegan",
+    "fruit salad",
+    "dessert",
+    "summer",
+    "gluten-free",
+    "no-cook",
+    "healthy",
+    "geometric"
+  ]
+}

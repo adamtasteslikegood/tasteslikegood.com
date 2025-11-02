@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Deliciously moist and fluffy vegan blueberry muffins made with coconut milk and vital wheat gluten for a satisfying texture and structure.",
+  "type": "object",
+  "name": "Hearty Vegan Blueberry Muffins",
+  "prepTime": 15,
+  "cookTime": 22,
+  "servings": 12,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 2,
+        "units": "cups"
+      },
+      {
+        "name": "Granulated sugar",
+        "amount": 0.75,
+        "units": "cup"
+      },
+      {
+        "name": "Vital wheat gluten",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Baking powder",
+        "amount": 2,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Baking soda",
+        "amount": 0.5,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "teaspoon"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Full-fat coconut milk",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Canned, well-shaken"
+      },
+      {
+        "name": "Neutral oil",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Such as canola, or melted coconut oil"
+      },
+      {
+        "name": "Egg replacer",
+        "amount": 2,
+        "units": "qty",
+        "notes": "Equivalent to 2 large eggs, prepared according to package directions"
+      },
+      {
+        "name": "Apple cider vinegar",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 1,
+        "units": "teaspoon"
+      }
+    ],
+    "other": [
+      {
+        "name": "Blueberries",
+        "amount": 1.5,
+        "units": "cups",
+        "notes": "Fresh or frozen"
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat your oven to 400\u00b0F (200\u00b0C). Line a 12-cup muffin tin with paper liners or lightly grease it.",
+    "In a large bowl, whisk together all the dry ingredients: all-purpose flour, granulated sugar, vital wheat gluten, baking powder, baking soda, and salt.",
+    "In a separate medium bowl, combine all the wet ingredients: coconut milk, oil, prepared egg replacer, apple cider vinegar, and vanilla extract. Whisk until smooth.",
+    "Pour the wet ingredients into the bowl with the dry ingredients. Mix with a spatula until just combined. Be careful not to overmix; a few lumps are okay.",
+    "Gently fold in the blueberries. If using frozen blueberries, do not thaw them first.",
+    "Divide the batter evenly among the 12 prepared muffin cups. They will be quite full.",
+    "For a bakery-style top, you can optionally sprinkle a little coarse sugar over each muffin.",
+    "Bake for 20-25 minutes, or until a toothpick inserted into the center of a muffin comes out clean.",
+    "Let the muffins cool in the tin for 5 minutes before transferring them to a wire rack to cool completely."
+  ],
+  "notes": "The vital wheat gluten gives these muffins a wonderful, hearty texture and helps them rise. If using frozen blueberries, you may need to add 2-3 minutes to the baking time. Do not thaw them before adding to the batter to avoid staining it purple.",
+  "tags": [
+    "vegan",
+    "muffin",
+    "blueberry",
+    "breakfast",
+    "snack",
+    "coconut milk",
+    "dairy-free"
+  ]
+}

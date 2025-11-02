@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A mysterious and delightfully tangy green dip, perfect for goblin gatherings and adventurous snackers. Is it sweet? Is it savory? You decide!",
+  "type": "object",
+  "name": "Goboly Goo Delight",
+  "prepTime": 10,
+  "cookTime": 10,
+  "servings": 6,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "ripe avocados",
+        "amount": 2,
+        "units": "qty",
+        "notes": "peeled, pitted, and mashed"
+      },
+      {
+        "name": "pineapple juice",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "lime juice",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "freshly squeezed"
+      },
+      {
+        "name": "green food coloring",
+        "amount": [
+          2,
+          4
+        ],
+        "units": "qty",
+        "notes": "drops, to desired color"
+      }
+    ],
+    "dry": [
+      {
+        "name": "cornstarch",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "granulated sugar",
+        "amount": 3,
+        "units": "tablespoons"
+      },
+      {
+        "name": "salt",
+        "amount": 0.25,
+        "units": "tsp"
+      },
+      {
+        "name": "garlic powder",
+        "amount": 0.5,
+        "units": "teaspoon"
+      }
+    ],
+    "other": [
+      {
+        "name": "fresh chives",
+        "amount": 2,
+        "units": "Tbs",
+        "notes": "finely chopped"
+      }
+    ]
+  },
+  "instructions": [
+    "In a small saucepan off the heat, whisk together the pineapple juice, lime juice, cornstarch, granulated sugar, salt, and garlic powder until no lumps remain.",
+    "Place the saucepan over medium heat. Bring to a simmer, whisking constantly. Continue to cook for 1-2 minutes until the mixture thickens into a translucent 'goo'.",
+    "Remove the saucepan from the heat. Stir in the green food coloring, adding a few drops at a time until you reach a vibrant, goblin-like green.",
+    "Let the goo cool for about 5 minutes. It should still be warm, but not hot enough to brown the avocado.",
+    "In a separate bowl, combine the mashed avocado and finely chopped chives.",
+    "Gently fold the warm goo into the avocado mixture until everything is well combined and uniformly green.",
+    "Transfer the Goboly Goo to a serving bowl. Serve immediately while slightly warm, or chill for 30 minutes for a thicker dip."
+  ],
+  "notes": "For a 'bubbly swamp' effect, stir in a spoonful of lemon-lime soda just before serving. Excellent with 'witch's finger' pretzels, tortilla chips, or crunchy vegetable sticks like carrots and bell peppers.",
+  "tags": [
+    "dip",
+    "snack",
+    "party",
+    "green",
+    "fun",
+    "kids",
+    "sweet and sour",
+    "appetizer"
+  ]
+}

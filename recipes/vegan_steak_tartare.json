@@ -1,0 +1,160 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A sophisticated and savory plant-based appetizer that mimics the classic French bistro dish using roasted beets and umami-rich sun-dried tomatoes. Perfect for impressing guests.",
+  "name": "Vegan Steak Tartare",
+  "prepTime": 25,
+  "cookTime": 50,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Vegan mayonnaise",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "For the 'yolk' sauce"
+      },
+      {
+        "name": "Dijon mustard",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Vegan Worcestershire sauce",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Fresh lemon juice",
+        "amount": 1,
+        "units": "tsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Smoked paprika",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Freshly ground black pepper",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Nutritional yeast",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "For the 'yolk' sauce"
+      },
+      {
+        "name": "Kala namak (black salt)",
+        "amount": 0.25,
+        "units": "tsp",
+        "notes": "Gives an 'eggy' flavor to the yolk sauce"
+      },
+      {
+        "name": "Turmeric powder",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "For color in the 'yolk' sauce"
+      }
+    ],
+    "other": [
+      {
+        "name": "Beets",
+        "amount": 2,
+        "units": "qty",
+        "notes": "Medium-sized, about 400g total"
+      },
+      {
+        "name": "Sun-dried tomatoes in oil",
+        "amount": 50,
+        "units": "g",
+        "notes": "Drained and finely chopped"
+      },
+      {
+        "name": "Shallot",
+        "amount": 1,
+        "units": "qty",
+        "notes": "Small, peeled and very finely minced"
+      },
+      {
+        "name": "Capers",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "Rinsed and chopped"
+      },
+      {
+        "name": "Cornichons",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "Finely chopped"
+      },
+      {
+        "name": "Fresh parsley",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "Finely chopped"
+      },
+      {
+        "name": "Fresh chives",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "Finely chopped"
+      },
+      {
+        "name": "Baguette or crackers",
+        "amount": 1,
+        "units": "qty",
+        "notes": "For serving"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Preheat your oven to 400\u00b0F (200\u00b0C). Wash the beets, wrap each one in aluminum foil, and place on a baking sheet. Roast for 45-50 minutes, or until easily pierced with a fork. Allow to cool completely."
+    },
+    {
+      "step": 2,
+      "description": "Once cooled, peel the beets (the skin should slip off easily) and dice them into very small, uniform 1/8-inch (3mm) cubes. This fine dice is crucial for the classic tartare texture. Place the diced beets in a medium bowl."
+    },
+    {
+      "step": 3,
+      "description": "While the beets roast and cool, prepare the other components. In a small bowl, create the 'yolk' sauce by whisking together the vegan mayonnaise, nutritional yeast, kala namak, and a pinch of turmeric until smooth. Set aside."
+    },
+    {
+      "step": 4,
+      "description": "To the bowl with the diced beets, add the finely chopped sun-dried tomatoes, minced shallot, capers, and cornichons."
+    },
+    {
+      "step": 5,
+      "description": "Gently dress the mixture with the olive oil, Dijon mustard, vegan Worcestershire sauce, lemon juice, smoked paprika, and a few grinds of black pepper. Carefully stir to combine, being mindful not to mash the beets."
+    },
+    {
+      "step": 6,
+      "description": "Gently fold in the chopped fresh parsley and chives. Taste and adjust seasoning as needed."
+    },
+    {
+      "step": 7,
+      "description": "To serve, use a ring mold to plate the tartare onto individual serving plates for a clean, professional look. Create a small well in the center of each portion and add a dollop of the 'yolk' sauce. Serve immediately with toasted baguette slices, crackers, or crispy french fries."
+    }
+  ],
+  "notes": "For the best texture and flavor, do not use canned or pre-cooked beets. Roasting them fresh is key. The tartare can be made a few hours ahead and chilled, which allows the flavors to meld, but add the fresh herbs just before serving.",
+  "tags": [
+    "vegan",
+    "appetizer",
+    "plant-based",
+    "french",
+    "beets",
+    "gluten-free",
+    "tartare"
+  ],
+  "image": "https://example.com/images/vegan-beet-tartare.jpg"
+}

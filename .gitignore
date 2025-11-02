@@ -1,0 +1,4 @@
+/templates/.env
+/api_key.py
+/.venv/
+/.new_venv/
