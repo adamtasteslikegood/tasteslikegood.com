@@ -8,6 +8,14 @@
 </head>
 <body>
     <h1>Welcome to TastesLikeGood.com!!!</h1>
+
+    {% if session['credentials'] %}
+        <p>Welcome, {{ session['user_info']['name'] }}!</p>
+        <a href="{{ url_for('auth.logout') }}">Logout</a>
+    {% else %}
+        <a href="{{ url_for('auth.login') }}">Login with Google</a>
+    {% endif %}
+
     <a href="{{ url_for('generate_recipe') }}" class="generate-link">Generate a New Recipe with AI</a>
     <ul class="recipe-list">
         {% for recipe in recipes %}

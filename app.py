@@ -1,12 +1,21 @@
 import os
 import json
+import time
 
+from dotenv import load_dotenv
 import google.generativeai as genai
-from flask import Flask, render_template, abort, request, redirect, url_for
+from flask import Flask, render_template, abort, request, redirect, url_for, Response
+
+load_dotenv()
+
 from jsonschema import Draft7Validator, ValidationError
+from auth import auth_bp
 
 # Initialize the Flask application
 app = Flask(__name__)
+app.secret_key = os.urandom(24)
+app.register_blueprint(auth_bp, url_prefix='/auth')
+
 
 # The folder where the recipe .json files are stored
 RECIPES_DIR = 'recipes'
@@ -34,7 +43,7 @@ model = None
 
 if GOOGLE_API_KEY:
     genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel('gemini-2.5-pro')
+    model = genai.GenerativeModel('gemini-1.5-flash')
 
 
 def validate_recipe_data(recipe_data):
@@ -104,8 +113,13 @@ def show_recipe_json(filename):
     try:
         with open(filepath, 'r') as f:
             recipe_data = json.load(f)
-        recipe_data['filename'] = filename
+        
         pretty_json = json.dumps(recipe_data, indent=2)
+        
+        if request.args.get('raw') == 'true':
+            return Response(pretty_json, mimetype='application/json')
+            
+        recipe_data['filename'] = filename
         return render_template('json_viewer.html', recipe=recipe_data, recipe_json_str=pretty_json)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
@@ -126,6 +140,9 @@ def generate_recipe():
         prompt = request.form.get('prompt', '').strip()
         if not prompt:
             return "A prompt describing the desired recipe is required.", 400
+            
+        if len(prompt) < 10 or len(prompt) > 500:
+            return "Prompt must be between 10 and 500 characters.", 400
 
         if RECIPE_SCHEMA is None or RECIPE_VALIDATOR is None:
             return "Recipe schema is unavailable; cannot validate generated recipes.", 500
@@ -144,6 +161,8 @@ def generate_recipe():
 
         recipe_json_str = ""
         response = None
+        
+        start_time = time.time()
 
         try:
             # Generate the content
@@ -165,6 +184,9 @@ def generate_recipe():
             # Save the new recipe to a file
             with open(filepath, 'w') as f:
                 json.dump(recipe_data, f, indent=2)
+                
+            end_time = time.time()
+            print(f"Recipe generated in {end_time - start_time:.2f} seconds.")
 
             # Redirect to the new recipe's page
             return redirect(url_for('show_recipe', filename=filename))
@@ -201,6 +223,7 @@ def generate_recipe():
 
     # For a GET request, just show the form
     return render_template('generate_recipe.html')
+
 
 
 if __name__ == '__main__':

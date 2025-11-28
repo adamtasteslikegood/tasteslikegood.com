@@ -23,6 +23,8 @@ google-api-core==2.25.1
 google-api-python-client==2.182.0
 google-auth==2.40.3
 google-auth-httplib2==0.2.0
+google-auth-oauthlib==1.2.3
+google-genai==1.47.0
 google-generativeai==0.8.5
 googleapis-common-protos==1.70.0
 grpcio==1.75.0
@@ -45,6 +47,7 @@ matplotlib==3.10.6
 mdurl==0.1.2
 narwhals==2.4.0
 numpy==2.3.3
+oauthlib==3.3.1
 orjson==3.11.3
 packaging==25.0
 pandas==2.3.2
@@ -68,6 +71,7 @@ pytz==2025.2
 PyYAML==6.0.2
 referencing==0.36.2
 requests==2.32.5
+requests-oauthlib==2.0.0
 rich==14.1.0
 rich-toolkit==0.15.1
 rignore==0.6.4

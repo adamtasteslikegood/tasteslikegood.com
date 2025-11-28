@@ -7,6 +7,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
+    {% if session['credentials'] %}
+        <p>Welcome, {{ session['user_info']['name'] }}!</p>
+        <a href="{{ url_for('auth.logout') }}">Logout</a>
+    {% else %}
+        <a href="{{ url_for('auth.login') }}">Login with Google</a>
+    {% endif %}
 
     <h1>JSON for: {{ recipe.name }}</h1>
 
