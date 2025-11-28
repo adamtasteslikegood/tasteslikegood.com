@@ -1,0 +1,9 @@
+/templates/.env
+/api_key.py
+/.venv/
+/.new_venv/
+/.idea/
+.env
+/recipes/
+recipe_error.json
+recipe_error.txt
