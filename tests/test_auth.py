@@ -32,5 +32,23 @@ class AuthTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Login with Google', response.data)
 
+    @patch('google_auth_oauthlib.flow.Flow.authorization_url')
+    def test_profile_access(self, mock_authorization_url):
+        mock_authorization_url.return_value = ('https://accounts.google.com/o/oauth2/auth?prompt=consent', 'test-state')
+        # Test access without login
+        response = self.client.get('/auth/profile')
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('/auth/login', response.location)
+
+        # Test access with login
+        with self.client.session_transaction() as sess:
+            sess['credentials'] = {'token': 'test-token'}
+            sess['user_info'] = {'name': 'Test User', 'email': 'test@example.com', 'picture': 'http://example.com/pic.jpg', 'verified_email': True}
+        
+        response = self.client.get('/auth/profile')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'User Profile', response.data)
+        self.assertIn(b'Test User', response.data)
+        self.assertIn(b'test@example.com', response.data)
 if __name__ == '__main__':
     unittest.main()

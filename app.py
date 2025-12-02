@@ -3,13 +3,14 @@ import json
 import time
 
 from dotenv import load_dotenv
-import google.generativeai as genai
-from flask import Flask, render_template, abort, request, redirect, url_for, Response
-
-load_dotenv()
+from flask import Flask, render_template, abort, request, redirect, url_for, Response, session
+from google.genai import Client
+import google.oauth2.credentials
 
 from jsonschema import Draft7Validator, ValidationError
 from auth import auth_bp
+
+load_dotenv()
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -37,13 +38,8 @@ def _load_recipe_schema():
 RECIPE_SCHEMA = _load_recipe_schema()
 RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
-# --- NEW: Configure the generative model ---
+# Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-model = None
-
-if GOOGLE_API_KEY:
-    genai.configure(api_key=GOOGLE_API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
 
 
 def validate_recipe_data(recipe_data):
@@ -131,12 +127,6 @@ def show_recipe_json(filename):
 def generate_recipe():
     """Handles both displaying the form and processing the generation request."""
     if request.method == 'POST':
-        if model is None:
-            return (
-                "Recipe generation is not configured. Set the GOOGLE_API_KEY environment variable and restart the application.",
-                500,
-            )
-
         prompt = request.form.get('prompt', '').strip()
         if not prompt:
             return "A prompt describing the desired recipe is required.", 400
@@ -159,52 +149,66 @@ def generate_recipe():
             f"Do not include any text before or after the JSON object."
         )
 
-        recipe_json_str = ""
-        response = None
-        
+        def attempt_generation(client, source_name):
+            """Helper to attempt generation with a specific client."""
+            print(f"Attempting generation using {source_name}...")
+            response = client.models.generate_content(
+                model='gemini-3-pro-preview',
+                contents=full_prompt
+            )
+            # Extract the JSON string from the response
+            text_response = response.text.strip().replace('```json', '').replace('```', '').strip()
+            # Parse and validate
+            data = json.loads(text_response)
+            validate_recipe_data(data)
+            return data, text_response
+
+        recipe_data = None
+        last_error_message = "No generation method available."
+        recipe_json_str = "" # Keep for error logging
+        response = None # Keep for error logging
+
         start_time = time.time()
 
-        try:
-            # Generate the content
-            response = model.generate_content(full_prompt)
-            # Extract the JSON string from the response
-            recipe_json_str = response.text.strip().replace('```json', '').replace('```', '').strip()
+        # 1. Try User Credentials
+        if 'credentials' in session:
+            try:
+                creds = google.oauth2.credentials.Credentials(**session['credentials'])
+                user_client = Client(credentials=creds)
+                recipe_data, recipe_json_str = attempt_generation(user_client, "User Credentials")
+            except Exception as e:
+                print(f"User credential generation failed: {e}")
+                last_error_message = f"User Auth Error: {e}"
+        
+        # 2. Fallback to API Key if step 1 failed or wasn't attempted
+        if recipe_data is None and GOOGLE_API_KEY:
+            try:
+                api_client = Client(api_key=GOOGLE_API_KEY)
+                recipe_data, recipe_json_str = attempt_generation(api_client, "API Key")
+            except Exception as e:
+                print(f"API Key generation failed: {e}")
+                last_error_message = f"API Key Error: {e}"
 
-            # Parse the JSON string into a Python dictionary
-            recipe_data = json.loads(recipe_json_str)
+        if recipe_data:
+            try:
+                # Create a filename from the recipe name
+                safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
+                filename = safe_filename.replace(' ', '_').lower() + '.json'
+                filepath = os.path.join(RECIPES_DIR, filename)
 
-            # Validate the recipe before saving it
-            validate_recipe_data(recipe_data)
+                # Save the new recipe to a file
+                with open(filepath, 'w') as f:
+                    json.dump(recipe_data, f, indent=2)
+                    
+                end_time = time.time()
+                print(f"Recipe generated successfully in {end_time - start_time:.2f} seconds.")
 
-            # Create a filename from the recipe name
-            safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
-            filename = safe_filename.replace(' ', '_').lower() + '.json'
-            filepath = os.path.join(RECIPES_DIR, filename)
+                # Redirect to the new recipe's page
+                return redirect(url_for('show_recipe', filename=filename))
+            except Exception as e:
+                last_error_message = f"File Save Error: {e}"
 
-            # Save the new recipe to a file
-            with open(filepath, 'w') as f:
-                json.dump(recipe_data, f, indent=2)
-                
-            end_time = time.time()
-            print(f"Recipe generated in {end_time - start_time:.2f} seconds.")
-
-            # Redirect to the new recipe's page
-            return redirect(url_for('show_recipe', filename=filename))
-
-        except json.JSONDecodeError as e:
-            # Handle JSON parsing errors
-            error_message = f"JSON parsing error: {e}"
-        except ValidationError as e:
-            error_message = f"Schema validation error: {e.message}"
-        except RuntimeError as e:
-            error_message = str(e)
-        except FileNotFoundError as e:
-            # Handle file I/O errors
-            error_message = f"File error: {e}"
-        except Exception as e:
-            # Handle all other unexpected errors
-            error_message = f"Unexpected error: {e}"
-
+        # If we reached here, both methods failed or saving failed
         # Log the error details securely
         try:
             with open('recipe_error.json', 'a+') as f:
@@ -212,14 +216,13 @@ def generate_recipe():
             with open('recipe_error.txt', 'a') as f:
                 f.write(
                     f"Full prompt:\n{full_prompt}\n\n"
-                    f"Response:\n{getattr(response, 'text', 'No response')}\n"
-                    f"Error: {error_message}\n"
+                    f"Last Error: {last_error_message}\n"
                 )
         except Exception as logging_error:
             print(f"Error while logging: {logging_error}")
 
         # Show the error response to the user
-        return "Sorry, there was an error generating the recipe. Please try again.", 500
+        return f"Sorry, there was an error generating the recipe. Details: {last_error_message}", 500
 
     # For a GET request, just show the form
     return render_template('generate_recipe.html')

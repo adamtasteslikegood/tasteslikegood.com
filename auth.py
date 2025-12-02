@@ -1,15 +1,27 @@
 import os
-from flask import Blueprint, redirect, url_for, session, request, abort
+from flask import Blueprint, redirect, url_for, session, request, abort, render_template
 from google_auth_oauthlib.flow import Flow
 import google.oauth2.credentials
 import googleapiclient.discovery
 from dotenv import load_dotenv
+from functools import wraps
 
 load_dotenv()
 
+# Allow OAuth over HTTP for local development
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+
 auth_bp = Blueprint('auth', __name__)
 
-SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile']
+SCOPES = ['openid', 'https://www.googleapis.com/auth/userinfo.email', 'https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/cloud-platform']
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'credentials' not in session:
+            return redirect(url_for('auth.login'))
+        return f(*args, **kwargs)
+    return decorated_function
 
 @auth_bp.route('/login')
 def login():
@@ -22,9 +34,19 @@ def login():
             "redirect_uris": [url_for('auth.callback', _external=True)],
         }
     }
+    
+    # Check if credentials are present
+    if not client_config["web"]["client_id"] or not client_config["web"]["client_secret"]:
+        return "Error: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set in environment.", 500
+
     flow = Flow.from_client_config(
         client_config, scopes=SCOPES)
-    flow.redirect_uri = url_for('auth.callback', _external=True)
+    
+    # Explicitly set the redirect_uri and log it for debugging
+    redirect_uri = url_for('auth.callback', _external=True)
+    print(f"DEBUG: Generated Redirect URI: {redirect_uri}")
+    flow.redirect_uri = redirect_uri
+    
     authorization_url, state = flow.authorization_url(
         access_type='offline',
         include_granted_scopes='true')
@@ -66,6 +88,11 @@ def callback():
 
     return redirect(url_for('index'))
 
+
+@auth_bp.route('/profile')
+@login_required
+def profile():
+    return render_template('profile.html', user_info=session.get('user_info'))
 
 
 @auth_bp.route('/logout')
