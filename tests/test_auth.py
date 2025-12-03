@@ -30,7 +30,7 @@ class AuthTestCase(unittest.TestCase):
             sess['user_info'] = {'name': 'Test User'}
         response = self.client.get('/auth/logout', follow_redirects=True)
         self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Login with Google', response.data)
+        self.assertIn(b'Login', response.data)
 
     @patch('google_auth_oauthlib.flow.Flow.authorization_url')
     def test_profile_access(self, mock_authorization_url):

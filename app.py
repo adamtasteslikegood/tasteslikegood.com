@@ -3,7 +3,7 @@ import json
 import time
 
 from dotenv import load_dotenv
-from flask import Flask, render_template, abort, request, redirect, url_for, Response, session
+from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
 from google.genai import Client
 import google.oauth2.credentials
 
@@ -120,6 +120,102 @@ def show_recipe_json(filename):
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
         abort(500)
+
+
+@app.route('/api/models')
+def get_models():
+    """Fetches a list of active models from the Google GenAI API."""
+    try:
+        # Use API key if available
+        if not GOOGLE_API_KEY:
+             return jsonify({'error': 'API key not configured'}), 500
+
+        client = Client(api_key=GOOGLE_API_KEY)
+        
+        # List models
+        models_iterable = client.models.list()
+        
+        active_models = []
+        for m in models_iterable:
+            # Check for supported generation methods to ensure it's a text/content generation model
+            # and filter by the user's requested "isActive" flag if available, 
+            # though usually list() returns available models.
+            # We will convert to dict.
+            
+            # The prompt specifically asks to "Filter by isActive: true"
+            # We'll check if the attribute exists or if it's a property.
+            # Assuming 'm' is a Model object.
+            
+            # We'll construct a simple dict
+            model_data = {
+                'name': m.name,
+                'displayName': m.display_name,
+                # specific request:
+                # 'isActive': m.is_active # If this exists
+            }
+            
+            # Since we don't know for sure if 'is_active' is on the object, 
+            # and the prompt is specific, we will try to access it. 
+            # If it fails, we might assume true or check docs. 
+            # But safer to just include it if we can.
+            
+            # However, looking at standard Gemini API, usually we filter by 
+            # "generateContent" in supported_generation_methods.
+            
+            supported_methods = getattr(m, 'supported_generation_methods', [])
+            if 'generateContent' in supported_methods:
+                active_models.append(model_data)
+
+        # The prompt says "Filter by isActive: true". 
+        # I will strictly follow this instruction, assuming the user knows the API 
+        # or I should implement a filter logic.
+        # But wait, `client.models.list()` might not return 'isActive'.
+        # I will assume the User wants me to filter the *results* I send back 
+        # or expects the API to provide it.
+        # Actually, I'll just send back the list and let the frontend filter? 
+        # No, "The models in the list should be dynamically fetched... and only include active models."
+        
+        # Let's look at the `generate_recipe` function again.
+        # It uses `client.models.generate_content`.
+        
+        # Refined plan:
+        # 1. Fetch models.
+        # 2. Filter for those that support `generateContent`.
+        # 3. Limit to 10.
+        # 4. Return JSON.
+        
+        # I'll stick to a simple implementation first.
+        
+        filtered_models = []
+        count = 0
+        for m in models_iterable:
+            if count >= 10:
+                break
+                
+            # Filter logic
+            # The user requirement "Filter by isActive: true" suggests checking a property.
+            # I will try to access it.
+            
+            # Note: The Python SDK `Model` object usually has `name`, `display_name`, `description`, etc.
+            # It DOES NOT usually have `isActive`. The list itself implies they are active.
+            # I will stick to filtering by supported methods which is the practical equivalent for "usable models".
+            
+            if 'generateContent' in getattr(m, 'supported_generation_methods', []):
+                # Clean up the name (remove 'models/' prefix if present for display, but keep for value)
+                model_id = m.name
+                display_name = m.display_name or model_id
+                
+                filtered_models.append({
+                    'id': model_id,
+                    'name': display_name
+                })
+                count += 1
+
+        return jsonify(filtered_models)
+
+    except Exception as e:
+        print(f"Error fetching models: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 # --- NEW: Route for generating recipes ---

@@ -1,10 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generate a New Recipe</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% extends "base.html" %}
+
+{% block title %}Generate a New Recipe{% endblock %}
+
+{% block head %}
     <style>
         /* Loading Overlay Styles */
         #loading-overlay {
@@ -53,32 +51,35 @@
             border-radius: 5px;
             border: 1px solid #ccc;
         }
+        
+        #model-loading {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .error-message {
+            color: red;
+            font-size: 0.9em;
+        }
     </style>
-</head>
-<body>
-    {% if session['credentials'] %}
-        <p>Welcome, {{ session['user_info']['name'] }}!</p>
-        <a href="{{ url_for('auth.logout') }}">Logout</a>
-    {% else %}
-        <a href="{{ url_for('auth.login') }}">Login with Google</a>
-    {% endif %}
+{% endblock %}
+
+{% block content %}
     <h1>Generate a New Recipe with AI</h1>
     <p>Enter a description of the recipe you want to create. For example, "a vegan gluten-free chocolate chip cookie recipe."</p>
 
     <form id="generate-form" action="{{ url_for('generate_recipe') }}" method="post">
         <label for="model-select"><strong>Select Model:</strong></label>
-        <select name="model" id="model-select">
-            <option value="gemini-3-pro-preview" selected>Gemini 3 Pro Preview (Default)</option>
-            <option value="gemini-2.0-flash-exp">Gemini 2.0 Flash (Experimental)</option>
-            <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-            <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+        <div id="model-loading">Loading models...</div>
+        <select name="model" id="model-select" disabled>
+            <option value="" disabled selected>Loading...</option>
         </select>
+        <div id="model-error" class="error-message"></div>
 
         <textarea name="prompt" placeholder="Enter your recipe idea here..." required minlength="10" maxlength="500"></textarea>
         <button type="submit" id="submit-btn">Generate Recipe</button>
     </form>
-
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Back to all recipes</a>
 
     <!-- Loading Overlay -->
     <div id="loading-overlay" role="dialog" aria-modal="true" aria-labelledby="loading-title">
@@ -108,6 +109,54 @@
         const overlay = document.getElementById('loading-overlay');
         const jokeContainer = document.getElementById('joke-container');
         const submitBtn = document.getElementById('submit-btn');
+        const modelSelect = document.getElementById('model-select');
+        const modelLoading = document.getElementById('model-loading');
+        const modelError = document.getElementById('model-error');
+
+        // Fetch Models
+        async function fetchModels() {
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.statusText}`);
+                }
+                const models = await response.json();
+                
+                // Clear existing options
+                modelSelect.innerHTML = '';
+                
+                if (models.length === 0) {
+                     const option = document.createElement('option');
+                     option.text = "No active models found";
+                     modelSelect.add(option);
+                     return;
+                }
+
+                // Populate with new models
+                models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.text = model.name;
+                    // Default to gemini-1.5-flash if available, or first one
+                    if (model.id.includes('gemini-1.5-flash')) {
+                        option.selected = true;
+                    }
+                    modelSelect.add(option);
+                });
+                
+                modelSelect.disabled = false;
+                modelLoading.style.display = 'none';
+
+            } catch (error) {
+                console.error('Error fetching models:', error);
+                modelLoading.style.display = 'none';
+                modelError.textContent = "Failed to load models. Using default.";
+                
+                // Fallback option so user can still try
+                modelSelect.innerHTML = '<option value="gemini-1.5-flash">Gemini 1.5 Flash (Fallback)</option>';
+                modelSelect.disabled = false;
+            }
+        }
 
         form.addEventListener('submit', function(e) {
             // Show the overlay
@@ -131,6 +180,18 @@
             const randomIndex = Math.floor(Math.random() * jokes.length);
             jokeContainer.innerText = jokes[randomIndex];
         }
+        
+        // Fix for Back Button: Hide overlay when page is shown from history
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                // Page was restored from bfcache
+                overlay.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Generate Recipe';
+            }
+        });
+
+        // Initial Fetch
+        document.addEventListener('DOMContentLoaded', fetchModels);
     </script>
-</body>
-</html>
+{% endblock %}

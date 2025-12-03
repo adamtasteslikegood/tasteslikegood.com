@@ -1,19 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON: {{ recipe.name }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    {% if session['credentials'] %}
-        <p>Welcome, {{ session['user_info']['name'] }}!</p>
-        <a href="{{ url_for('auth.logout') }}">Logout</a>
-    {% else %}
-        <a href="{{ url_for('auth.login') }}">Login with Google</a>
-    {% endif %}
+{% extends "base.html" %}
 
+{% block title %}JSON: {{ recipe.name }}{% endblock %}
+
+{% block content %}
     <h1>JSON for: {{ recipe.name }}</h1>
 
     <div class="json-nav">
@@ -27,8 +16,6 @@
         </div>
         <pre><code id="json-code">{{ recipe_json_str }}</code></pre>
     </div>
-
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Back to all recipes</a>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -53,6 +40,4 @@
             });
         });
     </script>
-
-</body>
-</html>
+{% endblock %}

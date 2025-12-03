@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Profile - TastesLikeGood.com</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block title %}User Profile - TastesLikeGood.com{% endblock %}
+
+{% block content %}
     <h1>User Profile</h1>
     <div class="profile-container">
         {% if user_info %}
@@ -17,8 +13,5 @@
         {% else %}
             <p>No user information available.</p>
         {% endif %}
-        <br>
-        <a href="{{ url_for('index') }}">Back to Home</a> | <a href="{{ url_for('auth.logout') }}">Logout</a>
     </div>
-</body>
-</html>
+{% endblock %}

@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}TastesLikeGood.com{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <nav class="top-nav">
+        <a href="{{ url_for('index') }}">Home</a> | 
+        <a href="{{ url_for('generate_recipe') }}">Generate Recipe</a>
+        {% if session.get('credentials') %}
+             | <a href="{{ url_for('auth.profile') }}">Profile</a>
+             | <a href="{{ url_for('auth.logout') }}">Logout ({{ session['user_info'].get('name', 'User') }})</a>
+        {% else %}
+             | <a href="{{ url_for('auth.login') }}">Login</a>
+        {% endif %}
+    </nav>
+    <hr>
+
+    <div class="content">
+        {% block content %}{% endblock %}
+    </div>
+
+    <hr>
+    <nav class="bottom-nav">
+        <a href="{{ url_for('index') }}">Home</a> | 
+        <a href="{{ url_for('generate_recipe') }}">Generate Recipe</a>
+    </nav>
+</body>
+</html>
