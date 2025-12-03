@@ -9,6 +9,7 @@ import google.oauth2.credentials
 
 from jsonschema import Draft7Validator, ValidationError
 from auth import auth_bp
+from utils import normalize_recipe_data
 
 load_dotenv()
 
@@ -259,6 +260,10 @@ def generate_recipe():
             text_response = response.text.strip().replace('```json', '').replace('```', '').strip()
             # Parse and validate
             data = json.loads(text_response)
+            
+            # --- NEW: Normalize data before validation ---
+            data = normalize_recipe_data(data)
+            
             validate_recipe_data(data)
             return data, text_response
 
@@ -277,7 +282,7 @@ def generate_recipe():
                 recipe_data, recipe_json_str = attempt_generation(user_client, "User Credentials", selected_model)
             except Exception as e:
                 print(f"User credential generation failed: {e}")
-                last_error_message = f"User Auth Error: {e}"
+                last_error_message = f"User Auth Error ({type(e).__name__}): {e}"
         
         # 2. Fallback to API Key if step 1 failed or wasn't attempted
         if recipe_data is None and GOOGLE_API_KEY:
@@ -286,7 +291,7 @@ def generate_recipe():
                 recipe_data, recipe_json_str = attempt_generation(api_client, "API Key", selected_model)
             except Exception as e:
                 print(f"API Key generation failed: {e}")
-                last_error_message = f"API Key Error: {e}"
+                last_error_message = f"API Key Error ({type(e).__name__}): {e}"
 
         if recipe_data:
             try:
