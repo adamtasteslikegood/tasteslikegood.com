@@ -72,7 +72,11 @@
         <h2>Instructions</h2>
         <ol>
             {% for step in recipe.instructions %}
-            <li>{{ step }}</li>
+                {% if step is mapping %}
+                    <li>{{ step.description }}</li>
+                {% else %}
+                    <li>{{ step }}</li>
+                {% endif %}
             {% endfor %}
         </ol>
     </div>

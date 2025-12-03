@@ -141,6 +141,9 @@ def generate_recipe():
         with open(RECIPE_SCHEMA_PATH, 'r') as f:
             schema = f.read()
 
+        # Get the selected model from the form, default to the preview model
+        selected_model = request.form.get('model', 'gemini-3-pro-preview')
+
         # Create the full prompt for the model
         full_prompt = (
             f"Generate a Vegan recipe based on the following request: '{prompt}'. "
@@ -149,11 +152,11 @@ def generate_recipe():
             f"Do not include any text before or after the JSON object."
         )
 
-        def attempt_generation(client, source_name):
+        def attempt_generation(client, source_name, model_name):
             """Helper to attempt generation with a specific client."""
-            print(f"Attempting generation using {source_name}...")
+            print(f"Attempting generation using {source_name} with model {model_name}...")
             response = client.models.generate_content(
-                model='gemini-3-pro-preview',
+                model=model_name,
                 contents=full_prompt
             )
             # Extract the JSON string from the response
@@ -175,7 +178,7 @@ def generate_recipe():
             try:
                 creds = google.oauth2.credentials.Credentials(**session['credentials'])
                 user_client = Client(credentials=creds)
-                recipe_data, recipe_json_str = attempt_generation(user_client, "User Credentials")
+                recipe_data, recipe_json_str = attempt_generation(user_client, "User Credentials", selected_model)
             except Exception as e:
                 print(f"User credential generation failed: {e}")
                 last_error_message = f"User Auth Error: {e}"
@@ -184,7 +187,7 @@ def generate_recipe():
         if recipe_data is None and GOOGLE_API_KEY:
             try:
                 api_client = Client(api_key=GOOGLE_API_KEY)
-                recipe_data, recipe_json_str = attempt_generation(api_client, "API Key")
+                recipe_data, recipe_json_str = attempt_generation(api_client, "API Key", selected_model)
             except Exception as e:
                 print(f"API Key generation failed: {e}")
                 last_error_message = f"API Key Error: {e}"
