@@ -61,9 +61,17 @@
 <style>
     .recipe-images {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        grid-template-columns: 1fr 1fr;
+        /* Force two equal columns */
         gap: 20px;
         margin-bottom: 30px;
+    }
+
+    @media (max-width: 600px) {
+        .recipe-images {
+            grid-template-columns: 1fr;
+            /* Stack on mobile */
+        }
     }
 
     .image-container {
@@ -236,8 +244,9 @@
         return fractions[roundedNum] || num.toFixed(2);
     }
 
-    // Auto-refresh stock image every 30 seconds
+    // Auto-refresh stock image every 30 seconds ONLY if it's a placeholder
     setInterval(() => {
+        // Only refresh if the source is explicitly loremflickr (our placeholder service)
         const img = document.querySelector('.image-container img[src*="loremflickr"]');
         if (img) {
             const url = new URL(img.src);

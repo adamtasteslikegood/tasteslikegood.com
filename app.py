@@ -51,6 +51,43 @@ if not DEFAULT_MODEL:
     DEFAULT_MODEL = "gemini-3-pro-preview"
 
 
+def get_genai_client():
+    """Helper to get an authenticated GenAI client."""
+    if 'credentials' in session:
+        creds = google.oauth2.credentials.Credentials(**session['credentials'])
+        return Client(credentials=creds)
+    elif GOOGLE_API_KEY:
+        return Client(api_key=GOOGLE_API_KEY)
+    return None
+
+
+def get_smart_stock_image(recipe_name):
+    """Uses Gemini to find a relevant stock image URL."""
+    client = get_genai_client()
+    if not client:
+        return None
+        
+    try:
+        prompt = (
+            f"Find a valid, high-quality, public stock image URL (e.g. from Unsplash, Pexels, or similar) "
+            f"for a recipe named '{recipe_name}'. "
+            f"Return ONLY the URL as a plain string. Do not include markdown or explanations."
+        )
+        # Use a fast model for this
+        response = client.models.generate_content(
+            model='gemini-2.0-flash-exp',
+            contents=prompt
+        )
+        url = response.text.strip()
+        # Basic validation
+        if url.startswith('http'):
+            return url
+    except Exception as e:
+        print(f"Smart stock image fetch failed: {e}")
+    
+    return None
+
+
 def validate_recipe_data(recipe_data):
     """Validate recipe data against the JSON schema."""
     if RECIPE_VALIDATOR is None:
@@ -108,13 +145,22 @@ def show_recipe(filename):
         
         # 1. Stock Image
         if not recipe_data.get('stock_image_url'):
-            # Use loremflickr with a lock to keep it consistent.
-            import random
-            keywords = recipe_data.get('name', 'food').replace(' ', ',')
-            lock_id = random.randint(1, 10000)
-            recipe_data['stock_image_url'] = f"https://loremflickr.com/800/600/{keywords}/all?lock={lock_id}"
+            # Try smart retrieval first
+            print(f"DEBUG: Fetching smart stock image for {recipe_data.get('name')}...")
+            smart_url = get_smart_stock_image(recipe_data.get('name'))
+            
+            if smart_url:
+                recipe_data['stock_image_url'] = smart_url
+                print(f"DEBUG: Found smart stock URL: {smart_url}")
+            else:
+                # Fallback to loremflickr if smart fetch fails
+                import random
+                keywords = recipe_data.get('name', 'food').replace(' ', ',')
+                lock_id = random.randint(1, 10000)
+                recipe_data['stock_image_url'] = f"https://loremflickr.com/800/600/{keywords}/all?lock={lock_id}"
+                print(f"DEBUG: Fallback to LoremFlickr: {recipe_data['stock_image_url']}")
+            
             updated = True
-            print(f"DEBUG: Generated Stock URL: {recipe_data['stock_image_url']}")
             
         # 2. AI Image - REMOVED synchronous generation
         # Generation is now handled asynchronously via /api/generate_image/<filename>
@@ -352,7 +398,9 @@ def generate_recipe():
         full_prompt = (
             f"Generate a Vegan recipe based on the following request: '{prompt}'. "
             f"The output must be a valid JSON object that strictly follows this schema:\n"
-            f"{schema}"
+            f"{schema}\n"
+            f"IMPORTANT: You MUST find and include a valid, high-quality public stock image URL (e.g. from Unsplash, Pexels) "
+            f"in the 'stock_image_url' field. Do not leave it empty.\n"
             f"Do not include any text before or after the JSON object."
         )
 

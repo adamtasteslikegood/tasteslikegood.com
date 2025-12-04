@@ -111,5 +111,6 @@
     "snack",
     "blueberry"
   ],
-  "stock_image_url": "https://loremflickr.com/800/600/Vegan,Blueberry,Muffins,(No,Banana)/all"
+  "stock_image_url": "https://loremflickr.com/800/600/Vegan,Blueberry,Muffins,(No,Banana)/all",
+  "ai_image_url": "/static/images/ai_sampleblueberrymuffinrecipie.png"
 }
