@@ -144,8 +144,11 @@ def get_models():
         # List models
         models_iterable = client.models.list()
         
+        print("DEBUG: Fetching models from API...")
         active_models = []
         for m in models_iterable:
+            print(f"DEBUG: Found model {m.name} with methods {getattr(m, 'supported_generation_methods', [])}")
+
             # Check for supported generation methods to ensure it's a text/content generation model
             # and filter by the user's requested "isActive" flag if available, 
             # though usually list() returns available models.
