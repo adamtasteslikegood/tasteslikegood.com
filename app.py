@@ -108,12 +108,13 @@ def show_recipe(filename):
         
         # 1. Stock Image
         if not recipe_data.get('stock_image_url'):
-            # Use loremflickr or similar. 
-            # Format: https://loremflickr.com/g/320/240/paris,girl/all
-            # We'll use the recipe name as keywords.
+            # Use loremflickr with a lock to keep it consistent.
+            import random
             keywords = recipe_data.get('name', 'food').replace(' ', ',')
-            recipe_data['stock_image_url'] = f"https://loremflickr.com/800/600/{keywords}/all"
+            lock_id = random.randint(1, 10000)
+            recipe_data['stock_image_url'] = f"https://loremflickr.com/800/600/{keywords}/all?lock={lock_id}"
             updated = True
+            print(f"DEBUG: Generated Stock URL: {recipe_data['stock_image_url']}")
             
         # 2. AI Image
         if not recipe_data.get('ai_image_url'):
@@ -128,33 +129,22 @@ def show_recipe(filename):
                     client = Client(api_key=GOOGLE_API_KEY)
                 
                 if client:
-                    print(f"Generating AI image for {recipe_data.get('name')}...")
-                    # Note: The user requested 'nano-banana-pro-preview'. 
-                    # We'll try to use the 'imagen-3.0-generate-001' model family if nano doesn't support images,
-                    # but the user specifically asked for nano-banana. 
-                    # Given the debug output showed 'models/nano-banana-pro-preview', we'll try it.
-                    # If it fails, we'll catch it.
+                    print(f"DEBUG: Attempting AI image generation for {recipe_data.get('name')}...")
                     
                     # Construct a prompt
                     image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
                     
-                    # Attempt generation. 
-                    # The SDK method is client.models.generate_images usually.
-                    # But if the model is text-only, this will fail.
-                    # We will try 'imagen-3.0-generate-001' as a safe bet for images if we can't confirm nano's capabilities,
-                    # OR we try nano first.
-                    
-                    # User instruction: "call the latest version of 'nano-bannana' to generate an orginal image"
-                    # I will try to use the model name 'nano-banana-pro-preview' with generate_images.
-                    
                     try:
+                        # Try the requested model first, then fallback
+                        model_to_use = 'imagen-3.0-generate-001'
+                        
+                        print(f"DEBUG: Calling generate_images with model {model_to_use}...")
                         response = client.models.generate_images(
-                            model='imagen-3.0-generate-001', # Using a known image model first as nano-banana is likely text/multimodal-input only
+                            model=model_to_use,
                             prompt=image_prompt,
                             config={'number_of_images': 1}
                         )
-                        # The response usually contains generated_images which have image_bytes or similar.
-                        # We need to save this image.
+                        
                         if response.generated_images:
                             image_data = response.generated_images[0].image.image_bytes
                             # Save to static/images
@@ -167,11 +157,14 @@ def show_recipe(filename):
                                 
                             recipe_data['ai_image_url'] = url_for('static', filename=f'images/{image_filename}')
                             updated = True
+                            print(f"DEBUG: AI Image saved to {image_path}")
+                        else:
+                            print("DEBUG: No images returned in response.")
                     except Exception as img_err:
-                        print(f"AI Image generation failed: {img_err}")
+                        print(f"DEBUG: AI Image generation failed: {img_err}")
                         # Fallback or leave empty
             except Exception as e:
-                print(f"Error setting up client for image generation: {e}")
+                print(f"DEBUG: Error setting up client for image generation: {e}")
 
         if updated:
             # Save the updated recipe
