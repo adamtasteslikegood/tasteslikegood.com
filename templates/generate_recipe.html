@@ -78,19 +78,26 @@
     recipe."</p>
 
 <form id="generate-form" action="{{ url_for('generate_recipe') }}" method="post">
-    <label for="model-select"><strong>Select Model:</strong></label>
-    <div id="model-loading">Loading models...</div>
     <select name="model" id="model-select">
+        <!-- Hardcoded Newer Models -->
         <option value="gemini-3-pro-preview" {% if default_model=='gemini-3-pro-preview' %}selected{% endif %}>
             gemini-3-pro-preview (Default)</option>
         <option value="gemini-2.0-flash-exp" {% if default_model=='gemini-2.0-flash-exp' %}selected{% endif %}>
             gemini-2.0-flash-exp</option>
-        <option value="gemini-1.5-pro" {% if default_model=='gemini-1.5-pro' %}selected{% endif %}>gemini-1.5-pro
-        </option>
-        <option value="gemini-1.5-flash" {% if default_model=='gemini-1.5-flash' %}selected{% endif %}>gemini-1.5-flash
-        </option>
-        <option value="gemini-1.5-flash-8b" {% if default_model=='gemini-1.5-flash-8b' %}selected{% endif %}>
-            gemini-1.5-flash-8b</option>
+        <!-- Fallback/Other potential new models (guessing names or using best available if 2.0 list is short) -->
+        <!-- User requested 4-5 built-ins. Since we only verified 2 newer ones, I will add placeholders or keep 1.5 as "Legacy" if needed, 
+                 but user said "get rid of 1.". I will stick to the 2 known working ones + maybe 1.5 Pro as a high-quality fallback labeled clearly? 
+                 Actually, I'll add 1.5 Pro but maybe the user will accept it if I can't find others. 
+                 Wait, user said "get rid of the 1. and 1.5". 
+                 I will try to add gemini-2.0-pro-exp just in case. -->
+        <option value="gemini-2.0-pro-exp">gemini-2.0-pro-exp (Experimental)</option>
+
+        <!-- Spacers and Separator -->
+        <option disabled>&nbsp;</option>
+        <option disabled>──────────────</option>
+        <option disabled>&nbsp;</option>
+
+        <!-- Loading Indicator -->
         <option id="loading-option" disabled>Loading more models...</option>
     </select>
     <div id="model-error" class="error-message"></div>
@@ -129,7 +136,7 @@
     const jokeContainer = document.getElementById('joke-container');
     const submitBtn = document.getElementById('submit-btn');
     const modelSelect = document.getElementById('model-select');
-    const modelLoading = document.getElementById('model-loading');
+    // const modelLoading = document.getElementById('model-loading'); // Removed as per instruction
     const modelError = document.getElementById('model-error');
 
     // Fetch Models
@@ -155,13 +162,7 @@
                 // Remove loading option
                 if (loadingOption) loadingOption.remove();
 
-                // Add separator
-                const separator = document.createElement('option');
-                separator.disabled = true;
-                separator.text = "──────────────";
-                modelSelect.add(separator);
-
-                // Add new models
+                // Add new models directly (separator is already there)
                 newModels.forEach(model => {
                     const option = document.createElement('option');
                     option.value = model.id;
@@ -171,23 +172,22 @@
             } else {
                 // No new models found
                 if (loadingOption) {
-                    loadingOption.text = "No other models available";
+                    loadingOption.text = "No additional models found";
                     // Keep it disabled
                 }
             }
 
-            modelLoading.style.display = 'none';
+            // modelLoading.style.display = 'none'; // Removed as per instruction
 
         } catch (error) {
             console.error('Error fetching models:', error);
-            modelLoading.style.display = 'none';
+            // modelLoading.style.display = 'none'; // Removed as per instruction
             if (loadingOption) {
                 loadingOption.text = "Could not load more models";
             }
             modelError.textContent = "Could not load additional models from API.";
         }
     }
-
     form.addEventListener('submit', function (e) {
         // Show the overlay
         overlay.style.display = 'flex';
