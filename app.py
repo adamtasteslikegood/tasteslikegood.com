@@ -42,6 +42,14 @@ RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 # Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
+# Default Model Configuration
+DEFAULT_MODEL = "gemini-3-pro-preview"
+
+# Validate DEFAULT_MODEL (Simple check, could be expanded)
+if not DEFAULT_MODEL:
+    print("Warning: DEFAULT_MODEL is not set. Fallback to 'gemini-3-pro-preview'.")
+    DEFAULT_MODEL = "gemini-3-pro-preview"
+
 
 def validate_recipe_data(recipe_data):
     """Validate recipe data against the JSON schema."""
@@ -238,8 +246,8 @@ def generate_recipe():
         with open(RECIPE_SCHEMA_PATH, 'r') as f:
             schema = f.read()
 
-        # Get the selected model from the form, default to the preview model
-        selected_model = request.form.get('model', 'gemini-3-pro-preview')
+        # Get the selected model from the form, default to the app's default model
+        selected_model = request.form.get('model', DEFAULT_MODEL)
 
         # Create the full prompt for the model
         full_prompt = (
@@ -329,7 +337,7 @@ def generate_recipe():
         return f"Sorry, there was an error generating the recipe. Details: {last_error_message}", 500
 
     # For a GET request, just show the form
-    return render_template('generate_recipe.html')
+    return render_template('generate_recipe.html', default_model=DEFAULT_MODEL)
 
 
 
