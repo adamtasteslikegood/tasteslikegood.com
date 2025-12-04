@@ -142,12 +142,12 @@ def get_models():
         client = Client(api_key=GOOGLE_API_KEY)
         
         # List models
-        models_iterable = client.models.list()
+        models_list = list(client.models.list())
         
-        print("DEBUG: Fetching models from API...")
         active_models = []
-        for m in models_iterable:
-            print(f"DEBUG: Found model {m.name} with methods {getattr(m, 'supported_generation_methods', [])}")
+        # Debug logging removed
+        
+        for m in models_list:
 
             # Check for supported generation methods to ensure it's a text/content generation model
             # and filter by the user's requested "isActive" flag if available, 
@@ -174,9 +174,20 @@ def get_models():
             # However, looking at standard Gemini API, usually we filter by 
             # "generateContent" in supported_generation_methods.
             
-            supported_methods = getattr(m, 'supported_generation_methods', [])
-            if 'generateContent' in supported_methods:
-                active_models.append(model_data)
+            # The SDK is returning empty supported_generation_methods for all models.
+            # We will assume any model starting with 'models/gemini' or 'models/gemma' is valid for text generation
+            # and filter out obvious non-text ones if needed (like embedding).
+            
+            # Simple filter: include if name contains 'gemini' or 'gemma' and not 'embedding'
+            if ('gemini' in m.name or 'gemma' in m.name) and 'embedding' not in m.name:
+                # Clean up the name (remove 'models/' prefix if present for display, but keep for value)
+                model_id = m.name.replace('models/', '')
+                display_name = m.display_name or model_id
+                
+                active_models.append({
+                    'id': model_id,
+                    'name': display_name
+                })
 
         # The prompt says "Filter by isActive: true". 
         # I will strictly follow this instruction, assuming the user knows the API 
@@ -200,7 +211,7 @@ def get_models():
         
         filtered_models = []
         count = 0
-        for m in models_iterable:
+        for m in models_list:
             if count >= 10:
                 break
                 
