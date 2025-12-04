@@ -8,6 +8,16 @@
       "type": "string",
       "description": "Name of the recipe"
     },
+    "stock_image_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL of a stock image for the recipe"
+    },
+    "ai_image_url": {
+      "type": "string",
+      "format": "uri",
+      "description": "URL of an AI-generated image for the recipe"
+    },
     "description": {
       "type": "string",
       "description": "Short description of the recipe"

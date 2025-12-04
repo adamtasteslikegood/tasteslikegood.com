@@ -3,160 +3,217 @@
 {% block title %}{{ recipe.name }}{% endblock %}
 
 {% block content %}
+<h1>{{ recipe.name }}</h1>
+<p><em>{{ recipe.description }}</em></p>
+
+<a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
+
+<div class="converter">
+    <h3>Portion Converter</h3>
+    <div class="converter-buttons">
+        <button onclick="updatePortions(0.5)">Half</button>
+        <button onclick="updatePortions(2)">Double</button>
+        <button onclick="updatePortions(3)">Triple</button>
+        <button onclick="updatePortions(1)">Reset</button>
+    </div>
+    <div class="converter-custom">
+        <form id="custom-servings-form">
+            <label for="custom-servings">Custom Servings:</label>
+            <input type="number" id="custom-servings" name="custom-servings" min="1"
+                placeholder="{{ recipe.servings }}">
+            <button type="submit">Update</button>
+        </form>
+    </div>
+</div>
+
+<div class="recipe-header">
     <h1>{{ recipe.name }}</h1>
-    <p><em>{{ recipe.description }}</em></p>
-
-    <a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
-
-    <div class="converter">
-        <h3>Portion Converter</h3>
-        <div class="converter-buttons">
-            <button onclick="updatePortions(0.5)">Half</button>
-            <button onclick="updatePortions(2)">Double</button>
-            <button onclick="updatePortions(3)">Triple</button>
-            <button onclick="updatePortions(1)">Reset</button>
-        </div>
-        <div class="converter-custom">
-            <form id="custom-servings-form">
-                <label for="custom-servings">Custom Servings:</label>
-                <input type="number" id="custom-servings" name="custom-servings" min="1" placeholder="{{ recipe.servings }}">
-                <button type="submit">Update</button>
-            </form>
-        </div>
-    </div>
-
-
     <div class="recipe-meta">
-        <p><strong>Prep Time:</strong> {{ recipe.prepTime }} minutes</p>
-        <p><strong>Cook Time:</strong> {{ recipe.cookTime }} minutes</p>
-        <p><strong>Servings:</strong> <span id="servings-count" data-original-servings="{{ recipe.servings }}">{{ recipe.servings }}</span></p>
+        <span><strong>Prep:</strong> {{ recipe.prepTime }} mins</span>
+        <span><strong>Cook:</strong> {{ recipe.cookTime }} mins</span>
+        <span><strong>Servings:</strong> <span id="servings-count" data-original-servings="{{ recipe.servings }}">{{
+                recipe.servings }}</span></span>
     </div>
+</div>
 
-    <h2>Ingredients</h2>
-    <div class="ingredients-container">
-        {% for group_name, ingredients_list in recipe.ingredients.items() %}
-        <div class="ingredient-group">
-            <h3>{{ group_name | capitalize }}</h3>
-            <ul>
-                {% for ingredient in ingredients_list %}
-                <li>
-                    {% if ingredient.amount is iterable and ingredient.amount is not string %}
-                        <span class="ingredient-amount" data-original-amount-low="{{ ingredient.amount[0] }}" data-original-amount-high="{{ ingredient.amount[1] }}">{{ ingredient.amount[0] }} - {{ ingredient.amount[1] }}</span>
-                    {% else %}
-                        <span class="ingredient-amount" data-original-amount="{{ ingredient.amount }}">{{ ingredient.amount }}</span>
-                    {% endif %}
-                    {{ ingredient.units }}
-                    <strong>{{ ingredient.name }}</strong>
-                    {% if ingredient.notes %}
-                        <em>({{ ingredient.notes }})</em>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endfor %}
+<div class="recipe-images">
+    {% if recipe.stock_image_url %}
+    <div class="image-container">
+        <img src="{{ recipe.stock_image_url }}" alt="Stock photo of {{ recipe.name }}"
+            onerror="this.style.display='none'">
+        <p class="image-caption">Stock Inspiration</p>
     </div>
+    {% endif %}
+    {% if recipe.ai_image_url %}
+    <div class="image-container">
+        <img src="{{ recipe.ai_image_url }}" alt="AI generated {{ recipe.name }}" onerror="this.style.display='none'">
+        <p class="image-caption">AI Generated (Gemini)</p>
+    </div>
+    {% endif %}
+</div>
 
-    <div class="instructions">
-        <h2>Instructions</h2>
-        <ol>
-            {% for step in recipe.instructions %}
-                {% if step is mapping %}
-                    <li>{{ step.description }}</li>
+<style>
+    .recipe-images {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    .image-container {
+        text-align: center;
+    }
+
+    .image-container img {
+        width: 100%;
+        height: 300px;
+        object-fit: cover;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .image-caption {
+        margin-top: 8px;
+        font-size: 0.9em;
+        color: #666;
+        font-style: italic;
+    }
+</style>
+
+<div class="recipe-content">
+    <p class="description"><em>{{ recipe.description }}</em></p>
+</div>
+
+<a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
+
+<h2>Ingredients</h2>
+<div class="ingredients-container">
+    {% for group_name, ingredients_list in recipe.ingredients.items() %}
+    <div class="ingredient-group">
+        <h3>{{ group_name | capitalize }}</h3>
+        <ul>
+            {% for ingredient in ingredients_list %}
+            <li>
+                {% if ingredient.amount is iterable and ingredient.amount is not string %}
+                <span class="ingredient-amount" data-original-amount-low="{{ ingredient.amount[0] }}"
+                    data-original-amount-high="{{ ingredient.amount[1] }}">{{ ingredient.amount[0] }} - {{
+                    ingredient.amount[1] }}</span>
                 {% else %}
-                    <li>{{ step }}</li>
+                <span class="ingredient-amount" data-original-amount="{{ ingredient.amount }}">{{ ingredient.amount
+                    }}</span>
                 {% endif %}
+                {{ ingredient.units }}
+                <strong>{{ ingredient.name }}</strong>
+                {% if ingredient.notes %}
+                <em>({{ ingredient.notes }})</em>
+                {% endif %}
+            </li>
             {% endfor %}
-        </ol>
+        </ul>
     </div>
+    {% endfor %}
+</div>
 
-
-    {% if recipe.notes %}
-    <div class="notes">
-        <h3>Notes</h3>
-        <p>{{ recipe.notes }}</p>
-    </div>
-    {% endif %}
-
-    {% if recipe.tags %}
-    <div class="tags">
-        {% for tag in recipe.tags %}
-        <span class="tag">{{ tag }}</span>
+<div class="instructions">
+    <h2>Instructions</h2>
+    <ol>
+        {% for step in recipe.instructions %}
+        {% if step is mapping %}
+        <li>{{ step.description }}</li>
+        {% else %}
+        <li>{{ step }}</li>
+        {% endif %}
         {% endfor %}
-    </div>
-    {% endif %}
+    </ol>
+</div>
 
-    <script>
-        // Wait until the page content is fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
 
-            // Handle the custom servings form submission
-            const customForm = document.getElementById('custom-servings-form');
-            customForm.addEventListener('submit', function(event) {
-                // Prevent the form from reloading the page
-                event.preventDefault();
+{% if recipe.notes %}
+<div class="notes">
+    <h3>Notes</h3>
+    <p>{{ recipe.notes }}</p>
+</div>
+{% endif %}
 
-                const desiredServings = document.getElementById('custom-servings').value;
-                const servingsEl = document.getElementById('servings-count');
-                const originalServings = parseFloat(servingsEl.dataset.originalServings);
+{% if recipe.tags %}
+<div class="tags">
+    {% for tag in recipe.tags %}
+    <span class="tag">{{ tag }}</span>
+    {% endfor %}
+</div>
+{% endif %}
 
-                if (desiredServings && desiredServings > 0) {
-                    const multiplier = desiredServings / originalServings;
-                    updatePortions(multiplier);
-                }
-            });
-        });
+<script>
+    // Wait until the page content is fully loaded
+    document.addEventListener('DOMContentLoaded', function () {
 
-        // The main function that updates all quantities on the page
-        function updatePortions(multiplier) {
-            // Update the servings count
+        // Handle the custom servings form submission
+        const customForm = document.getElementById('custom-servings-form');
+        customForm.addEventListener('submit', function (event) {
+            // Prevent the form from reloading the page
+            event.preventDefault();
+
+            const desiredServings = document.getElementById('custom-servings').value;
             const servingsEl = document.getElementById('servings-count');
             const originalServings = parseFloat(servingsEl.dataset.originalServings);
-            // Round to the nearest whole number for servings
-            servingsEl.innerText = Math.round(originalServings * multiplier);
 
-            // Find all ingredient amount elements
-            const allAmounts = document.querySelectorAll('.ingredient-amount');
-
-            // Loop through each ingredient
-            allAmounts.forEach(function(amountEl) {
-                // Check if it's a single amount or a range
-                if (amountEl.dataset.originalAmount) {
-                    const originalAmount = parseFloat(amountEl.dataset.originalAmount);
-                    const newAmount = originalAmount * multiplier;
-                    amountEl.innerText = formatQuantity(newAmount);
-                } else if (amountEl.dataset.originalAmountLow) {
-                    const originalLow = parseFloat(amountEl.dataset.originalAmountLow);
-                    const originalHigh = parseFloat(amountEl.dataset.originalAmountHigh);
-                    const newLow = originalLow * multiplier;
-                    const newHigh = originalHigh * multiplier;
-                    amountEl.innerText = `${formatQuantity(newLow)} - ${formatQuantity(newHigh)}`;
-                }
-            });
-        }
-
-        // Helper function to format numbers nicely (e.g., 0.5 becomes 1/2)
-        function formatQuantity(num) {
-            if (num >= 1) {
-                // For numbers 1 or greater, round to 2 decimal places if not a whole number
-                return Number.isInteger(num) ? num : num.toFixed(2);
+            if (desiredServings && desiredServings > 0) {
+                const multiplier = desiredServings / originalServings;
+                updatePortions(multiplier);
             }
+        });
+    });
 
-            // Simple fraction conversion for common values
-            const fractions = {
-                0.5: '1/2',
-                0.25: '1/4',
-                0.75: '3/4',
-                0.33: '1/3',
-                0.34: '1/3',
-                0.66: '2/3',
-                0.67: '2/3',
-                0.125: '1/8'
-            };
+    // The main function that updates all quantities on the page
+    function updatePortions(multiplier) {
+        // Update the servings count
+        const servingsEl = document.getElementById('servings-count');
+        const originalServings = parseFloat(servingsEl.dataset.originalServings);
+        // Round to the nearest whole number for servings
+        servingsEl.innerText = Math.round(originalServings * multiplier);
 
-            // Round to 2 decimal places for finding a match
-            const roundedNum = parseFloat(num.toFixed(2));
-            return fractions[roundedNum] || num.toFixed(2);
+        // Find all ingredient amount elements
+        const allAmounts = document.querySelectorAll('.ingredient-amount');
+
+        // Loop through each ingredient
+        allAmounts.forEach(function (amountEl) {
+            // Check if it's a single amount or a range
+            if (amountEl.dataset.originalAmount) {
+                const originalAmount = parseFloat(amountEl.dataset.originalAmount);
+                const newAmount = originalAmount * multiplier;
+                amountEl.innerText = formatQuantity(newAmount);
+            } else if (amountEl.dataset.originalAmountLow) {
+                const originalLow = parseFloat(amountEl.dataset.originalAmountLow);
+                const originalHigh = parseFloat(amountEl.dataset.originalAmountHigh);
+                const newLow = originalLow * multiplier;
+                const newHigh = originalHigh * multiplier;
+                amountEl.innerText = `${formatQuantity(newLow)} - ${formatQuantity(newHigh)}`;
+            }
+        });
+    }
+
+    // Helper function to format numbers nicely (e.g., 0.5 becomes 1/2)
+    function formatQuantity(num) {
+        if (num >= 1) {
+            // For numbers 1 or greater, round to 2 decimal places if not a whole number
+            return Number.isInteger(num) ? num : num.toFixed(2);
         }
-    </script>
+
+        // Simple fraction conversion for common values
+        const fractions = {
+            0.5: '1/2',
+            0.25: '1/4',
+            0.75: '3/4',
+            0.33: '1/3',
+            0.34: '1/3',
+            0.66: '2/3',
+            0.67: '2/3',
+            0.125: '1/8'
+        };
+
+        // Round to 2 decimal places for finding a match
+        const roundedNum = parseFloat(num.toFixed(2));
+        return fractions[roundedNum] || num.toFixed(2);
+    }
+</script>
 {% endblock %}
