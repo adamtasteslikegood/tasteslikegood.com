@@ -234,5 +234,6 @@
     "easy",
     "gluten-free"
   ],
-  "stock_image_url": "https://loremflickr.com/800/600/Vegan,Cornbread/all"
+  "stock_image_url": "https://loremflickr.com/800/600/Vegan,Cornbread/all",
+  "ai_image_url": "/static/images/ai_vegan_cornbread.png"
 }

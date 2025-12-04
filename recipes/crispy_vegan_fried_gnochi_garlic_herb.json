@@ -82,5 +82,6 @@
     "italian",
     "pasta"
   ],
-  "stock_image_url": "https://loremflickr.com/800/600/Crispy,Vegan,Pan-Fried,Gnocchi,with,Garlic,&,Herbs/all?lock=4807"
+  "stock_image_url": "https://loremflickr.com/800/600/Crispy,Vegan,Pan-Fried,Gnocchi,with,Garlic,&,Herbs/all?lock=4807",
+  "ai_image_url": "/static/images/ai_crispy_vegan_fried_gnochi_garlic_herb.png"
 }

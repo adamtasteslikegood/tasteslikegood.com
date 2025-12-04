@@ -138,5 +138,7 @@
         "units"
       ]
     }
-  }
+  },
+  "stock_image_url": "https://loremflickr.com/800/600/Vegan,Polenta,Fries/all?lock=4491",
+  "ai_image_url": "/static/images/ai_vegan_polenta_fries.png"
 }

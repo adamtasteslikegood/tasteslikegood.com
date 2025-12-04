@@ -1,0 +1,5 @@
+Checking AI image for refreshing_zesty_rainbow_fruit_salad.json
+AI image missing for refreshing_zesty_rainbow_fruit_salad.json. Attempting generation.
+Using API Key.
+Calling generate_images with model imagen-3.0-generate-001...
+Generation failed: 404 NOT_FOUND. {'error': {'code': 404, 'message': 'models/imagen-3.0-generate-001 is not found for API version v1beta, or is not supported for predict. Call ListModels to see the list of available models and their supported methods.', 'status': 'NOT_FOUND'}}

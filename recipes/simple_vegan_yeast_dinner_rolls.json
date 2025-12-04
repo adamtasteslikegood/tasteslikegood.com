@@ -214,5 +214,7 @@
     "yeast",
     "bread",
     "easy"
-  ]
+  ],
+  "stock_image_url": "https://loremflickr.com/800/600/Simple,Vegan,Yeast,Dinner,Rolls/all?lock=3668",
+  "ai_image_url": "/static/images/ai_simple_vegan_yeast_dinner_rolls.png"
 }

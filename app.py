@@ -116,55 +116,9 @@ def show_recipe(filename):
             updated = True
             print(f"DEBUG: Generated Stock URL: {recipe_data['stock_image_url']}")
             
-        # 2. AI Image
-        if not recipe_data.get('ai_image_url'):
-            # Generate using nano-banana-pro-preview (or fallback)
-            try:
-                # We need a client. Try user creds then API key.
-                client = None
-                if 'credentials' in session:
-                    creds = google.oauth2.credentials.Credentials(**session['credentials'])
-                    client = Client(credentials=creds)
-                elif GOOGLE_API_KEY:
-                    client = Client(api_key=GOOGLE_API_KEY)
-                
-                if client:
-                    print(f"DEBUG: Attempting AI image generation for {recipe_data.get('name')}...")
-                    
-                    # Construct a prompt
-                    image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
-                    
-                    try:
-                        # Try the requested model first, then fallback
-                        model_to_use = 'imagen-3.0-generate-001'
-                        
-                        print(f"DEBUG: Calling generate_images with model {model_to_use}...")
-                        response = client.models.generate_images(
-                            model=model_to_use,
-                            prompt=image_prompt,
-                            config={'number_of_images': 1}
-                        )
-                        
-                        if response.generated_images:
-                            image_data = response.generated_images[0].image.image_bytes
-                            # Save to static/images
-                            image_filename = f"ai_{filename.replace('.json', '.png')}"
-                            image_path = os.path.join('static', 'images', image_filename)
-                            os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                            
-                            with open(image_path, 'wb') as img_f:
-                                img_f.write(image_data)
-                                
-                            recipe_data['ai_image_url'] = url_for('static', filename=f'images/{image_filename}')
-                            updated = True
-                            print(f"DEBUG: AI Image saved to {image_path}")
-                        else:
-                            print("DEBUG: No images returned in response.")
-                    except Exception as img_err:
-                        print(f"DEBUG: AI Image generation failed: {img_err}")
-                        # Fallback or leave empty
-            except Exception as e:
-                print(f"DEBUG: Error setting up client for image generation: {e}")
+        # 2. AI Image - REMOVED synchronous generation
+        # Generation is now handled asynchronously via /api/generate_image/<filename>
+        pass
 
         if updated:
             # Save the updated recipe
@@ -285,16 +239,15 @@ def get_models():
                 break
                 
             # Filter logic
-            # The user requirement "Filter by isActive: true" suggests checking a property.
-            # I will try to access it.
-            
-            # Note: The Python SDK `Model` object usually has `name`, `display_name`, `description`, etc.
-            # It DOES NOT usually have `isActive`. The list itself implies they are active.
-            # I will stick to filtering by supported methods which is the practical equivalent for "usable models".
-            
-            if 'generateContent' in getattr(m, 'supported_generation_methods', []):
+            # Exclude embeddings, older models (1.0, 1.5), and non-text modalities (image, audio, video)
+            name = m.name.lower()
+            if ('gemini' in name or 'gemma' in name) and 'embedding' not in name:
+                # Exclude specific keywords
+                if any(x in name for x in ['1.0', '1.5', 'image', 'audio', 'video', 'vision', 'robotics']):
+                    continue
+                    
                 # Clean up the name (remove 'models/' prefix if present for display, but keep for value)
-                model_id = m.name
+                model_id = m.name.replace('models/', '')
                 display_name = m.display_name or model_id
                 
                 filtered_models.append({
@@ -304,9 +257,72 @@ def get_models():
                 count += 1
 
         return jsonify(filtered_models)
-
     except Exception as e:
         print(f"Error fetching models: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/generate_image/<filename>', methods=['POST'])
+def generate_recipe_image(filename):
+    """Generates an AI image for a recipe asynchronously."""
+    filepath = os.path.join(RECIPES_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Recipe not found'}), 404
+
+    try:
+        with open(filepath, 'r') as f:
+            recipe_data = json.load(f)
+
+        if recipe_data.get('ai_image_url'):
+            return jsonify({'image_url': recipe_data['ai_image_url']})
+
+        # Generate Image
+        try:
+            client = None
+            if 'credentials' in session:
+                creds = google.oauth2.credentials.Credentials(**session['credentials'])
+                client = Client(credentials=creds)
+            elif GOOGLE_API_KEY:
+                client = Client(api_key=GOOGLE_API_KEY)
+            
+            if not client:
+                 return jsonify({'error': 'No credentials available'}), 500
+
+            print(f"DEBUG: Async AI image generation for {recipe_data.get('name')}...")
+            image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
+            
+            model_to_use = 'imagen-4.0-generate-001'
+            response = client.models.generate_images(
+                model=model_to_use,
+                prompt=image_prompt,
+                config={'number_of_images': 1}
+            )
+            
+            if response.generated_images:
+                image_data = response.generated_images[0].image.image_bytes
+                image_filename = f"ai_{filename.replace('.json', '.png')}"
+                image_path = os.path.join('static', 'images', image_filename)
+                os.makedirs(os.path.dirname(image_path), exist_ok=True)
+                
+                with open(image_path, 'wb') as img_f:
+                    img_f.write(image_data)
+                    
+                image_url = url_for('static', filename=f'images/{image_filename}')
+                
+                # Update recipe file
+                recipe_data['ai_image_url'] = image_url
+                with open(filepath, 'w') as f:
+                    json.dump(recipe_data, f, indent=2)
+                    
+                return jsonify({'image_url': image_url})
+            else:
+                return jsonify({'error': 'No image generated'}), 500
+
+        except Exception as e:
+            print(f"Image generation error: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

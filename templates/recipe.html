@@ -76,6 +76,8 @@
         object-fit: cover;
         border-radius: 12px;
         box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: none !important;
+        outline: none !important;
     }
 
     .image-caption {
@@ -233,5 +235,52 @@
         const roundedNum = parseFloat(num.toFixed(2));
         return fractions[roundedNum] || num.toFixed(2);
     }
+
+    // Auto-refresh stock image every 30 seconds
+    setInterval(() => {
+        const img = document.querySelector('.image-container img[src*="loremflickr"]');
+        if (img) {
+            const url = new URL(img.src);
+            // Generate a new lock ID between 1 and 10000 to get a fresh image
+            const newLock = Math.floor(Math.random() * 10000) + 1;
+            url.searchParams.set('lock', newLock);
+
+            // Create a new image object to preload
+            const newImg = new Image();
+            newImg.onload = function () {
+                img.src = url.toString();
+            };
+            newImg.src = url.toString();
+        }
+    }, 30000);
+
+    // Async AI Image Generation
+    document.addEventListener('DOMContentLoaded', function () {
+        const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
+        const aiImg = aiImageContainer.querySelector('img');
+
+        // If no image tag exists (placeholder is showing), trigger generation
+        if (!aiImg) {
+            console.log("AI Image missing, triggering generation...");
+            fetch('/api/generate_image/{{ recipe.filename }}', {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.image_url) {
+                        console.log("Image generated:", data.image_url);
+                        // Replace placeholder with image
+                        aiImageContainer.innerHTML = `
+                        <img src="${data.image_url}" alt="AI generated {{ recipe.name }}" 
+                             style="width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;">
+                        <p class="image-caption">AI Generated (Gemini)</p>
+                    `;
+                    } else {
+                        console.error("Image generation failed:", data.error);
+                    }
+                })
+                .catch(error => console.error("Error triggering generation:", error));
+        }
+    });
 </script>
 {% endblock %}
