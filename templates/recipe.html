@@ -55,6 +55,10 @@
         {% else %}
         <div class="placeholder-image">Generating AI Image...</div>
         {% endif %}
+        <div class="image-controls" style="margin-top: 10px;">
+            <button onclick="regenerateImage('{{ recipe.filename }}')" class="btn-small">Regenerate</button>
+            <button onclick="reportImage('{{ recipe.filename }}')" class="btn-small btn-danger">Report Issue</button>
+        </div>
     </div>
 </div>
 
@@ -105,6 +109,30 @@
         border-radius: 12px;
         color: #888;
         font-style: italic;
+    }
+
+    .btn-small {
+        padding: 5px 10px;
+        font-size: 0.8em;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        background: #f8f8f8;
+        cursor: pointer;
+        margin-right: 5px;
+    }
+
+    .btn-small:hover {
+        background: #e8e8e8;
+    }
+
+    .btn-danger {
+        color: #d9534f;
+        border-color: #d9534f;
+    }
+
+    .btn-danger:hover {
+        background: #d9534f;
+        color: white;
     }
 </style>
 
@@ -291,5 +319,47 @@
                 .catch(error => console.error("Error triggering generation:", error));
         }
     });
+
+    function regenerateImage(filename) {
+        if (!confirm('Are you sure you want to regenerate the AI image?')) return;
+
+        const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
+        aiImageContainer.innerHTML = '<div class="placeholder-image">Regenerating...</div>';
+
+        fetch('/api/regenerate_image/' + filename, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.image_url) {
+                    // Force reload image with timestamp to bypass cache
+                    const timestamp = new Date().getTime();
+                    aiImageContainer.innerHTML = `
+                        <img src="${data.image_url}?t=${timestamp}" alt="AI generated {{ recipe.name }}" 
+                             style="width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;">
+                        <p class="image-caption">AI Generated (Gemini)</p>
+                        <div class="image-controls" style="margin-top: 10px;">
+                            <button onclick="regenerateImage('${filename}')" class="btn-small">Regenerate</button>
+                            <button onclick="reportImage('${filename}')" class="btn-small btn-danger">Report Issue</button>
+                        </div>
+                    `;
+                } else {
+                    alert('Regeneration failed: ' + data.error);
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+    }
+
+    function reportImage(filename) {
+        const reason = prompt("What is wrong with the image? (e.g., 'doesn't match recipe', 'low quality')");
+        if (reason) {
+            fetch('/api/report_recipe/' + filename, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason })
+            })
+                .then(response => response.json())
+                .then(data => alert('Report submitted. Thank you!'))
+                .catch(err => alert('Error reporting: ' + err));
+        }
+    }
 </script>
 {% endblock %}

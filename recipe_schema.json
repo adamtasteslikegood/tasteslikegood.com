@@ -113,6 +113,34 @@
       "type": "string",
       "format": "uri",
       "description": "Optional URL of an image of the finished dish"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID of the user who generated the recipe, or 'anonymous'"
+    },
+    "ai_metadata": {
+      "type": "object",
+      "description": "Metadata about the AI generation process",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "stock_image_url": {
+          "type": "string"
+        },
+        "ai_image_url": {
+          "type": "string"
+        },
+        "images_working": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "required": [

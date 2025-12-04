@@ -1,4 +1,3 @@
-
 {
   "name": "Glory Bee Israeli Couscous Recipe",
   "description": "Prepare a delicious and simple Israeli couscous dish with this easy-to-follow recipe.",
@@ -57,5 +56,7 @@
     "side dish",
     "easy recipe"
   ],
-  "image": "uploaded:IMG_1733.jpg-47ee5727-8099-4a47-b513-8f419dbc2165"
+  "image": "uploaded:IMG_1733.jpg-47ee5727-8099-4a47-b513-8f419dbc2165",
+  "stock_image_url": "https://images.pexels.com/photos/2097090/pexels-photo-2097090.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=750&w=1260",
+  "ai_image_url": "/static/images/ai_GloryBeeIsraeliCouscousRecipe.png"
 }

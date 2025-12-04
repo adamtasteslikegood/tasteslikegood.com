@@ -357,6 +357,12 @@ def generate_recipe_image(filename):
                 
                 # Update recipe file
                 recipe_data['ai_image_url'] = image_url
+                
+                # Update metadata if present
+                if 'ai_metadata' in recipe_data:
+                    recipe_data['ai_metadata']['ai_image_url'] = image_url
+                    recipe_data['ai_metadata']['images_working'] = True
+
                 with open(filepath, 'w') as f:
                     json.dump(recipe_data, f, indent=2)
                     
@@ -370,6 +376,112 @@ def generate_recipe_image(filename):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/regenerate_image/<filename>', methods=['POST'])
+def regenerate_recipe_image(filename):
+    """Force regeneration of an AI image."""
+    # Reuse the same logic as generate_recipe_image, but maybe clear the existing URL first?
+    # For now, just calling the same logic is fine as it overwrites.
+    # However, generate_recipe_image returns early if URL exists.
+    # So we need a flag or a separate function.
+    
+    filepath = os.path.join(RECIPES_DIR, filename)
+    if not os.path.exists(filepath):
+        return jsonify({'error': 'Recipe not found'}), 404
+
+    try:
+        with open(filepath, 'r') as f:
+            recipe_data = json.load(f)
+            
+        # Clear existing image URL to force generation
+        if 'ai_image_url' in recipe_data:
+            del recipe_data['ai_image_url']
+            
+        # Save temporarily so generate_recipe_image sees it empty? 
+        # Or just copy the logic. Copying is safer to avoid race conditions or recursion.
+        
+        # ... logic copied/adapted ...
+        client = get_genai_client()
+        if not client:
+             return jsonify({'error': 'No credentials available'}), 500
+
+        print(f"DEBUG: Regenerating AI image for {recipe_data.get('name')}...")
+        image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
+        
+        # Use metadata model if available, else default
+        model_to_use = 'imagen-4.0-generate-001'
+        if recipe_data.get('ai_metadata', {}).get('model'):
+             # If the metadata model is a text model, we still use imagen for image gen.
+             # So we stick to imagen-4.0.
+             pass
+
+        response = client.models.generate_images(
+            model=model_to_use,
+            prompt=image_prompt,
+            config={'number_of_images': 1}
+        )
+        
+        if response.generated_images:
+            image_data = response.generated_images[0].image.image_bytes
+            image_filename = f"ai_{filename.replace('.json', '.png')}"
+            image_path = os.path.join('static', 'images', image_filename)
+            os.makedirs(os.path.dirname(image_path), exist_ok=True)
+            
+            with open(image_path, 'wb') as img_f:
+                img_f.write(image_data)
+                
+            image_url = url_for('static', filename=f'images/{image_filename}')
+            
+            # Update recipe data
+            recipe_data['ai_image_url'] = image_url
+            
+            # Update metadata
+            if 'ai_metadata' not in recipe_data:
+                recipe_data['ai_metadata'] = {}
+            recipe_data['ai_metadata']['ai_image_url'] = image_url
+            recipe_data['ai_metadata']['timestamp'] = datetime.datetime.now().isoformat()
+            recipe_data['ai_metadata']['images_working'] = True
+            
+            with open(filepath, 'w') as f:
+                json.dump(recipe_data, f, indent=2)
+                
+            return jsonify({'image_url': image_url})
+        else:
+            return jsonify({'error': 'No image generated'}), 500
+
+    except Exception as e:
+        print(f"Regeneration error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/report_recipe/<filename>', methods=['POST'])
+def report_recipe(filename):
+    """Log a user report about a recipe."""
+    data = request.get_json()
+    reason = data.get('reason', 'Unknown')
+    print(f"REPORT: User reported {filename}. Reason: {reason}")
+    
+    # In a real app, save to DB. Here, maybe update metadata?
+    filepath = os.path.join(RECIPES_DIR, filename)
+    if os.path.exists(filepath):
+        try:
+            with open(filepath, 'r') as f:
+                recipe_data = json.load(f)
+            
+            if 'ai_metadata' not in recipe_data:
+                recipe_data['ai_metadata'] = {}
+            
+            recipe_data['ai_metadata']['reported'] = True
+            recipe_data['ai_metadata']['report_reason'] = reason
+            recipe_data['ai_metadata']['images_working'] = False # Assume broken if reported?
+            
+            with open(filepath, 'w') as f:
+                json.dump(recipe_data, f, indent=2)
+        except Exception as e:
+            print(f"Error saving report: {e}")
+
+    return jsonify({'status': 'reported'})
 
 
 # --- NEW: Route for generating recipes ---
@@ -450,9 +562,20 @@ def generate_recipe():
 
         if recipe_data:
             try:
+                # Add metadata
+                import datetime
+                recipe_data['user_id'] = session.get('user_id', 'anonymous')
+                recipe_data['ai_metadata'] = {
+                    'model': selected_model,
+                    'timestamp': datetime.datetime.now().isoformat(),
+                    'prompt': prompt,
+                    'stock_image_url': recipe_data.get('stock_image_url'),
+                    'ai_image_url': None, # Will be filled by async gen
+                    'images_working': True # Optimistic default
+                }
+
                 # Create a filename from the recipe name
-                safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
-                filename = safe_filename.replace(' ', '_').lower() + '.json'
+                filename = f"{recipe_data['name'].lower().replace(' ', '_')}.json"
                 filepath = os.path.join(RECIPES_DIR, filename)
 
                 # Save the new recipe to a file
