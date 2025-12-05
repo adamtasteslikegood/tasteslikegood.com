@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import datetime
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
@@ -123,6 +124,44 @@ def get_all_recipes():
     return sorted(recipes, key=lambda r: r['name'])
 
 
+def migrate_recipe_data(data, filename):
+    """
+    Migrates recipe data to the latest schema.
+    Returns (migrated_data, changed_boolean).
+    """
+    changed = False
+    
+    # 1. Fix nested 'properties'
+    if 'properties' in data and 'name' not in data:
+        print(f"Migrating nested JSON in {filename}")
+        data = data['properties']
+        changed = True
+        
+    # 2. Add user_id
+    if 'user_id' not in data:
+        data['user_id'] = 'anonymous'
+        changed = True
+        
+    # 3. Add ai_metadata
+    if 'ai_metadata' not in data:
+        data['ai_metadata'] = {
+            'model': 'unknown',
+            'timestamp': datetime.datetime.now().isoformat(),
+            'prompt': 'unknown',
+            'images_working': True if data.get('stock_image_url') else False
+        }
+        changed = True
+    
+    # 4. Fix "Untitled Recipe" if name is generic and filename is specific
+    if data.get('name') == "Untitled Recipe":
+        # Try to derive from filename
+        derived_name = filename.replace('_', ' ').replace('.json', '').title()
+        data['name'] = derived_name
+        changed = True
+        
+    return data, changed
+
+
 @app.route('/')
 def index():
     """The homepage route. Displays a list of all recipes."""
@@ -140,9 +179,15 @@ def show_recipe(filename):
         with open(filepath, 'r') as f:
             recipe_data = json.load(f)
         
-        # --- Lazy Load Images ---
         updated = False
         
+        # --- Auto-Migration ---
+        recipe_data, migrated = migrate_recipe_data(recipe_data, filename)
+        if migrated:
+            updated = True
+            print(f"DEBUG: Auto-migrated {filename} on view.")
+        
+        # --- Lazy Load Images ---
         # 1. Stock Image
         if not recipe_data.get('stock_image_url'):
             # Try smart retrieval first
@@ -513,35 +558,63 @@ def generate_recipe():
             f"{schema}\n"
             f"IMPORTANT: You MUST find and include a valid, high-quality public stock image URL (e.g. from Unsplash, Pexels) "
             f"in the 'stock_image_url' field. Do not leave it empty.\n"
+            f"CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it inside a 'properties' or 'type' object. "
+            f"The top-level keys must be 'name', 'description', 'ingredients', etc.\n"
             f"Do not include any text before or after the JSON object."
         )
 
         def attempt_generation(client, source_name, model_name):
             """Helper to attempt generation with a specific client."""
-            print(f"Attempting generation using {source_name} with model {model_name}...")
-            response = client.models.generate_content(
-                model=model_name,
-                contents=full_prompt
-            )
-            # Extract the JSON string from the response
-            text_response = response.text.strip().replace('```json', '').replace('```', '').strip()
-            # Parse and validate
-            data = json.loads(text_response)
-            
-            # --- NEW: Normalize data before validation ---
-            data = normalize_recipe_data(data)
-            
-            validate_recipe_data(data)
-            return data, text_response
+            print(f"Attempting generation with {source_name} using {model_name}...")
+            try:
+                response = client.models.generate_content(
+                    model=model_name,
+                    contents=full_prompt,
+                    config={
+                        'response_mime_type': 'application/json',
+                        'temperature': 0.7,
+                    }
+                )
+                
+                text_response = response.text.strip()
+                # Clean up markdown code blocks if present
+                if text_response.startswith('```json'):
+                    text_response = text_response[7:]
+                if text_response.startswith('```'):
+                    text_response = text_response[3:]
+                if text_response.endswith('```'):
+                    text_response = text_response[:-3]
+                
+                text_response = text_response.strip()
+                
+                try:
+                    data = json.loads(text_response)
+                    
+                    # FIX: Check for nested 'properties' (common model error with schemas)
+                    if 'properties' in data and 'name' not in data:
+                        print("DEBUG: Detected nested JSON structure. Flattening...")
+                        data = data['properties']
+                    
+                    # Validate against schema
+                    if not validate_recipe_data(data):
+                        print(f"Validation failed for {source_name}")
+                        return None, None
+                        
+                    return data, text_response
+                except json.JSONDecodeError:
+                    print(f"JSON Decode Error for {source_name}: {text_response[:100]}...")
+                    return None, None
+                    
+            except Exception as e:
+                print(f"Generation error with {source_name}: {e}")
+                raise e
 
+        # 1. Try with User Credentials (if logged in)
         recipe_data = None
-        last_error_message = "No generation method available."
-        recipe_json_str = "" # Keep for error logging
-        response = None # Keep for error logging
-
+        recipe_json_str = None
+        last_error_message = "Unknown error"
         start_time = time.time()
 
-        # 1. Try User Credentials
         if 'credentials' in session:
             try:
                 creds = google.oauth2.credentials.Credentials(**session['credentials'])
@@ -610,6 +683,34 @@ def generate_recipe():
     return render_template('generate_recipe.html', default_model=DEFAULT_MODEL)
 
 
+
+@app.route('/api/migrate', methods=['POST'])
+def run_migration():
+    """Migrate old recipes to the new schema."""
+    count = 0
+    updated_files = []
+    
+    for filename in os.listdir(RECIPES_DIR):
+        if not filename.endswith('.json'):
+            continue
+            
+        filepath = os.path.join(RECIPES_DIR, filename)
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            
+            data, changed = migrate_recipe_data(data, filename)
+
+            if changed:
+                with open(filepath, 'w') as f:
+                    json.dump(data, f, indent=2)
+                count += 1
+                updated_files.append(filename)
+                
+        except Exception as e:
+            print(f"Error migrating {filename}: {e}")
+            
+    return jsonify({'migrated_count': count, 'files': updated_files})
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
