@@ -61,5 +61,12 @@
     "frozen fruit"
   ],
   "stock_image_url": "https://loremflickr.com/800/600/Easy,Vegan,Strawberry,Sauce/all",
-  "ai_image_url": "/static/images/ai_vegan_strawberry_sauce.png"
+  "ai_image_url": "/static/images/ai_vegan_strawberry_sauce.png",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-04T16:14:55.223309",
+    "prompt": "unknown",
+    "images_working": true
+  }
 }

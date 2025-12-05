@@ -42,14 +42,15 @@ RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
 # Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+print(f"DEBUG: Loaded GOOGLE_API_KEY: {'Yes' if GOOGLE_API_KEY else 'No'}")
 
 # Default Model Configuration
-DEFAULT_MODEL = "gemini-3-pro-preview"
+DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
 # Validate DEFAULT_MODEL (Simple check, could be expanded)
 if not DEFAULT_MODEL:
-    print("Warning: DEFAULT_MODEL is not set. Fallback to 'gemini-3-pro-preview'.")
-    DEFAULT_MODEL = "gemini-3-pro-preview"
+    print("Warning: DEFAULT_MODEL is not set. Fallback to 'gemini-2.0-flash-exp'.")
+    DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
 
 def get_genai_client():
@@ -104,6 +105,8 @@ def validate_recipe_data(recipe_data):
         if location:
             message = f"{message} (at {location})"
         raise ValidationError(message)
+    
+    return True
 
 
 def get_all_recipes():
@@ -411,13 +414,18 @@ def generate_recipe_image(filename):
                 with open(filepath, 'w') as f:
                     json.dump(recipe_data, f, indent=2)
                     
-                return jsonify({'image_url': image_url})
-            else:
-                return jsonify({'error': 'No image generated'}), 500
-
         except Exception as e:
-            print(f"Image generation error: {e}")
-            return jsonify({'error': str(e)}), 500
+            import traceback
+            traceback_str = traceback.format_exc()
+            print(f"Error generating recipe: {e}")
+            print(traceback_str)
+            
+            # Log to file for debugging
+            with open('recipe_error.txt', 'a') as f:
+                f.write(f"\nLast Error (Recipe Gen): {repr(e)}\nTraceback:\n{traceback_str}\n")
+                
+            error_msg = f"{type(e).__name__}: {str(e)}" or "Unknown error"
+            return jsonify({'error': error_msg}), 500
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -683,6 +691,15 @@ def generate_recipe():
     return render_template('generate_recipe.html', default_model=DEFAULT_MODEL)
 
 
+@app.route('/api/status', methods=['GET'])
+def api_status():
+    return jsonify({
+        'status': 'running',
+        'api_key_loaded': bool(GOOGLE_API_KEY),
+        'default_model': DEFAULT_MODEL
+    })
+
+
 
 @app.route('/api/migrate', methods=['POST'])
 def run_migration():
@@ -711,6 +728,8 @@ def run_migration():
             print(f"Error migrating {filename}: {e}")
             
     return jsonify({'migrated_count': count, 'files': updated_files})
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

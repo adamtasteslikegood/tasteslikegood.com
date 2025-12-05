@@ -9,12 +9,18 @@
       "description": "Name of the recipe"
     },
     "stock_image_url": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "uri",
       "description": "URL of a stock image for the recipe"
     },
     "ai_image_url": {
-      "type": "string",
+      "type": [
+        "string",
+        "null"
+      ],
       "format": "uri",
       "description": "URL of an AI-generated image for the recipe"
     },
@@ -132,10 +138,16 @@
           "type": "string"
         },
         "stock_image_url": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "ai_image_url": {
-          "type": "string"
+          "type": [
+            "string",
+            "null"
+          ]
         },
         "images_working": {
           "type": "boolean"
