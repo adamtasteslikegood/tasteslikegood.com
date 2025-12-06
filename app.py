@@ -64,26 +64,26 @@ def get_genai_client():
 
 
 def get_smart_stock_image(recipe_name):
-    """Uses Gemini to find a relevant stock image URL."""
+    """Uses Gemini to generate keywords for a stock image."""
     client = get_genai_client()
     if not client:
         return None
         
     try:
         prompt = (
-            f"Find a valid, high-quality, public stock image URL (e.g. from Unsplash, Pexels, or similar) "
-            f"for a recipe named '{recipe_name}'. "
-            f"Return ONLY the URL as a plain string. Do not include markdown or explanations."
+            f"Generate 2-3 simple, comma-separated keywords to search for a stock photo of '{recipe_name}'. "
+            f"Example: 'spicy tacos, mexican food'. Return ONLY the keywords."
         )
         # Use a fast model for this
         response = client.models.generate_content(
             model='gemini-2.0-flash-exp',
             contents=prompt
         )
-        url = response.text.strip()
-        # Basic validation
-        if url.startswith('http'):
-            return url
+        keywords = response.text.strip().replace(' ', ',')
+        # Use loremflickr with specific keywords which is reliable
+        import random
+        lock_id = random.randint(1, 10000)
+        return f"https://loremflickr.com/800/600/{keywords}/all?lock={lock_id}"
     except Exception as e:
         print(f"Smart stock image fetch failed: {e}")
     
@@ -500,8 +500,6 @@ def regenerate_recipe_image(filename):
                 json.dump(recipe_data, f, indent=2)
                 
             return jsonify({'image_url': image_url})
-        else:
-            return jsonify({'error': 'No image generated'}), 500
 
     except Exception as e:
         print(f"Regeneration error: {e}")
@@ -510,31 +508,30 @@ def regenerate_recipe_image(filename):
 
 @app.route('/api/report_recipe/<filename>', methods=['POST'])
 def report_recipe(filename):
-    """Log a user report about a recipe."""
-    data = request.get_json()
-    reason = data.get('reason', 'Unknown')
-    print(f"REPORT: User reported {filename}. Reason: {reason}")
-    
-    # In a real app, save to DB. Here, maybe update metadata?
-    filepath = os.path.join(RECIPES_DIR, filename)
-    if os.path.exists(filepath):
-        try:
-            with open(filepath, 'r') as f:
-                recipe_data = json.load(f)
+    """Log a user report about a recipe or image."""
+    try:
+        data = request.json
+        reason = data.get('reason', 'No reason provided')
+        
+        report_entry = {
+            'timestamp': datetime.datetime.now().isoformat(),
+            'filename': filename,
+            'reason': reason,
+            'user_id': session.get('user_id', 'anonymous')
+        }
+        
+        # Log to a reports file
+        with open('user_reports.json', 'a') as f:
+            f.write(json.dumps(report_entry) + "\n")
             
-            if 'ai_metadata' not in recipe_data:
-                recipe_data['ai_metadata'] = {}
-            
-            recipe_data['ai_metadata']['reported'] = True
-            recipe_data['ai_metadata']['report_reason'] = reason
-            recipe_data['ai_metadata']['images_working'] = False # Assume broken if reported?
-            
-            with open(filepath, 'w') as f:
-                json.dump(recipe_data, f, indent=2)
-        except Exception as e:
-            print(f"Error saving report: {e}")
+        return jsonify({'status': 'reported'})
+    except Exception as e:
+        print(f"Reporting error: {e}")
+        return jsonify({'error': str(e)}), 500
 
-    return jsonify({'status': 'reported'})
+
+
+
 
 
 # --- NEW: Route for generating recipes ---
