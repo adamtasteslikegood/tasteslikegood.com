@@ -71,9 +71,10 @@
 
     <form id="generate-form" action="{{ url_for('generate_recipe') }}" method="post">
         <label for="model-select"><strong>Select Model:</strong></label>
-        <div id="model-loading">Loading models...</div>
-        <select name="model" id="model-select" disabled>
-            <option value="" disabled selected>Loading...</option>
+        <div id="model-loading">Loading additional models...</div>
+        <select name="model" id="model-select">
+            <option value="models/gemini-2.5-flash" selected>Gemini 2.5 Flash (Default)</option>
+            <option value="" disabled>── Loading more models... ──</option>
         </select>
         <div id="model-error" class="error-message"></div>
 
@@ -121,40 +122,46 @@
                     throw new Error(`API Error: ${response.statusText}`);
                 }
                 const models = await response.json();
-                
-                // Clear existing options
-                modelSelect.innerHTML = '';
-                
-                if (models.length === 0) {
-                     const option = document.createElement('option');
-                     option.text = "No active models found";
-                     modelSelect.add(option);
-                     return;
+
+                // Remove the "loading" placeholder option (second option)
+                if (modelSelect.options.length > 1) {
+                    modelSelect.remove(1);
                 }
 
-                // Populate with new models
+                if (models.length === 0) {
+                    modelLoading.style.display = 'none';
+                    return;
+                }
+
+                // Add separator before additional models
+                const separator = document.createElement('option');
+                separator.disabled = true;
+                separator.text = '── Additional Models ──';
+                modelSelect.add(separator);
+
+                // Populate with fetched models (skip if it's the default)
                 models.forEach(model => {
+                    // Skip if this is the default model already shown
+                    if (model.id === 'models/gemini-2.5-flash') return;
+
                     const option = document.createElement('option');
                     option.value = model.id;
                     option.text = model.name;
-                    // Default to gemini-1.5-flash if available, or first one
-                    if (model.id.includes('gemini-1.5-flash')) {
-                        option.selected = true;
-                    }
                     modelSelect.add(option);
                 });
-                
-                modelSelect.disabled = false;
+
                 modelLoading.style.display = 'none';
 
             } catch (error) {
                 console.error('Error fetching models:', error);
                 modelLoading.style.display = 'none';
-                modelError.textContent = "Failed to load models. Using default.";
-                
-                // Fallback option so user can still try
-                modelSelect.innerHTML = '<option value="gemini-1.5-flash">Gemini 1.5 Flash (Fallback)</option>';
-                modelSelect.disabled = false;
+
+                // Remove loading placeholder on error
+                if (modelSelect.options.length > 1 && modelSelect.options[1].value === '') {
+                    modelSelect.remove(1);
+                }
+
+                modelError.textContent = "Could not load additional models.";
             }
         }
 

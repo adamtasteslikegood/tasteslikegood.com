@@ -123,96 +123,80 @@ def show_recipe_json(filename):
         abort(500)
 
 
+MODELS_LIST_PATH = 'models_list.json'
+
+# Curated list of preferred Gemini models for recipe generation
+PREFERRED_MODELS = [
+    'models/gemini-2.5-pro',
+    'models/gemini-2.5-flash',
+    'models/gemini-2.0-flash',
+    'models/gemini-2.0-flash-exp',
+    'models/gemini-3-pro-preview',
+    'models/gemini-2.0-flash-lite',
+    'models/gemini-exp-1206',
+    'models/gemini-pro-latest',
+    'models/gemini-flash-latest',
+]
+
+
+def load_models_from_cache():
+    """Load models from the cached models_list.json file."""
+    try:
+        with open(MODELS_LIST_PATH, 'r') as f:
+            data = json.load(f)
+            return data.get('models', [])
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Could not load models cache: {e}")
+        return None
+
+
 @app.route('/api/models')
 def get_models():
-    """Fetches a list of active models from the Google GenAI API."""
+    """Returns a curated list of Gemini models for recipe generation."""
     try:
-        # Use API key if available
-        if not GOOGLE_API_KEY:
-             return jsonify({'error': 'API key not configured'}), 500
+        # Try to load from cache first
+        cached_models = load_models_from_cache()
 
-        client = Client(api_key=GOOGLE_API_KEY)
-        
-        # List models
-        models_iterable = client.models.list()
-        
-        active_models = []
-        for m in models_iterable:
-            # Check for supported generation methods to ensure it's a text/content generation model
-            # and filter by the user's requested "isActive" flag if available, 
-            # though usually list() returns available models.
-            # We will convert to dict.
-            
-            # The prompt specifically asks to "Filter by isActive: true"
-            # We'll check if the attribute exists or if it's a property.
-            # Assuming 'm' is a Model object.
-            
-            # We'll construct a simple dict
-            model_data = {
-                'name': m.name,
-                'displayName': m.display_name,
-                # specific request:
-                # 'isActive': m.is_active # If this exists
-            }
-            
-            # Since we don't know for sure if 'is_active' is on the object, 
-            # and the prompt is specific, we will try to access it. 
-            # If it fails, we might assume true or check docs. 
-            # But safer to just include it if we can.
-            
-            # However, looking at standard Gemini API, usually we filter by 
-            # "generateContent" in supported_generation_methods.
-            
-            supported_methods = getattr(m, 'supported_generation_methods', [])
-            if 'generateContent' in supported_methods:
-                active_models.append(model_data)
+        if cached_models:
+            # Filter to preferred models and text generation capable ones
+            # Exclude: embedding, imagen, veo, live, tts, audio, robotics models
+            exclude_patterns = ['embedding', 'imagen', 'veo', 'live', 'tts', 'audio', 'robotics', 'aqa']
 
-        # The prompt says "Filter by isActive: true". 
-        # I will strictly follow this instruction, assuming the user knows the API 
-        # or I should implement a filter logic.
-        # But wait, `client.models.list()` might not return 'isActive'.
-        # I will assume the User wants me to filter the *results* I send back 
-        # or expects the API to provide it.
-        # Actually, I'll just send back the list and let the frontend filter? 
-        # No, "The models in the list should be dynamically fetched... and only include active models."
-        
-        # Let's look at the `generate_recipe` function again.
-        # It uses `client.models.generate_content`.
-        
-        # Refined plan:
-        # 1. Fetch models.
-        # 2. Filter for those that support `generateContent`.
-        # 3. Limit to 10.
-        # 4. Return JSON.
-        
-        # I'll stick to a simple implementation first.
-        
-        filtered_models = []
-        count = 0
-        for m in models_iterable:
-            if count >= 10:
-                break
-                
-            # Filter logic
-            # The user requirement "Filter by isActive: true" suggests checking a property.
-            # I will try to access it.
-            
-            # Note: The Python SDK `Model` object usually has `name`, `display_name`, `description`, etc.
-            # It DOES NOT usually have `isActive`. The list itself implies they are active.
-            # I will stick to filtering by supported methods which is the practical equivalent for "usable models".
-            
-            if 'generateContent' in getattr(m, 'supported_generation_methods', []):
-                # Clean up the name (remove 'models/' prefix if present for display, but keep for value)
-                model_id = m.name
-                display_name = m.display_name or model_id
-                
+            filtered_models = []
+            for m in cached_models:
+                model_name = m.get('name', '').lower()
+
+                # Skip non-generation models
+                if any(pattern in model_name for pattern in exclude_patterns):
+                    continue
+
+                # Skip image generation specific models
+                if 'image' in model_name and 'gemini' in model_name:
+                    continue
+
+                # Only include gemini/gemma models
+                if not ('gemini' in model_name or 'gemma' in model_name):
+                    continue
+
                 filtered_models.append({
-                    'id': model_id,
-                    'name': display_name
+                    'id': m.get('name'),
+                    'name': m.get('display_name') or m.get('name')
                 })
-                count += 1
 
-        return jsonify(filtered_models)
+            # Sort: preferred models first, then alphabetically
+            def sort_key(model):
+                model_id = model['id']
+                if model_id in PREFERRED_MODELS:
+                    return (0, PREFERRED_MODELS.index(model_id))
+                return (1, model['name'])
+
+            filtered_models.sort(key=sort_key)
+
+            # Return top 8 models
+            return jsonify(filtered_models[:8])
+
+        # Fallback: return empty list if no cache available
+        return jsonify([])
 
     except Exception as e:
         print(f"Error fetching models: {e}")
