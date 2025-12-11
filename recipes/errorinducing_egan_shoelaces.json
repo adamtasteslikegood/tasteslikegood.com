@@ -1,0 +1,65 @@
+{
+  "name": "Error-Inducing Egan Shoelaces",
+  "description": "A deliberately nonsensical recipe designed to test data validation and error handling. This dish is not intended for consumption and may cause unexpected system behavior.",
+  "prepTime": 15,
+  "cookTime": 10,
+  "servings": 1,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Filtered Void Water",
+        "amount": 1,
+        "units": "liter"
+      },
+      {
+        "name": "Synthesized Almond Tears",
+        "amount": 2,
+        "units": "Tbs",
+        "notes": "must be ethically sourced from a simulation"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Conceptual Flour",
+        "amount": 2,
+        "units": "cups"
+      },
+      {
+        "name": "Quantum Salt",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "simultaneously present and not present"
+      },
+      {
+        "name": "Ground Black Pepper Anomalies",
+        "amount": 0.5,
+        "units": "tsp"
+      }
+    ],
+    "other": [
+      {
+        "name": "A single, clean shoelace",
+        "amount": 1,
+        "units": "qty",
+        "notes": "for garnish and existential dread"
+      }
+    ]
+  },
+  "instructions": [
+    "In a bowl that doesn't exist, whisk together the Conceptual Flour, Quantum Salt, and Ground Black Pepper Anomalies.",
+    "Slowly pour in the Filtered Void Water and Synthesized Almond Tears. The mixture should defy a single state of matter.",
+    "Extrude the resulting non-dough through a pasta maker set to the 'shoelace' setting. If a 'shoelace' setting is unavailable, contemplate the futility of your task.",
+    "Boil the 'shoelaces' in a pot of simmering paradoxes for exactly 3.14 minutes.",
+    "Drain carefully, ensuring not to lose any stray data packets.",
+    "Serve immediately, garnished with the single shoelace. This dish is best paired with a 404 error."
+  ],
+  "notes": "Consumption may lead to a segmentation fault in your digestive system. Please consult your system administrator before attempting to metabolize. This recipe is strictly for testing purposes.",
+  "tags": [
+    "test",
+    "error",
+    "vegan",
+    "pasta",
+    "absurd"
+  ],
+  "image": "http://example.com/images/null.jpg"
+}

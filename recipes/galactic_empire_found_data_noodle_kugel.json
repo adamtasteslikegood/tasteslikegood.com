@@ -1,0 +1,135 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A 'lost' recipe rediscovered from the archives of the First Galactic Empire. This sweet, creamy, and comforting vegan noodle kugel uses psychohistorical principles (and plant-based ingredients) to predict a delicious future. A perfect comfort food for colonists on any new world.",
+  "name": "Galactic Empire 'Found Data' Noodle Kugel",
+  "prepTime": 20,
+  "cookTime": 55,
+  "servings": 8,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "Wide egg-free noodles",
+        "amount": 12,
+        "units": "oz"
+      },
+      {
+        "name": "Granulated sugar",
+        "amount": 0.75,
+        "units": "cup"
+      },
+      {
+        "name": "Cornstarch",
+        "amount": 3,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Ground cinnamon",
+        "amount": 1.5,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Ground nutmeg",
+        "amount": 0.25,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Raisins",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Or dried cranberries for a Terminus-style twist"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Silken tofu",
+        "amount": 12,
+        "units": "oz",
+        "notes": "Drained"
+      },
+      {
+        "name": "Vegan cream cheese",
+        "amount": 8,
+        "units": "oz",
+        "notes": "Softened to room temperature"
+      },
+      {
+        "name": "Unsweetened plant-based milk",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Oat or soy milk work best for creaminess"
+      },
+      {
+        "name": "Vegan butter",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Melted, plus more for greasing the dish"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 2,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Lemon juice",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "Freshly squeezed"
+      }
+    ],
+    "Topping": [
+      {
+        "name": "Brown sugar",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "Packed"
+      },
+      {
+        "name": "Ground cinnamon",
+        "amount": 1,
+        "units": "teaspoon"
+      },
+      {
+        "name": "Chopped pecans",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Optional, for extra crunch"
+      },
+      {
+        "name": "Vegan butter",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "Melted"
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat your starship's oven to 350\u00b0F (175\u00b0C). Grease a 9x13 inch (or equivalent) baking dish with vegan butter.",
+    "Cook the egg-free noodles according to package directions until al dente. Drain well and set aside.",
+    "In a high-speed blender or food processor, combine all the wet ingredients (silken tofu, vegan cream cheese, plant-based milk, 1/2 cup melted vegan butter, vanilla extract, lemon juice) with the dry ingredients from the main list (granulated sugar, cornstarch, 1.5 tsp cinnamon, nutmeg, salt).",
+    "Blend the mixture until it is completely smooth and creamy, like a well-oiled hyperdrive. This will form your 'custard'.",
+    "In a large bowl, gently combine the cooked noodles, the blended custard mixture, and the raisins. Stir until the noodles are evenly coated.",
+    "Pour the noodle mixture into the prepared baking dish and spread evenly.",
+    "In a small bowl, prepare the topping. Mix together the brown sugar, 1 tsp cinnamon, and optional chopped pecans. Drizzle with the 2 Tbsp of melted vegan butter and stir with a fork until crumbly.",
+    "Sprinkle the topping evenly over the noodle mixture in the baking dish.",
+    "Bake for 50-60 minutes, or until the center is set and the top is golden brown and bubbly. The kugel should only have a slight jiggle in the very center when shaken.",
+    "Let the kugel cool on a wire rack for at least 20 minutes before serving. This allows the custard to set properly. It can be served warm or at room temperature."
+  ],
+  "notes": "For a subtle 'eggy' flavor reminiscent of ancient Earth recipes, add a small pinch of black salt (kala namak) to the blender with the other custard ingredients. This recipe is best enjoyed while contemplating the fall of empires and the rise of new foundations.",
+  "tags": [
+    "vegan",
+    "kugel",
+    "casserole",
+    "noodle",
+    "dessert",
+    "comfort food",
+    "sci-fi",
+    "asimov",
+    "jewish"
+  ]
+}

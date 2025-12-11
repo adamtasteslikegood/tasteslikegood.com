@@ -1,0 +1,99 @@
+{
+  "name": "Boundaries and Respect Cake",
+  "description": "A simple, no-nonsense vanilla cake. The key ingredients are consent and respect, which, like this cake, are best shared in a safe and positive environment.",
+  "prepTime": 20,
+  "cookTime": 35,
+  "servings": 12,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 2.5,
+        "units": "cups"
+      },
+      {
+        "name": "Granulated sugar",
+        "amount": 1.5,
+        "units": "cups"
+      },
+      {
+        "name": "Baking powder",
+        "amount": 3,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "teaspoon"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Milk",
+        "amount": 1,
+        "units": "cup",
+        "notes": "at room temperature"
+      },
+      {
+        "name": "Vegetable oil",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "Large eggs",
+        "amount": 2,
+        "units": "qty",
+        "notes": "at room temperature"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 2,
+        "units": "teaspoons"
+      }
+    ],
+    "frosting": [
+      {
+        "name": "Unsalted butter",
+        "amount": 1,
+        "units": "cup",
+        "notes": "softened"
+      },
+      {
+        "name": "Powdered sugar",
+        "amount": 4,
+        "units": "cups"
+      },
+      {
+        "name": "Milk",
+        "amount": 4,
+        "units": "tablespoons"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 1,
+        "units": "teaspoon"
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat your oven to 350\u00b0F (175\u00b0C). Grease and flour two 9-inch round cake pans.",
+    "In a large bowl, whisk together the dry ingredients: flour, sugar, baking powder, and salt. Set a clear boundary for this mixture and do not add wet ingredients yet.",
+    "In a separate bowl, combine the wet ingredients: milk, vegetable oil, eggs, and vanilla extract. Whisk until well blended.",
+    "Pour the wet ingredients into the dry ingredients. Mix on low speed until just combined. Do not overmix; respect the batter's structure.",
+    "Divide the batter evenly between the prepared pans. This promotes fairness and equality.",
+    "Bake for 30-35 minutes, or until a toothpick inserted into the center comes out clean.",
+    "Let the cakes cool in the pans for 10 minutes before inverting them onto a wire rack to cool completely. Give them the space they need.",
+    "While the cakes cool, prepare the frosting. In a large bowl, beat the softened butter until creamy. Gradually add the powdered sugar, alternating with the milk, and beating well after each addition. Mix in the vanilla.",
+    "Once the cakes are completely cool, frost them. Spread a layer of frosting between the two cakes and then cover the top and sides.",
+    "Serve to friends and allies in an environment of mutual respect and understanding."
+  ],
+  "notes": "This cake is a reminder that a safe environment is built on clear communication and respect for personal boundaries. It's not about what someone is wearing, how they act, or whether they've had a drink. It's about consent.",
+  "tags": [
+    "cake",
+    "dessert",
+    "support",
+    "respect",
+    "empowerment",
+    "vanilla"
+  ]
+}

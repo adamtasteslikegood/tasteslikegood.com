@@ -1,0 +1,96 @@
+{
+  "name": "Vegan Blueberry Muffins with Coconut Milk",
+  "description": "Deliciously moist and fluffy vegan blueberry muffins featuring a tender crumb thanks to coconut milk and vital wheat gluten. A perfect dairy-free and egg-free breakfast treat.",
+  "prepTime": 15,
+  "cookTime": 22,
+  "servings": 12,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 2,
+        "units": "cups"
+      },
+      {
+        "name": "Granulated sugar",
+        "amount": 0.75,
+        "units": "cup"
+      },
+      {
+        "name": "Vital wheat gluten",
+        "amount": 1.5,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Baking powder",
+        "amount": 2.5,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Powdered egg replacer",
+        "amount": 1,
+        "units": "tablespoon",
+        "notes": "Equivalent to 2 eggs, check package for specific instructions."
+      },
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "teaspoon"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Full-fat coconut milk",
+        "amount": 1,
+        "units": "cup",
+        "notes": "From a can, well-shaken."
+      },
+      {
+        "name": "Neutral oil",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Such as canola or melted coconut oil."
+      },
+      {
+        "name": "Water",
+        "amount": 4,
+        "units": "tablespoons",
+        "notes": "For mixing with the egg replacer."
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 1.5,
+        "units": "teaspoons"
+      }
+    ],
+    "other": [
+      {
+        "name": "Blueberries",
+        "amount": 1.5,
+        "units": "cups",
+        "notes": "Fresh or frozen."
+      }
+    ]
+  },
+  "instructions": [
+    "Preheat your oven to 400°F (200°C). Line a 12-cup muffin tin with paper liners or lightly grease it.",
+    "In a large bowl, whisk together the all-purpose flour, granulated sugar, vital wheat gluten, baking powder, powdered egg replacer, and salt until well combined.",
+    "In a separate medium bowl, whisk together the coconut milk, oil, water, and vanilla extract.",
+    "Pour the wet ingredients into the bowl with the dry ingredients. Stir with a spatula until just combined. Do not overmix; a few lumps are okay.",
+    "Gently fold in the blueberries. If using frozen blueberries, toss them with a tablespoon of flour from the dry ingredients before folding in to prevent sinking.",
+    "Divide the batter evenly among the 12 prepared muffin cups, filling each about three-quarters full.",
+    "Bake for 20-25 minutes, or until the tops are golden brown and a toothpick inserted into the center of a muffin comes out clean.",
+    "Let the muffins cool in the tin for 5 minutes before transferring them to a wire rack to cool completely."
+  ],
+  "notes": "For a crunchy topping, sprinkle a little coarse sugar on top of the muffins before baking. If you don't have vital wheat gluten, you can omit it, but the texture will be slightly more crumbly.",
+  "tags": [
+    "vegan",
+    "blueberry",
+    "muffin",
+    "breakfast",
+    "baking",
+    "dairy-free",
+    "egg-free",
+    "coconut milk"
+  ]
+}

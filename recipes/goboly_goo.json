@@ -1,0 +1,85 @@
+{
+  "name": "Goboly Goo",
+  "description": "A mischievously green and delightfully gooey dessert, rumored to be a favorite in goblin dens. Perfect for adventurous eaters and fantasy-themed parties!",
+  "prepTime": 15,
+  "cookTime": 0,
+  "servings": 6,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Cold milk",
+        "amount": 1.5,
+        "units": "cups"
+      },
+      {
+        "name": "Whipped topping",
+        "amount": 8,
+        "units": "oz",
+        "notes": "thawed"
+      },
+      {
+        "name": "Green food coloring",
+        "amount": [
+          2,
+          3
+        ],
+        "units": "qty",
+        "notes": "drops, optional for extra goblin-green color"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Pistachio instant pudding mix",
+        "amount": 1,
+        "units": "qty",
+        "notes": "3.4 oz box"
+      },
+      {
+        "name": "Mini marshmallows",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Chopped pecans",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "toasted, optional"
+      }
+    ],
+    "other": [
+      {
+        "name": "Crushed pineapple",
+        "amount": 8,
+        "units": "oz",
+        "notes": "from one can, drained very well"
+      },
+      {
+        "name": "Gummy worms",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "for garnish"
+      }
+    ]
+  },
+  "instructions": [
+    "In a large mixing bowl, whisk together the cold milk and the pistachio instant pudding mix for about 2 minutes, or until it begins to thicken.",
+    "If using, stir in a few drops of green food coloring until you achieve a vibrant goblin-green hue.",
+    "Gently fold in the thawed whipped topping until just combined. Be careful not to overmix.",
+    "Add the well-drained crushed pineapple, mini marshmallows, and optional chopped pecans to the bowl. Stir gently to incorporate everything.",
+    "Transfer the Goboly Goo to a large serving bowl or individual dessert dishes.",
+    "Cover and refrigerate for at least 1 hour to allow the goo to set and the flavors to meld.",
+    "Just before serving, artfully arrange the gummy worms on top, making them look like they are crawling out of the goo."
+  ],
+  "notes": "This dish is sometimes called 'Watergate Salad' or 'Pistachio Fluff' by humans, but we think 'Goboly Goo' is much more fun! For an extra chunky texture, try adding 1/2 cup of shredded coconut. The dessert is best served chilled.",
+  "tags": [
+    "dessert",
+    "no-bake",
+    "green",
+    "gooey",
+    "fantasy",
+    "party",
+    "pistachio",
+    "kids",
+    "salad"
+  ]
+}

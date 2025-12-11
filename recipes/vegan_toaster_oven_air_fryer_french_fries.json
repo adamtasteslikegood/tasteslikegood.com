@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Crispy, golden, and perfectly seasoned fresh-cut french fries made effortlessly in your toaster oven air fryer. A healthier, vegan-friendly alternative to deep-fried potatoes.",
+  "type": "object",
+  "name": "Vegan Toaster Oven Air Fryer French Fries",
+  "prepTime": 40,
+  "cookTime": 20,
+  "servings": 2,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "or other high-heat neutral oil"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "tsp",
+        "notes": "or to taste"
+      },
+      {
+        "name": "Paprika",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Garlic Powder",
+        "amount": 0.25,
+        "units": "tsp"
+      },
+      {
+        "name": "Black Pepper",
+        "amount": 0.25,
+        "units": "tsp",
+        "notes": "freshly ground, to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Russet Potatoes",
+        "amount": 2,
+        "units": "qty",
+        "notes": "medium-sized, scrubbed clean"
+      }
+    ]
+  },
+  "instructions": [
+    "Wash and scrub the potatoes thoroughly. Cut them into uniform 1/4-inch thick fries. Peeling is optional.",
+    "Place the cut fries into a large bowl of cold water and let them soak for at least 30 minutes. This removes excess starch and helps them get crispier.",
+    "Preheat your toaster oven air fryer to 400\u00b0F (200\u00b0C) on the air fry setting.",
+    "Drain the potatoes and pat them completely dry with a clean kitchen towel or paper towels. This step is crucial for achieving a crispy texture.",
+    "In a large, dry bowl, toss the potato fries with olive oil until they are lightly and evenly coated.",
+    "In a small separate bowl, mix together the salt, paprika, garlic powder, and black pepper.",
+    "Sprinkle the seasoning mix over the oiled fries and toss again to ensure they are evenly seasoned.",
+    "Arrange the fries in a single layer in the air fryer basket or tray. Do not overcrowd the basket; cook in batches if necessary to ensure even cooking.",
+    "Air fry for 15-20 minutes, shaking the basket or flipping the fries halfway through the cooking time, until they are golden brown and crispy.",
+    "Serve immediately with your favorite vegan dipping sauce like ketchup or vegan aioli."
+  ],
+  "notes": "For extra crispy fries, soak the potatoes for a longer period (up to 2 hours), changing the water once. Ensure potatoes are completely dry before adding oil. Feel free to experiment with other seasonings like onion powder, chili powder, or dried herbs like rosemary.",
+  "tags": [
+    "vegan",
+    "french fries",
+    "toaster oven",
+    "air fryer",
+    "side dish",
+    "snack",
+    "potato",
+    "gluten-free",
+    "healthy"
+  ],
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}

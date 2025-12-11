@@ -1,0 +1,129 @@
+{
+  "name": "Post-Apocalyptic Pantry Pile-Up",
+  "description": "A chaotic but comforting dish for when you've raided the pantry and need a miracle. A messy, delicious pile-up of roasted root vegetables, beans, and whatever else you can salvage. Survival has never tasted so good.",
+  "prepTime": 15,
+  "cookTime": 30,
+  "servings": 2,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "Sweet potatoes",
+        "amount": 2,
+        "units": "qty",
+        "notes": "large, scrubbed and chopped into 1-inch cubes"
+      },
+      {
+        "name": "Canned black beans",
+        "amount": 15,
+        "units": "oz",
+        "notes": "rinsed and drained"
+      },
+      {
+        "name": "Canned corn",
+        "amount": 15,
+        "units": "oz",
+        "notes": "drained"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground cumin",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Chili powder",
+        "amount": 0.5,
+        "units": "tsp",
+        "notes": "or more, depending on your courage"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "or any high-heat oil you have"
+      },
+      {
+        "name": "Salsa",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "from a jar, any kind"
+      }
+    ],
+    "other": [
+      {
+        "name": "Avocado",
+        "amount": 1,
+        "units": "qty",
+        "notes": "diced, if you're lucky enough to find one"
+      },
+      {
+        "name": "Pickled jalape\u00f1os",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "chopped"
+      },
+      {
+        "name": "Fresh cilantro",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "chopped, if any survived the blast"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Secure the perimeter and preheat your oven to 400\u00b0F (200\u00b0C). Find a baking sheet."
+    },
+    {
+      "step": 2,
+      "description": "In a large bowl, toss the sweet potato cubes with the oil, smoked paprika, cumin, chili powder, salt, and pepper. Make sure every piece is coated for maximum flavor survival."
+    },
+    {
+      "step": 3,
+      "description": "Spread the seasoned sweet potatoes in a single layer on the baking sheet. Roast for 25-30 minutes, or until tender and slightly charred, like the world you once knew. Flip them halfway through."
+    },
+    {
+      "step": 4,
+      "description": "While the potatoes are roasting, prepare the 'sludge'. In a small bowl, combine the rinsed black beans, drained corn, and salsa. Mix it all together. It's not pretty, but it's sustenance."
+    },
+    {
+      "step": 5,
+      "description": "Once the sweet potatoes are cooked, remove them from the oven. Divide the roasted potato 'rubble' between two plates or bowls."
+    },
+    {
+      "step": 6,
+      "description": "Spoon the bean and corn mixture haphazardly over the potatoes. Embrace the chaos."
+    },
+    {
+      "step": 7,
+      "description": "If you have them, scatter the diced avocado, pickled jalape\u00f1os, and fresh cilantro over the top. Serve immediately and enjoy your delicious disaster."
+    }
+  ],
+  "notes": "This recipe is a blueprint for survival. Feel free to substitute any ingredient with what you have on hand. Canned chickpeas, lentils, or other root vegetables work well. No fresh garnishes? Crushed tortilla chips or stale breadcrumbs add a great crunch.",
+  "tags": [
+    "vegan",
+    "pantry",
+    "disaster",
+    "comfort food",
+    "gluten-free",
+    "easy",
+    "one-pan"
+  ]
+}

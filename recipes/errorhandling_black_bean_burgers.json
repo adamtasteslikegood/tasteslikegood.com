@@ -1,0 +1,118 @@
+{
+  "name": "Error-Handling Black Bean Burgers",
+  "description": "A robust and forgiving vegan burger recipe for when your dinner plans return a 400 Bad Request. These burgers handle errors well and always compile into a delicious, satisfying meal.",
+  "prepTime": 15,
+  "cookTime": 20,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Canned black beans",
+        "amount": 15,
+        "units": "oz",
+        "notes": "rinsed, drained, and patted very dry"
+      },
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "divided for cooking veggies and patties"
+      },
+      {
+        "name": "Vegan Worcestershire sauce",
+        "amount": 2,
+        "units": "tsp"
+      },
+      {
+        "name": "Tamari or low-sodium soy sauce",
+        "amount": 1,
+        "units": "Tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Panko breadcrumbs",
+        "amount": 0.75,
+        "units": "cup",
+        "notes": "add more if mixture is too wet"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground cumin",
+        "amount": 1.5,
+        "units": "teaspoons"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Onion powder",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "freshly ground"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Yellow onion",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "finely chopped"
+      },
+      {
+        "name": "Red bell pepper",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "finely chopped"
+      },
+      {
+        "name": "Vegan burger buns",
+        "amount": 4,
+        "units": "qty",
+        "notes": "for serving"
+      },
+      {
+        "name": "Toppings (lettuce, tomato, avocado, vegan mayo)",
+        "amount": 1,
+        "units": "to taste",
+        "notes": "for serving"
+      }
+    ]
+  },
+  "instructions": [
+    "Heat 1 Tbsp of olive oil in a skillet over medium heat. Saut\u00e9 the finely chopped onion and bell pepper for 5-7 minutes until soft. Set aside.",
+    "In a large bowl, add the thoroughly dried black beans. Mash about half of them with a fork or potato masher, leaving the other half whole for texture.",
+    "Add the saut\u00e9ed vegetables, breadcrumbs, all dry spices, vegan Worcestershire sauce, and tamari to the bowl with the beans.",
+    "Mix gently with your hands or a spatula until just combined. Be careful not to overmix into a paste. This is your 'request body'.",
+    "Perform 'error handling': If the mixture is too wet to form a patty, add more breadcrumbs, 1 Tbsp at a time, until it holds together.",
+    "Divide the mixture into 4 equal portions and form into patties. Place them on a plate and let them 'cache' in the refrigerator for at least 10 minutes to firm up.",
+    "Wipe out the skillet and heat the remaining 1 Tbsp of olive oil over medium-high heat. Cook the patties for 5-6 minutes per side, until a dark, stable crust forms and they are heated through.",
+    "Serve the burgers on toasted buns with your favorite toppings. A successful 200 OK response!"
+  ],
+  "notes": "The key to a non-mushy burger is drying the beans as much as possible. For an even firmer result, you can bake the rinsed and dried beans on a baking sheet at 350\u00b0F (175\u00b0C) for 15 minutes before mashing.",
+  "tags": [
+    "vegan",
+    "burger",
+    "black bean",
+    "easy",
+    "dinner",
+    "comfort food",
+    "error handling"
+  ]
+}

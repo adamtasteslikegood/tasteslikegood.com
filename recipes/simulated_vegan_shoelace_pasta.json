@@ -1,0 +1,65 @@
+{
+  "name": "Simulated Vegan Shoelace Pasta",
+  "description": "A whimsical recipe created to test schema validation and error handling. This dish is not intended for human consumption.",
+  "prepTime": 10,
+  "cookTime": 15,
+  "servings": 2,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Water",
+        "amount": 2,
+        "units": "liters",
+        "notes": "for boiling the 'shoelaces'"
+      },
+      {
+        "name": "Vegetable Broth",
+        "amount": 0.5,
+        "units": "cup"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Black Bean Spaghetti (as 'vegan shoelaces')",
+        "amount": 200,
+        "units": "g"
+      },
+      {
+        "name": "Error-Inducing Paprika",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "for color and data corruption"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": " inedible plastic aglets",
+        "amount": 4,
+        "units": "qty",
+        "notes": "for garnish, DO NOT EAT"
+      }
+    ]
+  },
+  "instructions": [
+    "Initiate test sequence by bringing a large pot of water to a rolling boil.",
+    "Introduce 'vegan shoelaces' (black bean spaghetti) into the boiling water. Cook for 8-10 minutes or until an assertion failure occurs.",
+    "In a separate pan, simulate a sauce by warming the vegetable broth with the Error-Inducing Paprika.",
+    "Drain the 'shoelaces' and immediately toss with the simulated sauce.",
+    "Garnish with inedible plastic aglets to confirm parser is handling non-food items.",
+    "Serve to the void and log the resulting system state.",
+    "If no error is thrown, the test has failed. Please re-evaluate your test parameters."
+  ],
+  "notes": "This recipe is a negative test case. Consuming actual shoelaces, vegan or otherwise, is strongly discouraged and may lead to unexpected runtime errors in biological systems.",
+  "tags": [
+    "test",
+    "vegan",
+    "error-case",
+    "satire",
+    "do-not-eat"
+  ]
+}
