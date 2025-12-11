@@ -1,0 +1,91 @@
+{
+    "name": "Vegan Baked Yams with Mini Marshmallows",
+    "description": "Sweet and comforting baked yams topped with vegan marshmallows.",
+    "prepTime": 10,
+    "cookTime": 45,
+    "servings": 4,
+    "ingredients": {
+        "wet": [
+            {
+                "name": "Coconut Oil",
+                "amount": 1,
+                "units": "Tbsp",
+                "notes": "Melted"
+            }
+        ],
+        "dry": [
+            {
+                "name": "Yams",
+                "amount": 2,
+                "units": "large",
+                "notes": "Scrubbed and Pricked"
+            },
+            {
+                "name": "Cinnamon",
+                "amount": 1,
+                "units": "tsp"
+            },
+            {
+                "name": "Nutmeg",
+                "amount": 0.5,
+                "units": "tsp"
+            }
+        ],
+        "other": [
+            {
+                "name": "Vegan Mini Marshmallows",
+                "amount": 1,
+                "units": "cup"
+            }
+        ]
+    },
+    "instructions": [
+        {
+            "step": 1,
+            "description": "Preheat oven to 400\u00b0F (200\u00b0C)."
+        },
+        {
+            "step": 2,
+            "description": "Rub yams with melted coconut oil and sprinkle with cinnamon and nutmeg."
+        },
+        {
+            "step": 3,
+            "description": "Place yams on a baking sheet and bake for 30-40 minutes, or until fork-tender."
+        },
+        {
+            "step": 4,
+            "description": "Remove from oven and carefully slice each yam open lengthwise."
+        },
+        {
+            "step": 5,
+            "description": "Top each yam with vegan mini marshmallows."
+        },
+        {
+            "step": 6,
+            "description": "Return to the oven for 5-10 minutes, or until marshmallows are lightly golden brown."
+        },
+        {
+            "step": 7,
+            "description": "Let cool slightly before serving."
+        }
+    ],
+    "notes": "For added flavor, you can drizzle maple syrup or agave nectar over the yams before adding the marshmallows. Watch carefully while broiling so the marshmallows don't burn.",
+    "tags": [
+        "vegan",
+        "yam",
+        "marshmallow",
+        "sweet potato",
+        "baked",
+        "dessert",
+        "holiday"
+    ],
+    "stock_image_url": "https://images.pexels.com/photos/1387287/pexels-photo-1387287.jpeg",
+    "ai_image_url": "/static/images/ai_vegan_baked_yams_with_mini_marshmallows.png",
+    "user_id": "anonymous",
+    "ai_metadata": {
+        "model": "unknown",
+        "timestamp": "2025-12-04T16:15:46.336899",
+        "prompt": "unknown",
+        "images_working": true
+    }
+}

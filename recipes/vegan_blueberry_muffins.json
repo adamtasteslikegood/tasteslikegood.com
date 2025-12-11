@@ -112,5 +112,12 @@
     "blueberry"
   ],
   "stock_image_url": "https://loremflickr.com/800/600/Vegan,Blueberry,Muffins,(No,Banana)/all?lock=9220",
-  "ai_image_url": "/static/images/ai_vegan_blueberry_muffins.png"
+  "ai_image_url": "/static/images/ai_vegan_blueberry_muffins.png",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-05T01:07:54.002507",
+    "prompt": "unknown",
+    "images_working": true
+  }
 }

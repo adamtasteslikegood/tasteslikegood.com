@@ -83,5 +83,12 @@
     "pasta"
   ],
   "stock_image_url": "https://loremflickr.com/800/600/Crispy,Vegan,Pan-Fried,Gnocchi,with,Garlic,&,Herbs/all?lock=4807",
-  "ai_image_url": "/static/images/ai_crispy_vegan_fried_gnochi_garlic_herb.png"
+  "ai_image_url": "/static/images/ai_crispy_vegan_fried_gnochi_garlic_herb.png",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-05T01:07:54.005268",
+    "prompt": "unknown",
+    "images_working": true
+  }
 }
