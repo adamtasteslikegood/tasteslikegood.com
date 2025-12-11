@@ -1,21 +1,204 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Generate a New Recipe</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block title %}Generate a New Recipe{% endblock %}
+
+{% block head %}
+    <style>
+        /* Loading Overlay Styles */
+        #loading-overlay {
+            display: none; /* Hidden by default */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            color: #fff;
+            text-align: center;
+            padding: 20px;
+        }
+
+        .spinner {
+            border: 8px solid #f3f3f3;
+            border-top: 8px solid #3498db;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        #joke-container {
+            font-size: 1.2em;
+            max-width: 600px;
+            line-height: 1.5;
+            min-height: 100px; /* Prevent layout shift */
+        }
+        
+        select {
+            padding: 10px;
+            margin-bottom: 15px;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        
+        #model-loading {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
+        
+        .error-message {
+            color: red;
+            font-size: 0.9em;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
     <h1>Generate a New Recipe with AI</h1>
     <p>Enter a description of the recipe you want to create. For example, "a vegan gluten-free chocolate chip cookie recipe."</p>
 
-    <form action="{{ url_for('generate_recipe') }}" method="post">
-        <textarea name="prompt" placeholder="Enter your recipe idea here..."></textarea>
-        <button type="submit">Generate Recipe</button>
+    <form id="generate-form" action="{{ url_for('generate_recipe') }}" method="post">
+        <label for="model-select"><strong>Select Model:</strong></label>
+        <div id="model-loading">Loading additional models...</div>
+        <select name="model" id="model-select">
+            <option value="models/gemini-2.5-flash" selected>Gemini 2.5 Flash (Default)</option>
+            <option value="" disabled>── Loading more models... ──</option>
+        </select>
+        <div id="model-error" class="error-message"></div>
+
+        <textarea name="prompt" placeholder="Enter your recipe idea here..." required minlength="10" maxlength="500"></textarea>
+        <button type="submit" id="submit-btn">Generate Recipe</button>
     </form>
 
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Back to all recipes</a>
-</body>
-</html>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" role="dialog" aria-modal="true" aria-labelledby="loading-title">
+        <div class="spinner"></div>
+        <h2 id="loading-title">Generating Recipe...</h2>
+        <p>Please wait while we whip up something delicious.</p>
+        <div id="joke-container"></div>
+    </div>
 
+    <script>
+        const jokes = [
+            "Why did the programmer quit his job? He didn't get arrays.",
+            "How do you comfort a JavaScript bug? You console it.",
+            "Why do programmers prefer dark mode? Because light attracts bugs.",
+            "A SQL query walks into a bar, walks up to two tables and asks, 'Can I join you?'",
+            "Why was the developer unhappy at their job? They wanted arrays.",
+            "What is a programmer's favorite hangout place? Foo Bar.",
+            "Why did the Java developers wear glasses? Because they don't C#.",
+            "3 SQL statements walk into a NoSQL bar. A little while later they walk out... because they couldn't find a table.",
+            "A programmer puts two glasses on his bedside table before going to sleep. A full one, in case he gets thirsty, and an empty one, in case he doesn't.",
+            "Knock, knock. Who's there? Recursion. Recursion who? Knock, knock.",
+            "There are 10 types of people in the world: those who understand binary, and those who don't.",
+            "I'd tell you a joke about UDP, but you might not get it."
+        ];
+
+        const form = document.getElementById('generate-form');
+        const overlay = document.getElementById('loading-overlay');
+        const jokeContainer = document.getElementById('joke-container');
+        const submitBtn = document.getElementById('submit-btn');
+        const modelSelect = document.getElementById('model-select');
+        const modelLoading = document.getElementById('model-loading');
+        const modelError = document.getElementById('model-error');
+
+        // Fetch Models
+        async function fetchModels() {
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.statusText}`);
+                }
+                const models = await response.json();
+
+                // Remove the "loading" placeholder option (second option)
+                if (modelSelect.options.length > 1) {
+                    modelSelect.remove(1);
+                }
+
+                if (models.length === 0) {
+                    modelLoading.style.display = 'none';
+                    return;
+                }
+
+                // Add separator before additional models
+                const separator = document.createElement('option');
+                separator.disabled = true;
+                separator.text = '── Additional Models ──';
+                modelSelect.add(separator);
+
+                // Populate with fetched models (skip if it's the default)
+                models.forEach(model => {
+                    // Skip if this is the default model already shown
+                    if (model.id === 'models/gemini-2.5-flash') return;
+
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.text = model.name;
+                    modelSelect.add(option);
+                });
+
+                modelLoading.style.display = 'none';
+
+            } catch (error) {
+                console.error('Error fetching models:', error);
+                modelLoading.style.display = 'none';
+
+                // Remove loading placeholder on error
+                if (modelSelect.options.length > 1 && modelSelect.options[1].value === '') {
+                    modelSelect.remove(1);
+                }
+
+                modelError.textContent = "Could not load additional models.";
+            }
+        }
+
+        form.addEventListener('submit', function(e) {
+            // Show the overlay
+            overlay.style.display = 'flex';
+            
+            // Disable submit button to prevent double submission
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Cooking...';
+
+            // Display a random joke immediately
+            displayRandomJoke();
+
+            // Cycle jokes every 5 seconds
+            setInterval(displayRandomJoke, 5000);
+            
+            // Focus on the overlay for accessibility
+            overlay.focus();
+        });
+
+        function displayRandomJoke() {
+            const randomIndex = Math.floor(Math.random() * jokes.length);
+            jokeContainer.innerText = jokes[randomIndex];
+        }
+        
+        // Fix for Back Button: Hide overlay when page is shown from history
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                // Page was restored from bfcache
+                overlay.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Generate Recipe';
+            }
+        });
+
+        // Initial Fetch
+        document.addEventListener('DOMContentLoaded', fetchModels);
+    </script>
+{% endblock %}

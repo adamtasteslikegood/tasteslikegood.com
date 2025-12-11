@@ -3,3 +3,11 @@
 /.venv/
 /.new_venv/
 /.idea/
+.env
+/recipes/
+recipe_error.json
+recipe_error.txt
+__pycache__/
+
+.gemini/
+gha-creds-*.json

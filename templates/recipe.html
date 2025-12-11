@@ -1,13 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ recipe.name }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}{{ recipe.name }}{% endblock %}
+
+{% block content %}
     <h1>{{ recipe.name }}</h1>
     <p><em>{{ recipe.description }}</em></p>
 
@@ -66,7 +61,11 @@
         <h2>Instructions</h2>
         <ol>
             {% for step in recipe.instructions %}
-            <li>{{ step }}</li>
+                {% if step is mapping %}
+                    <li>{{ step.description }}</li>
+                {% else %}
+                    <li>{{ step }}</li>
+                {% endif %}
             {% endfor %}
         </ol>
     </div>
@@ -86,9 +85,6 @@
         {% endfor %}
     </div>
     {% endif %}
-
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Back to all recipes</a>
-
 
     <script>
         // Wait until the page content is fully loaded
@@ -163,6 +159,4 @@
             return fractions[roundedNum] || num.toFixed(2);
         }
     </script>
-
-</body>
-</html>
+{% endblock %}

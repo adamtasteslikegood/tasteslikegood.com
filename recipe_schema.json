@@ -133,36 +133,7 @@
         },
         "units": {
           "type": "string",
-          "description": "Unit of measurement",
-          "enum": [
-            "cup",
-            "cups",
-            "tsp",
-            "teaspoon",
-            "teaspoons",
-            "Tbs",
-            "Tbsp",
-            "tablespoon",
-            "tablespoons",
-            "oz",
-            "ounce",
-            "ounces",
-            "g",
-            "gram",
-            "grams",
-            "kg",
-            "kilogram",
-            "kilograms",
-            "ml",
-            "milliliter",
-            "milliliters",
-            "l",
-            "liter",
-            "liters",
-            "qty",
-            "pinch",
-            "to taste"
-          ]
+          "description": "Unit of measurement"
         },
         "notes": {
           "type": "string",

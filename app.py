@@ -1,12 +1,23 @@
 import os
 import json
+import time
 
-from google import genai
-from flask import Flask, render_template, abort, request, redirect, url_for
+from dotenv import load_dotenv
+from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
+from google.genai import Client
+import google.oauth2.credentials
+
 from jsonschema import Draft7Validator, ValidationError
+from auth import auth_bp
+from utils import normalize_recipe_data
+
+load_dotenv()
 
 # Initialize the Flask application
 app = Flask(__name__)
+app.secret_key = os.urandom(24)
+app.register_blueprint(auth_bp, url_prefix='/auth')
+
 
 # The folder where the recipe .json files are stored
 RECIPES_DIR = 'recipes'
@@ -28,12 +39,8 @@ def _load_recipe_schema():
 RECIPE_SCHEMA = _load_recipe_schema()
 RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
-# --- NEW: Configure the generative model ---
+# Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-client = None
-
-if GOOGLE_API_KEY:
-    client = genai.Client(api_key=GOOGLE_API_KEY)
 
 
 def validate_recipe_data(recipe_data):
@@ -103,12 +110,97 @@ def show_recipe_json(filename):
     try:
         with open(filepath, 'r') as f:
             recipe_data = json.load(f)
-        recipe_data['filename'] = filename
+        
         pretty_json = json.dumps(recipe_data, indent=2)
+        
+        if request.args.get('raw') == 'true':
+            return Response(pretty_json, mimetype='application/json')
+            
+        recipe_data['filename'] = filename
         return render_template('json_viewer.html', recipe=recipe_data, recipe_json_str=pretty_json)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
         abort(500)
+
+
+MODELS_LIST_PATH = 'models_list.json'
+
+# Curated list of preferred Gemini models for recipe generation
+PREFERRED_MODELS = [
+    'models/gemini-2.5-pro',
+    'models/gemini-2.5-flash',
+    'models/gemini-2.0-flash',
+    'models/gemini-2.0-flash-exp',
+    'models/gemini-3-pro-preview',
+    'models/gemini-2.0-flash-lite',
+    'models/gemini-exp-1206',
+    'models/gemini-pro-latest',
+    'models/gemini-flash-latest',
+]
+
+
+def load_models_from_cache():
+    """Load models from the cached models_list.json file."""
+    try:
+        with open(MODELS_LIST_PATH, 'r') as f:
+            data = json.load(f)
+            return data.get('models', [])
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Could not load models cache: {e}")
+        return None
+
+
+@app.route('/api/models')
+def get_models():
+    """Returns a curated list of Gemini models for recipe generation."""
+    try:
+        # Try to load from cache first
+        cached_models = load_models_from_cache()
+
+        if cached_models:
+            # Filter to preferred models and text generation capable ones
+            # Exclude: embedding, imagen, veo, live, tts, audio, robotics models
+            exclude_patterns = ['embedding', 'imagen', 'veo', 'live', 'tts', 'audio', 'robotics', 'aqa']
+
+            filtered_models = []
+            for m in cached_models:
+                model_name = m.get('name', '').lower()
+
+                # Skip non-generation models
+                if any(pattern in model_name for pattern in exclude_patterns):
+                    continue
+
+                # Skip image generation specific models
+                if 'image' in model_name and 'gemini' in model_name:
+                    continue
+
+                # Only include gemini/gemma models
+                if not ('gemini' in model_name or 'gemma' in model_name):
+                    continue
+
+                filtered_models.append({
+                    'id': m.get('name'),
+                    'name': m.get('display_name') or m.get('name')
+                })
+
+            # Sort: preferred models first, then alphabetically
+            def sort_key(model):
+                model_id = model['id']
+                if model_id in PREFERRED_MODELS:
+                    return (0, PREFERRED_MODELS.index(model_id))
+                return (1, model['name'])
+
+            filtered_models.sort(key=sort_key)
+
+            # Return top 8 models
+            return jsonify(filtered_models[:8])
+
+        # Fallback: return empty list if no cache available
+        return jsonify([])
+
+    except Exception as e:
+        print(f"Error fetching models: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 # --- NEW: Route for generating recipes ---
@@ -116,15 +208,12 @@ def show_recipe_json(filename):
 def generate_recipe():
     """Handles both displaying the form and processing the generation request."""
     if request.method == 'POST':
-        if client is None:
-            return (
-                "Recipe generation is not configured. Set the GOOGLE_API_KEY environment variable and restart the application.",
-                500,
-            )
-
         prompt = request.form.get('prompt', '').strip()
         if not prompt:
             return "A prompt describing the desired recipe is required.", 400
+            
+        if len(prompt) < 10 or len(prompt) > 500:
+            return "Prompt must be between 10 and 500 characters.", 400
 
         if RECIPE_SCHEMA is None or RECIPE_VALIDATOR is None:
             return "Recipe schema is unavailable; cannot validate generated recipes.", 500
@@ -132,6 +221,9 @@ def generate_recipe():
         # The JSON schema to guide the model's output
         with open(RECIPE_SCHEMA_PATH, 'r') as f:
             schema = f.read()
+
+        # Get the selected model from the form, default to the preview model
+        selected_model = request.form.get('model', 'gemini-3-pro-preview')
 
         # Create the full prompt for the model
         full_prompt = (
@@ -141,50 +233,70 @@ def generate_recipe():
             f"Do not include any text before or after the JSON object."
         )
 
-        recipe_json_str = ""
-        response = None
-
-        try:
-            # Generate the content
+        def attempt_generation(client, source_name, model_name):
+            """Helper to attempt generation with a specific client."""
+            print(f"Attempting generation using {source_name} with model {model_name}...")
             response = client.models.generate_content(
-                model='gemini-2.5-pro',
-                contents=full_prompt,
+                model=model_name,
+                contents=full_prompt
             )
             # Extract the JSON string from the response
-            recipe_json_str = response.text.strip().replace('```json', '').replace('```', '').strip()
+            text_response = response.text.strip().replace('```json', '').replace('```', '').strip()
+            # Parse and validate
+            data = json.loads(text_response)
+            
+            # --- NEW: Normalize data before validation ---
+            data = normalize_recipe_data(data)
+            
+            validate_recipe_data(data)
+            return data, text_response
 
-            # Parse the JSON string into a Python dictionary
-            recipe_data = json.loads(recipe_json_str)
+        recipe_data = None
+        last_error_message = "No generation method available."
+        recipe_json_str = "" # Keep for error logging
+        response = None # Keep for error logging
 
-            # Validate the recipe before saving it
-            validate_recipe_data(recipe_data)
+        start_time = time.time()
 
-            # Create a filename from the recipe name
-            safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
-            filename = safe_filename.replace(' ', '_').lower() + '.json'
-            filepath = os.path.join(RECIPES_DIR, filename)
+        # 1. Try User Credentials
+        if 'credentials' in session:
+            try:
+                creds = google.oauth2.credentials.Credentials(**session['credentials'])
+                user_client = Client(credentials=creds)
+                recipe_data, recipe_json_str = attempt_generation(user_client, "User Credentials", selected_model)
+            except Exception as e:
+                print(f"User credential generation failed: {e}")
+                last_error_message = f"User Auth Error ({type(e).__name__}): {e}"
+        
+        # 2. Fallback to API Key if step 1 failed or wasn't attempted
+        if recipe_data is None and GOOGLE_API_KEY:
+            try:
+                api_client = Client(api_key=GOOGLE_API_KEY)
+                recipe_data, recipe_json_str = attempt_generation(api_client, "API Key", selected_model)
+            except Exception as e:
+                print(f"API Key generation failed: {e}")
+                last_error_message = f"API Key Error ({type(e).__name__}): {e}"
 
-            # Save the new recipe to a file
-            with open(filepath, 'w') as f:
-                json.dump(recipe_data, f, indent=2)
+        if recipe_data:
+            try:
+                # Create a filename from the recipe name
+                safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
+                filename = safe_filename.replace(' ', '_').lower() + '.json'
+                filepath = os.path.join(RECIPES_DIR, filename)
 
-            # Redirect to the new recipe's page
-            return redirect(url_for('show_recipe', filename=filename))
+                # Save the new recipe to a file
+                with open(filepath, 'w') as f:
+                    json.dump(recipe_data, f, indent=2)
+                    
+                end_time = time.time()
+                print(f"Recipe generated successfully in {end_time - start_time:.2f} seconds.")
 
-        except json.JSONDecodeError as e:
-            # Handle JSON parsing errors
-            error_message = f"JSON parsing error: {e}"
-        except ValidationError as e:
-            error_message = f"Schema validation error: {e.message}"
-        except RuntimeError as e:
-            error_message = str(e)
-        except FileNotFoundError as e:
-            # Handle file I/O errors
-            error_message = f"File error: {e}"
-        except Exception as e:
-            # Handle all other unexpected errors
-            error_message = f"Unexpected error: {e}"
+                # Redirect to the new recipe's page
+                return redirect(url_for('show_recipe', filename=filename))
+            except Exception as e:
+                last_error_message = f"File Save Error: {e}"
 
+        # If we reached here, both methods failed or saving failed
         # Log the error details securely
         try:
             with open('recipe_error.json', 'a+') as f:
@@ -192,17 +304,17 @@ def generate_recipe():
             with open('recipe_error.txt', 'a') as f:
                 f.write(
                     f"Full prompt:\n{full_prompt}\n\n"
-                    f"Response:\n{getattr(response, 'text', 'No response')}\n"
-                    f"Error: {error_message}\n"
+                    f"Last Error: {last_error_message}\n"
                 )
         except Exception as logging_error:
             print(f"Error while logging: {logging_error}")
 
         # Show the error response to the user
-        return "Sorry, there was an error generating the recipe. Please try again.", 500
+        return f"Sorry, there was an error generating the recipe. Details: {last_error_message}", 500
 
     # For a GET request, just show the form
     return render_template('generate_recipe.html')
+
 
 
 if __name__ == '__main__':
