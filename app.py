@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import csv
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
@@ -12,6 +13,21 @@ from auth import auth_bp
 from utils import normalize_recipe_data
 
 load_dotenv()
+
+# Load configuration
+CONFIG_PATH = 'config.json'
+
+
+def _load_config():
+    try:
+        with open(CONFIG_PATH, 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Warning: Could not load config.json: {e}")
+        return {}
+
+
+CONFIG = _load_config()
 
 # Initialize the Flask application
 app = Flask(__name__)
@@ -150,50 +166,50 @@ def load_models_from_cache():
         return None
 
 
+def filter_and_sort_models(models_list):
+    """Filter and sort models for recipe generation."""
+    exclude_patterns = ['embedding', 'imagen', 'veo', 'live', 'tts', 'audio', 'robotics', 'aqa']
+
+    filtered_models = []
+    for m in models_list:
+        model_name = m.get('name', '').lower()
+
+        # Skip non-generation models
+        if any(pattern in model_name for pattern in exclude_patterns):
+            continue
+
+        # Skip image generation specific models
+        if 'image' in model_name and 'gemini' in model_name:
+            continue
+
+        # Only include gemini/gemma models
+        if not ('gemini' in model_name or 'gemma' in model_name):
+            continue
+
+        filtered_models.append({
+            'id': m.get('name'),
+            'name': m.get('display_name') or m.get('name')
+        })
+
+    # Sort: preferred models first, then alphabetically
+    def sort_key(model):
+        model_id = model['id']
+        if model_id in PREFERRED_MODELS:
+            return (0, PREFERRED_MODELS.index(model_id))
+        return (1, model['name'])
+
+    filtered_models.sort(key=sort_key)
+    return filtered_models[:8]
+
+
 @app.route('/api/models')
 def get_models():
     """Returns a curated list of Gemini models for recipe generation."""
     try:
-        # Try to load from cache first
         cached_models = load_models_from_cache()
 
         if cached_models:
-            # Filter to preferred models and text generation capable ones
-            # Exclude: embedding, imagen, veo, live, tts, audio, robotics models
-            exclude_patterns = ['embedding', 'imagen', 'veo', 'live', 'tts', 'audio', 'robotics', 'aqa']
-
-            filtered_models = []
-            for m in cached_models:
-                model_name = m.get('name', '').lower()
-
-                # Skip non-generation models
-                if any(pattern in model_name for pattern in exclude_patterns):
-                    continue
-
-                # Skip image generation specific models
-                if 'image' in model_name and 'gemini' in model_name:
-                    continue
-
-                # Only include gemini/gemma models
-                if not ('gemini' in model_name or 'gemma' in model_name):
-                    continue
-
-                filtered_models.append({
-                    'id': m.get('name'),
-                    'name': m.get('display_name') or m.get('name')
-                })
-
-            # Sort: preferred models first, then alphabetically
-            def sort_key(model):
-                model_id = model['id']
-                if model_id in PREFERRED_MODELS:
-                    return (0, PREFERRED_MODELS.index(model_id))
-                return (1, model['name'])
-
-            filtered_models.sort(key=sort_key)
-
-            # Return top 8 models
-            return jsonify(filtered_models[:8])
+            return jsonify(filter_and_sort_models(cached_models))
 
         # Fallback: return empty list if no cache available
         return jsonify([])
@@ -201,6 +217,88 @@ def get_models():
     except Exception as e:
         print(f"Error fetching models: {e}")
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/models/refresh', methods=['POST'])
+def refresh_models():
+    """Fetches fresh models from Gemini API and updates the cache."""
+    client = None
+    auth_method = None
+
+    # 1. Try User Credentials first
+    if 'credentials' in session:
+        try:
+            creds = google.oauth2.credentials.Credentials(**session['credentials'])
+            client = Client(credentials=creds)
+            auth_method = "user_credentials"
+        except Exception as e:
+            print(f"User credential client failed: {e}")
+
+    # 2. Fallback to API Key
+    if client is None and GOOGLE_API_KEY:
+        try:
+            client = Client(api_key=GOOGLE_API_KEY)
+            auth_method = "api_key"
+        except Exception as e:
+            print(f"API Key client failed: {e}")
+
+    if client is None:
+        return jsonify({
+            'error': 'No valid authentication method available. Please login or configure API key.'
+        }), 401
+
+    try:
+        # Fetch models from Gemini API
+        models_response = client.models.list()
+
+        # Convert to list of dicts for caching
+        models_data = []
+        for model in models_response:
+            models_data.append({
+                'name': model.name,
+                'display_name': getattr(model, 'display_name', model.name),
+                'supported_generation_methods': getattr(model, 'supported_generation_methods', [])
+            })
+
+        # Update the cache file
+        cache_data = {
+            'models': models_data,
+            'updated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+        }
+        with open(MODELS_LIST_PATH, 'w') as f:
+            json.dump(cache_data, f, indent=2)
+
+        # Return filtered models
+        filtered_models = filter_and_sort_models(models_data)
+
+        return jsonify({
+            'models': filtered_models,
+            'auth_method': auth_method,
+            'total_fetched': len(models_data),
+            'message': f'Successfully fetched {len(models_data)} models using {auth_method}'
+        })
+
+    except Exception as e:
+        print(f"Error refreshing models from API: {e}")
+        return jsonify({
+            'error': f'Failed to fetch models: {str(e)}',
+            'auth_method': auth_method
+        }), 500
+
+
+@app.route('/api/jokes')
+def get_jokes():
+    """Returns additional jokes from CSV file if it exists."""
+    joke_file = CONFIG.get('app', {}).get('joke_file', 'computer_jokes.csv')
+    if not os.path.exists(joke_file):
+        return jsonify([])
+    try:
+        with open(joke_file, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            return jsonify([row['joke'] for row in reader if row.get('joke')])
+    except Exception as e:
+        print(f"Error loading jokes from {joke_file}: {e}")
+        return jsonify([])
 
 
 # --- NEW: Route for generating recipes ---
@@ -222,8 +320,9 @@ def generate_recipe():
         with open(RECIPE_SCHEMA_PATH, 'r') as f:
             schema = f.read()
 
-        # Get the selected model from the form, default to the preview model
-        selected_model = request.form.get('model', 'gemini-3-pro-preview')
+        # Get the selected model from the form, default from config
+        default_model = CONFIG.get('app', {}).get('default_model', 'models/gemini-2.5-flash')
+        selected_model = request.form.get('model', default_model)
 
         # Create the full prompt for the model
         full_prompt = (
