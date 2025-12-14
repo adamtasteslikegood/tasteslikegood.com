@@ -242,6 +242,8 @@ def show_recipe(filename):
             # Save the updated recipe
             with open(filepath, 'w') as f:
                 json.dump(recipe_data, f, indent=2)
+            # Invalidate cache since recipe name may have changed during migration
+            invalidate_recipes_cache()
 
         recipe_data['filename'] = filename
         return render_template('recipe.html', recipe=recipe_data)
@@ -682,6 +684,10 @@ def run_migration():
                 
         except Exception as e:
             print(f"Error migrating {filename}: {e}")
+    
+    # Invalidate cache if any recipes were migrated (names may have changed)
+    if count > 0:
+        invalidate_recipes_cache()
             
     return jsonify({'migrated_count': count, 'files': updated_files})
 
