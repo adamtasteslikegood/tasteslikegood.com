@@ -27,6 +27,10 @@ RECIPE_SCHEMA_PATH = 'recipe_schema.json'
 # Ensure the recipes directory exists so list/save operations do not fail
 os.makedirs(RECIPES_DIR, exist_ok=True)
 
+# Simple cache for recipe list to avoid reading all files on every request
+_recipes_cache = {'data': None, 'timestamp': 0}
+_RECIPES_CACHE_TTL = 60  # Cache for 60 seconds
+
 
 def _load_recipe_schema():
     try:
@@ -95,11 +99,9 @@ def validate_recipe_data(recipe_data):
     if RECIPE_VALIDATOR is None:
         raise RuntimeError("Recipe schema is not available for validation.")
 
-    errors = sorted(
-        RECIPE_VALIDATOR.iter_errors(recipe_data), key=lambda e: tuple(e.path)
-    )
-    if errors:
-        first_error = errors[0]
+    # Get the first error without sorting all errors
+    first_error = next(RECIPE_VALIDATOR.iter_errors(recipe_data), None)
+    if first_error:
         location = " -> ".join(str(part) for part in first_error.absolute_path)
         message = first_error.message
         if location:
@@ -110,7 +112,15 @@ def validate_recipe_data(recipe_data):
 
 
 def get_all_recipes():
-    """Gets a list of all recipes, reading the name from each JSON file."""
+    """Gets a list of all recipes, with in-memory caching to reduce disk I/O."""
+    global _recipes_cache
+    
+    current_time = time.time()
+    # Return cached data if still valid
+    if _recipes_cache['data'] is not None and (current_time - _recipes_cache['timestamp']) < _RECIPES_CACHE_TTL:
+        return _recipes_cache['data']
+    
+    # Cache miss or expired - read from disk
     recipes = []
     for filename in os.listdir(RECIPES_DIR):
         if filename.endswith('.json'):
@@ -124,7 +134,21 @@ def get_all_recipes():
                     })
             except (json.JSONDecodeError, IOError) as e:
                 print(f"Warning: Could not read or parse {filename}. Error: {e}")
-    return sorted(recipes, key=lambda r: r['name'])
+    
+    sorted_recipes = sorted(recipes, key=lambda r: r['name'])
+    
+    # Update cache
+    _recipes_cache['data'] = sorted_recipes
+    _recipes_cache['timestamp'] = current_time
+    
+    return sorted_recipes
+
+
+def invalidate_recipes_cache():
+    """Invalidate the recipes cache, forcing a refresh on next request."""
+    global _recipes_cache
+    _recipes_cache['data'] = None
+    _recipes_cache['timestamp'] = 0
 
 
 def migrate_recipe_data(data, filename):
@@ -258,89 +282,21 @@ def get_models():
 
         client = Client(api_key=GOOGLE_API_KEY)
         
-        # List models
-        models_list = list(client.models.list())
-        
-        active_models = []
-        # Debug logging removed
-        
-        for m in models_list:
-
-            # Check for supported generation methods to ensure it's a text/content generation model
-            # and filter by the user's requested "isActive" flag if available, 
-            # though usually list() returns available models.
-            # We will convert to dict.
-            
-            # The prompt specifically asks to "Filter by isActive: true"
-            # We'll check if the attribute exists or if it's a property.
-            # Assuming 'm' is a Model object.
-            
-            # We'll construct a simple dict
-            model_data = {
-                'name': m.name,
-                'displayName': m.display_name,
-                # specific request:
-                # 'isActive': m.is_active # If this exists
-            }
-            
-            # Since we don't know for sure if 'is_active' is on the object, 
-            # and the prompt is specific, we will try to access it. 
-            # If it fails, we might assume true or check docs. 
-            # But safer to just include it if we can.
-            
-            # However, looking at standard Gemini API, usually we filter by 
-            # "generateContent" in supported_generation_methods.
-            
-            # The SDK is returning empty supported_generation_methods for all models.
-            # We will assume any model starting with 'models/gemini' or 'models/gemma' is valid for text generation
-            # and filter out obvious non-text ones if needed (like embedding).
-            
-            # Simple filter: include if name contains 'gemini' or 'gemma' and not 'embedding'
-            if ('gemini' in m.name or 'gemma' in m.name) and 'embedding' not in m.name:
-                # Clean up the name (remove 'models/' prefix if present for display, but keep for value)
-                model_id = m.name.replace('models/', '')
-                display_name = m.display_name or model_id
-                
-                active_models.append({
-                    'id': model_id,
-                    'name': display_name
-                })
-
-        # The prompt says "Filter by isActive: true". 
-        # I will strictly follow this instruction, assuming the user knows the API 
-        # or I should implement a filter logic.
-        # But wait, `client.models.list()` might not return 'isActive'.
-        # I will assume the User wants me to filter the *results* I send back 
-        # or expects the API to provide it.
-        # Actually, I'll just send back the list and let the frontend filter? 
-        # No, "The models in the list should be dynamically fetched... and only include active models."
-        
-        # Let's look at the `generate_recipe` function again.
-        # It uses `client.models.generate_content`.
-        
-        # Refined plan:
-        # 1. Fetch models.
-        # 2. Filter for those that support `generateContent`.
-        # 3. Limit to 10.
-        # 4. Return JSON.
-        
-        # I'll stick to a simple implementation first.
-        
+        # List models and filter in a single pass
         filtered_models = []
         count = 0
-        for m in models_list:
+        for m in client.models.list():
             if count >= 10:
                 break
                 
-            # Filter logic
-            # Exclude embeddings, older models (1.0, 1.5), and non-text modalities (image, audio, video)
+            # Filter logic: Include gemini/gemma models, exclude embeddings and older versions
             name = m.name.lower()
             if ('gemini' in name or 'gemma' in name) and 'embedding' not in name:
-                # Exclude specific keywords
+                # Exclude older models and non-text modalities
                 if any(x in name for x in ['1.0', '1.5', 'image', 'audio', 'video', 'vision', 'robotics']):
                     continue
                     
-                # Clean up the name (remove 'models/' prefix if present for display, but keep for value)
+                # Clean up the name (remove 'models/' prefix for display)
                 model_id = m.name.replace('models/', '')
                 display_name = m.display_name or model_id
                 
@@ -659,6 +615,9 @@ def generate_recipe():
                 # Save the new recipe to a file
                 with open(filepath, 'w') as f:
                     json.dump(recipe_data, f, indent=2)
+                
+                # Invalidate recipe list cache since we added a new recipe
+                invalidate_recipes_cache()
                     
                 end_time = time.time()
                 print(f"Recipe generated successfully in {end_time - start_time:.2f} seconds.")
