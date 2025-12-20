@@ -1,0 +1,141 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A sophisticated and refreshing plant-based appetizer that cleverly mimics classic steak tartare using finely diced tomatoes, capers, and a savory dijon dressing. Perfect for impressing guests.",
+  "name": "Vegan Tomato Tartare",
+  "prepTime": 20,
+  "cookTime": 5,
+  "servings": 2,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "Roma tomatoes",
+        "amount": 4,
+        "units": "qty",
+        "notes": "firm and ripe"
+      },
+      {
+        "name": "Shallot",
+        "amount": 1,
+        "units": "qty",
+        "notes": "small, finely minced"
+      },
+      {
+        "name": "Capers",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "rinsed and finely chopped"
+      },
+      {
+        "name": "Cornichons",
+        "amount": 3,
+        "units": "qty",
+        "notes": "finely chopped"
+      },
+      {
+        "name": "Fresh parsley",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "finely chopped, plus more for garnish"
+      },
+      {
+        "name": "Sea salt",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 0.25,
+        "units": "tsp",
+        "notes": "freshly ground"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Extra virgin olive oil",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Dijon mustard",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Vegan Worcestershire sauce",
+        "amount": 2,
+        "units": "tsp"
+      },
+      {
+        "name": "Lemon juice",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "freshly squeezed"
+      }
+    ],
+    "other": [
+      {
+        "name": "Vegan mayonnaise",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "For the optional 'yolk'"
+      },
+      {
+        "name": "Turmeric powder",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "For the optional 'yolk' color"
+      },
+      {
+        "name": "Black salt (kala namak)",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "Optional, for an 'eggy' flavor in the yolk"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Prepare the tomatoes: Bring a small pot of water to a boil. Score a small 'X' on the bottom of each tomato. Blanch them in the boiling water for 30-60 seconds, then immediately transfer to an ice bath to stop the cooking."
+    },
+    {
+      "step": 2,
+      "description": "Once cool enough to handle, peel the skins from the tomatoes. Cut them into quarters, remove the seeds and watery pulp with a small spoon, and discard."
+    },
+    {
+      "step": 3,
+      "description": "Finely dice the remaining tomato flesh into very small, uniform 1/4-inch (6mm) cubes. Place them in a non-reactive bowl."
+    },
+    {
+      "step": 4,
+      "description": "Add the finely minced shallot, chopped capers, chopped cornichons, and 2 tablespoons of finely chopped parsley to the bowl with the tomatoes."
+    },
+    {
+      "step": 5,
+      "description": "In a separate small bowl, whisk together the extra virgin olive oil, Dijon mustard, vegan Worcestershire sauce, and lemon juice to create the dressing. Season with salt and pepper."
+    },
+    {
+      "step": 6,
+      "description": "Pour the dressing over the tomato mixture and gently fold everything together until just combined. Be careful not to mash the tomatoes. Taste and adjust seasoning if necessary."
+    },
+    {
+      "step": 7,
+      "description": "For the optional 'yolk', mix the vegan mayonnaise with a pinch of turmeric for color and a pinch of black salt for flavor."
+    },
+    {
+      "step": 8,
+      "description": "To serve, use a ring mold to plate the tartare onto chilled plates. Create a small well in the center of each portion and add a dollop of the vegan 'yolk'. Garnish with extra parsley and serve immediately with toasted baguette slices, crostini, or gourmet crackers."
+    }
+  ],
+  "notes": "The key to a great texture is dicing the tomatoes very finely and uniformly. Ensure your Worcestershire sauce is vegan, as traditional versions contain anchovies. This dish is best served immediately after preparing to maintain its fresh texture.",
+  "tags": [
+    "vegan",
+    "appetizer",
+    "raw",
+    "plant-based",
+    "tomato tartare",
+    "no-cook",
+    "gluten-free option"
+  ]
+}

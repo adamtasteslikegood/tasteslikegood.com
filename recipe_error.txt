@@ -1,0 +1,4335 @@
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Disaster'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+```
+Error: Schema validation error: 'name' is a required property
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Disastaspect hope ozone dune winter guard sponsor gauge nest number super crystal there 
+🤤🤤🤤🤤'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "name": "Winter Dune Crystal Nest Bowl",
+  "description": "A hearty, warming vegan bowl designed to guard against the winter cold. It features a spiced quinoa base reminiscent of desert dunes, a nest of sweet potato noodles, and a glistening 'crystal' ginger-tahini sauce. A super dish to satisfy your cravings.",
+  "prepTime": 20,
+  "cookTime": 35,
+  "servings": 2,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "Quinoa",
+        "amount": 1,
+        "units": "cup",
+        "notes": "rinsed"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground cumin",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Sea salt",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Toasted sesame seeds",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "for garnish"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Vegetable broth",
+        "amount": 2,
+        "units": "cups"
+      },
+      {
+        "name": "Tahini",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "Maple syrup",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Tamari or soy sauce",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Rice vinegar",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Water",
+        "amount": 3,
+        "units": "Tbsp",
+        "notes": "to thin the sauce"
+      },
+      {
+        "name": "Olive oil",
+        "amount": 1,
+        "units": "Tbsp"
+      }
+    ],
+    "other": [
+      {
+        "name": "Sweet potato",
+        "amount": 1,
+        "units": "qty",
+        "notes": "large, spiralized or julienned"
+      },
+      {
+        "name": "Chickpeas",
+        "amount": 15,
+        "units": "oz",
+        "notes": "canned, rinsed and drained"
+      },
+      {
+        "name": "Fresh ginger",
+        "amount": 1,
+        "units": "inch",
+        "notes": "peeled and grated"
+      },
+      {
+        "name": "Garlic clove",
+        "amount": 1,
+        "units": "qty",
+        "notes": "minced"
+      },
+      {
+        "name": "Scallions",
+        "amount": 2,
+        "units": "qty",
+        "notes": "thinly sliced, for garnish"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Preheat your oven to 400°F (200°C). Pat the rinsed chickpeas completely dry. On a baking sheet, toss them with the olive oil, smoked paprika, and half of the cumin. Roast for 20-25 minutes, or until crispy."
+    },
+    {
+      "step": 2,
+      "description": "While the chickpeas roast, cook the quinoa. In a medium saucepan, combine the rinsed quinoa, vegetable broth, the remaining cumin, and garlic powder. Bring to a boil, then reduce heat to low, cover, and simmer for 15 minutes or until the liquid is absorbed. Fluff with a fork."
+    },
+    {
+      "step": 3,
+      "description": "Prepare the Crystal Tahini Sauce. In a small bowl, whisk together the tahini, maple syrup, tamari, rice vinegar, grated ginger, and minced garlic. Add 2-3 tablespoons of water, one at a time, until the sauce is smooth and pourable."
+    },
+    {
+      "step": 4,
+      "description": "Create the sweet potato 'nest'. Heat a large skillet over medium heat with a splash of water or oil. Add the spiralized sweet potato and sauté for 5-7 minutes until tender-crisp. Season lightly with salt and pepper."
+    },
+    {
+      "step": 5,
+      "description": "Assemble the bowls. Divide the spiced quinoa between two bowls. Top with a 'nest' of the sautéed sweet potato noodles. Sprinkle the crispy roasted chickpeas over the top. Drizzle generously with the crystal tahini sauce and garnish with toasted sesame seeds and sliced scallions."
+    }
+  ],
+  "notes": "For best results, use a spiralizer for the sweet potato, but a julienne peeler also works well. You can substitute the sweet potato with zucchini or carrot noodles for a different flavor profile.",
+  "tags": [
+    "vegan",
+    "winter",
+    "comfort food",
+    "gluten-free",
+    "healthy",
+    "bowl",
+    "tahini"
+  ]
+}
+```
+Error: Schema validation error: 'inch' is not one of ['cup', 'cups', 'tsp', 'teaspoon', 'teaspoons', 'Tbs', 'Tbsp', 'tablespoon', 'tablespoons', 'oz', 'ounce', 'ounces', 'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'qty', 'pinch', 'to taste'] (at ingredients -> other -> 2 -> units)
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Non-vegetarian baby duck pussy lip tacos'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "name": "Spicy King Oyster Mushroom Tacos",
+  "description": "Savory and satisfying vegan tacos featuring shredded king oyster mushrooms, cooked in a rich, smoky adobo sauce. A delicious and cruelty-free take on classic street tacos.",
+  "prepTime": 15,
+  "cookTime": 20,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Soy sauce or tamari",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Lime juice",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "freshly squeezed"
+      },
+      {
+        "name": "Chipotle peppers in adobo sauce",
+        "amount": 2,
+        "units": "Tbs",
+        "notes": "finely chopped, adjust to taste"
+      },
+      {
+        "name": "Water",
+        "amount": 0.25,
+        "units": "cup"
+      }
+    ],
+    "dry": [
+      {
+        "name": "King oyster mushrooms",
+        "amount": 1,
+        "units": "lb",
+        "notes": "also known as King Trumpet mushrooms"
+      },
+      {
+        "name": "Yellow onion",
+        "amount": 1,
+        "units": "qty",
+        "notes": "medium, finely chopped"
+      },
+      {
+        "name": "Garlic",
+        "amount": 3,
+        "units": "qty",
+        "notes": "cloves, minced"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Cumin",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Oregano",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Corn tortillas",
+        "amount": 8,
+        "units": "qty",
+        "notes": "small, for serving"
+      },
+      {
+        "name": "Fresh cilantro",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "chopped, for garnish"
+      },
+      {
+        "name": "Red onion",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "finely diced, for garnish"
+      },
+      {
+        "name": "Avocado",
+        "amount": 1,
+        "units": "qty",
+        "notes": "sliced or mashed, for garnish"
+      },
+      {
+        "name": "Lime wedges",
+        "amount": 4,
+        "units": "qty",
+        "notes": "for serving"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Prepare the mushrooms: Clean the king oyster mushrooms. Using a fork, shred the stems lengthwise to create a pulled, meat-like texture. Roughly chop the caps."
+    },
+    {
+      "step": 2,
+      "description": "Heat the olive oil in a large skillet or pan over medium-high heat. Add the chopped yellow onion and cook until softened, about 3-4 minutes."
+    },
+    {
+      "step": 3,
+      "description": "Add the minced garlic, smoked paprika, cumin, and oregano to the skillet. Cook for another minute until fragrant."
+    },
+    {
+      "step": 4,
+      "description": "Add the shredded and chopped mushrooms to the skillet. Cook, stirring occasionally, for 8-10 minutes, until the mushrooms have released their moisture and started to brown and crisp up on the edges."
+    },
+    {
+      "step": 5,
+      "description": "In a small bowl, whisk together the soy sauce, lime juice, chopped chipotle peppers, and water. Pour the sauce over the mushrooms in the skillet."
+    },
+    {
+      "step": 6,
+      "description": "Stir everything to combine and let the sauce simmer for 2-3 minutes, until it has thickened and coats the mushrooms well. Season with salt and pepper to taste."
+    },
+    {
+      "step": 7,
+      "description": "While the filling simmers, warm the corn tortillas in a dry pan, over a gas flame, or in the microwave."
+    },
+    {
+      "step": 8,
+      "description": "Assemble the tacos: Spoon the spicy mushroom filling into the warm tortillas. Garnish with fresh cilantro, diced red onion, and avocado slices. Serve immediately with lime wedges on the side."
+    }
+  ],
+  "notes": "For a meatier texture, press the shredded mushrooms between paper towels to remove excess moisture before cooking. You can also add a tablespoon of nutritional yeast for a cheesy flavor.",
+  "tags": [
+    "vegan",
+    "tacos",
+    "mexican",
+    "plant-based",
+    "mushrooms",
+    "dinner",
+    "spicy"
+  ]
+}
+```
+Error: Schema validation error: 'lb' is not one of ['cup', 'cups', 'tsp', 'teaspoon', 'teaspoons', 'Tbs', 'Tbsp', 'tablespoon', 'tablespoons', 'oz', 'ounce', 'ounces', 'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'qty', 'pinch', 'to taste'] (at ingredients -> dry -> 0 -> units)
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Non-vegetarian baby duck pussy lip tacos'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "name": "Spicy Shredded Mushroom Tacos",
+  "description": "Hearty, savory, and completely plant-based tacos featuring shredded king oyster mushrooms cooked in a smoky and spicy adobo sauce. A delicious and satisfying vegan take on a classic.",
+  "prepTime": 20,
+  "cookTime": 25,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Soy sauce or tamari",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Lime juice",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "freshly squeezed"
+      },
+      {
+        "name": "Maple syrup",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Liquid smoke",
+        "amount": 0.5,
+        "units": "tsp",
+        "notes": "optional, for a smokier flavor"
+      }
+    ],
+    "dry": [
+      {
+        "name": "King oyster mushrooms",
+        "amount": 1,
+        "units": "lb",
+        "notes": "about 450g"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Chili powder",
+        "amount": 2,
+        "units": "tsp"
+      },
+      {
+        "name": "Cumin powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Onion powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 0.5,
+        "units": "tsp",
+        "notes": "freshly ground"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Corn tortillas",
+        "amount": 8,
+        "units": "qty",
+        "notes": "small or medium"
+      },
+      {
+        "name": "Red onion",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "finely diced, for topping"
+      },
+      {
+        "name": "Cilantro",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "freshly chopped, for topping"
+      },
+      {
+        "name": "Avocado",
+        "amount": 1,
+        "units": "qty",
+        "notes": "sliced or mashed, for topping"
+      },
+      {
+        "name": "Lime wedges",
+        "amount": 4,
+        "units": "qty",
+        "notes": "for serving"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Prepare the mushrooms: Clean the king oyster mushrooms and trim the ends. Using a fork, shred the mushroom stems lengthwise to create a pulled, meat-like texture. Roughly chop the caps."
+    },
+    {
+      "step": 2,
+      "description": "Create the marinade: In a large bowl, whisk together the olive oil, soy sauce, lime juice, maple syrup, liquid smoke (if using), smoked paprika, chili powder, cumin, garlic powder, and onion powder."
+    },
+    {
+      "step": 3,
+      "description": "Marinate the mushrooms: Add the shredded mushrooms to the bowl with the marinade and toss well to ensure every piece is evenly coated. Let it sit for at least 10 minutes."
+    },
+    {
+      "step": 4,
+      "description": "Cook the filling: Heat a large skillet or pan over medium-high heat. Once hot, add the marinated mushrooms in a single layer (you may need to do this in batches). Cook for 8-10 minutes, stirring occasionally, until the mushrooms are browned and slightly crispy on the edges."
+    },
+    {
+      "step": 5,
+      "description": "Warm the tortillas: While the mushrooms are cooking, warm the corn tortillas in a dry pan, over a gas flame, or in the microwave until soft and pliable."
+    },
+    {
+      "step": 6,
+      "description": "Assemble the tacos: Spoon the cooked mushroom filling into the warm tortillas. Top with diced red onion, fresh cilantro, and sliced avocado. Serve immediately with lime wedges on the side."
+    }
+  ],
+  "notes": "For a creamier texture, you can make a quick cashew or avocado crema to drizzle on top. Adjust the chili powder to your preferred level of spiciness.",
+  "tags": [
+    "Vegan",
+    "Plant-Based",
+    "Tacos",
+    "Mexican-Inspired",
+    "Mushroom",
+    "Dinner",
+    "Gluten-Free"
+  ]
+}
+```
+Error: Schema validation error: 'lb' is not one of ['cup', 'cups', 'tsp', 'teaspoon', 'teaspoons', 'Tbs', 'Tbsp', 'tablespoon', 'tablespoons', 'oz', 'ounce', 'ounces', 'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'qty', 'pinch', 'to taste'] (at ingredients -> dry -> 0 -> units)
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Non-vegetarian baby duck pussy lip tacos'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+```
+Error: Schema validation error: 'name' is a required property
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Non-vegetarian baby duck pussy lip tacos'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+```json
+{
+  "name": "Spicy Hoisin Mushroom Tacos",
+  "description": "Savory, shredded king oyster mushrooms stir-fried in a sweet and spicy hoisin glaze, served in warm corn tortillas with a crisp, tangy slaw. A completely plant-based and delicious fusion dish.",
+  "prepTime": 20,
+  "cookTime": 15,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Hoisin sauce",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "Soy sauce or tamari",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Rice vinegar",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Toasted sesame oil",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Sriracha or chili garlic sauce",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "Adjust to taste"
+      },
+      {
+        "name": "Vegetable oil",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Lime juice",
+        "amount": 1,
+        "units": "Tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "King oyster mushrooms",
+        "amount": 1,
+        "units": "lb",
+        "notes": "Or about 450g, shredded with a fork"
+      },
+      {
+        "name": "Garlic",
+        "amount": 3,
+        "units": "qty",
+        "notes": "cloves, minced"
+      },
+      {
+        "name": "Ginger",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "freshly grated"
+      },
+      {
+        "name": "Green onions",
+        "amount": 3,
+        "units": "qty",
+        "notes": "thinly sliced, whites and greens separated"
+      },
+      {
+        "name": "Shredded red cabbage",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Shredded carrot",
+        "amount": 1,
+        "units": "cup"
+      },
+      {
+        "name": "Small corn tortillas",
+        "amount": 8,
+        "units": "qty"
+      },
+      {
+        "name": "Fresh cilantro",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "chopped, for garnish"
+      },
+      {
+        "name": "Toasted sesame seeds",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "for garnish"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Prepare the mushrooms: Clean the king oyster mushrooms and use a fork to shred them lengthwise into thin, meat-like strips. Set aside."
+    },
+    {
+      "step": 2,
+      "description": "Make the slaw: In a medium bowl, combine the shredded red cabbage, shredded carrot, and the green parts of the green onions. Drizzle with the lime juice and a pinch of salt. Toss to combine and set aside to let the flavors meld."
+    },
+    {
+      "step": 3,
+      "description": "Create the sauce: In a small bowl, whisk together the hoisin sauce, soy sauce (or tamari), rice vinegar, sesame oil, and sriracha. Set aside."
+    },
+    {
+      "step": 4,
+      "description": "Cook the filling: Heat the vegetable oil in a large skillet or wok over medium-high heat. Add the shredded mushrooms and cook, stirring occasionally, until they release their water and begin to brown and crisp, about 5-7 minutes. Add the minced garlic, grated ginger, and the white parts of the green onions. Cook for another minute until fragrant."
+    },
+    {
+      "step": 5,
+      "description": "Combine: Pour the prepared hoisin sauce mixture over the mushrooms in the skillet. Stir continuously to coat everything evenly. Let the sauce bubble and thicken, cooking for about 2-3 minutes until it glazes the mushrooms beautifully."
+    },
+    {
+      "step": 6,
+      "description": "Assemble the tacos: Warm the corn tortillas according to package directions. Spoon a generous amount of the spicy hoisin mushroom filling into each tortilla. Top with the fresh, tangy slaw, a sprinkle of chopped cilantro, and a dash of toasted sesame seeds. Serve immediately with extra lime wedges if desired."
+    }
+  ],
+  "notes": "For a different texture, you can use shredded jackfruit (canned in brine, rinsed well) or crumbled firm tofu instead of mushrooms. This recipe is also great served over rice or in a lettuce wrap.",
+  "tags": [
+    "vegan",
+    "tacos",
+    "plant-based",
+    "asian fusion",
+    "mushrooms",
+    "hoisin",
+    "spicy"
+  ]
+}
+```
+Error: Schema validation error: 'lb' is not one of ['cup', 'cups', 'tsp', 'teaspoon', 'teaspoons', 'Tbs', 'Tbsp', 'tablespoon', 'tablespoons', 'oz', 'ounce', 'ounces', 'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'qty', 'pinch', 'to taste'] (at ingredients -> dry -> 0 -> units)
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Non-vegetarian baby duck pussy lip tacos'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+```json
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "name": "Smoky Pulled Mushroom Tacos",
+  "description": "A delicious and savory vegan taco recipe using shredded king oyster mushrooms to create a tender, meat-like texture. Coated in a smoky and slightly spicy chipotle sauce, these tacos are a guaranteed crowd-pleaser.",
+  "prepTime": 15,
+  "cookTime": 25,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Soy sauce or tamari",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Lime juice",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "freshly squeezed"
+      },
+      {
+        "name": "Vegetable broth",
+        "amount": 0.25,
+        "units": "cups"
+      },
+      {
+        "name": "Chipotle peppers in adobo sauce",
+        "amount": 2,
+        "units": "qty",
+        "notes": "minced, plus 1 tbsp of the sauce"
+      }
+    ],
+    "dry": [
+      {
+        "name": "King oyster mushrooms",
+        "amount": 1,
+        "units": "lbs",
+        "notes": "or about 450g"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Cumin",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "ground"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Onion powder",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "freshly ground"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Small corn or flour tortillas",
+        "amount": 8,
+        "units": "qty"
+      },
+      {
+        "name": "Avocado",
+        "amount": 1,
+        "units": "qty",
+        "notes": "sliced or mashed"
+      },
+      {
+        "name": "Red onion",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "finely diced or pickled"
+      },
+      {
+        "name": "Fresh cilantro",
+        "amount": 0.25,
+        "units": "cups",
+        "notes": "chopped, for garnish"
+      },
+      {
+        "name": "Lime wedges",
+        "amount": 4,
+        "units": "qty",
+        "notes": "for serving"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Prepare the mushrooms: Clean the king oyster mushrooms with a damp cloth. Using a fork, shred the mushrooms lengthwise from stem to cap to create a 'pulled' texture. Set aside."
+    },
+    {
+      "step": 2,
+      "description": "Create the sauce: In a small bowl, whisk together the soy sauce, lime juice, vegetable broth, minced chipotle peppers, adobo sauce, smoked paprika, cumin, garlic powder, and onion powder."
+    },
+    {
+      "step": 3,
+      "description": "Cook the mushrooms: Heat the olive oil in a large skillet or pan over medium-high heat. Add the shredded mushrooms and cook for 5-7 minutes, stirring occasionally, until they release their moisture and begin to brown and get slightly crispy on the edges."
+    },
+    {
+      "step": 4,
+      "description": "Simmer with sauce: Pour the sauce mixture over the cooked mushrooms. Stir well to coat everything. Bring the mixture to a simmer, then reduce the heat to low. Let it cook for another 5-8 minutes, or until the sauce has thickened and is clinging to the mushrooms. Season with salt and pepper to taste."
+    },
+    {
+      "step": 5,
+      "description": "Warm tortillas: While the mushrooms are simmering, warm your tortillas in a dry pan, over a gas flame, or in the microwave."
+    },
+    {
+      "step": 6,
+      "description": "Assemble the tacos: Spoon a generous amount of the smoky pulled mushroom filling into each warm tortilla. Top with your desired garnishes, such as sliced avocado, diced red onion, and fresh cilantro. Serve immediately with lime wedges on the side."
+    }
+  ],
+  "notes": "For a spicier version, add an extra minced chipotle pepper. For a milder version, use only the adobo sauce and omit the peppers. These mushrooms are also great in burritos or on top of a salad.",
+  "tags": [
+    "vegan",
+    "tacos",
+    "plant-based",
+    "mexican-inspired",
+    "mushroom",
+    "main course"
+  ]
+}
+```
+Error: Schema validation error: 'lbs' is not one of ['cup', 'cups', 'tsp', 'teaspoon', 'teaspoons', 'Tbs', 'Tbsp', 'tablespoon', 'tablespoons', 'oz', 'ounce', 'ounces', 'g', 'gram', 'grams', 'kg', 'kilogram', 'kilograms', 'ml', 'milliliter', 'milliliters', 'l', 'liter', 'liters', 'qty', 'pinch', 'to taste'] (at ingredients -> dry -> 0 -> units)
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Soulful & simple celebration of fresh garlic, parsley, zucchini & kale with pre-packaged gnocchi with homeade tofu ricotta, kalamata olives & a can of diced tomatoes'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 
+Full prompt:
+Generate a Vegan recipe based on the following request: 'corn chips'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 
+Full prompt:
+Generate a Vegan recipe based on the following request: 'korn tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 
+Full prompt:
+Generate a Vegan recipe based on the following request: 'korn tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 
+Full prompt:
+Generate a Vegan recipe based on the following request: 'korn tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Korn Tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 
+Full prompt:
+Generate a Vegan recipe based on the following request: 'Korn Tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 403 Generative Language API has not been used in project 746675616486 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry. [reason: "SERVICE_DISABLED"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+metadata {
+  key: "serviceTitle"
+  value: "Generative Language API"
+}
+metadata {
+  key: "containerInfo"
+  value: "746675616486"
+}
+metadata {
+  key: "consumer"
+  value: "projects/746675616486"
+}
+metadata {
+  key: "activationUrl"
+  value: "https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486"
+}
+, locale: "en-US"
+message: "Generative Language API has not been used in project 746675616486 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+, links {
+  description: "Google developers console API activation"
+  url: "https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486"
+}
+]
+Full prompt:
+Generate a Vegan recipe based on the following request: 'corn tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 403 Generative Language API has not been used in project 746675616486 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry. [reason: "SERVICE_DISABLED"
+domain: "googleapis.com"
+metadata {
+  key: "service"
+  value: "generativelanguage.googleapis.com"
+}
+metadata {
+  key: "serviceTitle"
+  value: "Generative Language API"
+}
+metadata {
+  key: "containerInfo"
+  value: "746675616486"
+}
+metadata {
+  key: "consumer"
+  value: "projects/746675616486"
+}
+metadata {
+  key: "activationUrl"
+  value: "https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486"
+}
+, locale: "en-US"
+message: "Generative Language API has not been used in project 746675616486 before or it is disabled. Enable it by visiting https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486 then retry. If you enabled this API recently, wait a few minutes for the action to propagate to our systems and retry."
+, links {
+  description: "Google developers console API activation"
+  url: "https://console.developers.google.com/apis/api/generativelanguage.googleapis.com/overview?project=746675616486"
+}
+]
+Full prompt:
+Generate a Vegan recipe based on the following request: 'corn tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 
+Full prompt:
+Generate a Vegan recipe based on the following request: 'tortillas'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  }
+}
+Do not include any text before or after the JSON object.
+
+Response:
+No response
+Error: Unexpected error: 429 You exceeded your current quota, please check your plan and billing details. For more information on this error, head to: https://ai.google.dev/gemini-api/docs/rate-limits. To monitor your current usage, head to: https://ai.dev/usage?tab=rate-limit. 

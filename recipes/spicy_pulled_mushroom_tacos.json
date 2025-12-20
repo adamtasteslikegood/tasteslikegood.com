@@ -1,0 +1,306 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Hearty, savory, and spicy tacos made with shredded king oyster mushrooms that perfectly mimic the texture of pulled meat. A flavorful and compassionate plant-based twist on a classic.",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": [
+        "wet",
+        "dry"
+      ]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": [
+              "description"
+            ],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image": {
+      "type": "string",
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": [
+            "number",
+            "array"
+          ],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement",
+          "enum": [
+            "cup",
+            "cups",
+            "tsp",
+            "teaspoon",
+            "teaspoons",
+            "Tbs",
+            "Tbsp",
+            "tablespoon",
+            "tablespoons",
+            "oz",
+            "ounce",
+            "ounces",
+            "g",
+            "gram",
+            "grams",
+            "kg",
+            "kilogram",
+            "kilograms",
+            "ml",
+            "milliliter",
+            "milliliters",
+            "l",
+            "liter",
+            "liters",
+            "qty",
+            "pinch",
+            "to taste"
+          ]
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": [
+        "name",
+        "amount",
+        "units"
+      ]
+    }
+  },
+  "name": "Spicy Pulled Mushroom Tacos",
+  "prepTime": 15,
+  "cookTime": 20,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Vegetable Oil",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Soy Sauce",
+        "amount": 3,
+        "units": "Tbsp",
+        "notes": "Or tamari for gluten-free"
+      },
+      {
+        "name": "Maple Syrup",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Liquid Smoke",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Lime Juice",
+        "amount": 2,
+        "units": "Tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "King Oyster Mushrooms",
+        "amount": 450,
+        "units": "g"
+      },
+      {
+        "name": "Smoked Paprika",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Chili Powder",
+        "amount": 2,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground Cumin",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Garlic Powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Onion Powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Black Pepper",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      }
+    ],
+    "other": [
+      {
+        "name": "Corn Tortillas",
+        "amount": 8,
+        "units": "qty"
+      },
+      {
+        "name": "Avocado",
+        "amount": 1,
+        "units": "qty",
+        "notes": "sliced or mashed"
+      },
+      {
+        "name": "Red Onion",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "thinly sliced"
+      },
+      {
+        "name": "Fresh Cilantro",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "chopped, for garnish"
+      },
+      {
+        "name": "Lime Wedges",
+        "amount": 1,
+        "units": "qty",
+        "notes": "for serving"
+      }
+    ]
+  },
+  "instructions": [
+    "Clean the king oyster mushrooms. Using a fork, shred the mushroom stems lengthwise to create a pulled, stringy texture. Set aside.",
+    "In a medium bowl, whisk together the soy sauce, maple syrup, liquid smoke, lime juice, smoked paprika, chili powder, cumin, garlic powder, and onion powder to create the marinade.",
+    "Add the shredded mushrooms to the marinade and toss thoroughly to ensure they are all evenly coated. Let them marinate for at least 10-15 minutes to absorb the flavors.",
+    "Heat the vegetable oil in a large skillet or pan over medium-high heat.",
+    "Once the oil is hot, add the marinated mushrooms to the skillet in a single layer. Cook for 15-20 minutes, stirring occasionally, until the liquid has evaporated and the mushrooms are browned and slightly crispy on the edges.",
+    "While the mushrooms are cooking, warm the corn tortillas. You can do this in a dry skillet for 30 seconds per side, over a gas flame for a slight char, or wrapped in a damp paper towel in the microwave.",
+    "Assemble the tacos by filling each warm tortilla with a generous portion of the spicy pulled mushrooms.",
+    "Garnish with your favorite toppings, such as sliced avocado, thinly sliced red onion, and fresh cilantro. Serve immediately with extra lime wedges on the side for squeezing."
+  ],
+  "notes": "For a creamy element, whip up a quick avocado crema by blending avocado, lime juice, cilantro, and a pinch of salt. These tacos are also excellent with a topping of crisp, fresh cabbage slaw.",
+  "tags": [
+    "vegan",
+    "tacos",
+    "plant-based",
+    "mexican-inspired",
+    "mushrooms",
+    "spicy",
+    "main course"
+  ]
+}

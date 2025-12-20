@@ -1,14 +1,30 @@
+# environmental vars./secrets and virtual enviroments
 /templates/.env
 /api_key.py
+
 /.venv/
+/.venv_313/
 /.new_venv/
 /.idea/
 .env
-/recipes/
+
+# Recipe data and error logs
+/recipes/*.json
 recipe_error.json
 recipe_error.txt
-__pycache__/
+models_list.json
 
+# Temporary / Editor files
+__pycache__/
+*.py[cod]
+*$py.class
+#temp_sratch.txt#
+#recipe_error.json#
+#recipe_error.txt#
+temp_sratch.txt
+requiremnets.txt.old
+
+# Google/Cloud Specifics
 .gemini/
 gha-creds-*.json
 .DS_Store

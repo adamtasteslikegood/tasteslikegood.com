@@ -1,0 +1,260 @@
+{
+  "models": [
+    {
+      "name": "models/embedding-gecko-001",
+      "display_name": "Embedding Gecko",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash",
+      "display_name": "Gemini 2.5 Flash",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-pro",
+      "display_name": "Gemini 2.5 Pro",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash-exp",
+      "display_name": "Gemini 2.0 Flash Experimental",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash",
+      "display_name": "Gemini 2.0 Flash",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash-001",
+      "display_name": "Gemini 2.0 Flash 001",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash-exp-image-generation",
+      "display_name": "Gemini 2.0 Flash (Image Generation) Experimental",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash-lite-001",
+      "display_name": "Gemini 2.0 Flash-Lite 001",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash-lite",
+      "display_name": "Gemini 2.0 Flash-Lite",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash-lite-preview-02-05",
+      "display_name": "Gemini 2.0 Flash-Lite Preview 02-05",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.0-flash-lite-preview",
+      "display_name": "Gemini 2.0 Flash-Lite Preview",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-exp-1206",
+      "display_name": "Gemini Experimental 1206",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-preview-tts",
+      "display_name": "Gemini 2.5 Flash Preview TTS",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-pro-preview-tts",
+      "display_name": "Gemini 2.5 Pro Preview TTS",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemma-3-1b-it",
+      "display_name": "Gemma 3 1B",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemma-3-4b-it",
+      "display_name": "Gemma 3 4B",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemma-3-12b-it",
+      "display_name": "Gemma 3 12B",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemma-3-27b-it",
+      "display_name": "Gemma 3 27B",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemma-3n-e4b-it",
+      "display_name": "Gemma 3n E4B",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemma-3n-e2b-it",
+      "display_name": "Gemma 3n E2B",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-flash-latest",
+      "display_name": "Gemini Flash Latest",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-flash-lite-latest",
+      "display_name": "Gemini Flash-Lite Latest",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-pro-latest",
+      "display_name": "Gemini Pro Latest",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-lite",
+      "display_name": "Gemini 2.5 Flash-Lite",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-image-preview",
+      "display_name": "Nano Banana",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-image",
+      "display_name": "Nano Banana",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-preview-09-2025",
+      "display_name": "Gemini 2.5 Flash Preview Sep 2025",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-lite-preview-09-2025",
+      "display_name": "Gemini 2.5 Flash-Lite Preview Sep 2025",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-3-pro-preview",
+      "display_name": "Gemini 3 Pro Preview",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-3-pro-image-preview",
+      "display_name": "Nano Banana Pro",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/nano-banana-pro-preview",
+      "display_name": "Nano Banana Pro",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-robotics-er-1.5-preview",
+      "display_name": "Gemini Robotics-ER 1.5 Preview",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-computer-use-preview-10-2025",
+      "display_name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/embedding-001",
+      "display_name": "Embedding 001",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/text-embedding-004",
+      "display_name": "Text Embedding 004",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-embedding-exp-03-07",
+      "display_name": "Gemini Embedding Experimental 03-07",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-embedding-exp",
+      "display_name": "Gemini Embedding Experimental",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-embedding-001",
+      "display_name": "Gemini Embedding 001",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/aqa",
+      "display_name": "Model that performs Attributed Question Answering.",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/imagen-4.0-generate-preview-06-06",
+      "display_name": "Imagen 4 (Preview)",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/imagen-4.0-ultra-generate-preview-06-06",
+      "display_name": "Imagen 4 Ultra (Preview)",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/imagen-4.0-generate-001",
+      "display_name": "Imagen 4",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/imagen-4.0-ultra-generate-001",
+      "display_name": "Imagen 4 Ultra",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/imagen-4.0-fast-generate-001",
+      "display_name": "Imagen 4 Fast",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/veo-2.0-generate-001",
+      "display_name": "Veo 2",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/veo-3.0-generate-001",
+      "display_name": "Veo 3",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/veo-3.0-fast-generate-001",
+      "display_name": "Veo 3 fast",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/veo-3.1-generate-preview",
+      "display_name": "Veo 3.1",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/veo-3.1-fast-generate-preview",
+      "display_name": "Veo 3.1 fast",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-native-audio-latest",
+      "display_name": "Gemini 2.5 Flash Native Audio Latest",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-native-audio-preview-09-2025",
+      "display_name": "Gemini 2.5 Flash Native Audio Preview 09-2025",
+      "supported_generation_methods": []
+    }
+  ],
+  "updated_at": "2025-12-11T15:32:37Z"
+}

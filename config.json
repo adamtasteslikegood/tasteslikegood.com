@@ -1,0 +1,24 @@
+{
+  "app": {
+    "default_model": "models/gemini-2.5-flash",
+    "joke_file": "computer_jokes.csv",
+    "recipes_dir": "recipes",
+    "models_cache_file": "models_list.json",
+    "prompt_min_length": 10,
+    "prompt_max_length": 500
+  },
+  "uvicorn": {
+    "host": "0.0.0.0",
+    "port": 5000,
+    "workers": 4,
+    "reload": false,
+    "log_level": "info",
+    "access_log": true,
+    "proxy_headers": true,
+    "forwarded_allow_ips": "*"
+  },
+  "flask": {
+    "debug": false,
+    "testing": false
+  }
+}

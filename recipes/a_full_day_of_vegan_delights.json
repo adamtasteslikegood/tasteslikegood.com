@@ -1,0 +1,220 @@
+{
+  "name": "A Full Day of Vegan Delights",
+  "description": "A complete one-day meal and drink plan for anyone obsessed with delicious, easy-to-make vegan food. This plan covers a revitalizing smoothie, a savory breakfast scramble, a fresh lentil salad for lunch, and a comforting coconut curry for dinner.",
+  "prepTime": 40,
+  "cookTime": 55,
+  "servings": 1,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Plant-based milk",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Almond or oat, for smoothie"
+      },
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Lemon juice",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "Freshly squeezed, for lentil salad dressing"
+      },
+      {
+        "name": "Dijon mustard",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "For lentil salad dressing"
+      },
+      {
+        "name": "Coconut oil",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "For curry"
+      },
+      {
+        "name": "Diced tomatoes",
+        "amount": 200,
+        "units": "g",
+        "notes": "Canned, for curry"
+      },
+      {
+        "name": "Full-fat coconut milk",
+        "amount": 200,
+        "units": "ml",
+        "notes": "Canned, for curry"
+      },
+      {
+        "name": "Vegetable broth",
+        "amount": 1.5,
+        "units": "cups",
+        "notes": "For cooking lentils"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Ground flaxseed",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "For smoothie"
+      },
+      {
+        "name": "Nutritional yeast",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "For tofu scramble"
+      },
+      {
+        "name": "Turmeric powder",
+        "amount": 0.25,
+        "units": "tsp",
+        "notes": "For tofu scramble"
+      },
+      {
+        "name": "Black salt (kala namak)",
+        "amount": 1,
+        "units": "pinch",
+        "notes": "Optional, for eggy flavor in scramble"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Brown or green lentils",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Dry, for salad"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "to taste"
+      },
+      {
+        "name": "Curry powder",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "For curry"
+      },
+      {
+        "name": "Chickpeas",
+        "amount": 200,
+        "units": "g",
+        "notes": "Canned, rinsed and drained"
+      },
+      {
+        "name": "Basmati rice",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Dry, for serving with curry"
+      }
+    ],
+    "other": [
+      {
+        "name": "Frozen mixed berries",
+        "amount": 1,
+        "units": "cup",
+        "notes": "For smoothie"
+      },
+      {
+        "name": "Banana",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "Ripe, for smoothie"
+      },
+      {
+        "name": "Firm tofu",
+        "amount": 150,
+        "units": "g",
+        "notes": "Pressed to remove excess water"
+      },
+      {
+        "name": "Spinach",
+        "amount": 2,
+        "units": "cups",
+        "notes": "Divided use: 1 cup for scramble, 1 cup for curry"
+      },
+      {
+        "name": "Sourdough bread",
+        "amount": 2,
+        "units": "qty",
+        "notes": "Slices, for toast"
+      },
+      {
+        "name": "Red onion",
+        "amount": 0.25,
+        "units": "qty",
+        "notes": "Finely diced, for lentil salad"
+      },
+      {
+        "name": "Cucumber",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Diced, for lentil salad"
+      },
+      {
+        "name": "Cherry tomatoes",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Halved, for lentil salad"
+      },
+      {
+        "name": "Fresh parsley",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "Chopped, for lentil salad"
+      },
+      {
+        "name": "Yellow onion",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "Diced, for curry"
+      },
+      {
+        "name": "Garlic",
+        "amount": 1,
+        "units": "qty",
+        "notes": "Clove, minced, for curry"
+      },
+      {
+        "name": "Fresh ginger",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "Grated, for curry"
+      },
+      {
+        "name": "Lime",
+        "amount": 0.5,
+        "units": "qty",
+        "notes": "For juice, to finish curry"
+      }
+    ]
+  },
+  "instructions": [
+    "DRINK: Morning Berry Smoothie - In a blender, combine frozen berries, banana, plant-based milk, and ground flaxseed. Blend until smooth and creamy. Pour into a glass and enjoy immediately.",
+    "BREAKFAST: Savory Tofu Scramble - Crumble the pressed tofu into a bowl. Heat 1 tsp of olive oil in a non-stick pan over medium heat. Add the crumbled tofu, nutritional yeast, turmeric, black salt, and pepper. Cook, stirring occasionally, for 5-7 minutes until heated through. Stir in 1 cup of spinach and cook until just wilted. Serve hot with toasted sourdough bread.",
+    "LUNCH: Hearty Lentil Salad - Rinse the dry lentils. In a small pot, combine lentils and vegetable broth. Bring to a boil, then reduce heat and simmer for 15-20 minutes, or until tender but not mushy. Drain any excess liquid and let cool slightly.",
+    "LUNCH: (Continued) - While lentils cook, prepare the dressing by whisking together 1 Tbsp olive oil, lemon juice, and Dijon mustard in a large bowl. Add salt and pepper to taste. Add the cooked lentils, diced red onion, cucumber, cherry tomatoes, and chopped parsley to the bowl with the dressing. Toss gently to combine. Serve immediately or chilled.",
+    "DINNER: Creamy Coconut Chickpea Curry - Cook the basmati rice according to package directions. While it cooks, heat the coconut oil in a pot or deep skillet over medium heat. Add the diced yellow onion and cook until softened, about 5 minutes.",
+    "DINNER: (Continued) - Add the minced garlic and grated ginger, and cook for another minute until fragrant. Stir in the curry powder and cook for 30 seconds. Add the drained chickpeas, diced tomatoes, and coconut milk. Stir to combine, bring to a simmer, then reduce heat and let it gently bubble for 10-15 minutes for the flavors to meld.",
+    "DINNER: (Final) - Stir in the remaining 1 cup of spinach until wilted. Squeeze in the juice from half a lime. Season with salt to taste. Serve the curry over the cooked basmati rice."
+  ],
+  "notes": "Meal prep tip: The lentils for the salad and the entire curry can be made 2-3 days in advance to save time. Just reheat the curry and assemble the salad when you're ready to eat. Feel free to add any other veggies you have on hand to the scramble, salad, or curry!",
+  "tags": [
+    "vegan",
+    "plant-based",
+    "meal plan",
+    "full day",
+    "beginner",
+    "healthy",
+    "breakfast",
+    "lunch",
+    "dinner",
+    "smoothie"
+  ]
+}

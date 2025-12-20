@@ -41,142 +41,294 @@
         100% {
             transform: rotate(360deg);
         }
-    }
 
-    #joke-container {
-        font-size: 1.2em;
-        max-width: 600px;
-        line-height: 1.5;
-        min-height: 100px;
-        /* Prevent layout shift */
-    }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
 
-    select {
-        padding: 10px;
-        margin-bottom: 15px;
-        width: 100%;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-    }
+        #joke-container {
+            font-size: 1.2em;
+            max-width: 600px;
+            line-height: 1.5;
+            min-height: 100px; /* Prevent layout shift */
+        }
+        
+        select {
+            padding: 10px;
+            margin-bottom: 15px;
+            width: 100%;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        
+        #model-loading {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 5px;
+        }
 
-    #model-loading {
-        font-size: 0.9em;
-        color: #666;
-        margin-bottom: 5px;
-    }
+        .error-message {
+            color: red;
+            font-size: 0.9em;
+        }
 
-    .error-message {
-        color: red;
-        font-size: 0.9em;
-    }
-</style>
+        .model-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        #refresh-models-btn {
+            background: none;
+            border: none;
+            color: #3498db;
+            cursor: pointer;
+            font-size: 0.9em;
+            text-decoration: underline;
+            padding: 0;
+        }
+
+        #refresh-models-btn:hover {
+            color: #2980b9;
+        }
+
+        #refresh-models-btn:disabled {
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .refresh-status {
+            font-size: 0.85em;
+            padding: 5px 10px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+        }
+
+        .refresh-status.success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .refresh-status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+    </style>
 {% endblock %}
 
 {% block content %}
-<h1>Generate a New Recipe with AI</h1>
-<p>Enter a description of the recipe you want to create. For example, "a vegan gluten-free chocolate chip cookie
-    recipe."</p>
+    <h1>Generate a New Recipe with AI</h1>
+    <p>Enter a description of the recipe you want to create. For example, "a vegan gluten-free chocolate chip cookie recipe."</p>
 
-<form id="generate-form" action="{{ url_for('generate_recipe') }}" method="post">
-    <select name="model" id="model-select">
-        <!-- Hardcoded Newer Models -->
-        <option value="gemini-3-pro-preview" {% if default_model=='gemini-3-pro-preview' %}selected{% endif %}>
-            gemini-3-pro-preview (Default)</option>
-        <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-        <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+    <form id="generate-form" action="{{ url_for('generate_recipe') }}" method="post">
+        <div class="model-controls">
+            <label for="model-select"><strong>Select Model:</strong></label>
+            <button type="button" id="refresh-models-btn" title="Fetch latest models from Gemini API">Refresh Models</button>
+        </div>
+        <div id="model-loading">Loading additional models...</div>
+        <div id="refresh-status" class="refresh-status" style="display: none;"></div>
+        <select name="model" id="model-select">
+            <option value="models/gemini-2.5-flash" selected>Gemini 2.5 Flash (Default)</option>
+            <option value="" disabled>── Loading more models... ──</option>
+        </select>
+        <div id="model-error" class="error-message"></div>
 
-        <!-- Spacers and Separator -->
-        <option disabled>&nbsp;</option>
-        <option disabled>──────────────</option>
-        <option disabled>&nbsp;</option>
+        <textarea name="prompt" placeholder="Enter your recipe idea here..." required minlength="10" maxlength="500"></textarea>
+        <button type="submit" id="submit-btn">Generate Recipe</button>
+    </form>
 
-        <!-- Loading Indicator -->
-        <option id="loading-option" disabled>Loading more models...</option>
-    </select>
-    <div id="model-error" class="error-message"></div>
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" role="dialog" aria-modal="true" aria-labelledby="loading-title">
+        <div class="spinner"></div>
+        <h2 id="loading-title">Generating Recipe...</h2>
+        <p>Please wait while we whip up something delicious.</p>
+        <div id="joke-container"></div>
+    </div>
 
-    <textarea name="prompt" placeholder="Enter your recipe idea here..." required minlength="10"
-        maxlength="500"></textarea>
-    <button type="submit" id="submit-btn">Generate Recipe</button>
-</form>
+    <script>
+        let jokes = [
+            "Why did the programmer quit his job? He didn't get arrays.",
+            "How do you comfort a JavaScript bug? You console it.",
+            "Why do programmers prefer dark mode? Because light attracts bugs.",
+            "A SQL query walks into a bar, walks up to two tables and asks, 'Can I join you?'",
+            "Why was the developer unhappy at their job? They wanted arrays.",
+            "What is a programmer's favorite hangout place? Foo Bar.",
+            "Why did the Java developers wear glasses? Because they don't C#.",
+            "3 SQL statements walk into a NoSQL bar. A little while later they walk out... because they couldn't find a table.",
+            "A programmer puts two glasses on his bedside table before going to sleep. A full one, in case he gets thirsty, and an empty one, in case he doesn't.",
+            "Knock, knock. Who's there? Recursion. Recursion who? Knock, knock.",
+            "There are 10 types of people in the world: those who understand binary, and those who don't.",
+            "I'd tell you a joke about UDP, but you might not get it.",
+            "Why did the AI chef get fired? It kept trying to import salt from a library.",
+            "My code doesn't have bugs, it just develops random features.",
+            "A vegan, a crossfitter, and a programmer walk into a bar. I only know because they told everyone within 2 minutes.",
+            "Why do Python programmers have low self-esteem? They're constantly comparing themselves to None.",
+            "I asked the AI to make me a sandwich. It returned a promise... still pending.",
+            "What's a programmer's favorite recipe? Spaghetti code with meatballs of technical debt.",
+            "Why did the function go to therapy? It had too many unresolved callbacks.",
+            "This recipe is so good, even my compiler stopped throwing errors to taste it.",
+            "I told my AI to write a cooking joke. It said: 'Error 418: I'm a teapot.'",
+            "Why do chefs make great programmers? They're experts at handling exceptions in the kitchen."
+        ];
 
-<!-- Loading Overlay -->
-<div id="loading-overlay" role="dialog" aria-modal="true" aria-labelledby="loading-title">
-    <div class="spinner"></div>
-    <h2 id="loading-title">Generating Recipe...</h2>
-    <p>Please wait while we whip up something delicious.</p>
-    <div id="joke-container"></div>
-</div>
+        // Load additional jokes from server if available
+        fetch('/api/jokes').then(r => r.ok ? r.json() : []).then(extra => {
+            if (extra.length) jokes = jokes.concat(extra);
+        }).catch(() => {});
 
-<script>
-    const jokes = [
-        "Why did the programmer quit his job? He didn't get arrays.",
-        "How do you comfort a JavaScript bug? You console it.",
-        "Why do programmers prefer dark mode? Because light attracts bugs.",
-        "A SQL query walks into a bar, walks up to two tables and asks, 'Can I join you?'",
-        "Why was the developer unhappy at their job? They wanted arrays.",
-        "What is a programmer's favorite hangout place? Foo Bar.",
-        "Why did the Java developers wear glasses? Because they don't C#.",
-        "3 SQL statements walk into a NoSQL bar. A little while later they walk out... because they couldn't find a table.",
-        "A programmer puts two glasses on his bedside table before going to sleep. A full one, in case he gets thirsty, and an empty one, in case he doesn't.",
-        "Knock, knock. Who's there? Recursion. Recursion who? Knock, knock.",
-        "There are 10 types of people in the world: those who understand binary, and those who don't.",
-        "I'd tell you a joke about UDP, but you might not get it."
-    ];
+        const form = document.getElementById('generate-form');
+        const overlay = document.getElementById('loading-overlay');
+        const jokeContainer = document.getElementById('joke-container');
+        const submitBtn = document.getElementById('submit-btn');
+        const modelSelect = document.getElementById('model-select');
+        const modelLoading = document.getElementById('model-loading');
+        const modelError = document.getElementById('model-error');
+        const refreshBtn = document.getElementById('refresh-models-btn');
+        const refreshStatus = document.getElementById('refresh-status');
 
-    const form = document.getElementById('generate-form');
-    const overlay = document.getElementById('loading-overlay');
-    const jokeContainer = document.getElementById('joke-container');
-    const submitBtn = document.getElementById('submit-btn');
-    const modelSelect = document.getElementById('model-select');
-    // const modelLoading = document.getElementById('model-loading'); // Removed as per instruction
-    const modelError = document.getElementById('model-error');
+        // Fetch Models
+        async function fetchModels() {
+            try {
+                const response = await fetch('/api/models');
+                if (!response.ok) {
+                    throw new Error(`API Error: ${response.statusText}`);
+                }
+                const models = await response.json();
 
-    // Fetch Models
-    async function fetchModels() {
-        const loadingOption = document.getElementById('loading-option');
-        try {
-            const response = await fetch('/api/models');
-            if (!response.ok) {
-                throw new Error(`API Error: ${response.statusText}`);
-            }
-            const models = await response.json();
+                // Remove the "loading" placeholder option (second option)
+                if (modelSelect.options.length > 1) {
+                    modelSelect.remove(1);
+                }
 
-            // Get existing values to avoid duplicates
-            const existingValues = new Set();
-            for (let i = 0; i < modelSelect.options.length; i++) {
-                existingValues.add(modelSelect.options[i].value);
-            }
+                if (models.length === 0) {
+                    modelLoading.style.display = 'none';
+                    return;
+                }
 
-            // Filter new models
-            const newModels = models.filter(model => !existingValues.has(model.id));
+                // Add separator before additional models
+                const separator = document.createElement('option');
+                separator.disabled = true;
+                separator.text = '── Additional Models ──';
+                modelSelect.add(separator);
 
-            if (newModels.length > 0) {
-                // Remove loading option
-                if (loadingOption) loadingOption.remove();
+                // Populate with fetched models (skip if it's the default)
+                models.forEach(model => {
+                    // Skip if this is the default model already shown
+                    if (model.id === 'models/gemini-2.5-flash') return;
 
-                // Add new models directly (separator is already there)
-                newModels.forEach(model => {
                     const option = document.createElement('option');
                     option.value = model.id;
                     option.text = model.name;
                     modelSelect.add(option);
                 });
-            } else {
-                // No new models found
-                if (loadingOption) {
-                    loadingOption.text = "No additional models found";
-                    // Keep it disabled
+
+                modelLoading.style.display = 'none';
+
+            } catch (error) {
+                console.error('Error fetching models:', error);
+                modelLoading.style.display = 'none';
+
+                // Remove loading placeholder on error
+                if (modelSelect.options.length > 1 && modelSelect.options[1].value === '') {
+                    modelSelect.remove(1);
                 }
+
+                modelError.textContent = "Could not load additional models.";
+            }
+        }
+
+        // Refresh Models from Gemini API
+        async function refreshModels() {
+            refreshBtn.disabled = true;
+            refreshBtn.textContent = 'Refreshing...';
+            refreshStatus.style.display = 'none';
+            modelError.textContent = '';
+
+            try {
+                const response = await fetch('/api/models/refresh', { method: 'POST' });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || 'Failed to refresh models');
+                }
+
+                // Clear current options except the default
+                while (modelSelect.options.length > 1) {
+                    modelSelect.remove(1);
+                }
+
+                // Add separator before additional models
+                if (data.models && data.models.length > 0) {
+                    const separator = document.createElement('option');
+                    separator.disabled = true;
+                    separator.text = '── Additional Models ──';
+                    modelSelect.add(separator);
+
+                    // Populate with refreshed models (skip if it's the default)
+                    data.models.forEach(model => {
+                        if (model.id === 'models/gemini-2.5-flash') return;
+
+                        const option = document.createElement('option');
+                        option.value = model.id;
+                        option.text = model.name;
+                        modelSelect.add(option);
+                    });
+                }
+
+                // Show success message
+                refreshStatus.className = 'refresh-status success';
+                refreshStatus.textContent = data.message || 'Models refreshed successfully!';
+                refreshStatus.style.display = 'block';
+
+                // Hide success message after 5 seconds
+                setTimeout(() => {
+                    refreshStatus.style.display = 'none';
+                }, 5000);
+
+            } catch (error) {
+                console.error('Error refreshing models:', error);
+                refreshStatus.className = 'refresh-status error';
+                refreshStatus.textContent = error.message || 'Failed to refresh models.';
+                refreshStatus.style.display = 'block';
+            } finally {
+                refreshBtn.disabled = false;
+                refreshBtn.textContent = 'Refresh Models';
             }
 
-            // modelLoading.style.display = 'none'; // Removed as per instruction
+        refreshBtn.addEventListener('click', refreshModels);
 
-        } catch (error) {
-            console.error('Error fetching models:', error);
-            // modelLoading.style.display = 'none'; // Removed as per instruction
-            if (loadingOption) {
-                loadingOption.text = "Could not load more models";
+        form.addEventListener('submit', function(e) {
+            // Show the overlay
+            overlay.style.display = 'flex';
+            
+            // Disable submit button to prevent double submission
+            submitBtn.disabled = true;
+            submitBtn.innerText = 'Cooking...';
+
+            // Display a random joke immediately
+            displayRandomJoke();
+
+            // Cycle jokes every 5 seconds
+            setInterval(displayRandomJoke, 5000);
+            
+            // Focus on the overlay for accessibility
+            overlay.focus();
+        });
+
+        function displayRandomJoke() {
+            const randomIndex = Math.floor(Math.random() * jokes.length);
+            jokeContainer.innerText = jokes[randomIndex];
+        }
+        
+        // Fix for Back Button: Hide overlay when page is shown from history
+        window.addEventListener('pageshow', function(event) {
+            if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+                // Page was restored from bfcache
+                overlay.style.display = 'none';
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Generate Recipe';
             }
             modelError.textContent = "Could not load additional models from API.";
         }

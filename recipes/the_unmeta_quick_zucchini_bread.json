@@ -1,0 +1,147 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "A straightforward, no-fuss vegan quick bread that's moist, delicious, and refreshingly simple. No data harvesting, just great taste.",
+  "name": "The Un-Meta Quick Zucchini Bread",
+  "prepTime": 15,
+  "cookTime": 55,
+  "servings": 10,
+  "ingredients": {
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 1.5,
+        "units": "cups"
+      },
+      {
+        "name": "Granulated sugar",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Use a vegan-certified brand if needed"
+      },
+      {
+        "name": "Light brown sugar",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "packed"
+      },
+      {
+        "name": "Baking soda",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Baking powder",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground cinnamon",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground nutmeg",
+        "amount": 0.25,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.25,
+        "units": "tsp"
+      }
+    ],
+    "wet": [
+      {
+        "name": "Zucchini",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Grated and lightly packed. Do not squeeze dry."
+      },
+      {
+        "name": "Neutral oil",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Such as canola or vegetable oil"
+      },
+      {
+        "name": "Ground flaxseed",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Water",
+        "amount": 3,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 1,
+        "units": "tsp"
+      }
+    ],
+    "other": [
+      {
+        "name": "Walnuts or pecans",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Chopped (optional)"
+      },
+      {
+        "name": "Vegan chocolate chips",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Optional"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Preheat oven to 350\u00b0F (175\u00b0C). Lightly grease and flour a 9x5 inch loaf pan."
+    },
+    {
+      "step": 2,
+      "description": "In a small bowl, whisk together the ground flaxseed and water. Set aside for 5-10 minutes to thicken into a gel-like 'flax egg'."
+    },
+    {
+      "step": 3,
+      "description": "In a large bowl, whisk together the dry ingredients: all-purpose flour, granulated sugar, brown sugar, baking soda, baking powder, cinnamon, nutmeg, and salt."
+    },
+    {
+      "step": 4,
+      "description": "To the bowl with the thickened flax egg, add the neutral oil, and vanilla extract. Whisk to combine. Then, stir in the grated zucchini."
+    },
+    {
+      "step": 5,
+      "description": "Pour the wet ingredients into the bowl of dry ingredients. Stir with a spatula until just combined. Do not overmix; a few lumps are perfectly fine."
+    },
+    {
+      "step": 6,
+      "description": "If using, gently fold in the chopped walnuts or vegan chocolate chips."
+    },
+    {
+      "step": 7,
+      "description": "Pour the batter into the prepared loaf pan and spread it into an even layer."
+    },
+    {
+      "step": 8,
+      "description": "Bake for 50-60 minutes, or until a wooden skewer or toothpick inserted into the center of the loaf comes out clean."
+    },
+    {
+      "step": 9,
+      "description": "Let the bread cool in the pan on a wire rack for 15 minutes before carefully removing it from the pan. Let it cool completely on the rack before slicing."
+    }
+  ],
+  "notes": "For best results, do not squeeze the water out of the grated zucchini; its moisture is key to a tender loaf. The bread is best once fully cooled, as it allows the structure to set properly. Store in an airtight container at room temperature for up to 3 days.",
+  "tags": [
+    "vegan",
+    "quick bread",
+    "zucchini bread",
+    "baking",
+    "dessert",
+    "snack",
+    "egg-free",
+    "dairy-free"
+  ]
+}
