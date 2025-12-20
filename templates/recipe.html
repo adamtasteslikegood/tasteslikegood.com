@@ -273,7 +273,9 @@
     }
 
     // Auto-refresh stock image every 30 seconds ONLY if it's a placeholder
-    setInterval(() => {
+    // Note: Once cleared, the interval won't restart. This is intentional since
+    // stock images are loaded at page load and don't dynamically appear later.
+    const stockImageRefreshInterval = setInterval(() => {
         // Only refresh if the source is explicitly loremflickr (our placeholder service)
         const img = document.querySelector('.image-container img[src*="loremflickr"]');
         if (img) {
@@ -288,12 +290,15 @@
                 img.src = url.toString();
             };
             newImg.src = url.toString();
+        } else {
+            // If no loremflickr image found, clear the interval to prevent memory leaks
+            clearInterval(stockImageRefreshInterval);
         }
     }, 30000);
 
-    // Async AI Image Generation
-    document.addEventListener('DOMContentLoaded', function () {
-        const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
+    // Async AI Image Generation - merged into main DOMContentLoaded block
+    const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
+    if (aiImageContainer) {
         const aiImg = aiImageContainer.querySelector('img');
 
         // If no image tag exists (placeholder is showing), trigger generation
@@ -318,7 +323,14 @@
                 })
                 .catch(error => console.error("Error triggering generation:", error));
         }
-    });
+    }
+
+    // Helper function for comprehensive HTML/JS escaping
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
     function regenerateImage(filename) {
         if (!confirm('Are you sure you want to regenerate the AI image?')) return;
@@ -326,21 +338,45 @@
         const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
         aiImageContainer.innerHTML = '<div class="placeholder-image">Regenerating...</div>';
 
-        fetch('/api/regenerate_image/' + filename, { method: 'POST' })
+        // Encode filename to prevent XSS
+        const encodedFilename = encodeURIComponent(filename);
+        fetch('/api/regenerate_image/' + encodedFilename, { method: 'POST' })
             .then(response => response.json())
             .then(data => {
                 if (data.image_url) {
                     // Force reload image with timestamp to bypass cache
                     const timestamp = new Date().getTime();
-                    aiImageContainer.innerHTML = `
-                        <img src="${data.image_url}?t=${timestamp}" alt="AI generated {{ recipe.name }}" 
-                             style="width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;">
-                        <p class="image-caption">AI Generated (Gemini)</p>
-                        <div class="image-controls" style="margin-top: 10px;">
-                            <button onclick="regenerateImage('${filename}')" class="btn-small">Regenerate</button>
-                            <button onclick="reportImage('${filename}')" class="btn-small btn-danger">Report Issue</button>
-                        </div>
-                    `;
+                    // Use DOM methods instead of innerHTML for safer insertion
+                    const img = document.createElement('img');
+                    img.src = data.image_url + '?t=' + timestamp;
+                    img.alt = 'AI generated {{ recipe.name }}';
+                    img.style.cssText = 'width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;';
+                    
+                    const caption = document.createElement('p');
+                    caption.className = 'image-caption';
+                    caption.textContent = 'AI Generated (Gemini)';
+                    
+                    const controls = document.createElement('div');
+                    controls.className = 'image-controls';
+                    controls.style.marginTop = '10px';
+                    
+                    const regenBtn = document.createElement('button');
+                    regenBtn.className = 'btn-small';
+                    regenBtn.textContent = 'Regenerate';
+                    regenBtn.onclick = function() { regenerateImage(filename); };
+                    
+                    const reportBtn = document.createElement('button');
+                    reportBtn.className = 'btn-small btn-danger';
+                    reportBtn.textContent = 'Report Issue';
+                    reportBtn.onclick = function() { reportImage(filename); };
+                    
+                    controls.appendChild(regenBtn);
+                    controls.appendChild(reportBtn);
+                    
+                    aiImageContainer.innerHTML = '';
+                    aiImageContainer.appendChild(img);
+                    aiImageContainer.appendChild(caption);
+                    aiImageContainer.appendChild(controls);
                 } else {
                     alert('Regeneration failed: ' + data.error);
                 }
@@ -351,7 +387,9 @@
     function reportImage(filename) {
         const reason = prompt("What is wrong with the image? (e.g., 'doesn't match recipe', 'low quality')");
         if (reason) {
-            fetch('/api/report_recipe/' + filename, {
+            // Encode filename to prevent XSS
+            const encodedFilename = encodeURIComponent(filename);
+            fetch('/api/report_recipe/' + encodedFilename, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ reason: reason })

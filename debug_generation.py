@@ -1,5 +1,3 @@
-import os
-import google.generativeai as genai
 from app import get_genai_client, DEFAULT_MODEL
 from dotenv import load_dotenv
 

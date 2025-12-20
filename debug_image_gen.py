@@ -1,9 +1,7 @@
 print("Starting debug script...")
 import os
-import sys
 from dotenv import load_dotenv
 from google.genai import Client
-import google.oauth2.credentials
 
 load_dotenv()
 

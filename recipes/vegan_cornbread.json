@@ -239,11 +239,7 @@
   "user_id": "anonymous",
   "ai_metadata": {
     "model": "unknown",
-<<<<<<< HEAD
     "timestamp": "2025-12-09T14:27:01.515195",
-=======
-    "timestamp": "2025-12-05T01:07:54.013389",
->>>>>>> a25e5985db6086179b817525bb9057c34d73186c
     "prompt": "unknown",
     "images_working": true
   }

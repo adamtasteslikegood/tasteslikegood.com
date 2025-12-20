@@ -2,6 +2,7 @@ import os
 import json
 import time
 import datetime
+import re
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
@@ -29,7 +30,9 @@ os.makedirs(RECIPES_DIR, exist_ok=True)
 
 # Simple cache for recipe list to avoid reading all files on every request
 _recipes_cache = {'data': None, 'timestamp': 0}
-_RECIPES_CACHE_TTL = 60  # Cache for 60 seconds
+# Cache TTL (in seconds) for the recipes list. Default is 60s, which balances
+# avoiding frequent disk reads with keeping the list reasonably fresh.
+_RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
 
 
 def _load_recipe_schema():
@@ -46,6 +49,7 @@ RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
 # Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# Debug logging - executed at import time to verify API key configuration
 print(f"DEBUG: Loaded GOOGLE_API_KEY: {'Yes' if GOOGLE_API_KEY else 'No'}")
 
 # Default Model Configuration
@@ -53,6 +57,7 @@ DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
 # Validate DEFAULT_MODEL (Simple check, could be expanded)
 if not DEFAULT_MODEL:
+    # Debug logging - executed at import time to warn about missing model configuration
     print("Warning: DEFAULT_MODEL is not set. Fallback to 'gemini-2.0-flash-exp'.")
     DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
@@ -92,6 +97,31 @@ def get_smart_stock_image(recipe_name):
         print(f"Smart stock image fetch failed: {e}")
     
     return None
+
+
+def sanitize_filename(filename):
+    """Sanitize filename to prevent path traversal attacks."""
+    # Use only the basename to prevent directory traversal
+    safe_filename = os.path.basename(filename)
+    # Additional validation: ensure it's not empty and ends with .json
+    if not safe_filename or not safe_filename.endswith('.json'):
+        raise ValueError("Invalid filename")
+    return safe_filename
+
+
+def validate_recipe_filepath(filename):
+    """Validate that a recipe filepath is safe and within RECIPES_DIR."""
+    try:
+        safe_filename = sanitize_filename(filename)
+        filepath = os.path.join(RECIPES_DIR, safe_filename)
+        # Resolve to absolute path and verify it's within RECIPES_DIR
+        abs_filepath = os.path.abspath(filepath)
+        abs_recipes_dir = os.path.abspath(RECIPES_DIR)
+        if not abs_filepath.startswith(abs_recipes_dir + os.sep):
+            raise ValueError("Path traversal detected")
+        return filepath
+    except (ValueError, OSError) as e:
+        raise ValueError(f"Invalid filename: {e}")
 
 
 def validate_recipe_data(recipe_data):
@@ -236,7 +266,6 @@ def show_recipe(filename):
             
         # 2. AI Image - REMOVED synchronous generation
         # Generation is now handled asynchronously via /api/generate_image/<filename>
-        pass
 
         if updated:
             # Save the updated recipe
@@ -294,8 +323,12 @@ def get_models():
             # Filter logic: Include gemini/gemma models, exclude embeddings and older versions
             name = m.name.lower()
             if ('gemini' in name or 'gemma' in name) and 'embedding' not in name:
-                # Exclude older models and non-text modalities
-                if any(x in name for x in ['1.0', '1.5', 'image', 'audio', 'video', 'vision', 'robotics']):
+                # Exclude clearly older/deprecated model versions
+                if any(x in name for x in ['1.0', '1.5']):
+                    continue
+                
+                # Exclude models for non-text modalities (but keep vision/image models as they can generate text)
+                if any(x in name for x in ['audio', 'video', 'robotics']):
                     continue
                     
                 # Clean up the name (remove 'models/' prefix for display)
@@ -316,8 +349,20 @@ def get_models():
 
 @app.route('/api/generate_image/<filename>', methods=['POST'])
 def generate_recipe_image(filename):
-    """Generates an AI image for a recipe asynchronously."""
-    filepath = os.path.join(RECIPES_DIR, filename)
+    """Generates an AI image for a recipe asynchronously.
+    
+    Note: This endpoint and others (regenerate_recipe_image, report_recipe, show_recipe)
+    can read and write to the same recipe JSON files concurrently without file locking.
+    This creates a race condition risk that could lead to data loss or corruption if
+    multiple requests modify the same file simultaneously. Consider implementing file
+    locking (e.g., fcntl on Unix, msvcrt on Windows) or migrating to a proper database
+    for production use.
+    """
+    try:
+        filepath = validate_recipe_filepath(filename)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    
     if not os.path.exists(filepath):
         return jsonify({'error': 'Recipe not found'}), 404
 
@@ -352,7 +397,8 @@ def generate_recipe_image(filename):
             
             if response.generated_images:
                 image_data = response.generated_images[0].image.image_bytes
-                image_filename = f"ai_{filename.replace('.json', '.png')}"
+                safe_filename = sanitize_filename(filename)
+                image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
                 image_path = os.path.join('static', 'images', image_filename)
                 os.makedirs(os.path.dirname(image_path), exist_ok=True)
                 
@@ -371,6 +417,11 @@ def generate_recipe_image(filename):
 
                 with open(filepath, 'w') as f:
                     json.dump(recipe_data, f, indent=2)
+                
+                return jsonify({'image_url': image_url})
+            else:
+                # No images generated but no exception raised
+                return jsonify({'error': 'No images generated'}), 500
                     
         except Exception as e:
             import traceback
@@ -378,6 +429,8 @@ def generate_recipe_image(filename):
             print(f"Error generating recipe: {e}")
             print(traceback_str)
             
+            # TODO: Implement log rotation for recipe_error.txt to prevent unbounded growth.
+            # Consider using Python's logging module with RotatingFileHandler.
             # Log to file for debugging
             with open('recipe_error.txt', 'a') as f:
                 f.write(f"\nLast Error (Recipe Gen): {repr(e)}\nTraceback:\n{traceback_str}\n")
@@ -391,13 +444,17 @@ def generate_recipe_image(filename):
 
 @app.route('/api/regenerate_image/<filename>', methods=['POST'])
 def regenerate_recipe_image(filename):
-    """Force regeneration of an AI image."""
-    # Reuse the same logic as generate_recipe_image, but maybe clear the existing URL first?
-    # For now, just calling the same logic is fine as it overwrites.
-    # However, generate_recipe_image returns early if URL exists.
-    # So we need a flag or a separate function.
+    """Force regeneration of an AI image.
     
-    filepath = os.path.join(RECIPES_DIR, filename)
+    TODO: This function shares nearly identical logic with generate_recipe_image.
+    Consider extracting the common image generation code into a shared helper function
+    to follow DRY principles and make maintenance easier.
+    """
+    try:
+        filepath = validate_recipe_filepath(filename)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    
     if not os.path.exists(filepath):
         return jsonify({'error': 'Recipe not found'}), 404
 
@@ -409,9 +466,6 @@ def regenerate_recipe_image(filename):
         if 'ai_image_url' in recipe_data:
             del recipe_data['ai_image_url']
             
-        # Save temporarily so generate_recipe_image sees it empty? 
-        # Or just copy the logic. Copying is safer to avoid race conditions or recursion.
-        
         # ... logic copied/adapted ...
         client = get_genai_client()
         if not client:
@@ -435,7 +489,8 @@ def regenerate_recipe_image(filename):
         
         if response.generated_images:
             image_data = response.generated_images[0].image.image_bytes
-            image_filename = f"ai_{filename.replace('.json', '.png')}"
+            safe_filename = sanitize_filename(filename)
+            image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
             image_path = os.path.join('static', 'images', image_filename)
             os.makedirs(os.path.dirname(image_path), exist_ok=True)
             
@@ -458,6 +513,9 @@ def regenerate_recipe_image(filename):
                 json.dump(recipe_data, f, indent=2)
                 
             return jsonify({'image_url': image_url})
+        else:
+            # If no images were generated but no exception was raised, return an error response
+            return jsonify({'error': 'No images generated'}), 500
 
     except Exception as e:
         print(f"Regeneration error: {e}")
@@ -468,8 +526,17 @@ def regenerate_recipe_image(filename):
 def report_recipe(filename):
     """Log a user report about a recipe or image."""
     try:
+        # Validate filename to prevent path traversal
+        try:
+            validate_recipe_filepath(filename)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+        
         data = request.json
         reason = data.get('reason', 'No reason provided')
+        
+        # Sanitize reason input - limit length and escape HTML
+        reason = reason[:500]  # Limit to 500 characters
         
         report_entry = {
             'timestamp': datetime.datetime.now().isoformat(),
@@ -478,9 +545,29 @@ def report_recipe(filename):
             'user_id': session.get('user_id', 'anonymous')
         }
         
-        # Log to a reports file
-        with open('user_reports.json', 'a') as f:
-            f.write(json.dumps(report_entry) + "\n")
+        # Log to a reports file as a JSON array
+        reports_path = 'user_reports.json'
+        reports = []
+
+        if os.path.exists(reports_path):
+            try:
+                with open(reports_path, 'r', encoding='utf-8') as f:
+                    existing_content = f.read().strip()
+                    if existing_content:
+                        existing_data = json.loads(existing_content)
+                        if isinstance(existing_data, list):
+                            reports = existing_data
+                        else:
+                            reports = [existing_data]
+            except Exception as read_error:
+                # If the existing file is corrupt or unreadable, start fresh
+                print(f"Warning: could not read existing reports file: {read_error}")
+                reports = []
+
+        reports.append(report_entry)
+
+        with open(reports_path, 'w', encoding='utf-8') as f:
+            json.dump(reports, f, indent=2)
             
         return jsonify({'status': 'reported'})
     except Exception as e:
@@ -599,7 +686,6 @@ def generate_recipe():
         if recipe_data:
             try:
                 # Add metadata
-                import datetime
                 recipe_data['user_id'] = session.get('user_id', 'anonymous')
                 recipe_data['ai_metadata'] = {
                     'model': selected_model,
@@ -610,8 +696,17 @@ def generate_recipe():
                     'images_working': True # Optimistic default
                 }
 
-                # Create a filename from the recipe name
-                filename = f"{recipe_data['name'].lower().replace(' ', '_')}.json"
+                # Create a safe filename from the recipe name
+                recipe_name = recipe_data.get('name', 'untitled_recipe')
+                # Remove special characters and limit length
+                safe_name = re.sub(r'[^\w\s-]', '', recipe_name).strip().lower()
+                safe_name = re.sub(r'[-\s]+', '_', safe_name)
+                # Limit length to avoid filesystem issues
+                safe_name = safe_name[:100]
+                # Ensure we have a valid filename
+                if not safe_name:
+                    safe_name = 'untitled_recipe'
+                filename = f"{safe_name}.json"
                 filepath = os.path.join(RECIPES_DIR, filename)
 
                 # Save the new recipe to a file

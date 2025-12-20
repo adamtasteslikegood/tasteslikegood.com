@@ -13,7 +13,6 @@ This workflow outlines a multi-agent approach to fixing and optimizing the recip
     - Scan all files in `recipes/`.
     - Identify files matching old schema or "Untitled Recipe".
     - Apply `migrate_recipe_data` to fix structure and add metadata.
-    - // turbo
     - Run `curl -X POST http://localhost:5000/api/migrate` to trigger batch migration.
 
 3. **Frontend Agent**:
