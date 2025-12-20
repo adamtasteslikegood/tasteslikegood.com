@@ -1,0 +1,150 @@
+{
+  "name": "Vegan 'Chicken' & Waffles with Pineapple BBQ Maple Drizzle",
+  "stock_image_url": "https://images.unsplash.com/photo-1562376552-0d160a2eb8da?ixlib=rb-4.0.3&auto=format&fit=crop&w=1000&q=80",
+  "ai_image_url": "",
+  "prepTime": 30,
+  "cookTime": 25,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Unsweetened Soy Milk",
+        "amount": 2,
+        "units": "cups",
+        "notes": "Divided use (waffles and dredge)"
+      },
+      {
+        "name": "Apple Cider Vinegar",
+        "amount": 2,
+        "units": "tbsp",
+        "notes": "To create vegan buttermilk"
+      },
+      {
+        "name": "Vanilla Extract",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Melted Coconut Oil",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "Pineapple Juice",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "Maple Syrup",
+        "amount": 0.5,
+        "units": "cup"
+      },
+      {
+        "name": "Vegan BBQ Sauce",
+        "amount": 2,
+        "units": "tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "All-Purpose Flour",
+        "amount": 2.5,
+        "units": "cups",
+        "notes": "Divided use (waffles and coating)"
+      },
+      {
+        "name": "Cornstarch",
+        "amount": 2,
+        "units": "tbsp"
+      },
+      {
+        "name": "Baking Powder",
+        "amount": 1,
+        "units": "tbsp"
+      },
+      {
+        "name": "Smoked Paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Garlic Powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 1,
+        "units": "tsp"
+      }
+    ],
+    "other": [
+      {
+        "name": "King Oyster Mushrooms",
+        "amount": 4,
+        "units": "large stems",
+        "notes": "Sliced vertically to resemble chicken tenders"
+      },
+      {
+        "name": "Coconut Cream",
+        "amount": 1,
+        "units": "can",
+        "notes": "Refrigerated overnight, solid part only"
+      },
+      {
+        "name": "Vegetable Oil",
+        "amount": 2,
+        "units": "cups",
+        "notes": "For frying"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Make the Vegan Buttermilk: In a measuring cup, combine the soy milk and apple cider vinegar. Let it sit for 5-10 minutes until it curdles. Split this mixture: 1.5 cups for the waffle batter, 0.5 cups for the mushroom dredge."
+    },
+    {
+      "step": 2,
+      "description": "Prepare the Syrup: In a small saucepan over medium heat, whisk together the pineapple juice, maple syrup, and BBQ sauce. Simmer for 10 minutes until slightly reduced and syrupy. Remove from heat."
+    },
+    {
+      "step": 3,
+      "description": "Make Waffle Batter: In a large bowl, whisk 1.5 cups flour, baking powder, and half the salt. Pour in the 1.5 cups of prepared buttermilk, melted coconut oil, and vanilla. Whisk until just combined (lumps are okay). Cook in a preheated waffle iron according to manufacturer instructions."
+    },
+    {
+      "step": 4,
+      "description": "Prepare the 'Chicken': In a shallow bowl, mix the remaining 1 cup flour, cornstarch, paprika, garlic powder, and remaining salt. In a second bowl, place the remaining 0.5 cups buttermilk. Dip mushroom slices into the liquid, then coat thoroughly in the flour mixture."
+    },
+    {
+      "step": 5,
+      "description": "Fry the Mushrooms: Heat vegetable oil in a skillet to 350\u00b0F (175\u00b0C). Fry the breaded mushrooms for 3-4 minutes per side until golden brown and crispy. Transfer to a wire rack to drain."
+    },
+    {
+      "step": 6,
+      "description": "Whipped Cream: Using a hand mixer, whip the solid chilled coconut cream until fluffy. (Optional: add a pinch of salt for a savory contrast)."
+    },
+    {
+      "step": 7,
+      "description": "Assembly: Place a waffle on a plate. Top with fried mushroom 'chicken'. Add a generous dollop of coconut whipped cream. Drizzle everything with the warm Pineapple Maple BBQ syrup."
+    }
+  ],
+  "notes": "For a spicier kick, add a dash of cayenne pepper to the flour coating for the mushrooms. Ensure your coconut milk can is full-fat and thoroughly chilled to get a good whip.",
+  "tags": [
+    "vegan",
+    "brunch",
+    "soul food",
+    "waffles",
+    "comfort food",
+    "sweet and savory"
+  ],
+  "image": "",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "gpt-4-turbo",
+    "timestamp": "2023-10-27T10:00:00Z",
+    "prompt": "vegan waffle with chicken whipped cream and pinapple maple barbeque siz-syrupp",
+    "stock_image_url": "https://images.unsplash.com/photo-1562376552-0d160a2eb8da",
+    "images_working": true
+  }
+}
