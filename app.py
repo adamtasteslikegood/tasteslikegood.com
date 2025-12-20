@@ -326,6 +326,10 @@ def get_models():
                 # Exclude clearly older/deprecated model versions
                 if any(x in name for x in ['1.0', '1.5']):
                     continue
+                
+                # Exclude models for non-text modalities (but keep vision/image models as they can generate text)
+                if any(x in name for x in ['audio', 'video', 'robotics']):
+                    continue
                     
                 # Clean up the name (remove 'models/' prefix for display)
                 model_id = m.name.replace('models/', '')
@@ -415,9 +419,9 @@ def generate_recipe_image(filename):
                     json.dump(recipe_data, f, indent=2)
                 
                 return jsonify({'image_url': image_url})
-            
-            # No images generated but no exception raised
-            return jsonify({'error': 'No images generated'}), 500
+            else:
+                # No images generated but no exception raised
+                return jsonify({'error': 'No images generated'}), 500
                     
         except Exception as e:
             import traceback
@@ -509,9 +513,9 @@ def regenerate_recipe_image(filename):
                 json.dump(recipe_data, f, indent=2)
                 
             return jsonify({'image_url': image_url})
-        
-        # If no images were generated but no exception was raised, return an error response
-        return jsonify({'error': 'No images generated'}), 500
+        else:
+            # If no images were generated but no exception was raised, return an error response
+            return jsonify({'error': 'No images generated'}), 500
 
     except Exception as e:
         print(f"Regeneration error: {e}")

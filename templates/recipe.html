@@ -323,6 +323,13 @@
         }
     }
 
+    // Helper function for comprehensive HTML/JS escaping
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
     function regenerateImage(filename) {
         if (!confirm('Are you sure you want to regenerate the AI image?')) return;
 
@@ -337,17 +344,37 @@
                 if (data.image_url) {
                     // Force reload image with timestamp to bypass cache
                     const timestamp = new Date().getTime();
-                    // Escape filename for safe HTML insertion
-                    const escapedFilename = filename.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                    aiImageContainer.innerHTML = `
-                        <img src="${data.image_url}?t=${timestamp}" alt="AI generated {{ recipe.name }}" 
-                             style="width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;">
-                        <p class="image-caption">AI Generated (Gemini)</p>
-                        <div class="image-controls" style="margin-top: 10px;">
-                            <button onclick="regenerateImage('${escapedFilename}')" class="btn-small">Regenerate</button>
-                            <button onclick="reportImage('${escapedFilename}')" class="btn-small btn-danger">Report Issue</button>
-                        </div>
-                    `;
+                    // Use DOM methods instead of innerHTML for safer insertion
+                    const img = document.createElement('img');
+                    img.src = data.image_url + '?t=' + timestamp;
+                    img.alt = 'AI generated {{ recipe.name }}';
+                    img.style.cssText = 'width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;';
+                    
+                    const caption = document.createElement('p');
+                    caption.className = 'image-caption';
+                    caption.textContent = 'AI Generated (Gemini)';
+                    
+                    const controls = document.createElement('div');
+                    controls.className = 'image-controls';
+                    controls.style.marginTop = '10px';
+                    
+                    const regenBtn = document.createElement('button');
+                    regenBtn.className = 'btn-small';
+                    regenBtn.textContent = 'Regenerate';
+                    regenBtn.onclick = function() { regenerateImage(filename); };
+                    
+                    const reportBtn = document.createElement('button');
+                    reportBtn.className = 'btn-small btn-danger';
+                    reportBtn.textContent = 'Report Issue';
+                    reportBtn.onclick = function() { reportImage(filename); };
+                    
+                    controls.appendChild(regenBtn);
+                    controls.appendChild(reportBtn);
+                    
+                    aiImageContainer.innerHTML = '';
+                    aiImageContainer.appendChild(img);
+                    aiImageContainer.appendChild(caption);
+                    aiImageContainer.appendChild(controls);
                 } else {
                     alert('Regeneration failed: ' + data.error);
                 }
