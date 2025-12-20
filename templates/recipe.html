@@ -273,6 +273,8 @@
     }
 
     // Auto-refresh stock image every 30 seconds ONLY if it's a placeholder
+    // Note: Once cleared, the interval won't restart. This is intentional since
+    // stock images are loaded at page load and don't dynamically appear later.
     const stockImageRefreshInterval = setInterval(() => {
         // Only refresh if the source is explicitly loremflickr (our placeholder service)
         const img = document.querySelector('.image-container img[src*="loremflickr"]');
