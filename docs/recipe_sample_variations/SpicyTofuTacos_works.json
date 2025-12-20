@@ -1,0 +1,155 @@
+{
+  "name": "Spicy Chipotle Tofu Tacos",
+  "stock_image_url": "https://images.unsplash.com/photo-1504544750208-dc0358e63f7f?q=80&w=2000&auto=format&fit=crop",
+  "ai_image_url": "/static/images/ai_spicy_chipotle_tofu_tacos.png",
+  "description": "Crispy, protein-packed tofu crumbles tossed in a smoky chipotle glaze, served in warm corn tortillas with fresh toppings. A perfect vegan weeknight dinner.",
+  "prepTime": 20,
+  "cookTime": 15,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "tbsp",
+        "notes": "divided"
+      },
+      {
+        "name": "Soy sauce or Tamari",
+        "amount": 1,
+        "units": "tbsp"
+      },
+      {
+        "name": "Chipotle peppers in adobo",
+        "amount": 2,
+        "units": "tbsp",
+        "notes": "finely chopped, plus 1 tsp sauce"
+      },
+      {
+        "name": "Lime juice",
+        "amount": 1,
+        "units": "tbsp"
+      },
+      {
+        "name": "Maple syrup",
+        "amount": 1,
+        "units": "tsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Extra firm tofu",
+        "amount": 14,
+        "units": "oz",
+        "notes": "pressed and drained"
+      },
+      {
+        "name": "Cornstarch",
+        "amount": 2,
+        "units": "tbsp"
+      },
+      {
+        "name": "Chili powder",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Ground cumin",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Corn tortillas",
+        "amount": 8,
+        "units": "count"
+      }
+    ],
+    "other": [
+      {
+        "name": "Avocado",
+        "amount": 1,
+        "units": "count",
+        "notes": "sliced"
+      },
+      {
+        "name": "Purple cabbage",
+        "amount": 2,
+        "units": "cups",
+        "notes": "shredded"
+      },
+      {
+        "name": "Cilantro",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "chopped"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Press the tofu for at least 15 minutes to remove excess moisture. Once pressed, crumble the tofu into bite-sized pieces with your hands into a large bowl."
+    },
+    {
+      "step": 2,
+      "description": "In a small bowl, whisk together the soy sauce, chopped chipotle peppers, adobo sauce, lime juice, and maple syrup. Set aside."
+    },
+    {
+      "step": 3,
+      "description": "Sprinkle the cornstarch, chili powder, cumin, smoked paprika, garlic powder, and salt over the crumbled tofu. Toss gently until the tofu is evenly coated."
+    },
+    {
+      "step": 4,
+      "description": "Heat the olive oil in a large skillet over medium-high heat. Add the tofu in a single layer. Cook undisturbed for 3-4 minutes until the bottom is golden and crispy."
+    },
+    {
+      "step": 5,
+      "description": "Stir the tofu and continue cooking for another 5-7 minutes, stirring occasionally, until crispy on all sides."
+    },
+    {
+      "step": 6,
+      "description": "Reduce heat to low. Pour the sauce mixture over the tofu and toss quickly to coat. Cook for 1-2 minutes until the sauce glazes the tofu and thickens slightly."
+    },
+    {
+      "step": 7,
+      "description": "Warm the corn tortillas in a dry pan or directly over a gas flame for char marks."
+    },
+    {
+      "step": 8,
+      "description": "Assemble the tacos by placing a scoop of spicy tofu onto each tortilla. Top with shredded cabbage, avocado slices, and fresh cilantro."
+    }
+  ],
+  "notes": "For extra heat, add a pinch of cayenne pepper to the spice mix. Serve with vegan sour cream or a squeeze of fresh lime.",
+  "tags": [
+    "Vegan",
+    "Tacos",
+    "Spicy",
+    "Mexican-Inspired",
+    "Gluten-Free Option",
+    "Dinner"
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "gemini-3-pro-preview",
+    "timestamp": "2025-12-04T18:59:12.275923",
+    "prompt": "Spicy Tofu Tacos",
+    "stock_image_url": "https://images.unsplash.com/photo-1504544750208-dc0358e63f7f?q=80&w=2000&auto=format&fit=crop",
+    "ai_image_url": "/static/images/ai_spicy_chipotle_tofu_tacos.png",
+    "images_working": true
+  }
+}

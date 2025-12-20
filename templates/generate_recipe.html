@@ -3,33 +3,43 @@
 {% block title %}Generate a New Recipe{% endblock %}
 
 {% block head %}
-    <style>
-        /* Loading Overlay Styles */
-        #loading-overlay {
-            display: none; /* Hidden by default */
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.85);
-            z-index: 1000;
-            justify-content: center;
-            align-items: center;
-            flex-direction: column;
-            color: #fff;
-            text-align: center;
-            padding: 20px;
+<style>
+    /* Loading Overlay Styles */
+    #loading-overlay {
+        display: none;
+        /* Hidden by default */
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.85);
+        z-index: 1000;
+        justify-content: center;
+        align-items: center;
+        flex-direction: column;
+        color: #fff;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .spinner {
+        border: 8px solid #f3f3f3;
+        border-top: 8px solid #3498db;
+        border-radius: 50%;
+        width: 60px;
+        height: 60px;
+        animation: spin 1s linear infinite;
+        margin-bottom: 20px;
+    }
+
+    @keyframes spin {
+        0% {
+            transform: rotate(0deg);
         }
 
-        .spinner {
-            border: 8px solid #f3f3f3;
-            border-top: 8px solid #3498db;
-            border-radius: 50%;
-            width: 60px;
-            height: 60px;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+        100% {
+            transform: rotate(360deg);
         }
 
         @keyframes spin {
@@ -286,7 +296,6 @@
                 refreshBtn.disabled = false;
                 refreshBtn.textContent = 'Refresh Models';
             }
-        }
 
         refreshBtn.addEventListener('click', refreshModels);
 
@@ -321,9 +330,43 @@
                 submitBtn.disabled = false;
                 submitBtn.innerText = 'Generate Recipe';
             }
-        });
+            modelError.textContent = "Could not load additional models from API.";
+        }
+    }
+    form.addEventListener('submit', function (e) {
+        // Show the overlay
+        overlay.style.display = 'flex';
 
-        // Initial Fetch
-        document.addEventListener('DOMContentLoaded', fetchModels);
-    </script>
+        // Disable submit button to prevent double submission
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Cooking...';
+
+        // Display a random joke immediately
+        displayRandomJoke();
+
+        // Cycle jokes every 5 seconds
+        setInterval(displayRandomJoke, 5000);
+
+        // Focus on the overlay for accessibility
+        overlay.focus();
+    });
+
+    function displayRandomJoke() {
+        const randomIndex = Math.floor(Math.random() * jokes.length);
+        jokeContainer.innerText = jokes[randomIndex];
+    }
+
+    // Fix for Back Button: Hide overlay when page is shown from history
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted || (window.performance && window.performance.navigation.type === 2)) {
+            // Page was restored from bfcache
+            overlay.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'Generate Recipe';
+        }
+    });
+
+    // Initial Fetch
+    document.addEventListener('DOMContentLoaded', fetchModels);
+</script>
 {% endblock %}
