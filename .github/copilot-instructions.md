@@ -75,6 +75,12 @@ tasteslikegood.com/
 ## Testing
 
 ### Running Tests
+First, ensure pytest is installed:
+```bash
+pip install pytest
+```
+
+Then run the tests:
 ```bash
 pytest tests/
 ```
@@ -164,9 +170,11 @@ pytest tests/
 
 Key dependencies in `requirements.txt`:
 - `Flask==3.1.1`: Web framework
-- `google-genai`: Google Generative AI client
+- `google-genai`: Google Generative AI client (no version pinned)
 - `jsonschema==4.25.1`: JSON schema validation
-- `pytest`: Testing framework
+
+Development dependencies (install separately):
+- `pytest`: Testing framework (required to run tests)
 
 When adding new dependencies:
 1. Add them to `requirements.txt` with specific version numbers
