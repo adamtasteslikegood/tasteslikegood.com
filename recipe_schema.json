@@ -8,6 +8,22 @@
       "type": "string",
       "description": "Name of the recipe"
     },
+    "stock_image_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "description": "URL of a stock image for the recipe"
+    },
+    "ai_image_url": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "format": "uri",
+      "description": "URL of an AI-generated image for the recipe"
+    },
     "description": {
       "type": "string",
       "description": "Short description of the recipe"
@@ -103,6 +119,40 @@
       "type": "string",
       "format": "uri",
       "description": "Optional URL of an image of the finished dish"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID of the user who generated the recipe, or 'anonymous'"
+    },
+    "ai_metadata": {
+      "type": "object",
+      "description": "Metadata about the AI generation process",
+      "properties": {
+        "model": {
+          "type": "string"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "prompt": {
+          "type": "string"
+        },
+        "stock_image_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ai_image_url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "images_working": {
+          "type": "boolean"
+        }
+      }
     }
   },
   "required": [

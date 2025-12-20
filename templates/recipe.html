@@ -3,160 +3,401 @@
 {% block title %}{{ recipe.name }}{% endblock %}
 
 {% block content %}
+<h1>{{ recipe.name }}</h1>
+<p><em>{{ recipe.description }}</em></p>
+
+<a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
+
+<div class="converter">
+    <h3>Portion Converter</h3>
+    <div class="converter-buttons">
+        <button onclick="updatePortions(0.5)">Half</button>
+        <button onclick="updatePortions(2)">Double</button>
+        <button onclick="updatePortions(3)">Triple</button>
+        <button onclick="updatePortions(1)">Reset</button>
+    </div>
+    <div class="converter-custom">
+        <form id="custom-servings-form">
+            <label for="custom-servings">Custom Servings:</label>
+            <input type="number" id="custom-servings" name="custom-servings" min="1"
+                placeholder="{{ recipe.servings }}">
+            <button type="submit">Update</button>
+        </form>
+    </div>
+</div>
+
+<div class="recipe-header">
     <h1>{{ recipe.name }}</h1>
-    <p><em>{{ recipe.description }}</em></p>
-
-    <a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
-
-    <div class="converter">
-        <h3>Portion Converter</h3>
-        <div class="converter-buttons">
-            <button onclick="updatePortions(0.5)">Half</button>
-            <button onclick="updatePortions(2)">Double</button>
-            <button onclick="updatePortions(3)">Triple</button>
-            <button onclick="updatePortions(1)">Reset</button>
-        </div>
-        <div class="converter-custom">
-            <form id="custom-servings-form">
-                <label for="custom-servings">Custom Servings:</label>
-                <input type="number" id="custom-servings" name="custom-servings" min="1" placeholder="{{ recipe.servings }}">
-                <button type="submit">Update</button>
-            </form>
-        </div>
-    </div>
-
-
     <div class="recipe-meta">
-        <p><strong>Prep Time:</strong> {{ recipe.prepTime }} minutes</p>
-        <p><strong>Cook Time:</strong> {{ recipe.cookTime }} minutes</p>
-        <p><strong>Servings:</strong> <span id="servings-count" data-original-servings="{{ recipe.servings }}">{{ recipe.servings }}</span></p>
+        <span><strong>Prep:</strong> {{ recipe.prepTime }} mins</span>
+        <span><strong>Cook:</strong> {{ recipe.cookTime }} mins</span>
+        <span><strong>Servings:</strong> <span id="servings-count" data-original-servings="{{ recipe.servings }}">{{
+                recipe.servings }}</span></span>
+    </div>
+</div>
+
+<div class="recipe-images">
+    <div class="image-container">
+        {% if recipe.stock_image_url %}
+        <img src="{{ recipe.stock_image_url }}" alt="Stock photo of {{ recipe.name }}"
+            onerror="this.onerror=null; this.src='https://placehold.co/800x600?text=No+Stock+Image';">
+        <p class="image-caption">Stock Inspiration</p>
+        {% else %}
+        <div class="placeholder-image">Generating Stock Image...</div>
+        {% endif %}
     </div>
 
-    <h2>Ingredients</h2>
-    <div class="ingredients-container">
-        {% for group_name, ingredients_list in recipe.ingredients.items() %}
-        <div class="ingredient-group">
-            <h3>{{ group_name | capitalize }}</h3>
-            <ul>
-                {% for ingredient in ingredients_list %}
-                <li>
-                    {% if ingredient.amount is iterable and ingredient.amount is not string %}
-                        <span class="ingredient-amount" data-original-amount-low="{{ ingredient.amount[0] }}" data-original-amount-high="{{ ingredient.amount[1] }}">{{ ingredient.amount[0] }} - {{ ingredient.amount[1] }}</span>
-                    {% else %}
-                        <span class="ingredient-amount" data-original-amount="{{ ingredient.amount }}">{{ ingredient.amount }}</span>
-                    {% endif %}
-                    {{ ingredient.units }}
-                    <strong>{{ ingredient.name }}</strong>
-                    {% if ingredient.notes %}
-                        <em>({{ ingredient.notes }})</em>
-                    {% endif %}
-                </li>
-                {% endfor %}
-            </ul>
+    <div class="image-container">
+        {% if recipe.ai_image_url %}
+        <img src="{{ recipe.ai_image_url }}" alt="AI generated {{ recipe.name }}"
+            onerror="this.onerror=null; this.src='https://placehold.co/800x600?text=Generation+Failed';">
+        <p class="image-caption">AI Generated (Gemini)</p>
+        {% else %}
+        <div class="placeholder-image">Generating AI Image...</div>
+        {% endif %}
+        <div class="image-controls" style="margin-top: 10px;">
+            <button onclick="regenerateImage('{{ recipe.filename }}')" class="btn-small">Regenerate</button>
+            <button onclick="reportImage('{{ recipe.filename }}')" class="btn-small btn-danger">Report Issue</button>
         </div>
-        {% endfor %}
     </div>
+</div>
 
-    <div class="instructions">
-        <h2>Instructions</h2>
-        <ol>
-            {% for step in recipe.instructions %}
-                {% if step is mapping %}
-                    <li>{{ step.description }}</li>
+<style>
+    .recipe-images {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        /* Force two equal columns */
+        gap: 20px;
+        margin-bottom: 30px;
+    }
+
+    @media (max-width: 600px) {
+        .recipe-images {
+            grid-template-columns: 1fr;
+            /* Stack on mobile */
+        }
+    }
+
+    .image-container {
+        text-align: center;
+    }
+
+    .image-container img {
+        width: 100%;
+        height: 300px;
+        object-fit: cover;
+        border-radius: 12px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        border: none !important;
+        outline: none !important;
+    }
+
+    .image-caption {
+        margin-top: 8px;
+        font-size: 0.9em;
+        color: #666;
+        font-style: italic;
+    }
+
+    .placeholder-image {
+        width: 100%;
+        height: 300px;
+        background-color: #f0f0f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 12px;
+        color: #888;
+        font-style: italic;
+    }
+
+    .btn-small {
+        padding: 5px 10px;
+        font-size: 0.8em;
+        border-radius: 4px;
+        border: 1px solid #ccc;
+        background: #f8f8f8;
+        cursor: pointer;
+        margin-right: 5px;
+    }
+
+    .btn-small:hover {
+        background: #e8e8e8;
+    }
+
+    .btn-danger {
+        color: #d9534f;
+        border-color: #d9534f;
+    }
+
+    .btn-danger:hover {
+        background: #d9534f;
+        color: white;
+    }
+</style>
+
+<div class="recipe-content">
+    <p class="description"><em>{{ recipe.description }}</em></p>
+</div>
+
+<a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
+
+<h2>Ingredients</h2>
+<div class="ingredients-container">
+    {% for group_name, ingredients_list in recipe.ingredients.items() %}
+    <div class="ingredient-group">
+        <h3>{{ group_name | capitalize }}</h3>
+        <ul>
+            {% for ingredient in ingredients_list %}
+            <li>
+                {% if ingredient.amount is iterable and ingredient.amount is not string %}
+                <span class="ingredient-amount" data-original-amount-low="{{ ingredient.amount[0] }}"
+                    data-original-amount-high="{{ ingredient.amount[1] }}">{{ ingredient.amount[0] }} - {{
+                    ingredient.amount[1] }}</span>
                 {% else %}
-                    <li>{{ step }}</li>
+                <span class="ingredient-amount" data-original-amount="{{ ingredient.amount }}">{{ ingredient.amount
+                    }}</span>
                 {% endif %}
+                {{ ingredient.units }}
+                <strong>{{ ingredient.name }}</strong>
+                {% if ingredient.notes %}
+                <em>({{ ingredient.notes }})</em>
+                {% endif %}
+            </li>
             {% endfor %}
-        </ol>
+        </ul>
     </div>
+    {% endfor %}
+</div>
 
-
-    {% if recipe.notes %}
-    <div class="notes">
-        <h3>Notes</h3>
-        <p>{{ recipe.notes }}</p>
-    </div>
-    {% endif %}
-
-    {% if recipe.tags %}
-    <div class="tags">
-        {% for tag in recipe.tags %}
-        <span class="tag">{{ tag }}</span>
+<div class="instructions">
+    <h2>Instructions</h2>
+    <ol>
+        {% for step in recipe.instructions %}
+        {% if step is mapping %}
+        <li>{{ step.description }}</li>
+        {% else %}
+        <li>{{ step }}</li>
+        {% endif %}
         {% endfor %}
-    </div>
-    {% endif %}
+    </ol>
+</div>
 
-    <script>
-        // Wait until the page content is fully loaded
-        document.addEventListener('DOMContentLoaded', function() {
 
-            // Handle the custom servings form submission
-            const customForm = document.getElementById('custom-servings-form');
-            customForm.addEventListener('submit', function(event) {
-                // Prevent the form from reloading the page
-                event.preventDefault();
+{% if recipe.notes %}
+<div class="notes">
+    <h3>Notes</h3>
+    <p>{{ recipe.notes }}</p>
+</div>
+{% endif %}
 
-                const desiredServings = document.getElementById('custom-servings').value;
-                const servingsEl = document.getElementById('servings-count');
-                const originalServings = parseFloat(servingsEl.dataset.originalServings);
+{% if recipe.tags %}
+<div class="tags">
+    {% for tag in recipe.tags %}
+    <span class="tag">{{ tag }}</span>
+    {% endfor %}
+</div>
+{% endif %}
 
-                if (desiredServings && desiredServings > 0) {
-                    const multiplier = desiredServings / originalServings;
-                    updatePortions(multiplier);
-                }
-            });
-        });
+<script>
+    // Wait until the page content is fully loaded
+    document.addEventListener('DOMContentLoaded', function () {
 
-        // The main function that updates all quantities on the page
-        function updatePortions(multiplier) {
-            // Update the servings count
+        // Handle the custom servings form submission
+        const customForm = document.getElementById('custom-servings-form');
+        customForm.addEventListener('submit', function (event) {
+            // Prevent the form from reloading the page
+            event.preventDefault();
+
+            const desiredServings = document.getElementById('custom-servings').value;
             const servingsEl = document.getElementById('servings-count');
             const originalServings = parseFloat(servingsEl.dataset.originalServings);
-            // Round to the nearest whole number for servings
-            servingsEl.innerText = Math.round(originalServings * multiplier);
 
-            // Find all ingredient amount elements
-            const allAmounts = document.querySelectorAll('.ingredient-amount');
-
-            // Loop through each ingredient
-            allAmounts.forEach(function(amountEl) {
-                // Check if it's a single amount or a range
-                if (amountEl.dataset.originalAmount) {
-                    const originalAmount = parseFloat(amountEl.dataset.originalAmount);
-                    const newAmount = originalAmount * multiplier;
-                    amountEl.innerText = formatQuantity(newAmount);
-                } else if (amountEl.dataset.originalAmountLow) {
-                    const originalLow = parseFloat(amountEl.dataset.originalAmountLow);
-                    const originalHigh = parseFloat(amountEl.dataset.originalAmountHigh);
-                    const newLow = originalLow * multiplier;
-                    const newHigh = originalHigh * multiplier;
-                    amountEl.innerText = `${formatQuantity(newLow)} - ${formatQuantity(newHigh)}`;
-                }
-            });
-        }
-
-        // Helper function to format numbers nicely (e.g., 0.5 becomes 1/2)
-        function formatQuantity(num) {
-            if (num >= 1) {
-                // For numbers 1 or greater, round to 2 decimal places if not a whole number
-                return Number.isInteger(num) ? num : num.toFixed(2);
+            if (desiredServings && desiredServings > 0) {
+                const multiplier = desiredServings / originalServings;
+                updatePortions(multiplier);
             }
+        });
+    });
 
-            // Simple fraction conversion for common values
-            const fractions = {
-                0.5: '1/2',
-                0.25: '1/4',
-                0.75: '3/4',
-                0.33: '1/3',
-                0.34: '1/3',
-                0.66: '2/3',
-                0.67: '2/3',
-                0.125: '1/8'
-            };
+    // The main function that updates all quantities on the page
+    function updatePortions(multiplier) {
+        // Update the servings count
+        const servingsEl = document.getElementById('servings-count');
+        const originalServings = parseFloat(servingsEl.dataset.originalServings);
+        // Round to the nearest whole number for servings
+        servingsEl.innerText = Math.round(originalServings * multiplier);
 
-            // Round to 2 decimal places for finding a match
-            const roundedNum = parseFloat(num.toFixed(2));
-            return fractions[roundedNum] || num.toFixed(2);
+        // Find all ingredient amount elements
+        const allAmounts = document.querySelectorAll('.ingredient-amount');
+
+        // Loop through each ingredient
+        allAmounts.forEach(function (amountEl) {
+            // Check if it's a single amount or a range
+            if (amountEl.dataset.originalAmount) {
+                const originalAmount = parseFloat(amountEl.dataset.originalAmount);
+                const newAmount = originalAmount * multiplier;
+                amountEl.innerText = formatQuantity(newAmount);
+            } else if (amountEl.dataset.originalAmountLow) {
+                const originalLow = parseFloat(amountEl.dataset.originalAmountLow);
+                const originalHigh = parseFloat(amountEl.dataset.originalAmountHigh);
+                const newLow = originalLow * multiplier;
+                const newHigh = originalHigh * multiplier;
+                amountEl.innerText = `${formatQuantity(newLow)} - ${formatQuantity(newHigh)}`;
+            }
+        });
+    }
+
+    // Helper function to format numbers nicely (e.g., 0.5 becomes 1/2)
+    function formatQuantity(num) {
+        if (num >= 1) {
+            // For numbers 1 or greater, round to 2 decimal places if not a whole number
+            return Number.isInteger(num) ? num : num.toFixed(2);
         }
-    </script>
+
+        // Simple fraction conversion for common values
+        const fractions = {
+            0.5: '1/2',
+            0.25: '1/4',
+            0.75: '3/4',
+            0.33: '1/3',
+            0.34: '1/3',
+            0.66: '2/3',
+            0.67: '2/3',
+            0.125: '1/8'
+        };
+
+        // Round to 2 decimal places for finding a match
+        const roundedNum = parseFloat(num.toFixed(2));
+        return fractions[roundedNum] || num.toFixed(2);
+    }
+
+    // Auto-refresh stock image every 30 seconds ONLY if it's a placeholder
+    // Note: Once cleared, the interval won't restart. This is intentional since
+    // stock images are loaded at page load and don't dynamically appear later.
+    const stockImageRefreshInterval = setInterval(() => {
+        // Only refresh if the source is explicitly loremflickr (our placeholder service)
+        const img = document.querySelector('.image-container img[src*="loremflickr"]');
+        if (img) {
+            const url = new URL(img.src);
+            // Generate a new lock ID between 1 and 10000 to get a fresh image
+            const newLock = Math.floor(Math.random() * 10000) + 1;
+            url.searchParams.set('lock', newLock);
+
+            // Create a new image object to preload
+            const newImg = new Image();
+            newImg.onload = function () {
+                img.src = url.toString();
+            };
+            newImg.src = url.toString();
+        } else {
+            // If no loremflickr image found, clear the interval to prevent memory leaks
+            clearInterval(stockImageRefreshInterval);
+        }
+    }, 30000);
+
+    // Async AI Image Generation - merged into main DOMContentLoaded block
+    const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
+    if (aiImageContainer) {
+        const aiImg = aiImageContainer.querySelector('img');
+
+        // If no image tag exists (placeholder is showing), trigger generation
+        if (!aiImg) {
+            console.log("AI Image missing, triggering generation...");
+            fetch('/api/generate_image/{{ recipe.filename }}', {
+                method: 'POST'
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.image_url) {
+                        console.log("Image generated:", data.image_url);
+                        // Replace placeholder with image
+                        aiImageContainer.innerHTML = `
+                        <img src="${data.image_url}" alt="AI generated {{ recipe.name }}" 
+                             style="width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;">
+                        <p class="image-caption">AI Generated (Gemini)</p>
+                    `;
+                    } else {
+                        console.error("Image generation failed:", data.error);
+                    }
+                })
+                .catch(error => console.error("Error triggering generation:", error));
+        }
+    }
+
+    // Helper function for comprehensive HTML/JS escaping
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function regenerateImage(filename) {
+        if (!confirm('Are you sure you want to regenerate the AI image?')) return;
+
+        const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
+        aiImageContainer.innerHTML = '<div class="placeholder-image">Regenerating...</div>';
+
+        // Encode filename to prevent XSS
+        const encodedFilename = encodeURIComponent(filename);
+        fetch('/api/regenerate_image/' + encodedFilename, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.image_url) {
+                    // Force reload image with timestamp to bypass cache
+                    const timestamp = new Date().getTime();
+                    // Use DOM methods instead of innerHTML for safer insertion
+                    const img = document.createElement('img');
+                    img.src = data.image_url + '?t=' + timestamp;
+                    img.alt = 'AI generated {{ recipe.name }}';
+                    img.style.cssText = 'width: 100%; height: 300px; object-fit: cover; border-radius: 12px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); border: none !important; outline: none !important;';
+                    
+                    const caption = document.createElement('p');
+                    caption.className = 'image-caption';
+                    caption.textContent = 'AI Generated (Gemini)';
+                    
+                    const controls = document.createElement('div');
+                    controls.className = 'image-controls';
+                    controls.style.marginTop = '10px';
+                    
+                    const regenBtn = document.createElement('button');
+                    regenBtn.className = 'btn-small';
+                    regenBtn.textContent = 'Regenerate';
+                    regenBtn.onclick = function() { regenerateImage(filename); };
+                    
+                    const reportBtn = document.createElement('button');
+                    reportBtn.className = 'btn-small btn-danger';
+                    reportBtn.textContent = 'Report Issue';
+                    reportBtn.onclick = function() { reportImage(filename); };
+                    
+                    controls.appendChild(regenBtn);
+                    controls.appendChild(reportBtn);
+                    
+                    aiImageContainer.innerHTML = '';
+                    aiImageContainer.appendChild(img);
+                    aiImageContainer.appendChild(caption);
+                    aiImageContainer.appendChild(controls);
+                } else {
+                    alert('Regeneration failed: ' + data.error);
+                }
+            })
+            .catch(err => alert('Error: ' + err));
+    }
+
+    function reportImage(filename) {
+        const reason = prompt("What is wrong with the image? (e.g., 'doesn't match recipe', 'low quality')");
+        if (reason) {
+            // Encode filename to prevent XSS
+            const encodedFilename = encodeURIComponent(filename);
+            fetch('/api/report_recipe/' + encodedFilename, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ reason: reason })
+            })
+                .then(response => response.json())
+                .then(data => alert('Report submitted. Thank you!'))
+                .catch(err => alert('Error reporting: ' + err));
+        }
+    }
+</script>
 {% endblock %}
