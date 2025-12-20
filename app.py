@@ -387,38 +387,7 @@ def get_models():
     """Returns a curated list of Gemini models for recipe generation."""
     try:
         cached_models = load_models_from_cache()
-
-        client = Client(api_key=GOOGLE_API_KEY)
         
-        # List models and filter in a single pass
-        filtered_models = []
-        count = 0
-        for m in client.models.list():
-            if count >= 10:
-                break
-                
-            # Filter logic: Include gemini/gemma models, exclude embeddings and older versions
-            name = m.name.lower()
-            if ('gemini' in name or 'gemma' in name) and 'embedding' not in name:
-                # Exclude clearly older/deprecated model versions
-                if any(x in name for x in ['1.0', '1.5']):
-                    continue
-                
-                # Exclude models for non-text modalities (but keep vision/image models as they can generate text)
-                if any(x in name for x in ['audio', 'video', 'robotics']):
-                    continue
-                    
-                # Clean up the name (remove 'models/' prefix for display)
-                model_id = m.name.replace('models/', '')
-                display_name = m.display_name or model_id
-                
-                filtered_models.append({
-                    'id': model_id,
-                    'name': display_name
-                })
-                count += 1
-
-        return jsonify(filtered_models)
         if cached_models:
             return jsonify(filter_and_sort_models(cached_models))
 
