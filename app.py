@@ -49,6 +49,7 @@ RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
 # Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+# Debug logging - executed at import time to verify API key configuration
 print(f"DEBUG: Loaded GOOGLE_API_KEY: {'Yes' if GOOGLE_API_KEY else 'No'}")
 
 # Default Model Configuration
@@ -56,6 +57,7 @@ DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
 # Validate DEFAULT_MODEL (Simple check, could be expanded)
 if not DEFAULT_MODEL:
+    # Debug logging - executed at import time to warn about missing model configuration
     print("Warning: DEFAULT_MODEL is not set. Fallback to 'gemini-2.0-flash-exp'.")
     DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
@@ -343,7 +345,15 @@ def get_models():
 
 @app.route('/api/generate_image/<filename>', methods=['POST'])
 def generate_recipe_image(filename):
-    """Generates an AI image for a recipe asynchronously."""
+    """Generates an AI image for a recipe asynchronously.
+    
+    Note: This endpoint and others (regenerate_recipe_image, report_recipe, show_recipe)
+    can read and write to the same recipe JSON files concurrently without file locking.
+    This creates a race condition risk that could lead to data loss or corruption if
+    multiple requests modify the same file simultaneously. Consider implementing file
+    locking (e.g., fcntl on Unix, msvcrt on Windows) or migrating to a proper database
+    for production use.
+    """
     try:
         filepath = validate_recipe_filepath(filename)
     except ValueError as e:
@@ -415,6 +425,8 @@ def generate_recipe_image(filename):
             print(f"Error generating recipe: {e}")
             print(traceback_str)
             
+            # TODO: Implement log rotation for recipe_error.txt to prevent unbounded growth.
+            # Consider using Python's logging module with RotatingFileHandler.
             # Log to file for debugging
             with open('recipe_error.txt', 'a') as f:
                 f.write(f"\nLast Error (Recipe Gen): {repr(e)}\nTraceback:\n{traceback_str}\n")
@@ -428,7 +440,12 @@ def generate_recipe_image(filename):
 
 @app.route('/api/regenerate_image/<filename>', methods=['POST'])
 def regenerate_recipe_image(filename):
-    """Force regeneration of an AI image."""
+    """Force regeneration of an AI image.
+    
+    TODO: This function shares nearly identical logic with generate_recipe_image.
+    Consider extracting the common image generation code into a shared helper function
+    to follow DRY principles and make maintenance easier.
+    """
     try:
         filepath = validate_recipe_filepath(filename)
     except ValueError as e:
