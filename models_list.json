@@ -146,6 +146,11 @@
       "supported_generation_methods": []
     },
     {
+      "name": "models/gemini-3-flash-preview",
+      "display_name": "Gemini 3 Flash Preview",
+      "supported_generation_methods": []
+    },
+    {
       "name": "models/gemini-3-pro-image-preview",
       "display_name": "Nano Banana Pro",
       "supported_generation_methods": []
@@ -163,6 +168,11 @@
     {
       "name": "models/gemini-2.5-computer-use-preview-10-2025",
       "display_name": "Gemini 2.5 Computer Use Preview 10-2025",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/deep-research-pro-preview-12-2025",
+      "display_name": "Deep Research Pro Preview (Dec-12-2025)",
       "supported_generation_methods": []
     },
     {
@@ -254,7 +264,12 @@
       "name": "models/gemini-2.5-flash-native-audio-preview-09-2025",
       "display_name": "Gemini 2.5 Flash Native Audio Preview 09-2025",
       "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-2.5-flash-native-audio-preview-12-2025",
+      "display_name": "Gemini 2.5 Flash Native Audio Preview 12-2025",
+      "supported_generation_methods": []
     }
   ],
-  "updated_at": "2025-12-11T15:32:37Z"
+  "updated_at": "2025-12-20T05:01:15Z"
 }

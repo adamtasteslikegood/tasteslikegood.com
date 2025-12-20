@@ -272,31 +272,7 @@
         return fractions[roundedNum] || num.toFixed(2);
     }
 
-    // Auto-refresh stock image every 30 seconds ONLY if it's a placeholder
-    // Note: Once cleared, the interval won't restart. This is intentional since
-    // stock images are loaded at page load and don't dynamically appear later.
-    const stockImageRefreshInterval = setInterval(() => {
-        // Only refresh if the source is explicitly loremflickr (our placeholder service)
-        const img = document.querySelector('.image-container img[src*="loremflickr"]');
-        if (img) {
-            const url = new URL(img.src);
-            // Generate a new lock ID between 1 and 10000 to get a fresh image
-            const newLock = Math.floor(Math.random() * 10000) + 1;
-            url.searchParams.set('lock', newLock);
-
-            // Create a new image object to preload
-            const newImg = new Image();
-            newImg.onload = function () {
-                img.src = url.toString();
-            };
-            newImg.src = url.toString();
-        } else {
-            // If no loremflickr image found, clear the interval to prevent memory leaks
-            clearInterval(stockImageRefreshInterval);
-        }
-    }, 30000);
-
-    // Async AI Image Generation - merged into main DOMContentLoaded block
+    // Async AI Image Generation
     const aiImageContainer = document.querySelector('.image-container:nth-child(2)');
     if (aiImageContainer) {
         const aiImg = aiImageContainer.querySelector('img');

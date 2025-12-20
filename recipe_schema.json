@@ -126,31 +126,58 @@
     },
     "ai_metadata": {
       "type": "object",
-      "description": "Metadata about the AI generation process",
+      "description": "Metadata about all AI generation processes",
       "properties": {
+        "recipe_generation": {
+          "type": "object",
+          "description": "Metadata for the recipe text generation",
+          "properties": {
+            "model": { "type": "string", "description": "Model used for generation" },
+            "user_id": { "type": "string", "description": "User who triggered the generation" },
+            "prompt": { "type": "string", "description": "Original user prompt" },
+            "timestamp": { "type": "string", "description": "ISO timestamp of generation" },
+            "success": { "type": "boolean", "description": "Whether generation succeeded" }
+          }
+        },
+        "image_generation": {
+          "type": ["object", "null"],
+          "description": "Metadata for AI image generation (Imagen)",
+          "properties": {
+            "model": { "type": "string", "description": "Model used for image generation" },
+            "user_id": { "type": "string", "description": "User who triggered the generation" },
+            "prompt": { "type": "string", "description": "Image generation prompt" },
+            "timestamp": { "type": "string", "description": "ISO timestamp of generation" },
+            "success": { "type": "boolean", "description": "Whether generation succeeded" },
+            "image_path": { "type": ["string", "null"], "description": "Path to generated image" }
+          }
+        },
+        "stock_image_generation": {
+          "type": ["object", "null"],
+          "description": "Metadata for stock image URL generation",
+          "properties": {
+            "model": { "type": "string", "description": "Model used to find stock image" },
+            "user_id": { "type": "string", "description": "User who triggered the generation" },
+            "prompt": { "type": "string", "description": "Prompt used to find stock image" },
+            "timestamp": { "type": "string", "description": "ISO timestamp of generation" },
+            "success": { "type": "boolean", "description": "Whether a valid URL was found" },
+            "url_validated": { "type": "boolean", "description": "Whether the URL was validated as working" }
+          }
+        },
         "model": {
-          "type": "string"
+          "type": "string",
+          "description": "Legacy: Primary model used (for backwards compatibility)"
         },
         "timestamp": {
-          "type": "string"
+          "type": "string",
+          "description": "Legacy: Primary timestamp (for backwards compatibility)"
         },
         "prompt": {
-          "type": "string"
-        },
-        "stock_image_url": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "ai_image_url": {
-          "type": [
-            "string",
-            "null"
-          ]
+          "type": "string",
+          "description": "Legacy: Primary prompt (for backwards compatibility)"
         },
         "images_working": {
-          "type": "boolean"
+          "type": "boolean",
+          "description": "Whether images are currently working/valid"
         }
       }
     }

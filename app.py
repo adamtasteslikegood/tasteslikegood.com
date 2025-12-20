@@ -4,6 +4,7 @@ import time
 import datetime
 import re
 import csv
+import requests
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
@@ -88,31 +89,170 @@ def get_genai_client():
     return None
 
 
-def get_smart_stock_image(recipe_name):
-    """Uses Gemini to generate keywords for a stock image."""
+# Curated static fallback images from Unsplash (real, permanent URLs)
+FALLBACK_FOOD_IMAGES = [
+    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop",  # Healthy bowl
+    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop",  # Plated food
+    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=600&fit=crop",  # Comfort food
+    "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop",  # Pancakes
+    "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop",  # Pizza
+    "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop",  # Salad
+    "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&h=600&fit=crop",  # Veggie bowl
+    "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&h=600&fit=crop",  # Fresh produce
+    "https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=800&h=600&fit=crop",  # Pasta
+    "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&h=600&fit=crop",  # Breakfast spread
+]
+
+
+def get_smart_stock_image(recipe_name, user_id='anonymous'):
+    """Uses Gemini to find a real stock image URL for the recipe.
+
+    Returns a tuple: (url, metadata_dict) or (None, metadata_dict) on failure.
+    Only returns direct, static URLs - never dynamic or keyword-based URLs.
+    """
     client = get_genai_client()
+    model_used = 'gemini-2.0-flash-exp'
+    timestamp = datetime.datetime.now().isoformat()
+
+    metadata = {
+        'model': model_used,
+        'user_id': user_id,
+        'prompt': '',
+        'timestamp': timestamp,
+        'success': False,
+        'url_validated': False,
+        'fallback_used': False
+    }
+
     if not client:
-        return None
-        
+        # Use curated fallback
+        fallback_url = _get_fallback_image(recipe_name)
+        metadata['success'] = True
+        metadata['fallback_used'] = True
+        metadata['url_validated'] = True
+        return fallback_url, metadata
+
     try:
+        # Primary prompt - ask for a specific, real stock image URL
         prompt = (
-            f"Generate 2-3 simple, comma-separated keywords to search for a stock photo of '{recipe_name}'. "
-            f"Example: 'spicy tacos, mexican food'. Return ONLY the keywords."
+            f"I need a REAL, direct stock image URL for a vegan dish called '{recipe_name}'.\n\n"
+            f"REQUIREMENTS:\n"
+            f"1. Return ONLY a single direct image URL from Unsplash, Pexels, or Pixabay\n"
+            f"2. The URL must be a real, permanent link to an actual food photo\n"
+            f"3. Format: https://images.unsplash.com/photo-XXXXX or https://images.pexels.com/photos/XXXXX/...\n"
+            f"4. Do NOT return search URLs, API URLs, or placeholder services\n"
+            f"5. If you cannot find a specific real URL, respond with exactly: NONE\n\n"
+            f"Return ONLY the URL or NONE, nothing else."
         )
-        # Use a fast model for this
+        metadata['prompt'] = prompt
+
         response = client.models.generate_content(
-            model='gemini-2.0-flash-exp',
+            model=model_used,
             contents=prompt
         )
-        keywords = response.text.strip().replace(' ', ',')
-        # Use loremflickr with specific keywords which is reliable
-        import random
-        lock_id = random.randint(1, 10000)
-        return f"https://loremflickr.com/800/600/{keywords}/all?lock={lock_id}"
+        url_text = response.text.strip()
+
+        # Check if AI returned NONE or invalid response
+        if url_text.upper() == 'NONE' or not url_text.startswith('http'):
+            # Try a second, more targeted prompt
+            retry_prompt = (
+                f"Search for a food photography image on Unsplash that matches: {recipe_name}\n"
+                f"Return the direct image URL in format: https://images.unsplash.com/photo-XXXXXXXXX?w=800\n"
+                f"Return ONLY the URL, or NONE if not found."
+            )
+            metadata['prompt'] = retry_prompt
+
+            retry_response = client.models.generate_content(
+                model=model_used,
+                contents=retry_prompt
+            )
+            url_text = retry_response.text.strip()
+
+            if url_text.upper() == 'NONE' or not url_text.startswith('http'):
+                # Use curated static fallback
+                fallback_url = _get_fallback_image(recipe_name)
+                metadata['success'] = True
+                metadata['fallback_used'] = True
+                metadata['url_validated'] = True
+                return fallback_url, metadata
+
+        # Validate the URL is accessible and returns an image
+        is_valid = validate_image_url(url_text)
+        metadata['success'] = True
+        metadata['url_validated'] = is_valid
+
+        if is_valid:
+            return url_text, metadata
+        else:
+            # URL validation failed - use curated static fallback
+            fallback_url = _get_fallback_image(recipe_name)
+            metadata['fallback_used'] = True
+            metadata['url_validated'] = True
+            return fallback_url, metadata
+
     except Exception as e:
         print(f"Smart stock image fetch failed: {e}")
-    
-    return None
+        metadata['success'] = False
+        # Use curated fallback on error
+        fallback_url = _get_fallback_image(recipe_name)
+        metadata['fallback_used'] = True
+        return fallback_url, metadata
+
+
+def _get_fallback_image(recipe_name):
+    """Returns a deterministic fallback image based on recipe name.
+
+    Uses a hash of the recipe name to consistently return the same image
+    for the same recipe, avoiding random behavior.
+    """
+    # Use hash to get deterministic but varied selection
+    name_hash = hash(recipe_name.lower())
+    index = abs(name_hash) % len(FALLBACK_FOOD_IMAGES)
+    return FALLBACK_FOOD_IMAGES[index]
+
+
+def validate_image_url(url):
+    """Validates that an image URL is accessible and returns an image.
+
+    Returns True if the URL is valid and returns an image, False otherwise.
+    """
+    try:
+        # Use HEAD request first to check if URL exists
+        response = requests.head(url, timeout=5, allow_redirects=True)
+        if response.status_code != 200:
+            return False
+
+        # Check content type is an image
+        content_type = response.headers.get('Content-Type', '')
+        if not content_type.startswith('image/'):
+            return False
+
+        return True
+    except Exception as e:
+        print(f"URL validation failed for {url}: {e}")
+        return False
+
+
+def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
+    """Checks if existing stock image URL is valid, refreshes if not.
+
+    Returns tuple: (updated_url, metadata_dict, was_refreshed)
+    """
+    current_url = recipe_data.get('stock_image_url')
+    recipe_name = recipe_data.get('name', 'food')
+
+    if current_url:
+        # Validate existing URL
+        is_valid = validate_image_url(current_url)
+        if is_valid:
+            # URL is working, no need to refresh
+            return current_url, None, False
+        else:
+            print(f"Stock image URL invalid, refreshing for {recipe_name}")
+
+    # Need to get a new URL
+    new_url, metadata = get_smart_stock_image(recipe_name, user_id)
+    return new_url, metadata, True
 
 
 def sanitize_filename(filename):
@@ -261,25 +401,28 @@ def show_recipe(filename):
             print(f"DEBUG: Auto-migrated {filename} on view.")
         
         # --- Lazy Load Images ---
-        # 1. Stock Image
-        if not recipe_data.get('stock_image_url'):
-            # Try smart retrieval first
-            print(f"DEBUG: Fetching smart stock image for {recipe_data.get('name')}...")
-            smart_url = get_smart_stock_image(recipe_data.get('name'))
-            
-            if smart_url:
-                recipe_data['stock_image_url'] = smart_url
-                print(f"DEBUG: Found smart stock URL: {smart_url}")
-            else:
-                # Fallback to loremflickr if smart fetch fails
-                import random
-                keywords = recipe_data.get('name', 'food').replace(' ', ',')
-                lock_id = random.randint(1, 10000)
-                recipe_data['stock_image_url'] = f"https://loremflickr.com/800/600/{keywords}/all?lock={lock_id}"
-                print(f"DEBUG: Fallback to LoremFlickr: {recipe_data['stock_image_url']}")
-            
+        # 1. Stock Image - validate existing or fetch new
+        user_id = session.get('user_id', 'anonymous')
+        new_url, stock_metadata, was_refreshed = validate_and_refresh_stock_image(recipe_data, user_id)
+
+        if was_refreshed and new_url:
+            recipe_data['stock_image_url'] = new_url
+            print(f"DEBUG: Stock image updated for {recipe_data.get('name')}: {new_url}")
+
+            # Update ai_metadata with stock image generation info
+            if 'ai_metadata' not in recipe_data:
+                recipe_data['ai_metadata'] = {}
+            recipe_data['ai_metadata']['stock_image_generation'] = stock_metadata
+            recipe_data['ai_metadata']['images_working'] = True
+
             updated = True
-            
+        elif not new_url and not recipe_data.get('stock_image_url'):
+            # Complete fallback - use curated static image
+            recipe_name = recipe_data.get('name', 'food')
+            recipe_data['stock_image_url'] = _get_fallback_image(recipe_name)
+            print(f"DEBUG: Ultimate fallback to curated image: {recipe_data['stock_image_url']}")
+            updated = True
+
         # 2. AI Image - REMOVED synchronous generation
         # Generation is now handled asynchronously via /api/generate_image/<filename>
 
@@ -433,43 +576,55 @@ def generate_recipe_image(filename):
                 client = Client(credentials=creds)
             elif GOOGLE_API_KEY:
                 client = Client(api_key=GOOGLE_API_KEY)
-            
+
             if not client:
-                 return jsonify({'error': 'No credentials available'}), 500
+                return jsonify({'error': 'No credentials available'}), 500
+
+            user_id = session.get('user_id', 'anonymous')
+            model_to_use = 'imagen-4.0-generate-001'
+            image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
+            generation_timestamp = datetime.datetime.now().isoformat()
 
             print(f"DEBUG: Async AI image generation for {recipe_data.get('name')}...")
-            image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
-            
-            model_to_use = 'imagen-4.0-generate-001'
+
             response = client.models.generate_images(
                 model=model_to_use,
                 prompt=image_prompt,
                 config={'number_of_images': 1}
             )
-            
+
             if response.generated_images:
                 image_data = response.generated_images[0].image.image_bytes
                 safe_filename = sanitize_filename(filename)
                 image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
                 image_path = os.path.join('static', 'images', image_filename)
                 os.makedirs(os.path.dirname(image_path), exist_ok=True)
-                
+
                 with open(image_path, 'wb') as img_f:
                     img_f.write(image_data)
-                    
+
                 image_url = url_for('static', filename=f'images/{image_filename}')
-                
+
                 # Update recipe file
                 recipe_data['ai_image_url'] = image_url
-                
-                # Update metadata if present
-                if 'ai_metadata' in recipe_data:
-                    recipe_data['ai_metadata']['ai_image_url'] = image_url
-                    recipe_data['ai_metadata']['images_working'] = True
+
+                # Update ai_metadata with comprehensive image generation info
+                if 'ai_metadata' not in recipe_data:
+                    recipe_data['ai_metadata'] = {}
+
+                recipe_data['ai_metadata']['image_generation'] = {
+                    'model': model_to_use,
+                    'user_id': user_id,
+                    'prompt': image_prompt,
+                    'timestamp': generation_timestamp,
+                    'success': True,
+                    'image_path': image_path
+                }
+                recipe_data['ai_metadata']['images_working'] = True
 
                 with open(filepath, 'w') as f:
                     json.dump(recipe_data, f, indent=2)
-                
+
                 return jsonify({'image_url': image_url})
             else:
                 # No images generated but no exception raised
@@ -518,52 +673,55 @@ def regenerate_recipe_image(filename):
         if 'ai_image_url' in recipe_data:
             del recipe_data['ai_image_url']
             
-        # ... logic copied/adapted ...
         client = get_genai_client()
         if not client:
-             return jsonify({'error': 'No credentials available'}), 500
+            return jsonify({'error': 'No credentials available'}), 500
+
+        user_id = session.get('user_id', 'anonymous')
+        model_to_use = 'imagen-4.0-generate-001'
+        image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
+        generation_timestamp = datetime.datetime.now().isoformat()
 
         print(f"DEBUG: Regenerating AI image for {recipe_data.get('name')}...")
-        image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
-        
-        # Use metadata model if available, else default
-        model_to_use = 'imagen-4.0-generate-001'
-        if recipe_data.get('ai_metadata', {}).get('model'):
-             # If the metadata model is a text model, we still use imagen for image gen.
-             # So we stick to imagen-4.0.
-             pass
 
         response = client.models.generate_images(
             model=model_to_use,
             prompt=image_prompt,
             config={'number_of_images': 1}
         )
-        
+
         if response.generated_images:
             image_data = response.generated_images[0].image.image_bytes
             safe_filename = sanitize_filename(filename)
             image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
             image_path = os.path.join('static', 'images', image_filename)
             os.makedirs(os.path.dirname(image_path), exist_ok=True)
-            
+
             with open(image_path, 'wb') as img_f:
                 img_f.write(image_data)
-                
+
             image_url = url_for('static', filename=f'images/{image_filename}')
-            
+
             # Update recipe data
             recipe_data['ai_image_url'] = image_url
-            
-            # Update metadata
+
+            # Update ai_metadata with comprehensive image generation info
             if 'ai_metadata' not in recipe_data:
                 recipe_data['ai_metadata'] = {}
-            recipe_data['ai_metadata']['ai_image_url'] = image_url
-            recipe_data['ai_metadata']['timestamp'] = datetime.datetime.now().isoformat()
+
+            recipe_data['ai_metadata']['image_generation'] = {
+                'model': model_to_use,
+                'user_id': user_id,
+                'prompt': image_prompt,
+                'timestamp': generation_timestamp,
+                'success': True,
+                'image_path': image_path
+            }
             recipe_data['ai_metadata']['images_working'] = True
-            
+
             with open(filepath, 'w') as f:
                 json.dump(recipe_data, f, indent=2)
-                
+
             return jsonify({'image_url': image_url})
         else:
             # If no images were generated but no exception was raised, return an error response
@@ -819,14 +977,27 @@ def generate_recipe():
         if recipe_data:
             try:
                 # Add metadata
-                recipe_data['user_id'] = session.get('user_id', 'anonymous')
+                user_id = session.get('user_id', 'anonymous')
+                recipe_data['user_id'] = user_id
+                generation_timestamp = datetime.datetime.now().isoformat()
+
                 recipe_data['ai_metadata'] = {
+                    # New comprehensive metadata structure
+                    'recipe_generation': {
+                        'model': selected_model,
+                        'user_id': user_id,
+                        'prompt': prompt,
+                        'timestamp': generation_timestamp,
+                        'success': True
+                    },
+                    'image_generation': None,  # Will be filled by async /api/generate_image
+                    'stock_image_generation': None,  # Will be filled when stock image is fetched
+
+                    # Legacy fields for backwards compatibility
                     'model': selected_model,
-                    'timestamp': datetime.datetime.now().isoformat(),
+                    'timestamp': generation_timestamp,
                     'prompt': prompt,
-                    'stock_image_url': recipe_data.get('stock_image_url'),
-                    'ai_image_url': None, # Will be filled by async gen
-                    'images_working': True # Optimistic default
+                    'images_working': True  # Optimistic default
                 }
 
                 # Create a safe filename from the recipe name

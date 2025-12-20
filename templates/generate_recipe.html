@@ -37,85 +37,80 @@
         0% {
             transform: rotate(0deg);
         }
-
         100% {
             transform: rotate(360deg);
         }
+    }
 
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
+    #joke-container {
+        font-size: 1.2em;
+        max-width: 600px;
+        line-height: 1.5;
+        min-height: 100px; /* Prevent layout shift */
+    }
 
-        #joke-container {
-            font-size: 1.2em;
-            max-width: 600px;
-            line-height: 1.5;
-            min-height: 100px; /* Prevent layout shift */
-        }
-        
-        select {
-            padding: 10px;
-            margin-bottom: 15px;
-            width: 100%;
-            border-radius: 5px;
-            border: 1px solid #ccc;
-        }
-        
-        #model-loading {
-            font-size: 0.9em;
-            color: #666;
-            margin-bottom: 5px;
-        }
+    select {
+        padding: 10px;
+        margin-bottom: 15px;
+        width: 100%;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+    }
 
-        .error-message {
-            color: red;
-            font-size: 0.9em;
-        }
+    #model-loading {
+        font-size: 0.9em;
+        color: #666;
+        margin-bottom: 5px;
+    }
 
-        .model-controls {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            margin-bottom: 5px;
-        }
+    .error-message {
+        color: red;
+        font-size: 0.9em;
+    }
 
-        #refresh-models-btn {
-            background: none;
-            border: none;
-            color: #3498db;
-            cursor: pointer;
-            font-size: 0.9em;
-            text-decoration: underline;
-            padding: 0;
-        }
+    .model-controls {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 5px;
+    }
 
-        #refresh-models-btn:hover {
-            color: #2980b9;
-        }
+    #refresh-models-btn {
+        background: none;
+        border: none;
+        color: #3498db;
+        cursor: pointer;
+        font-size: 0.9em;
+        text-decoration: underline;
+        padding: 0;
+    }
 
-        #refresh-models-btn:disabled {
-            color: #999;
-            cursor: not-allowed;
-        }
+    #refresh-models-btn:hover {
+        color: #2980b9;
+    }
 
-        .refresh-status {
-            font-size: 0.85em;
-            padding: 5px 10px;
-            border-radius: 4px;
-            margin-bottom: 10px;
-        }
+    #refresh-models-btn:disabled {
+        color: #999;
+        cursor: not-allowed;
+    }
 
-        .refresh-status.success {
-            background-color: #d4edda;
-            color: #155724;
-        }
+    .refresh-status {
+        font-size: 0.85em;
+        padding: 5px 10px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+    }
 
-        .refresh-status.error {
-            background-color: #f8d7da;
-            color: #721c24;
-        }
-    </style>
+    .refresh-status.success {
+        background-color: #d4edda;
+        color: #155724;
+    }
+
+    .refresh-status.error {
+        background-color: #f8d7da;
+        color: #721c24;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -130,8 +125,7 @@
         <div id="model-loading">Loading additional models...</div>
         <div id="refresh-status" class="refresh-status" style="display: none;"></div>
         <select name="model" id="model-select">
-            <option value="models/gemini-2.5-flash" selected>Gemini 2.5 Flash (Default)</option>
-            <option value="" disabled>── Loading more models... ──</option>
+            <option value="" disabled selected>Loading models...</option>
         </select>
         <div id="model-error" class="error-message"></div>
 
@@ -188,7 +182,7 @@
         const refreshBtn = document.getElementById('refresh-models-btn');
         const refreshStatus = document.getElementById('refresh-status');
 
-        // Fetch Models
+        // Fetch Models from cache
         async function fetchModels() {
             try {
                 const response = await fetch('/api/models');
@@ -197,30 +191,28 @@
                 }
                 const models = await response.json();
 
-                // Remove the "loading" placeholder option (second option)
-                if (modelSelect.options.length > 1) {
-                    modelSelect.remove(1);
-                }
+                // Clear all options and rebuild
+                modelSelect.innerHTML = '';
 
                 if (models.length === 0) {
+                    // Fallback if no models in cache
+                    const fallback = document.createElement('option');
+                    fallback.value = 'models/gemini-2.5-flash';
+                    fallback.text = 'Gemini 2.5 Flash (Default)';
+                    modelSelect.add(fallback);
                     modelLoading.style.display = 'none';
                     return;
                 }
 
-                // Add separator before additional models
-                const separator = document.createElement('option');
-                separator.disabled = true;
-                separator.text = '── Additional Models ──';
-                modelSelect.add(separator);
-
-                // Populate with fetched models (skip if it's the default)
-                models.forEach(model => {
-                    // Skip if this is the default model already shown
-                    if (model.id === 'models/gemini-2.5-flash') return;
-
+                // Populate with fetched models
+                models.forEach((model, index) => {
                     const option = document.createElement('option');
                     option.value = model.id;
                     option.text = model.name;
+                    // Mark first one as recommended
+                    if (index === 0) {
+                        option.text += ' (Recommended)';
+                    }
                     modelSelect.add(option);
                 });
 
@@ -230,12 +222,15 @@
                 console.error('Error fetching models:', error);
                 modelLoading.style.display = 'none';
 
-                // Remove loading placeholder on error
-                if (modelSelect.options.length > 1 && modelSelect.options[1].value === '') {
-                    modelSelect.remove(1);
+                // Ensure at least one option exists
+                if (modelSelect.options.length === 0) {
+                    const fallback = document.createElement('option');
+                    fallback.value = 'models/gemini-2.5-flash';
+                    fallback.text = 'Gemini 2.5 Flash (Default)';
+                    modelSelect.add(fallback);
                 }
 
-                modelError.textContent = "Could not load additional models.";
+                modelError.textContent = "Could not load models from cache. Click 'Refresh Models' to fetch from API.";
             }
         }
 
@@ -246,6 +241,9 @@
             refreshStatus.style.display = 'none';
             modelError.textContent = '';
 
+            // Save current selection
+            const currentSelection = modelSelect.value;
+
             try {
                 const response = await fetch('/api/models/refresh', { method: 'POST' });
                 const data = await response.json();
@@ -254,32 +252,38 @@
                     throw new Error(data.error || 'Failed to refresh models');
                 }
 
-                // Clear current options except the default
-                while (modelSelect.options.length > 1) {
-                    modelSelect.remove(1);
-                }
+                // Clear ALL current options to rebuild fresh
+                modelSelect.innerHTML = '';
 
-                // Add separator before additional models
                 if (data.models && data.models.length > 0) {
-                    const separator = document.createElement('option');
-                    separator.disabled = true;
-                    separator.text = '── Additional Models ──';
-                    modelSelect.add(separator);
-
-                    // Populate with refreshed models (skip if it's the default)
-                    data.models.forEach(model => {
-                        if (model.id === 'models/gemini-2.5-flash') return;
-
+                    // Add all models from the refreshed list
+                    data.models.forEach((model, index) => {
                         const option = document.createElement('option');
                         option.value = model.id;
                         option.text = model.name;
+                        // Mark first one as default if no prior selection matches
+                        if (index === 0) {
+                            option.text += ' (Recommended)';
+                        }
                         modelSelect.add(option);
                     });
+
+                    // Restore previous selection if it exists in new list
+                    const optionExists = Array.from(modelSelect.options).some(opt => opt.value === currentSelection);
+                    if (optionExists) {
+                        modelSelect.value = currentSelection;
+                    }
+                } else {
+                    // Fallback if no models returned
+                    const fallback = document.createElement('option');
+                    fallback.value = 'models/gemini-2.5-flash';
+                    fallback.text = 'Gemini 2.5 Flash (Default)';
+                    modelSelect.add(fallback);
                 }
 
                 // Show success message
                 refreshStatus.className = 'refresh-status success';
-                refreshStatus.textContent = data.message || 'Models refreshed successfully!';
+                refreshStatus.textContent = `${data.message} (${data.models?.length || 0} models available)`;
                 refreshStatus.style.display = 'block';
 
                 // Hide success message after 5 seconds
