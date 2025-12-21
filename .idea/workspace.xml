@@ -5,7 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="refactor: clean up dependencies, update `.gitignore`, and fix typos in `.env.example`">
-      <change beforePath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -248,7 +247,7 @@
       <workItem from="1761658072316" duration="183000" />
       <workItem from="1761912715507" duration="7337000" />
       <workItem from="1766204517269" duration="81000" />
-      <workItem from="1766204611852" duration="1826000" />
+      <workItem from="1766204611852" duration="3953000" />
     </task>
     <task id="LOCAL-00001" summary="&quot;Add Flask app to manage and display recipe collection&quot;">
       <option name="closed" value="true" />

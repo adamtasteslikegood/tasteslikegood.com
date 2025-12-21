@@ -216,18 +216,50 @@ def validate_image_url(url):
 
     Returns True if the URL is valid and returns an image, False otherwise.
     """
+    # Common headers to mimic a browser request
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    }
+
     try:
-        # Use HEAD request first to check if URL exists
-        response = requests.head(url, timeout=5, allow_redirects=True)
+        # Try HEAD request first (faster, less bandwidth)
+        response = requests.head(url, timeout=5, allow_redirects=True, headers=headers)
+
+        # If HEAD succeeds with 200 and has image content-type, we're good
+        if response.status_code == 200:
+            content_type = response.headers.get('Content-Type', '')
+            if content_type.startswith('image/'):
+                return True
+
+        # HEAD failed or no content-type - fall back to GET with stream
+        # Many servers (Pexels, Unsplash) don't properly support HEAD requests
+        response = requests.get(url, timeout=5, allow_redirects=True, headers=headers, stream=True)
+
         if response.status_code != 200:
+            print(f"URL validation failed for {url}: status {response.status_code}")
             return False
 
         # Check content type is an image
         content_type = response.headers.get('Content-Type', '')
-        if not content_type.startswith('image/'):
-            return False
+        if content_type.startswith('image/'):
+            return True
 
-        return True
+        # Some servers don't set Content-Type properly, check if we can read image bytes
+        # Read just the first few bytes to check for image magic numbers
+        first_bytes = response.raw.read(16)
+        response.close()
+
+        # Check for common image magic numbers
+        if (first_bytes.startswith(b'\xff\xd8\xff') or  # JPEG
+            first_bytes.startswith(b'\x89PNG') or       # PNG
+            first_bytes.startswith(b'GIF8') or          # GIF
+            first_bytes.startswith(b'RIFF') or          # WebP
+            first_bytes.startswith(b'<svg')):           # SVG
+            return True
+
+        print(f"URL validation failed for {url}: not an image (content-type: {content_type})")
+        return False
+
     except Exception as e:
         print(f"URL validation failed for {url}: {e}")
         return False
