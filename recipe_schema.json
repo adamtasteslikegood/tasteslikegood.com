@@ -115,6 +115,15 @@
         "type": "string"
       }
     },
+    "image_keywords": {
+      "type": "array",
+      "description": "Keywords optimized for stock photo searches (e.g., 'vegan curry bowl', 'colorful salad')",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 5
+    },
     "image": {
       "type": "string",
       "format": "uri",

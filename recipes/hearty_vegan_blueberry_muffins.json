@@ -105,6 +105,25 @@
     "model": "unknown",
     "timestamp": "2025-12-20T17:05:30.752464",
     "prompt": "unknown",
-    "images_working": false
-  }
+    "images_working": true,
+    "stock_image_generation": {
+      "model": "gemini-2.0-flash-exp",
+      "user_id": "anonymous",
+      "prompt": "I need a REAL, direct stock image URL for a vegan dish.\nDescription: Deliciously moist and fluffy vegan blueberry muffins made with coconut milk and vital wheat gluten for a satisfying texture and structure.\nRecipe name: 'Hearty Vegan Blueberry Muffins'\n\nIMPORTANT: Focus on the DESCRIPTION to find a matching food image, not just the recipe name (which may be creative/abstract).\n\nREQUIREMENTS:\n1. Return ONLY a single direct image URL from Unsplash, Pexels, or Pixabay\n2. The URL must be a real, permanent link to an actual food photo\n3. Format: https://images.unsplash.com/photo-XXXXX or https://images.pexels.com/photos/XXXXX/...\n4. Do NOT return search URLs, API URLs, or placeholder services\n5. If you cannot find a specific real URL, respond with exactly: NONE\n\nReturn ONLY the URL or NONE, nothing else.",
+      "timestamp": "2025-12-20T17:59:14.778145",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": true
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of Hearty Vegan Blueberry Muffins. Professional lighting, appetizing.",
+      "timestamp": "2025-12-20T17:59:16.900332",
+      "success": true,
+      "image_path": "static/images/ai_hearty_vegan_blueberry_muffins.png"
+    }
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop",
+  "ai_image_url": "/static/images/ai_hearty_vegan_blueberry_muffins.png"
 }

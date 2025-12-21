@@ -140,6 +140,25 @@
     "model": "unknown",
     "timestamp": "2025-12-20T17:05:30.751111",
     "prompt": "unknown",
-    "images_working": false
-  }
+    "images_working": true,
+    "stock_image_generation": {
+      "model": "gemini-2.0-flash-exp",
+      "user_id": "anonymous",
+      "prompt": "I need a REAL, direct stock image URL for a vegan dish.\nDescription: A classic, creamy, and savory vegan 'egg' salad sandwich made with firm tofu. This easy, no-cook recipe is perfect for a quick lunch or picnic, served on Dave's Killer Bread or soft Vegan Hawaiian Style Rolls.\nRecipe name: 'No Tariff Tofu-Salad Sandwiches'\n\nIMPORTANT: Focus on the DESCRIPTION to find a matching food image, not just the recipe name (which may be creative/abstract).\n\nREQUIREMENTS:\n1. Return ONLY a single direct image URL from Unsplash, Pexels, or Pixabay\n2. The URL must be a real, permanent link to an actual food photo\n3. Format: https://images.unsplash.com/photo-XXXXX or https://images.pexels.com/photos/XXXXX/...\n4. Do NOT return search URLs, API URLs, or placeholder services\n5. If you cannot find a specific real URL, respond with exactly: NONE\n\nReturn ONLY the URL or NONE, nothing else.",
+      "timestamp": "2025-12-20T17:55:50.964813",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of No Tariff Tofu-Salad Sandwiches. Professional lighting, appetizing.",
+      "timestamp": "2025-12-20T17:55:53.855700",
+      "success": true,
+      "image_path": "static/images/ai_no_tariff_tofusalad_sandwiches.png"
+    }
+  },
+  "stock_image_url": "https://images.pexels.com/photos/8387072/pexels-photo-8387072.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
+  "ai_image_url": "/static/images/ai_no_tariff_tofusalad_sandwiches.png"
 }

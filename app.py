@@ -69,6 +69,10 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 # Debug logging - executed at import time to verify API key configuration
 print(f"DEBUG: Loaded GOOGLE_API_KEY: {'Yes' if GOOGLE_API_KEY else 'No'}")
 
+# Unsplash API for stock images (free tier: 50 requests/hour)
+UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+print(f"DEBUG: Loaded UNSPLASH_ACCESS_KEY: {'Yes' if UNSPLASH_ACCESS_KEY else 'No'}")
+
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
@@ -91,119 +95,143 @@ def get_genai_client():
 
 # Curated static fallback images from Unsplash (real, permanent URLs)
 FALLBACK_FOOD_IMAGES = [
+    # All vegan-appropriate images for better fallback variety
     "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop",  # Healthy bowl
-    "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop",  # Plated food
-    "https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&h=600&fit=crop",  # Comfort food
-    "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop",  # Pancakes
-    "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&h=600&fit=crop",  # Pizza
-    "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop",  # Salad
+    "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop",  # Colorful salad
     "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&h=600&fit=crop",  # Veggie bowl
     "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&h=600&fit=crop",  # Fresh produce
-    "https://images.unsplash.com/photo-1476224203421-9ac39bcb3327?w=800&h=600&fit=crop",  # Pasta
-    "https://images.unsplash.com/photo-1490645935967-10de6ba17061?w=800&h=600&fit=crop",  # Breakfast spread
+    "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&h=600&fit=crop",  # Buddha bowl
+    "https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=800&h=600&fit=crop",  # Avocado toast
+    "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=800&h=600&fit=crop",  # Smoothie bowl
+    "https://images.unsplash.com/photo-1547592180-85f173990554?w=800&h=600&fit=crop",  # Vegetable curry
+    "https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&h=600&fit=crop",  # Indian dal
+    "https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&h=600&fit=crop",  # Hummus plate
+    "https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=800&h=600&fit=crop",  # Fresh smoothie
+    "https://images.unsplash.com/photo-1529059997568-3d847b1154f0?w=800&h=600&fit=crop",  # Grain bowl
+    "https://images.unsplash.com/photo-1515543237350-b3eea1ec8082?w=800&h=600&fit=crop",  # Stuffed peppers
+    "https://images.unsplash.com/photo-1600850056064-a8b380df8395?w=800&h=600&fit=crop",  # Falafel wrap
+    "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop",  # Roasted veggies
+    "https://images.unsplash.com/photo-1490914327627-9fe8d52f4d90?w=800&h=600&fit=crop",  # Green juice
 ]
 
 
-def get_smart_stock_image(recipe_name, user_id='anonymous', description=''):
-    """Uses Gemini to find a real stock image URL for the recipe.
+def search_unsplash(keywords, per_page=1):
+    """Search Unsplash for images matching keywords.
 
-    Returns a tuple: (url, metadata_dict) or (None, metadata_dict) on failure.
-    Only returns direct, static URLs - never dynamic or keyword-based URLs.
+    Args:
+        keywords: List of search terms or a single string
+        per_page: Number of results to return (default 1)
+
+    Returns:
+        URL string of the first matching image, or None if no results/error
     """
-    client = get_genai_client()
-    model_used = 'gemini-2.0-flash-exp'
+    if not UNSPLASH_ACCESS_KEY:
+        print("DEBUG: No Unsplash API key configured")
+        return None
+
+    # Join keywords if it's a list
+    if isinstance(keywords, list):
+        query = ' '.join(keywords[:3])  # Use first 3 keywords
+    else:
+        query = keywords
+
+    # Add "vegan" to ensure food-appropriate results
+    if 'vegan' not in query.lower():
+        query = f"vegan {query}"
+
+    try:
+        response = requests.get(
+            'https://api.unsplash.com/search/photos',
+            params={
+                'query': query,
+                'per_page': per_page,
+                'orientation': 'landscape',
+                'content_filter': 'high',  # Safe content only
+            },
+            headers={
+                'Authorization': f'Client-ID {UNSPLASH_ACCESS_KEY}'
+            },
+            timeout=10
+        )
+
+        if response.status_code == 200:
+            data = response.json()
+            if data.get('results'):
+                # Get the regular size URL (good balance of quality/size)
+                photo = data['results'][0]
+                image_url = photo.get('urls', {}).get('regular')
+                if image_url:
+                    print(f"DEBUG: Unsplash found image for '{query}': {image_url[:60]}...")
+                    return image_url
+        else:
+            print(f"DEBUG: Unsplash API returned {response.status_code}: {response.text[:100]}")
+
+    except Exception as e:
+        print(f"DEBUG: Unsplash search failed: {e}")
+
+    return None
+
+
+def get_smart_stock_image(recipe_name, user_id='anonymous', description='', image_keywords=None):
+    """Searches Unsplash for a stock image matching the recipe.
+
+    Uses image_keywords (generated by Gemini with the recipe) for best results,
+    falls back to description/name if keywords aren't available.
+
+    Returns a tuple: (url, metadata_dict) or (fallback_url, metadata_dict) on failure.
+    """
     timestamp = datetime.datetime.now().isoformat()
 
     metadata = {
-        'model': model_used,
+        'source': 'unsplash',
         'user_id': user_id,
-        'prompt': '',
+        'search_query': '',
         'timestamp': timestamp,
         'success': False,
         'url_validated': False,
         'fallback_used': False
     }
 
-    if not client:
-        # Use curated fallback
-        fallback_url = _get_fallback_image(recipe_name)
-        metadata['success'] = True
-        metadata['fallback_used'] = True
-        metadata['url_validated'] = True
-        return fallback_url, metadata
-
-    # Build description context for better image matching
-    desc_context = f"\nDescription: {description}" if description else ""
-
     try:
-        # Primary prompt - ask for a specific, real stock image URL
-        # Focus on description when available since recipe names can be abstract
-        prompt = (
-            f"I need a REAL, direct stock image URL for a vegan dish.{desc_context}\n"
-            f"Recipe name: '{recipe_name}'\n\n"
-            f"IMPORTANT: Focus on the DESCRIPTION to find a matching food image, "
-            f"not just the recipe name (which may be creative/abstract).\n\n"
-            f"REQUIREMENTS:\n"
-            f"1. Return ONLY a single direct image URL from Unsplash, Pexels, or Pixabay\n"
-            f"2. The URL must be a real, permanent link to an actual food photo\n"
-            f"3. Format: https://images.unsplash.com/photo-XXXXX or https://images.pexels.com/photos/XXXXX/...\n"
-            f"4. Do NOT return search URLs, API URLs, or placeholder services\n"
-            f"5. If you cannot find a specific real URL, respond with exactly: NONE\n\n"
-            f"Return ONLY the URL or NONE, nothing else."
-        )
-        metadata['prompt'] = prompt
-
-        response = client.models.generate_content(
-            model=model_used,
-            contents=prompt
-        )
-        url_text = response.text.strip()
-
-        # Check if AI returned NONE or invalid response
-        if url_text.upper() == 'NONE' or not url_text.startswith('http'):
-            # Try a second, more targeted prompt
-            retry_prompt = (
-                f"Search for a food photography image on Unsplash that matches: {recipe_name}\n"
-                f"Return the direct image URL in format: https://images.unsplash.com/photo-XXXXXXXXX?w=800\n"
-                f"Return ONLY the URL, or NONE if not found."
-            )
-            metadata['prompt'] = retry_prompt
-
-            retry_response = client.models.generate_content(
-                model=model_used,
-                contents=retry_prompt
-            )
-            url_text = retry_response.text.strip()
-
-            if url_text.upper() == 'NONE' or not url_text.startswith('http'):
-                # Use curated static fallback
-                fallback_url = _get_fallback_image(recipe_name)
+        # Strategy 1: Use image_keywords if provided (best option)
+        if image_keywords and isinstance(image_keywords, list) and len(image_keywords) > 0:
+            metadata['search_query'] = ' '.join(image_keywords[:3])
+            url = search_unsplash(image_keywords)
+            if url:
                 metadata['success'] = True
-                metadata['fallback_used'] = True
                 metadata['url_validated'] = True
-                return fallback_url, metadata
+                return url, metadata
 
-        # Validate the URL is accessible and returns an image
-        is_valid = validate_image_url(url_text)
-        metadata['success'] = True
-        metadata['url_validated'] = is_valid
+        # Strategy 2: Extract keywords from description
+        if description:
+            # Use first ~50 chars of description as search
+            desc_keywords = description[:100].split()[:5]
+            search_query = ' '.join(desc_keywords)
+            metadata['search_query'] = search_query
+            url = search_unsplash(search_query)
+            if url:
+                metadata['success'] = True
+                metadata['url_validated'] = True
+                return url, metadata
 
-        if is_valid:
-            return url_text, metadata
-        else:
-            # URL validation failed - use curated static fallback
-            fallback_url = _get_fallback_image(recipe_name)
-            metadata['fallback_used'] = True
+        # Strategy 3: Use recipe name
+        metadata['search_query'] = recipe_name
+        url = search_unsplash(recipe_name)
+        if url:
+            metadata['success'] = True
             metadata['url_validated'] = True
-            return fallback_url, metadata
+            return url, metadata
 
     except Exception as e:
-        print(f"Smart stock image fetch failed: {e}")
-        metadata['success'] = False
-        # Use curated fallback on error
-        fallback_url = _get_fallback_image(recipe_name)
-        metadata['fallback_used'] = True
-        return fallback_url, metadata
+        print(f"DEBUG: Unsplash search error: {e}")
+
+    # Strategy 4: Curated fallback
+    print(f"DEBUG: Using curated fallback for '{recipe_name}'")
+    fallback_url = _get_fallback_image(recipe_name)
+    metadata['success'] = True
+    metadata['fallback_used'] = True
+    metadata['url_validated'] = True
+    return fallback_url, metadata
 
 
 def _get_fallback_image(recipe_name):
@@ -280,6 +308,7 @@ def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
     current_url = recipe_data.get('stock_image_url')
     recipe_name = recipe_data.get('name', 'food')
     description = recipe_data.get('description', '')
+    image_keywords = recipe_data.get('image_keywords', [])
 
     if current_url:
         # Validate existing URL
@@ -290,8 +319,8 @@ def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
         else:
             print(f"Stock image URL invalid, refreshing for {recipe_name}")
 
-    # Need to get a new URL - pass description for better image matching
-    new_url, metadata = get_smart_stock_image(recipe_name, user_id, description)
+    # Need to get a new URL - pass keywords, description for better image matching
+    new_url, metadata = get_smart_stock_image(recipe_name, user_id, description, image_keywords)
     return new_url, metadata, True
 
 
@@ -937,8 +966,10 @@ def generate_recipe():
             f"Generate a Vegan recipe based on the following request: '{prompt}'. "
             f"The output must be a valid JSON object that strictly follows this schema:\n"
             f"{schema}\n"
-            f"IMPORTANT: You MUST find and include a valid, high-quality public stock image URL (e.g. from Unsplash, Pexels) "
-            f"in the 'stock_image_url' field. Do not leave it empty.\n"
+            f"IMPORTANT: Include 'image_keywords' - an array of 3-5 descriptive terms optimized for "
+            f"stock photo searches (e.g., ['vegan buddha bowl', 'colorful vegetables', 'healthy lunch']). "
+            f"Focus on visual descriptions of the finished dish, not recipe names.\n"
+            f"Do NOT include 'stock_image_url' - leave it out, we will fetch it separately.\n"
             f"CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it inside a 'properties' or 'type' object. "
             f"The top-level keys must be 'name', 'description', 'ingredients', etc.\n"
             f"Do not include any text before or after the JSON object."

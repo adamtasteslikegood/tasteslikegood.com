@@ -12,6 +12,7 @@ from app import (
     validate_image_url,
     validate_and_refresh_stock_image,
     _get_fallback_image,
+    search_unsplash,
     FALLBACK_FOOD_IMAGES,
 )
 
@@ -129,12 +130,12 @@ class TestValidateImageUrl(unittest.TestCase):
 
 
 class TestGetSmartStockImage(unittest.TestCase):
-    """Test the main stock image retrieval function."""
+    """Test the main stock image retrieval function (Unsplash-based)."""
 
-    @patch('app.get_genai_client')
-    def test_no_client_uses_fallback(self, mock_get_client):
-        """When no API client available, use fallback image."""
-        mock_get_client.return_value = None
+    @patch('app.search_unsplash')
+    def test_no_unsplash_key_uses_fallback(self, mock_search):
+        """When Unsplash returns None (no key), use fallback image."""
+        mock_search.return_value = None
 
         url, metadata = get_smart_stock_image("Test Recipe")
 
@@ -143,92 +144,88 @@ class TestGetSmartStockImage(unittest.TestCase):
         self.assertTrue(metadata['success'])
         self.assertTrue(metadata['fallback_used'])
 
-    @patch('app.validate_image_url')
-    @patch('app.get_genai_client')
-    def test_valid_ai_response(self, mock_get_client, mock_validate):
-        """When AI returns valid URL, use it."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.text = "https://images.unsplash.com/photo-12345"
-        mock_client.models.generate_content.return_value = mock_response
-        mock_get_client.return_value = mock_client
-        mock_validate.return_value = True
+    @patch('app.search_unsplash')
+    def test_valid_unsplash_response(self, mock_search):
+        """When Unsplash returns valid URL, use it."""
+        mock_search.return_value = "https://images.unsplash.com/photo-12345"
 
-        url, metadata = get_smart_stock_image("Chocolate Cake")
+        url, metadata = get_smart_stock_image(
+            "Chocolate Cake",
+            image_keywords=["chocolate", "cake", "dessert"]
+        )
 
         self.assertEqual(url, "https://images.unsplash.com/photo-12345")
         self.assertTrue(metadata['success'])
         self.assertTrue(metadata['url_validated'])
         self.assertFalse(metadata.get('fallback_used', False))
 
-    @patch('app.validate_image_url')
-    @patch('app.get_genai_client')
-    def test_ai_returns_none_uses_fallback(self, mock_get_client, mock_validate):
-        """When AI returns NONE, use fallback."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.text = "NONE"
-        mock_client.models.generate_content.return_value = mock_response
-        mock_get_client.return_value = mock_client
+    @patch('app.search_unsplash')
+    def test_unsplash_returns_none_uses_fallback(self, mock_search):
+        """When Unsplash returns None, use fallback."""
+        mock_search.return_value = None
 
         url, metadata = get_smart_stock_image("Exotic Dish")
 
         self.assertIn(url, FALLBACK_FOOD_IMAGES)
         self.assertTrue(metadata['fallback_used'])
 
-    @patch('app.validate_image_url')
-    @patch('app.get_genai_client')
-    def test_invalid_url_uses_fallback(self, mock_get_client, mock_validate):
-        """When AI URL fails validation, use fallback."""
-        mock_client = MagicMock()
-        mock_response = MagicMock()
-        mock_response.text = "https://images.unsplash.com/photo-broken"
-        mock_client.models.generate_content.return_value = mock_response
-        mock_get_client.return_value = mock_client
-        mock_validate.return_value = False  # URL validation fails
+    @patch('app.search_unsplash')
+    def test_uses_image_keywords_first(self, mock_search):
+        """Should try image_keywords before description or name."""
+        mock_search.return_value = "https://images.unsplash.com/photo-keywords"
+
+        url, metadata = get_smart_stock_image(
+            "Test Recipe",
+            description="A test description",
+            image_keywords=["vegan", "bowl", "colorful"]
+        )
+
+        # Should use keywords in search
+        mock_search.assert_called_once()
+        call_args = mock_search.call_args[0][0]
+        self.assertEqual(call_args, ["vegan", "bowl", "colorful"])
+
+    @patch('app.search_unsplash')
+    def test_falls_back_to_description(self, mock_search):
+        """When no keywords, should use description."""
+        # First call (keywords) returns None, second (description) returns URL
+        mock_search.side_effect = [None, "https://images.unsplash.com/photo-desc"]
+
+        url, metadata = get_smart_stock_image(
+            "Test Recipe",
+            description="A delicious vegan curry"
+        )
+
+        self.assertEqual(url, "https://images.unsplash.com/photo-desc")
+        self.assertEqual(mock_search.call_count, 2)
+
+    @patch('app.search_unsplash')
+    def test_unsplash_exception_uses_fallback(self, mock_search):
+        """When Unsplash throws exception, use fallback gracefully."""
+        mock_search.side_effect = Exception("API Error")
 
         url, metadata = get_smart_stock_image("Test Recipe")
 
+        # Should use fallback on any search failure
         self.assertIn(url, FALLBACK_FOOD_IMAGES)
         self.assertTrue(metadata['fallback_used'])
+        self.assertTrue(metadata['success'])  # Fallback is still a success
 
-    @patch('app.get_genai_client')
-    def test_api_exception_uses_fallback(self, mock_get_client):
-        """When API throws exception, use fallback."""
-        mock_client = MagicMock()
-        mock_client.models.generate_content.side_effect = Exception("API Error")
-        mock_get_client.return_value = mock_client
-
-        url, metadata = get_smart_stock_image("Test Recipe")
-
-        self.assertIn(url, FALLBACK_FOOD_IMAGES)
-        self.assertTrue(metadata['fallback_used'])
-        self.assertFalse(metadata['success'])
-
-    @patch('app.get_genai_client')
-    def test_metadata_includes_user_id(self, mock_get_client):
+    def test_metadata_includes_user_id(self):
         """Metadata should include the user_id."""
-        mock_get_client.return_value = None
-
         url, metadata = get_smart_stock_image("Test Recipe", user_id="user123")
 
         self.assertEqual(metadata['user_id'], "user123")
 
-    @patch('app.get_genai_client')
-    def test_metadata_includes_timestamp(self, mock_get_client):
+    def test_metadata_includes_timestamp(self):
         """Metadata should include a timestamp."""
-        mock_get_client.return_value = None
-
         url, metadata = get_smart_stock_image("Test Recipe")
 
         self.assertIn('timestamp', metadata)
         self.assertIsNotNone(metadata['timestamp'])
 
-    @patch('app.get_genai_client')
-    def test_no_loremflickr_urls(self, mock_get_client):
+    def test_no_loremflickr_urls(self):
         """Should never return loremflickr URLs."""
-        mock_get_client.return_value = None
-
         url, metadata = get_smart_stock_image("Any Recipe")
 
         self.assertNotIn("loremflickr", url)
@@ -287,10 +284,10 @@ class TestValidateAndRefreshStockImage(unittest.TestCase):
 class TestNoRandomBehavior(unittest.TestCase):
     """Ensure no random/lock behavior in stock image generation."""
 
-    @patch('app.get_genai_client')
-    def test_fallback_is_deterministic(self, mock_get_client):
+    @patch('app.search_unsplash')
+    def test_fallback_is_deterministic(self, mock_search):
         """Fallback images should be deterministic, not random."""
-        mock_get_client.return_value = None
+        mock_search.return_value = None
 
         # Call multiple times for the same recipe
         results = [get_smart_stock_image("Same Recipe")[0] for _ in range(10)]
