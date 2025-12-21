@@ -137,5 +137,12 @@
     "tomato tartare",
     "no-cook",
     "gluten-free option"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T17:05:30.744862",
+    "prompt": "unknown",
+    "images_working": false
+  }
 }

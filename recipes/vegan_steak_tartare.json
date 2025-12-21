@@ -156,5 +156,12 @@
     "gluten-free",
     "tartare"
   ],
-  "image": "https://example.com/images/vegan-beet-tartare.jpg"
+  "image": "https://example.com/images/vegan-beet-tartare.jpg",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T17:05:30.752841",
+    "prompt": "unknown",
+    "images_working": false
+  }
 }

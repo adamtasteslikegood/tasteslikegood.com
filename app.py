@@ -104,7 +104,7 @@ FALLBACK_FOOD_IMAGES = [
 ]
 
 
-def get_smart_stock_image(recipe_name, user_id='anonymous'):
+def get_smart_stock_image(recipe_name, user_id='anonymous', description=''):
     """Uses Gemini to find a real stock image URL for the recipe.
 
     Returns a tuple: (url, metadata_dict) or (None, metadata_dict) on failure.
@@ -132,10 +132,17 @@ def get_smart_stock_image(recipe_name, user_id='anonymous'):
         metadata['url_validated'] = True
         return fallback_url, metadata
 
+    # Build description context for better image matching
+    desc_context = f"\nDescription: {description}" if description else ""
+
     try:
         # Primary prompt - ask for a specific, real stock image URL
+        # Focus on description when available since recipe names can be abstract
         prompt = (
-            f"I need a REAL, direct stock image URL for a vegan dish called '{recipe_name}'.\n\n"
+            f"I need a REAL, direct stock image URL for a vegan dish.{desc_context}\n"
+            f"Recipe name: '{recipe_name}'\n\n"
+            f"IMPORTANT: Focus on the DESCRIPTION to find a matching food image, "
+            f"not just the recipe name (which may be creative/abstract).\n\n"
             f"REQUIREMENTS:\n"
             f"1. Return ONLY a single direct image URL from Unsplash, Pexels, or Pixabay\n"
             f"2. The URL must be a real, permanent link to an actual food photo\n"
@@ -272,6 +279,7 @@ def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
     """
     current_url = recipe_data.get('stock_image_url')
     recipe_name = recipe_data.get('name', 'food')
+    description = recipe_data.get('description', '')
 
     if current_url:
         # Validate existing URL
@@ -282,8 +290,8 @@ def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
         else:
             print(f"Stock image URL invalid, refreshing for {recipe_name}")
 
-    # Need to get a new URL
-    new_url, metadata = get_smart_stock_image(recipe_name, user_id)
+    # Need to get a new URL - pass description for better image matching
+    new_url, metadata = get_smart_stock_image(recipe_name, user_id, description)
     return new_url, metadata, True
 
 

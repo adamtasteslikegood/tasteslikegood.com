@@ -125,5 +125,12 @@
     "gluten-free",
     "easy",
     "one-pan"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T17:05:30.749858",
+    "prompt": "unknown",
+    "images_working": false
+  }
 }

@@ -152,5 +152,12 @@
     "apple",
     "gluten-free option",
     "fancy"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T17:05:30.751414",
+    "prompt": "unknown",
+    "images_working": false
+  }
 }
