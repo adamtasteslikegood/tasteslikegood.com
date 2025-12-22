@@ -123,7 +123,8 @@ def search_unsplash(keywords, per_page=1):
         per_page: Number of results to return (default 1)
 
     Returns:
-        URL string of the first matching image, or None if no results/error
+        Dict with 'url' and 'attribution' info, or None if no results/error
+        Attribution includes photographer name, profile URL, and Unsplash link
     """
     if not UNSPLASH_ACCESS_KEY:
         print("DEBUG: No Unsplash API key configured")
@@ -138,6 +139,9 @@ def search_unsplash(keywords, per_page=1):
     # Add "vegan" to ensure food-appropriate results
     if 'vegan' not in query.lower():
         query = f"vegan {query}"
+
+    # UTM params required by Unsplash API guidelines
+    utm_params = "?utm_source=tasteslikegood&utm_medium=referral"
 
     try:
         response = requests.get(
@@ -157,12 +161,28 @@ def search_unsplash(keywords, per_page=1):
         if response.status_code == 200:
             data = response.json()
             if data.get('results'):
-                # Get the regular size URL (good balance of quality/size)
                 photo = data['results'][0]
                 image_url = photo.get('urls', {}).get('regular')
+
                 if image_url:
-                    print(f"DEBUG: Unsplash found image for '{query}': {image_url[:60]}...")
-                    return image_url
+                    # Extract photographer info for attribution (required by Unsplash)
+                    user = photo.get('user', {})
+                    photographer_name = user.get('name', 'Unknown')
+                    photographer_username = user.get('username', '')
+                    photographer_url = f"https://unsplash.com/@{photographer_username}{utm_params}"
+                    unsplash_url = f"https://unsplash.com{utm_params}"
+
+                    print(f"DEBUG: Unsplash found image for '{query}' by {photographer_name}")
+
+                    return {
+                        'url': image_url,
+                        'attribution': {
+                            'photographer_name': photographer_name,
+                            'photographer_url': photographer_url,
+                            'unsplash_url': unsplash_url,
+                            'html': f'Photo by <a href="{photographer_url}">{photographer_name}</a> on <a href="{unsplash_url}">Unsplash</a>'
+                        }
+                    }
         else:
             print(f"DEBUG: Unsplash API returned {response.status_code}: {response.text[:100]}")
 
@@ -179,6 +199,7 @@ def get_smart_stock_image(recipe_name, user_id='anonymous', description='', imag
     falls back to description/name if keywords aren't available.
 
     Returns a tuple: (url, metadata_dict) or (fallback_url, metadata_dict) on failure.
+    Metadata includes attribution info when from Unsplash (required by their API guidelines).
     """
     timestamp = datetime.datetime.now().isoformat()
 
@@ -189,18 +210,20 @@ def get_smart_stock_image(recipe_name, user_id='anonymous', description='', imag
         'timestamp': timestamp,
         'success': False,
         'url_validated': False,
-        'fallback_used': False
+        'fallback_used': False,
+        'attribution': None  # Will contain photographer credit for Unsplash images
     }
 
     try:
         # Strategy 1: Use image_keywords if provided (best option)
         if image_keywords and isinstance(image_keywords, list) and len(image_keywords) > 0:
             metadata['search_query'] = ' '.join(image_keywords[:3])
-            url = search_unsplash(image_keywords)
-            if url:
+            result = search_unsplash(image_keywords)
+            if result:
                 metadata['success'] = True
                 metadata['url_validated'] = True
-                return url, metadata
+                metadata['attribution'] = result['attribution']
+                return result['url'], metadata
 
         # Strategy 2: Extract keywords from description
         if description:
@@ -208,24 +231,26 @@ def get_smart_stock_image(recipe_name, user_id='anonymous', description='', imag
             desc_keywords = description[:100].split()[:5]
             search_query = ' '.join(desc_keywords)
             metadata['search_query'] = search_query
-            url = search_unsplash(search_query)
-            if url:
+            result = search_unsplash(search_query)
+            if result:
                 metadata['success'] = True
                 metadata['url_validated'] = True
-                return url, metadata
+                metadata['attribution'] = result['attribution']
+                return result['url'], metadata
 
         # Strategy 3: Use recipe name
         metadata['search_query'] = recipe_name
-        url = search_unsplash(recipe_name)
-        if url:
+        result = search_unsplash(recipe_name)
+        if result:
             metadata['success'] = True
             metadata['url_validated'] = True
-            return url, metadata
+            metadata['attribution'] = result['attribution']
+            return result['url'], metadata
 
     except Exception as e:
         print(f"DEBUG: Unsplash search error: {e}")
 
-    # Strategy 4: Curated fallback
+    # Strategy 4: Curated fallback (no attribution needed - these are from Unsplash's free license)
     print(f"DEBUG: Using curated fallback for '{recipe_name}'")
     fallback_url = _get_fallback_image(recipe_name)
     metadata['success'] = True
@@ -483,6 +508,10 @@ def show_recipe(filename):
                 recipe_data['ai_metadata'] = {}
             recipe_data['ai_metadata']['stock_image_generation'] = stock_metadata
             recipe_data['ai_metadata']['images_working'] = True
+
+            # Store attribution at top level for easy template access
+            if stock_metadata and stock_metadata.get('attribution'):
+                recipe_data['stock_image_attribution'] = stock_metadata['attribution']
 
             updated = True
         elif not new_url and not recipe_data.get('stock_image_url'):

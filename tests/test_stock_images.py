@@ -147,7 +147,15 @@ class TestGetSmartStockImage(unittest.TestCase):
     @patch('app.search_unsplash')
     def test_valid_unsplash_response(self, mock_search):
         """When Unsplash returns valid URL, use it."""
-        mock_search.return_value = "https://images.unsplash.com/photo-12345"
+        mock_search.return_value = {
+            'url': "https://images.unsplash.com/photo-12345",
+            'attribution': {
+                'photographer_name': 'Test Photographer',
+                'photographer_url': 'https://unsplash.com/@test',
+                'unsplash_url': 'https://unsplash.com',
+                'html': 'Photo by Test Photographer on Unsplash'
+            }
+        }
 
         url, metadata = get_smart_stock_image(
             "Chocolate Cake",
@@ -158,6 +166,7 @@ class TestGetSmartStockImage(unittest.TestCase):
         self.assertTrue(metadata['success'])
         self.assertTrue(metadata['url_validated'])
         self.assertFalse(metadata.get('fallback_used', False))
+        self.assertIsNotNone(metadata.get('attribution'))
 
     @patch('app.search_unsplash')
     def test_unsplash_returns_none_uses_fallback(self, mock_search):
@@ -172,7 +181,15 @@ class TestGetSmartStockImage(unittest.TestCase):
     @patch('app.search_unsplash')
     def test_uses_image_keywords_first(self, mock_search):
         """Should try image_keywords before description or name."""
-        mock_search.return_value = "https://images.unsplash.com/photo-keywords"
+        mock_search.return_value = {
+            'url': "https://images.unsplash.com/photo-keywords",
+            'attribution': {
+                'photographer_name': 'Test',
+                'photographer_url': 'https://unsplash.com/@test',
+                'unsplash_url': 'https://unsplash.com',
+                'html': 'Photo by Test on Unsplash'
+            }
+        }
 
         url, metadata = get_smart_stock_image(
             "Test Recipe",
@@ -188,8 +205,16 @@ class TestGetSmartStockImage(unittest.TestCase):
     @patch('app.search_unsplash')
     def test_falls_back_to_description(self, mock_search):
         """When no keywords, should use description."""
-        # First call (keywords) returns None, second (description) returns URL
-        mock_search.side_effect = [None, "https://images.unsplash.com/photo-desc"]
+        # First call (description) returns URL
+        mock_search.return_value = {
+            'url': "https://images.unsplash.com/photo-desc",
+            'attribution': {
+                'photographer_name': 'Desc Photographer',
+                'photographer_url': 'https://unsplash.com/@desc',
+                'unsplash_url': 'https://unsplash.com',
+                'html': 'Photo by Desc Photographer on Unsplash'
+            }
+        }
 
         url, metadata = get_smart_stock_image(
             "Test Recipe",
@@ -197,7 +222,8 @@ class TestGetSmartStockImage(unittest.TestCase):
         )
 
         self.assertEqual(url, "https://images.unsplash.com/photo-desc")
-        self.assertEqual(mock_search.call_count, 2)
+        # Should have called with description keywords
+        mock_search.assert_called_once()
 
     @patch('app.search_unsplash')
     def test_unsplash_exception_uses_fallback(self, mock_search):

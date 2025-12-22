@@ -41,7 +41,14 @@
         {% if recipe.stock_image_url %}
         <img src="{{ recipe.stock_image_url }}" alt="Stock photo of {{ recipe.name }}"
             onerror="this.onerror=null; this.src='https://placehold.co/800x600?text=No+Stock+Image';">
+        {% if recipe.stock_image_attribution %}
+        <p class="image-caption image-attribution">
+            Photo by <a href="{{ recipe.stock_image_attribution.photographer_url }}" target="_blank" rel="noopener">{{ recipe.stock_image_attribution.photographer_name }}</a>
+            on <a href="{{ recipe.stock_image_attribution.unsplash_url }}" target="_blank" rel="noopener">Unsplash</a>
+        </p>
+        {% else %}
         <p class="image-caption">Stock Inspiration</p>
+        {% endif %}
         {% else %}
         <div class="placeholder-image">Generating Stock Image...</div>
         {% endif %}
@@ -97,6 +104,15 @@
         font-size: 0.9em;
         color: #666;
         font-style: italic;
+    }
+
+    .image-attribution a {
+        color: #555;
+        text-decoration: underline;
+    }
+
+    .image-attribution a:hover {
+        color: #333;
     }
 
     .placeholder-image {
