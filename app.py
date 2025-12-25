@@ -14,6 +14,17 @@ import google.oauth2.credentials
 from jsonschema import Draft7Validator, ValidationError
 from auth import auth_bp
 from utils import normalize_recipe_data
+from agents.cookbook_agents import run_pantry_session
+from services.cookbook_service import (
+    save_recipe as persist_recipe,
+    save_cookbook,
+    attach_recipe_to_cookbook,
+    list_cookbooks,
+    load_recipe,
+    update_recipe,
+    delete_recipe,
+    Cookbook,
+)
 
 load_dotenv()
 
@@ -63,6 +74,9 @@ def _load_recipe_schema():
 
 RECIPE_SCHEMA = _load_recipe_schema()
 RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
+
+# Pantry generator caching
+PANTRY_PAYLOADS: dict[str, dict] = {}
 
 # Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
@@ -965,6 +979,74 @@ def get_jokes():
     except Exception as e:
         print(f"Error loading jokes from {joke_file}: {e}")
         return jsonify([])
+
+
+# --- Pantry-aware routes ---
+@app.route('/pantry', methods=['GET'])
+def pantry():
+    return render_template('pantry.html')
+
+
+@app.route('/api/pantry/generate', methods=['POST'])
+def pantry_generate():
+    payload = request.get_json(force=True) or {}
+    run_id = str(uuid.uuid4())
+    payload['run_id'] = run_id
+    PANTRY_PAYLOADS[run_id] = payload
+    return jsonify({'ok': True, 'run_id': run_id})
+
+
+@app.route('/api/pantry/stream/<run_id>')
+def pantry_stream(run_id):
+    if run_id not in PANTRY_PAYLOADS:
+        return Response("unknown run", status=404)
+
+    def event_stream():
+        user_input = PANTRY_PAYLOADS.get(run_id, {})
+        schema = RECIPE_SCHEMA or {}
+        for evt in run_pantry_session(user_input, schema=schema):
+            yield f"data: {evt}\n\n"
+        PANTRY_PAYLOADS.pop(run_id, None)
+
+    return Response(event_stream(), mimetype='text/event-stream')
+
+
+@app.route('/api/cookbook', methods=['GET'])
+def cookbook_index():
+    return jsonify({'cookbooks': list_cookbooks()})
+
+
+@app.route('/cookbook', methods=['GET'])
+def cookbook_page():
+    return render_template('json_viewer.html', data=list_cookbooks(), title='Cookbook')
+
+
+@app.route('/api/cookbook/recipes', methods=['POST'])
+def cookbook_save_recipe():
+    payload = request.get_json(force=True) or {}
+    recipe = payload.get('recipe')
+    if not recipe:
+        return jsonify({'error': 'recipe required'}), 400
+    saved = persist_recipe(recipe)
+    cookbook_id = payload.get('cookbook_id')
+    if cookbook_id:
+        attach_recipe_to_cookbook(cookbook_id, saved.id)
+    return jsonify({'ok': True, 'recipe_id': saved.id})
+
+
+@app.route('/api/cookbook/recipes/<rid>', methods=['PATCH'])
+def cookbook_update_recipe(rid):
+    updates = request.get_json(force=True) or {}
+    updated = update_recipe(rid, updates)
+    if updated is None:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'ok': True, 'recipe': updated})
+
+
+@app.route('/api/cookbook/recipes/<rid>', methods=['DELETE'])
+def cookbook_delete_recipe(rid):
+    ok = delete_recipe(rid)
+    return jsonify({'ok': ok}), (200 if ok else 404)
 
 
 # --- NEW: Route for generating recipes ---

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Cookbook",
+  "type": "object",
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "owner_session_id": { "type": "string" },
+    "collections": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "tags": { "type": "array", "items": { "type": "string" }, "default": [] },
+    "default_preferences": { "type": "object", "default": {} },
+    "recipes": { "type": "array", "items": { "type": "string" }, "default": [] }
+  },
+  "required": ["id", "title", "owner_session_id", "recipes"],
+  "additionalProperties": false
+}

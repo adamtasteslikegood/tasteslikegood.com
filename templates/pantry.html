@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Pantry-Aware Generator{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+{% endblock %}
+{% block content %}
+<h1>Pantry-Aware Multi-Agent Generator</h1>
+<p>Share what's in your pantry and any constraints. We'll orchestrate multiple agents and stream the journey.</p>
+<form id="pantry-form">
+    <label for="pantry-text">Pantry</label>
+    <textarea id="pantry-text" name="pantry" rows="6" placeholder="2 cans chickpeas, 1 tbsp paprika, half onion..."></textarea>
+    <label for="constraints">Constraints (optional)</label>
+    <textarea id="constraints" name="constraints" rows="3" placeholder="Gluten-free, 20 minutes, high protein..."></textarea>
+    <button type="submit">Generate</button>
+</form>
+<section>
+    <h3>Progress</h3>
+    <pre id="pantry-log" aria-live="polite"></pre>
+</section>
+<section>
+    <h3>Final Recipe</h3>
+    <pre id="pantry-recipe"></pre>
+    <button id="save-cookbook" disabled>Save to Cookbook</button>
+</section>
+<script src="{{ url_for('static', filename='js/pantry.js') }}"></script>
+{% endblock %}
