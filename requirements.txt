@@ -16,6 +16,7 @@ googleapis-common-protos==1.70.0
 
 # Validation and Data
 jsonschema==4.25.1
+openai==1.59.5
 pydantic==2.12.5
 pydantic-core==2.41.5
 python-dotenv==1.2.1

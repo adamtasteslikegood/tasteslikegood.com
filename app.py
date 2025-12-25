@@ -5,6 +5,7 @@ import datetime
 import re
 import csv
 import requests
+import uuid
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
@@ -14,6 +15,15 @@ import google.oauth2.credentials
 from jsonschema import Draft7Validator, ValidationError
 from auth import auth_bp
 from utils import normalize_recipe_data
+from agents.cookbook_agents import run_pantry_session
+from services.cookbook_service import (
+    attach_recipe_to_cookbook,
+    delete_recipe,
+    list_cookbooks,
+    patch_recipe,
+    save_cookbook,
+    save_recipe,
+)
 
 load_dotenv()
 
@@ -50,6 +60,7 @@ _recipes_cache = {'data': None, 'timestamp': 0}
 # Cache TTL (in seconds) for the recipes list. Default is 60s, which balances
 # avoiding frequent disk reads with keeping the list reasonably fresh.
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
+RUN_PAYLOADS: dict[str, dict] = {}
 
 
 def _load_recipe_schema():
@@ -965,6 +976,94 @@ def get_jokes():
     except Exception as e:
         print(f"Error loading jokes from {joke_file}: {e}")
         return jsonify([])
+
+
+# Pantry-aware multi-agent workflow
+def _rate_limited(session_id: str, window_seconds: int = 5) -> bool:
+    now = time.time()
+    last = session.get("last_pantry_ts")
+    if last and now - last < window_seconds:
+        return True
+    session["last_pantry_ts"] = now
+    return False
+
+
+def _store_run(run_id: str, payload: dict):
+    RUN_PAYLOADS[run_id] = payload | {"run_id": run_id}
+
+
+def _load_run(run_id: str) -> dict | None:
+    return RUN_PAYLOADS.get(run_id)
+
+
+@app.route("/pantry", methods=["GET"])
+def pantry_page():
+    return render_template("pantry.html")
+
+
+@app.route("/api/pantry/generate", methods=["POST"])
+def pantry_generate():
+    if _rate_limited(session.get("user_id", "anon")):
+        return jsonify({"error": "Too many requests"}), 429
+    payload = request.get_json(force=True) or {}
+    pantry = payload.get("pantry", "").strip()
+    if not pantry:
+        return jsonify({"error": "pantry is required"}), 400
+    run_id = str(uuid.uuid4())
+    _store_run(run_id, {"pantry": pantry, "constraints": payload.get("constraints")})
+    return jsonify({"run_id": run_id, "session_id": session.get("user_id", "anon")})
+
+
+@app.route("/api/pantry/stream/<run_id>")
+def pantry_stream(run_id: str):
+    stored = _load_run(run_id)
+    if not stored:
+        return Response("not found", status=404)
+
+    def event_stream():
+        for evt in run_pantry_session(stored, schema=RECIPE_SCHEMA):
+            yield f"data: {evt}\n\n"
+
+    headers = {
+        "Cache-Control": "no-cache",
+        "Content-Type": "text/event-stream",
+        "Connection": "keep-alive",
+    }
+    return Response(event_stream(), headers=headers)
+
+
+@app.route("/api/cookbook", methods=["GET"])
+def api_cookbook_list():
+    return jsonify(list_cookbooks())
+
+
+@app.route("/cookbook", methods=["GET"])
+def cookbook_page():
+    return render_template("json_viewer.html", recipe={"name": "Cookbooks", "filename": ""}, recipe_json_str=json.dumps(list_cookbooks(), indent=2))
+
+
+@app.route("/api/cookbook/recipes", methods=["POST"])
+def api_cookbook_save_recipe():
+    payload = request.get_json(force=True) or {}
+    recipe = payload.get("recipe")
+    if not recipe:
+        return jsonify({"error": "recipe is required"}), 400
+    saved = save_recipe(recipe)
+    cookbook_id = payload.get("cookbook_id") or "default"
+    attach_recipe_to_cookbook(cookbook_id, saved["id"])
+    return jsonify(saved)
+
+
+@app.route("/api/cookbook/recipes/<recipe_id>", methods=["PATCH", "DELETE"])
+def api_cookbook_modify_recipe(recipe_id: str):
+    if request.method == "DELETE":
+        ok = delete_recipe(recipe_id)
+        return jsonify({"deleted": ok})
+    updates = request.get_json(force=True) or {}
+    updated = patch_recipe(recipe_id, updates)
+    if not updated:
+        return jsonify({"error": "not found"}), 404
+    return jsonify(updated)
 
 
 # --- NEW: Route for generating recipes ---

@@ -105,8 +105,11 @@
       }
     },
     "notes": {
-      "type": "string",
-      "description": "Optional notes, tips, or variations"
+      "type": ["string", "array"],
+      "description": "Optional notes, tips, or variations",
+      "items": {
+        "type": "string"
+      }
     },
     "tags": {
       "type": "array",
@@ -189,6 +192,66 @@
           "description": "Whether images are currently working/valid"
         }
       }
+    }
+    ,
+    "pantry_matches": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "pantry_stretchables": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "missing_items": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "shopping_delta": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "tools_equipment": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "difficulty": {
+      "type": "string"
+    },
+    "prep_time_minutes": {
+      "type": "integer"
+    },
+    "cook_time_minutes": {
+      "type": "integer"
+    },
+    "total_time_minutes": {
+      "type": "integer"
+    },
+    "nutrition": {
+      "type": "object"
+    },
+    "agents_involved": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "agent_trace": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "rating": {
+      "type": ["number", "null"]
+    },
+    "collections": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "variant_of": {
+      "type": ["string", "null"]
+    },
+    "version": {
+      "type": ["string", "number"]
     }
   },
   "required": [

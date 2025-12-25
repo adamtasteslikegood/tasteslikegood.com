@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block title %}Pantry-Aware Generator{% endblock %}
+
+{% block content %}
+<h1>Pantry-Aware Multi-Agent Generator</h1>
+<p>All dishes are plant-powered by default. Provide your pantry and constraints to craft a recipe that respects what you have.</p>
+
+<form id="pantry-form">
+  <label for="pantry-text">Pantry items</label><br>
+  <textarea id="pantry-text" name="pantry" rows="6" cols="60" placeholder="e.g., 2 cans chickpeas, 1 tbsp paprika, half onion"></textarea><br>
+  <label for="constraints">Constraints (diet, time, tools)</label><br>
+  <input type="text" id="constraints" name="constraints" placeholder="gluten-free, 30 minutes, one-pot"><br>
+  <button type="submit">Generate</button>
+</form>
+
+<section>
+  <h2>Progress</h2>
+  <pre id="progress-log"></pre>
+</section>
+
+<section id="recipe-card" style="display:none;">
+  <h2>Generated Recipe</h2>
+  <pre id="recipe-json"></pre>
+  <button id="save-recipe-btn">Save to Cookbook</button>
+</section>
+
+<script src="{{ url_for('static', filename='js/pantry.js') }}"></script>
+{% endblock %}
