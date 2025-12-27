@@ -66,21 +66,12 @@ RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
 # Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-# Debug logging - executed at import time to verify API key configuration
-print(f"DEBUG: Loaded GOOGLE_API_KEY: {'Yes' if GOOGLE_API_KEY else 'No'}")
 
 # Unsplash API for stock images (free tier: 50 requests/hour)
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
-print(f"DEBUG: Loaded UNSPLASH_ACCESS_KEY: {'Yes' if UNSPLASH_ACCESS_KEY else 'No'}")
 
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-2.0-flash-exp"
-
-# Validate DEFAULT_MODEL (Simple check, could be expanded)
-if not DEFAULT_MODEL:
-    # Debug logging - executed at import time to warn about missing model configuration
-    print("Warning: DEFAULT_MODEL is not set. Fallback to 'gemini-2.0-flash-exp'.")
-    DEFAULT_MODEL = "gemini-2.0-flash-exp"
 
 
 def get_genai_client():
