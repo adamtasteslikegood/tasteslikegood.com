@@ -302,5 +302,12 @@
     "mushrooms",
     "spicy",
     "main course"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T17:05:30.746446",
+    "prompt": "unknown",
+    "images_working": false
+  }
 }

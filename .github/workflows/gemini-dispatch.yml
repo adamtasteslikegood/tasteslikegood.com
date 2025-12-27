@@ -137,19 +137,23 @@ jobs:
       additional_context: '${{ needs.dispatch.outputs.additional_context }}'
     secrets: 'inherit'
 
-  triage:
-    needs: 'dispatch'
-    if: |-
-      ${{ needs.dispatch.outputs.command == 'triage' }}
-    uses: './.github/workflows/gemini-triage.yml'
-    permissions:
-      contents: 'read'
-      id-token: 'write'
-      issues: 'write'
-      pull-requests: 'write'
-    with:
-      additional_context: '${{ needs.dispatch.outputs.additional_context }}'
-    secrets: 'inherit'
+  ttriage:
+  needs:  'dispatch'
+  if:  |-
+    ${{ needs. dispatch.outputs.command == 'triage' }}
+  uses:  './.github/workflows/gemini-triage.yml'
+  permissions:
+    contents: 'read'
+    id-token:  'write'
+    issues:  'write'
+    pull-requests: 'write'
+  with:
+    additional_context:  '${{ needs.dispatch.outputs. additional_context }}'
+    repository: '${{ github.repository }}'
+    issue_number: '${{ github.event.issue.number || github.event.pull_request. number }}'
+    issue_title: '${{ github.event.issue.title || github.event.pull_request. title }}'
+    issue_body: '${{ github.event.issue.body || github.event.pull_request.body }}'
+  secrets: 'inherit'
 
   invoke:
     needs: 'dispatch'

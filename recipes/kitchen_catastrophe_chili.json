@@ -107,5 +107,31 @@
     "emergency",
     "gluten-free",
     "disaster"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T16:36:24.083102",
+    "prompt": "unknown",
+    "images_working": true,
+    "stock_image_generation": {
+      "model": "gemini-2.0-flash-exp",
+      "user_id": "anonymous",
+      "prompt": "Search for a food photography image on Unsplash that matches: Kitchen Catastrophe Chili\nReturn the direct image URL in format: https://images.unsplash.com/photo-XXXXXXXXX?w=800\nReturn ONLY the URL, or NONE if not found.",
+      "timestamp": "2025-12-20T16:36:24.120133",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": true
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of Kitchen Catastrophe Chili. Professional lighting, appetizing.",
+      "timestamp": "2025-12-20T16:36:26.221640",
+      "success": true,
+      "image_path": "static/images/ai_kitchen_catastrophe_chili.png"
+    }
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop",
+  "ai_image_url": "/static/images/ai_kitchen_catastrophe_chili.png"
 }

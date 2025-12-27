@@ -186,5 +186,30 @@
     "lentil",
     "sweet potato",
     "gluten-free"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T12:54:38.165834",
+    "prompt": "unknown",
+    "images_working": true,
+    "stock_image_generation": {
+      "model": "gemini-2.0-flash-exp",
+      "user_id": "anonymous",
+      "prompt": "Generate 2-3 simple, comma-separated keywords to search for a stock photo of 'Crystal-Topped Winter Lentil Nest'. Example: 'chocolate cake, dessert'. Return ONLY the keywords.",
+      "timestamp": "2025-12-20T12:54:38.184131",
+      "success": true,
+      "url_validated": false
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of Crystal-Topped Winter Lentil Nest. Professional lighting, appetizing.",
+      "timestamp": "2025-12-20T12:54:39.669415",
+      "success": true,
+      "image_path": "static/images/ai_crystaltopped_winter_lentil_nest.png"
+    }
+  },
+  "stock_image_url": "https://loremflickr.com/800/600/crystal,lentils,,winter,nest/all?lock=2800",
+  "ai_image_url": "/static/images/ai_crystaltopped_winter_lentil_nest.png"
 }
