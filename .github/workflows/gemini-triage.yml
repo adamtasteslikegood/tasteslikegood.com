@@ -1,15 +1,31 @@
 name: '🔀 Gemini Triage'
 
 on:
-  workflow_call:
+  workflow_call: 
     inputs:
       additional_context:
         type: 'string'
         description: 'Any additional context from the request'
         required: false
+      repository:
+        type: 'string'
+        description: 'Repository in owner/repo format'
+        required:  true
+      issue_number: 
+        type: 'string'
+        description: 'Issue or PR number'
+        required: true
+      issue_title:
+        type: 'string'
+        description: 'Issue or PR title'
+        required: true
+      issue_body:
+        type: 'string'
+        description: 'Issue or PR body'
+        required: true
 
 concurrency:
-  group: '${{ github.workflow }}-triage-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
+  group: '${{ github.workflow }}-triage-${{ github.event_name }}-${{ inputs.issue_number }}'
   cancel-in-progress: true
 
 defaults:
@@ -62,8 +78,8 @@ jobs:
         uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
         env:
           GITHUB_TOKEN: '' # Do NOT pass any auth tokens here since this runs on untrusted inputs
-          ISSUE_TITLE: '${{ github.event.issue.title }}'
-          ISSUE_BODY: '${{ github.event.issue.body }}'
+          ISSUE_TITLE: '${{ inputs.issue_title }}'
+          ISSUE_BODY: '${{ inputs.issue_body }}'
           AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
@@ -122,7 +138,7 @@ jobs:
 
       - name: 'Apply labels'
         env:
-          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          ISSUE_NUMBER: '${{ inputs.issue_number }}'
           AVAILABLE_LABELS: '${{ needs.triage.outputs.available_labels }}'
           SELECTED_LABELS: '${{ needs.triage.outputs.selected_labels }}'
         uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7.0.1
