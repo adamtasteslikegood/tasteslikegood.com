@@ -23,6 +23,7 @@ __pycache__/
 #recipe_error.txt#
 temp_sratch.txt
 requiremnets.txt.old
+.idea/workspace.xml
 
 # Google/Cloud Specifics
 .gemini/
