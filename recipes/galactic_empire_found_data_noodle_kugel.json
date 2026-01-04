@@ -137,6 +137,37 @@
     "model": "unknown",
     "timestamp": "2025-12-20T17:05:30.744222",
     "prompt": "unknown",
-    "images_working": false
-  }
+    "images_working": true,
+    "stock_image_generation": {
+      "source": "unsplash",
+      "user_id": "anonymous",
+      "search_query": "A 'lost' recipe rediscovered from",
+      "timestamp": "2025-12-31T08:04:45.928761",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false,
+      "attribution": {
+        "photographer_name": "Markus Winkler",
+        "photographer_url": "https://unsplash.com/@markuswinkler?utm_source=tasteslikegood&utm_medium=referral",
+        "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+        "html": "Photo by <a href=\"https://unsplash.com/@markuswinkler?utm_source=tasteslikegood&utm_medium=referral\">Markus Winkler</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+      }
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of Galactic Empire 'Found Data' Noodle Kugel. Professional lighting, appetizing.",
+      "timestamp": "2025-12-31T08:04:46.780937",
+      "success": true,
+      "image_path": "static/images/ai_galactic_empire_found_data_noodle_kugel.png"
+    }
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1705234384739-7244bdd49645?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDYyOTZ8MHwxfHNlYXJjaHwxfHx2ZWdhbiUyMEElMjAlMjdsb3N0JTI3JTIwcmVjaXBlJTIwcmVkaXNjb3ZlcmVkJTIwZnJvbXxlbnwxfDB8fHwxNzY3MTk3MDg2fDA&ixlib=rb-4.1.0&q=80&w=1080",
+  "stock_image_attribution": {
+    "photographer_name": "Markus Winkler",
+    "photographer_url": "https://unsplash.com/@markuswinkler?utm_source=tasteslikegood&utm_medium=referral",
+    "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+    "html": "Photo by <a href=\"https://unsplash.com/@markuswinkler?utm_source=tasteslikegood&utm_medium=referral\">Markus Winkler</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+  },
+  "ai_image_url": "/static/images/ai_galactic_empire_found_data_noodle_kugel.png"
 }
