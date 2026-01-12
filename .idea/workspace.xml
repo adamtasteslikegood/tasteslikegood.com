@@ -5,8 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="Initialized project dependencey managment with uv init. &#10;Created pyproject.toml, python-version and uv.lock...&#10;&#10;Add initial project files with dependencies and Python version specification.">
-      <change beforePath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/images/ai_creamy_vegan_chicken_and_mushroom_broccoli_casserole.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/images/ai_creamy_vegan_chicken_and_mushroom_casserole.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/images/ai_keep_warm_vegan_frozen_pizza_technique.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_creamy_chicken_broccoli_noodle_casserole.png" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_lemon_herb_chicken_pasta_with_broccoli_mushrooms.png" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/models_list.json" beforeDir="false" afterPath="$PROJECT_DIR$/models_list.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/recipe_error.json" beforeDir="false" afterPath="$PROJECT_DIR$/recipe_error.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/recipe_error.txt" beforeDir="false" afterPath="$PROJECT_DIR$/recipe_error.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -14,7 +21,7 @@
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
   <component name="EmbeddingIndexingInfo">
-    <option name="cachedIndexableFilesCount" value="185" />
+    <option name="cachedIndexableFilesCount" value="210" />
     <option name="fileBasedEmbeddingIndicesEnabled" value="true" />
   </component>
   <component name="FileTemplateManagerImpl">
@@ -254,6 +261,8 @@
       <workItem from="1766204517269" duration="81000" />
       <workItem from="1766204611852" duration="4556000" />
       <workItem from="1766930176944" duration="4632000" />
+      <workItem from="1767714555034" duration="590000" />
+      <workItem from="1768175645251" duration="2149000" />
     </task>
     <task id="LOCAL-00001" summary="&quot;Add Flask app to manage and display recipe collection&quot;">
       <option name="closed" value="true" />
