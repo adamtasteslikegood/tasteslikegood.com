@@ -4,9 +4,7 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="Initialized project dependencey managment with uv init. &#10;Created pyproject.toml, python-version and uv.lock...&#10;&#10;Add initial project files with dependencies and Python version specification.">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-    </list>
+    <list default="true" id="7f4cc865-1802-4dce-80e0-81e62f096c3b" name="Changes" comment="Remove unused image paths from workspace.xml and update work item duration" />
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -254,7 +252,7 @@
       <workItem from="1766204611852" duration="4556000" />
       <workItem from="1766930176944" duration="4632000" />
       <workItem from="1767714555034" duration="590000" />
-      <workItem from="1768175645251" duration="3377000" />
+      <workItem from="1768175645251" duration="3718000" />
     </task>
     <task id="LOCAL-00001" summary="&quot;Add Flask app to manage and display recipe collection&quot;">
       <option name="closed" value="true" />
@@ -352,7 +350,15 @@
       <option name="project" value="LOCAL" />
       <updated>1766933982906</updated>
     </task>
-    <option name="localTasksCounter" value="13" />
+    <task id="LOCAL-00013" summary="Remove unused image paths from workspace.xml and update work item duration">
+      <option name="closed" value="true" />
+      <created>1768191265102</created>
+      <option name="number" value="00013" />
+      <option name="presentableId" value="LOCAL-00013" />
+      <option name="project" value="LOCAL" />
+      <updated>1768191265102</updated>
+    </task>
+    <option name="localTasksCounter" value="14" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -397,7 +403,8 @@
     <MESSAGE value="Add user reports JSON and new AI-generated vegan recipe images&#10;&#10;- Created `user_reports.json` for tracking user feedback.&#10;- Added multiple AI-generated vegan recipe images to `static/images/`.&#10;- Updated `.gitignore` for `.idea/workspace.xml`." />
     <MESSAGE value="Add Python version and project configuration in pyproject.toml" />
     <MESSAGE value="Initialized project dependencey managment with uv init. &#10;Created pyproject.toml, python-version and uv.lock...&#10;&#10;Add initial project files with dependencies and Python version specification." />
-    <option name="LAST_COMMIT_MESSAGE" value="Initialized project dependencey managment with uv init. &#10;Created pyproject.toml, python-version and uv.lock...&#10;&#10;Add initial project files with dependencies and Python version specification." />
+    <MESSAGE value="Remove unused image paths from workspace.xml and update work item duration" />
+    <option name="LAST_COMMIT_MESSAGE" value="Remove unused image paths from workspace.xml and update work item duration" />
   </component>
   <component name="github-copilot-workspace">
     <instructionFileLocations>
