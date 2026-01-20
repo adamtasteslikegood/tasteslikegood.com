@@ -121,11 +121,6 @@
       "supported_generation_methods": []
     },
     {
-      "name": "models/gemini-2.5-flash-image-preview",
-      "display_name": "Nano Banana",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-2.5-flash-image",
       "display_name": "Nano Banana",
       "supported_generation_methods": []
@@ -271,5 +266,5 @@
       "supported_generation_methods": []
     }
   ],
-  "updated_at": "2026-01-09T11:51:39Z"
+  "updated_at": "2026-01-17T14:29:23Z"
 }

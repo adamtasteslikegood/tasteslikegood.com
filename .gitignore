@@ -29,3 +29,4 @@ requiremnets.txt.old
 gha-creds-*.json
 .DS_Store
 .github/.DS_Store
+static/images/duplicates/

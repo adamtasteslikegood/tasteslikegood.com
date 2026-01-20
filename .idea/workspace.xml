@@ -1,29 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
+  <component name="AutoImportSettings">
+    <option name="autoReloadType" value="SELECTIVE" />
+  </component>
   <component name="ChangeListManager">
-    <list default="true" id="5d52d747-db24-422e-ac2b-ebc994bfdbd8" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/#app.py#" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_creamy_vegan_chicken_and_mushroom_broccoli_casserole.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_creamy_vegan_chicken_and_mushroom_casserole.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_galactic_empire_found_data_noodle_kugel.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_keep_warm_vegan_frozen_pizza_technique.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_oven_baked_vegan_beyond_burger.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_spirit_world_three_sisters_stew_with_nopales.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_ultimate_vegan_chicken_and_waffles.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_broccoli_mushroom_rigatoni_with_lemon_butter_sauce.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_creamy_chicken_broccoli_noodle_casserole.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_gotham_steel_pasta_cake.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_lemon_herb_chicken_pasta_with_broccoli_mushrooms.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_mushroom_chicken_and_broccoli_pasta_fresca.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/static/images/ai_vegan_sweet_potato_black_bean_tofu_enchiladas.png" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/systeminfo.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/user_reports.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/tasteslikegood.com.iml" afterDir="false" />
+    <list default="true" id="5d52d747-db24-422e-ac2b-ebc994bfdbd8" name="Changes" comment="Add user reports, system info, and update recipe/model metadata">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/models_list.json" beforeDir="false" afterPath="$PROJECT_DIR$/models_list.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/recipe_error.json" beforeDir="false" afterPath="$PROJECT_DIR$/recipe_error.json" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/recipe_error.txt" beforeDir="false" afterPath="$PROJECT_DIR$/recipe_error.txt" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/recipes/galactic_empire_found_data_noodle_kugel.json" beforeDir="false" afterPath="$PROJECT_DIR$/recipes/galactic_empire_found_data_noodle_kugel.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/templates/json_viewer.html" beforeDir="false" afterPath="$PROJECT_DIR$/templates/json_viewer.html" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -37,43 +21,48 @@
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="GitHubPullRequestSearchHistory"><![CDATA[{
-  "lastFilter": {
-    "state": "OPEN",
-    "assignee": "adamtasteslikegood"
+  <component name="GitHubPullRequestSearchHistory">{
+  &quot;lastFilter&quot;: {
+    &quot;state&quot;: &quot;OPEN&quot;,
+    &quot;assignee&quot;: &quot;adamtasteslikegood&quot;
   }
-}]]></component>
-  <component name="GithubPullRequestsUISettings"><![CDATA[{
-  "selectedUrlAndAccountId": {
-    "url": "https://github.com/adamtasteslikegood/tasteslikegood.com.git",
-    "accountId": "e21b3276-0cd3-4c10-947c-f05896fc24c4"
+}</component>
+  <component name="GithubPullRequestsUISettings">{
+  &quot;selectedUrlAndAccountId&quot;: {
+    &quot;url&quot;: &quot;https://github.com/adamtasteslikegood/tasteslikegood.com.git&quot;,
+    &quot;accountId&quot;: &quot;e21b3276-0cd3-4c10-947c-f05896fc24c4&quot;
   }
-}]]></component>
+}</component>
   <component name="McpProjectServerCommands">
     <commands />
     <urls />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "customColor": "",
-  "associatedIndex": 7
-}]]></component>
+  <component name="ProjectColorInfo">{
+  &quot;customColor&quot;: &quot;&quot;,
+  &quot;associatedIndex&quot;: 7
+}</component>
   <component name="ProjectId" id="38L9Tr9nI50VXkdSWJtXeEy4k14" />
   <component name="ProjectViewState">
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "RunOnceActivity.MCP Project settings loaded": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "ai.playground.ignore.import.keys.banner.in.settings": "true",
-    "git-widget-placeholder": "Merging Main-development",
-    "nodejs_package_manager_path": "npm",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;RunOnceActivity.MCP Project settings loaded&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.typescript.service.memoryLimit.init&quot;: &quot;true&quot;,
+    &quot;ai.playground.ignore.import.keys.banner.in.settings&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;Main-development&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.pluginManager&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RunManager">
     <configuration name="tasteslikegood.com" type="PythonConfigurationType" factoryName="Python">
       <module name="tasteslikegood.com" />
@@ -115,11 +104,36 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1768567996794</updated>
-      <workItem from="1768568000411" duration="404000" />
+      <workItem from="1768568000411" duration="3339000" />
     </task>
+    <task id="LOCAL-00001" summary="Add user reports, system info, and update recipe/model metadata">
+      <option name="closed" value="true" />
+      <created>1768568535751</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1768568535751</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="Vcs.Log.Tabs.Properties">
+    <option name="TAB_STATES">
+      <map>
+        <entry key="MAIN">
+          <value>
+            <State />
+          </value>
+        </entry>
+      </map>
+    </option>
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Merge branch 'Main-development' of https://github.com/adamtasteslikegood/tasteslikegood.com into Main-development&#10;&#10;# Conflicts:&#10;#&#9;.idea/workspace.xml&#10;" />
+    <MESSAGE value="Add user reports, system info, and update recipe/model metadata" />
+    <option name="LAST_COMMIT_MESSAGE" value="Add user reports, system info, and update recipe/model metadata" />
   </component>
 </project>
