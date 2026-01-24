@@ -2,7 +2,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List
+from typing import Any, Dict, Iterable
 
 from openai import OpenAI
 try:
