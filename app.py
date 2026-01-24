@@ -58,7 +58,8 @@ os.makedirs(RECIPES_DIR, exist_ok=True)
 # Simple cache for recipe list to avoid reading all files on every request
 _recipes_cache = {'data': None, 'timestamp': 0}
 # Cache TTL (in seconds) for the recipes list. Default is 60s, which balances
-# avoiding frequent disk reads with keeping the list reasonably fresh.
+# TODO: Replace this with a more scalable solution like a database or Redis.
+RUN_PAYLOADS: dict[str, dict] = {}
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
 RUN_PAYLOADS: dict[str, dict] = {}
 
