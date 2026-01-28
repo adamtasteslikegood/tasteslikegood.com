@@ -7,26 +7,28 @@ Handles:
 - Refreshing model list from Gemini API
 - Sorting models by preference
 """
+
 import json
 import time
-from google.genai import Client
+
 import google.oauth2.credentials
+from google.genai import Client
+
 from config import GOOGLE_API_KEY
 
-
-MODELS_LIST_PATH = 'models_list.json'
+MODELS_LIST_PATH = "models_list.json"
 
 # Curated list of preferred Gemini models for recipe generation
 PREFERRED_MODELS = [
-    'models/gemini-2.5-pro',
-    'models/gemini-2.5-flash',
-    'models/gemini-2.0-flash',
-    'models/gemini-2.0-flash-exp',
-    'models/gemini-3-pro-preview',
-    'models/gemini-2.0-flash-lite',
-    'models/gemini-exp-1206',
-    'models/gemini-pro-latest',
-    'models/gemini-flash-latest',
+    "models/gemini-2.5-pro",
+    "models/gemini-2.5-flash",
+    "models/gemini-2.0-flash",
+    "models/gemini-2.0-flash-exp",
+    "models/gemini-3-pro-preview",
+    "models/gemini-2.0-flash-lite",
+    "models/gemini-exp-1206",
+    "models/gemini-pro-latest",
+    "models/gemini-flash-latest",
 ]
 
 
@@ -38,9 +40,9 @@ def load_models_from_cache():
         list: List of model dictionaries, or None if loading fails
     """
     try:
-        with open(MODELS_LIST_PATH, 'r') as f:
+        with open(MODELS_LIST_PATH, "r") as f:
             data = json.load(f)
-            return data.get('models', [])
+            return data.get("models", [])
     except (FileNotFoundError, json.JSONDecodeError) as e:
         print(f"Could not load models cache: {e}")
         return None
@@ -55,6 +57,7 @@ def filter_and_sort_models(models_list):
     - Image/video generation models
     - Audio/TTS models
     - Non-Gemini/Gemma models
+    - Models without 'generateContent' support
 
     Sorts by:
     1. Preferred models (in order of preference)
@@ -64,40 +67,57 @@ def filter_and_sort_models(models_list):
         models_list: List of model dictionaries from API
 
     Returns:
-        list: Filtered and sorted list of up to 8 models
+        list: Filtered and sorted list of up to 10 models
     """
-    exclude_patterns = ['embedding', 'imagen', 'veo', 'live', 'tts', 'audio', 'robotics', 'aqa']
+    exclude_patterns = [
+        "embedding",
+        "imagen",
+        "veo",
+        "live",
+        "tts",
+        "audio",
+        "robotics",
+        "aqa",
+    ]
 
     filtered_models = []
     for m in models_list:
-        model_name = m.get('name', '').lower()
+        model_name = m.get("name", "").lower()
 
         # Skip non-generation models
         if any(pattern in model_name for pattern in exclude_patterns):
             continue
 
         # Skip image generation specific models
-        if 'image' in model_name and 'gemini' in model_name:
+        if "image" in model_name and "gemini" in model_name:
             continue
 
         # Only include gemini/gemma models
-        if not ('gemini' in model_name or 'gemma' in model_name):
+        if not ("gemini" in model_name or "gemma" in model_name):
             continue
 
-        filtered_models.append({
-            'id': m.get('name'),
-            'name': m.get('display_name') or m.get('name')
-        })
+        # CRITICAL: Only include models that support generateContent
+        supported_methods = m.get("supported_generation_methods", [])
+        if "generateContent" not in supported_methods:
+            continue
+
+        filtered_models.append(
+            {
+                "id": m.get("name"),
+                "name": m.get("display_name") or m.get("name"),
+                "supported_methods": supported_methods,
+            }
+        )
 
     # Sort: preferred models first, then alphabetically
     def sort_key(model):
-        model_id = model['id']
+        model_id = model["id"]
         if model_id in PREFERRED_MODELS:
             return (0, PREFERRED_MODELS.index(model_id))
-        return (1, model['name'])
+        return (1, model["name"])
 
     filtered_models.sort(key=sort_key)
-    return filtered_models[:8]
+    return filtered_models[:10]  # Return up to 10 models
 
 
 def refresh_models_from_api(session_credentials=None):
@@ -138,7 +158,11 @@ def refresh_models_from_api(session_credentials=None):
             print(f"API Key client failed: {e}")
 
     if client is None:
-        return None, None, 'No valid authentication method available. Please login or configure API key.'
+        return (
+            None,
+            None,
+            "No valid authentication method available. Please login or configure API key.",
+        )
 
     try:
         # Fetch models from Gemini API
@@ -147,18 +171,22 @@ def refresh_models_from_api(session_credentials=None):
         # Convert to list of dicts for caching
         models_data = []
         for model in models_response:
-            models_data.append({
-                'name': model.name,
-                'display_name': getattr(model, 'display_name', model.name),
-                'supported_generation_methods': getattr(model, 'supported_generation_methods', [])
-            })
+            models_data.append(
+                {
+                    "name": model.name,
+                    "display_name": getattr(model, "display_name", model.name),
+                    "supported_generation_methods": getattr(
+                        model, "supported_generation_methods", []
+                    ),
+                }
+            )
 
         # Update the cache file
         cache_data = {
-            'models': models_data,
-            'updated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+            "models": models_data,
+            "updated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         }
-        with open(MODELS_LIST_PATH, 'w') as f:
+        with open(MODELS_LIST_PATH, "w") as f:
             json.dump(cache_data, f, indent=2)
 
         # Return filtered models
@@ -167,6 +195,6 @@ def refresh_models_from_api(session_credentials=None):
         return filtered_models, auth_method, None
 
     except Exception as e:
-        error_msg = f'Failed to fetch models: {str(e)}'
+        error_msg = f"Failed to fetch models: {str(e)}"
         print(f"Error refreshing models from API: {e}")
         return None, auth_method, error_msg

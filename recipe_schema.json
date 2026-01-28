@@ -9,18 +9,12 @@
       "description": "Name of the recipe"
     },
     "stock_image_url": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "format": "uri",
       "description": "URL of a stock image for the recipe"
     },
     "ai_image_url": {
-      "type": [
-        "string",
-        "null"
-      ],
+      "type": ["string", "null"],
       "format": "uri",
       "description": "URL of an AI-generated image for the recipe"
     },
@@ -70,10 +64,7 @@
           "$ref": "#/definitions/ingredient"
         }
       },
-      "required": [
-        "wet",
-        "dry"
-      ]
+      "required": ["wet", "dry"]
     },
     "instructions": {
       "type": "array",
@@ -96,9 +87,7 @@
                 "description": "Instructional text for the step"
               }
             },
-            "required": [
-              "description"
-            ],
+            "required": ["description"],
             "additionalProperties": false
           }
         ]
@@ -125,7 +114,7 @@
       "maxItems": 5
     },
     "image": {
-      "type": "string",
+      "type": ["string", "null"],
       "format": "uri",
       "description": "Optional URL of an image of the finished dish"
     },
@@ -141,35 +130,86 @@
           "type": "object",
           "description": "Metadata for the recipe text generation",
           "properties": {
-            "model": { "type": "string", "description": "Model used for generation" },
-            "user_id": { "type": "string", "description": "User who triggered the generation" },
-            "prompt": { "type": "string", "description": "Original user prompt" },
-            "timestamp": { "type": "string", "description": "ISO timestamp of generation" },
-            "success": { "type": "boolean", "description": "Whether generation succeeded" }
+            "model": {
+              "type": "string",
+              "description": "Model used for generation"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "User who triggered the generation"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Original user prompt"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO timestamp of generation"
+            },
+            "success": {
+              "type": "boolean",
+              "description": "Whether generation succeeded"
+            }
           }
         },
         "image_generation": {
           "type": ["object", "null"],
           "description": "Metadata for AI image generation (Imagen)",
           "properties": {
-            "model": { "type": "string", "description": "Model used for image generation" },
-            "user_id": { "type": "string", "description": "User who triggered the generation" },
-            "prompt": { "type": "string", "description": "Image generation prompt" },
-            "timestamp": { "type": "string", "description": "ISO timestamp of generation" },
-            "success": { "type": "boolean", "description": "Whether generation succeeded" },
-            "image_path": { "type": ["string", "null"], "description": "Path to generated image" }
+            "model": {
+              "type": "string",
+              "description": "Model used for image generation"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "User who triggered the generation"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Image generation prompt"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO timestamp of generation"
+            },
+            "success": {
+              "type": "boolean",
+              "description": "Whether generation succeeded"
+            },
+            "image_path": {
+              "type": ["string", "null"],
+              "description": "Path to generated image"
+            }
           }
         },
         "stock_image_generation": {
           "type": ["object", "null"],
           "description": "Metadata for stock image URL generation",
           "properties": {
-            "model": { "type": "string", "description": "Model used to find stock image" },
-            "user_id": { "type": "string", "description": "User who triggered the generation" },
-            "prompt": { "type": "string", "description": "Prompt used to find stock image" },
-            "timestamp": { "type": "string", "description": "ISO timestamp of generation" },
-            "success": { "type": "boolean", "description": "Whether a valid URL was found" },
-            "url_validated": { "type": "boolean", "description": "Whether the URL was validated as working" }
+            "model": {
+              "type": "string",
+              "description": "Model used to find stock image"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "User who triggered the generation"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Prompt used to find stock image"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO timestamp of generation"
+            },
+            "success": {
+              "type": "boolean",
+              "description": "Whether a valid URL was found"
+            },
+            "url_validated": {
+              "type": "boolean",
+              "description": "Whether the URL was validated as working"
+            }
           }
         },
         "model": {
@@ -208,10 +248,7 @@
           "description": "Name of the ingredient"
         },
         "amount": {
-          "type": [
-            "number",
-            "array"
-          ],
+          "type": ["number", "array"],
           "description": "Amount of the ingredient. Can be a single number or an array for a range.",
           "items": {
             "type": "number"
@@ -226,11 +263,7 @@
           "description": "Optional preparation notes, such as chopped, sliced, etc."
         }
       },
-      "required": [
-        "name",
-        "amount",
-        "units"
-      ]
+      "required": ["name", "amount", "units"]
     }
   }
 }
