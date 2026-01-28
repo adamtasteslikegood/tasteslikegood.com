@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+
+{% block title %}500 - Internal Server Error | TastesLikeGood.com{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <h1>500 - Internal Server Error</h1>
+    <p>Something went wrong on our end.</p>
+    <p>We've been notified of the issue and are working to fix it.</p>
+
+    <div class="error-actions">
+        <a href="{{ url_for('recipes.index') }}" class="button">Go to Home</a>
+        <a href="javascript:history.back()" class="button secondary">Go Back</a>
+    </div>
+</div>
+
+<style>
+    .error-page {
+        text-align: center;
+        padding: 3rem 1rem;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .error-page h1 {
+        color: #d32f2f;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .error-page p {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: #666;
+    }
+
+    .error-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .error-actions .button {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+
+    .error-actions .button:hover {
+        background-color: #45a049;
+    }
+
+    .error-actions .button.secondary {
+        background-color: #757575;
+    }
+
+    .error-actions .button.secondary:hover {
+        background-color: #616161;
+    }
+</style>
+{% endblock %}

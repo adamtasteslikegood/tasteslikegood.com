@@ -10,12 +10,16 @@ Handles:
 - Recipe metadata updates
 - Error logging with traceback
 """
-import os
-import json
+
 import datetime
+import json
+import os
 import traceback
-from flask import url_for, session
+
+from flask import session, url_for
+
 from services.gemini_service import get_genai_client
+from utils.session_utils import get_user_metadata
 
 
 def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
@@ -37,23 +41,26 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
             - error_dict: {'error': error_message, 'status': status_code} or None on success
     """
     # Check if image already exists and we're not forcing regeneration
-    if not force_regenerate and recipe_data.get('ai_image_url'):
-        return recipe_data['ai_image_url'], None
+    if not force_regenerate and recipe_data.get("ai_image_url"):
+        return recipe_data["ai_image_url"], None
 
     # Clear existing image URL if forcing regeneration
-    if force_regenerate and 'ai_image_url' in recipe_data:
-        del recipe_data['ai_image_url']
+    if force_regenerate and "ai_image_url" in recipe_data:
+        del recipe_data["ai_image_url"]
 
     # Get authenticated client
-    session_credentials = session.get('credentials') if session else None
+    session_credentials = session.get("credentials") if session else None
     client = get_genai_client(session_credentials)
 
     if not client:
-        return None, {'error': 'No credentials available', 'status': 500}
+        return None, {"error": "No credentials available", "status": 500}
 
     try:
-        user_id = session.get('user_id', 'anonymous') if session else 'anonymous'
-        model_to_use = 'imagen-4.0-generate-001'
+        # Get comprehensive user metadata
+        user_metadata = get_user_metadata()
+        user_id = user_metadata["user_id"]
+
+        model_to_use = "imagen-4.0-generate-001"
         image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
         generation_timestamp = datetime.datetime.now().isoformat()
 
@@ -62,13 +69,11 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
 
         # Generate image
         response = client.models.generate_images(
-            model=model_to_use,
-            prompt=image_prompt,
-            config={'number_of_images': 1}
+            model=model_to_use, prompt=image_prompt, config={"number_of_images": 1}
         )
 
         if not response.generated_images:
-            return None, {'error': 'No images generated', 'status': 500}
+            return None, {"error": "No images generated", "status": 500}
 
         # Save image file
         image_url = save_image_file(response.generated_images[0], filename)
@@ -78,14 +83,14 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
             recipe_data,
             image_url,
             model_to_use,
-            user_id,
+            user_metadata,
             image_prompt,
             generation_timestamp,
-            filename
+            filename,
         )
 
         # Save updated recipe
-        with open(filepath, 'w') as f:
+        with open(filepath, "w") as f:
             json.dump(recipe_data, f, indent=2)
 
         return image_url, None
@@ -98,10 +103,12 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
 
         # Log error to file for debugging
         # TODO: Implement log rotation using Python's logging module with RotatingFileHandler
-        with open('recipe_error.txt', 'a') as f:
-            f.write(f"\nLast Error (Image Gen): {repr(e)}\nTraceback:\n{traceback_str}\n")
+        with open("recipe_error.txt", "a") as f:
+            f.write(
+                f"\nLast Error (Image Gen): {repr(e)}\nTraceback:\n{traceback_str}\n"
+            )
 
-        return None, {'error': error_msg, 'status': 500}
+        return None, {"error": error_msg, "status": 500}
 
 
 def save_image_file(generated_image, filename):
@@ -120,20 +127,22 @@ def save_image_file(generated_image, filename):
     # Sanitize filename (already validated by caller)
     safe_filename = os.path.basename(filename)
     image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
-    image_path = os.path.join('static', 'images', image_filename)
+    image_path = os.path.join("static", "images", image_filename)
 
     # Ensure directory exists
     os.makedirs(os.path.dirname(image_path), exist_ok=True)
 
     # Write image bytes
-    with open(image_path, 'wb') as img_f:
+    with open(image_path, "wb") as img_f:
         img_f.write(image_data)
 
     # Return URL for template
-    return url_for('static', filename=f'images/{image_filename}')
+    return url_for("static", filename=f"images/{image_filename}")
 
 
-def update_recipe_with_image(recipe_data, image_url, model, user_id, prompt, timestamp, filename):
+def update_recipe_with_image(
+    recipe_data, image_url, model, user_metadata, prompt, timestamp, filename
+):
     """
     Update recipe dictionary with image URL and generation metadata.
 
@@ -141,27 +150,30 @@ def update_recipe_with_image(recipe_data, image_url, model, user_id, prompt, tim
         recipe_data: Recipe dictionary to update (modified in-place)
         image_url: URL to the generated image
         model: Model name used for generation
-        user_id: User ID who triggered generation
+        user_metadata: User metadata dict from get_user_metadata()
         prompt: Image generation prompt
         timestamp: ISO timestamp of generation
         filename: Recipe filename for image path reference
     """
-    recipe_data['ai_image_url'] = image_url
+    recipe_data["ai_image_url"] = image_url
 
     # Update ai_metadata with comprehensive image generation info
-    if 'ai_metadata' not in recipe_data:
-        recipe_data['ai_metadata'] = {}
+    if "ai_metadata" not in recipe_data:
+        recipe_data["ai_metadata"] = {}
 
     safe_filename = os.path.basename(filename)
     image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
-    image_path = os.path.join('static', 'images', image_filename)
+    image_path = os.path.join("static", "images", image_filename)
 
-    recipe_data['ai_metadata']['image_generation'] = {
-        'model': model,
-        'user_id': user_id,
-        'prompt': prompt,
-        'timestamp': timestamp,
-        'success': True,
-        'image_path': image_path
+    recipe_data["ai_metadata"]["image_generation"] = {
+        "model": model,
+        "user_id": user_metadata["user_id"],
+        "user_display_name": user_metadata["display_name"],
+        "is_authenticated": user_metadata["is_authenticated"],
+        "session_id": user_metadata["session_id"],
+        "prompt": prompt,
+        "timestamp": timestamp,
+        "success": True,
+        "image_path": image_path,
     }
-    recipe_data['ai_metadata']['images_working'] = True
+    recipe_data["ai_metadata"]["images_working"] = True

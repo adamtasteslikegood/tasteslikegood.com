@@ -9,10 +9,13 @@ Provides intelligent image search with fallback strategies:
 
 All images are vegan-appropriate with proper attribution per Unsplash guidelines.
 """
-import datetime
-import requests
-from config import UNSPLASH_ACCESS_KEY
 
+import datetime
+
+import requests
+
+from config import UNSPLASH_ACCESS_KEY
+from utils.session_utils import get_user_metadata
 
 # Curated static fallback images from Unsplash (real, permanent URLs)
 FALLBACK_FOOD_IMAGES = [
@@ -54,12 +57,12 @@ def search_unsplash(keywords, per_page=1):
 
     # Join keywords if it's a list
     if isinstance(keywords, list):
-        query = ' '.join(keywords[:3])  # Use first 3 keywords
+        query = " ".join(keywords[:3])  # Use first 3 keywords
     else:
         query = keywords
 
     # Add "vegan" to ensure food-appropriate results
-    if 'vegan' not in query.lower():
+    if "vegan" not in query.lower():
         query = f"vegan {query}"
 
     # UTM params required by Unsplash API guidelines
@@ -67,46 +70,50 @@ def search_unsplash(keywords, per_page=1):
 
     try:
         response = requests.get(
-            'https://api.unsplash.com/search/photos',
+            "https://api.unsplash.com/search/photos",
             params={
-                'query': query,
-                'per_page': per_page,
-                'orientation': 'landscape',
-                'content_filter': 'high',  # Safe content only
+                "query": query,
+                "per_page": per_page,
+                "orientation": "landscape",
+                "content_filter": "high",  # Safe content only
             },
-            headers={
-                'Authorization': f'Client-ID {UNSPLASH_ACCESS_KEY}'
-            },
-            timeout=10
+            headers={"Authorization": f"Client-ID {UNSPLASH_ACCESS_KEY}"},
+            timeout=10,
         )
 
         if response.status_code == 200:
             data = response.json()
-            if data.get('results'):
-                photo = data['results'][0]
-                image_url = photo.get('urls', {}).get('regular')
+            if data.get("results"):
+                photo = data["results"][0]
+                image_url = photo.get("urls", {}).get("regular")
 
                 if image_url:
                     # Extract photographer info for attribution (required by Unsplash)
-                    user = photo.get('user', {})
-                    photographer_name = user.get('name', 'Unknown')
-                    photographer_username = user.get('username', '')
-                    photographer_url = f"https://unsplash.com/@{photographer_username}{utm_params}"
+                    user = photo.get("user", {})
+                    photographer_name = user.get("name", "Unknown")
+                    photographer_username = user.get("username", "")
+                    photographer_url = (
+                        f"https://unsplash.com/@{photographer_username}{utm_params}"
+                    )
                     unsplash_url = f"https://unsplash.com{utm_params}"
 
-                    print(f"DEBUG: Unsplash found image for '{query}' by {photographer_name}")
+                    print(
+                        f"DEBUG: Unsplash found image for '{query}' by {photographer_name}"
+                    )
 
                     return {
-                        'url': image_url,
-                        'attribution': {
-                            'photographer_name': photographer_name,
-                            'photographer_url': photographer_url,
-                            'unsplash_url': unsplash_url,
-                            'html': f'Photo by <a href="{photographer_url}">{photographer_name}</a> on <a href="{unsplash_url}">Unsplash</a>'
-                        }
+                        "url": image_url,
+                        "attribution": {
+                            "photographer_name": photographer_name,
+                            "photographer_url": photographer_url,
+                            "unsplash_url": unsplash_url,
+                            "html": f'Photo by <a href="{photographer_url}">{photographer_name}</a> on <a href="{unsplash_url}">Unsplash</a>',
+                        },
                     }
         else:
-            print(f"DEBUG: Unsplash API returned {response.status_code}: {response.text[:100]}")
+            print(
+                f"DEBUG: Unsplash API returned {response.status_code}: {response.text[:100]}"
+            )
 
     except Exception as e:
         print(f"DEBUG: Unsplash search failed: {e}")
@@ -114,7 +121,9 @@ def search_unsplash(keywords, per_page=1):
     return None
 
 
-def get_smart_stock_image(recipe_name, user_id='anonymous', description='', image_keywords=None):
+def get_smart_stock_image(
+    recipe_name, user_metadata=None, description="", image_keywords=None
+):
     """
     Searches Unsplash for a stock image matching the recipe.
 
@@ -123,7 +132,7 @@ def get_smart_stock_image(recipe_name, user_id='anonymous', description='', imag
 
     Args:
         recipe_name: Name of the recipe
-        user_id: User ID for metadata tracking
+        user_metadata: User metadata dict from get_user_metadata() (or None to fetch automatically)
         description: Recipe description to extract keywords from
         image_keywords: AI-generated keywords for image search
 
@@ -131,51 +140,62 @@ def get_smart_stock_image(recipe_name, user_id='anonymous', description='', imag
         Tuple: (url, metadata_dict) or (fallback_url, metadata_dict) on failure.
         Metadata includes attribution info when from Unsplash (required by their API guidelines).
     """
+    # Get user metadata if not provided
+    if user_metadata is None:
+        user_metadata = get_user_metadata()
+
     timestamp = datetime.datetime.now().isoformat()
 
     metadata = {
-        'source': 'unsplash',
-        'user_id': user_id,
-        'search_query': '',
-        'timestamp': timestamp,
-        'success': False,
-        'url_validated': False,
-        'fallback_used': False,
-        'attribution': None  # Will contain photographer credit for Unsplash images
+        "source": "unsplash",
+        "user_id": user_metadata["user_id"],
+        "user_display_name": user_metadata["display_name"],
+        "is_authenticated": user_metadata["is_authenticated"],
+        "session_id": user_metadata["session_id"],
+        "search_query": "",
+        "timestamp": timestamp,
+        "success": False,
+        "url_validated": False,
+        "fallback_used": False,
+        "attribution": None,  # Will contain photographer credit for Unsplash images
     }
 
     try:
         # Strategy 1: Use image_keywords if provided (best option)
-        if image_keywords and isinstance(image_keywords, list) and len(image_keywords) > 0:
-            metadata['search_query'] = ' '.join(image_keywords[:3])
+        if (
+            image_keywords
+            and isinstance(image_keywords, list)
+            and len(image_keywords) > 0
+        ):
+            metadata["search_query"] = " ".join(image_keywords[:3])
             result = search_unsplash(image_keywords)
             if result:
-                metadata['success'] = True
-                metadata['url_validated'] = True
-                metadata['attribution'] = result['attribution']
-                return result['url'], metadata
+                metadata["success"] = True
+                metadata["url_validated"] = True
+                metadata["attribution"] = result["attribution"]
+                return result["url"], metadata
 
         # Strategy 2: Extract keywords from description
         if description:
             # Use first ~50 chars of description as search
             desc_keywords = description[:100].split()[:5]
-            search_query = ' '.join(desc_keywords)
-            metadata['search_query'] = search_query
+            search_query = " ".join(desc_keywords)
+            metadata["search_query"] = search_query
             result = search_unsplash(search_query)
             if result:
-                metadata['success'] = True
-                metadata['url_validated'] = True
-                metadata['attribution'] = result['attribution']
-                return result['url'], metadata
+                metadata["success"] = True
+                metadata["url_validated"] = True
+                metadata["attribution"] = result["attribution"]
+                return result["url"], metadata
 
         # Strategy 3: Use recipe name
-        metadata['search_query'] = recipe_name
+        metadata["search_query"] = recipe_name
         result = search_unsplash(recipe_name)
         if result:
-            metadata['success'] = True
-            metadata['url_validated'] = True
-            metadata['attribution'] = result['attribution']
-            return result['url'], metadata
+            metadata["success"] = True
+            metadata["url_validated"] = True
+            metadata["attribution"] = result["attribution"]
+            return result["url"], metadata
 
     except Exception as e:
         print(f"DEBUG: Unsplash search error: {e}")
@@ -183,9 +203,9 @@ def get_smart_stock_image(recipe_name, user_id='anonymous', description='', imag
     # Strategy 4: Curated fallback (no attribution needed - these are from Unsplash's free license)
     print(f"DEBUG: Using curated fallback for '{recipe_name}'")
     fallback_url = _get_fallback_image(recipe_name)
-    metadata['success'] = True
-    metadata['fallback_used'] = True
-    metadata['url_validated'] = True
+    metadata["success"] = True
+    metadata["fallback_used"] = True
+    metadata["url_validated"] = True
     return fallback_url, metadata
 
 
@@ -220,7 +240,7 @@ def validate_image_url(url):
     """
     # Common headers to mimic a browser request
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
     }
 
     try:
@@ -229,21 +249,23 @@ def validate_image_url(url):
 
         # If HEAD succeeds with 200 and has image content-type, we're good
         if response.status_code == 200:
-            content_type = response.headers.get('Content-Type', '')
-            if content_type.startswith('image/'):
+            content_type = response.headers.get("Content-Type", "")
+            if content_type.startswith("image/"):
                 return True
 
         # HEAD failed or no content-type - fall back to GET with stream
         # Many servers (Pexels, Unsplash) don't properly support HEAD requests
-        response = requests.get(url, timeout=5, allow_redirects=True, headers=headers, stream=True)
+        response = requests.get(
+            url, timeout=5, allow_redirects=True, headers=headers, stream=True
+        )
 
         if response.status_code != 200:
             print(f"URL validation failed for {url}: status {response.status_code}")
             return False
 
         # Check content type is an image
-        content_type = response.headers.get('Content-Type', '')
-        if content_type.startswith('image/'):
+        content_type = response.headers.get("Content-Type", "")
+        if content_type.startswith("image/"):
             return True
 
         # Some servers don't set Content-Type properly, check if we can read image bytes
@@ -252,14 +274,18 @@ def validate_image_url(url):
         response.close()
 
         # Check for common image magic numbers
-        if (first_bytes.startswith(b'\xff\xd8\xff') or  # JPEG
-            first_bytes.startswith(b'\x89PNG') or       # PNG
-            first_bytes.startswith(b'GIF8') or          # GIF
-            first_bytes.startswith(b'RIFF') or          # WebP
-            first_bytes.startswith(b'<svg')):           # SVG
+        if (
+            first_bytes.startswith(b"\xff\xd8\xff")  # JPEG
+            or first_bytes.startswith(b"\x89PNG")  # PNG
+            or first_bytes.startswith(b"GIF8")  # GIF
+            or first_bytes.startswith(b"RIFF")  # WebP
+            or first_bytes.startswith(b"<svg")
+        ):  # SVG
             return True
 
-        print(f"URL validation failed for {url}: not an image (content-type: {content_type})")
+        print(
+            f"URL validation failed for {url}: not an image (content-type: {content_type})"
+        )
         return False
 
     except Exception as e:
@@ -267,13 +293,13 @@ def validate_image_url(url):
         return False
 
 
-def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
+def validate_and_refresh_stock_image(recipe_data, user_metadata=None):
     """
     Checks if existing stock image URL is valid, refreshes if not.
 
     Args:
         recipe_data: Recipe dictionary with stock_image_url and other fields
-        user_id: User ID for metadata tracking
+        user_metadata: User metadata dict from get_user_metadata() (or None to fetch automatically)
 
     Returns:
         Tuple: (updated_url, metadata_dict, was_refreshed)
@@ -281,10 +307,14 @@ def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
             - metadata_dict: Image metadata (or None if not refreshed)
             - was_refreshed: Boolean indicating if URL was refreshed
     """
-    current_url = recipe_data.get('stock_image_url')
-    recipe_name = recipe_data.get('name', 'food')
-    description = recipe_data.get('description', '')
-    image_keywords = recipe_data.get('image_keywords', [])
+    # Get user metadata if not provided
+    if user_metadata is None:
+        user_metadata = get_user_metadata()
+
+    current_url = recipe_data.get("stock_image_url")
+    recipe_name = recipe_data.get("name", "food")
+    description = recipe_data.get("description", "")
+    image_keywords = recipe_data.get("image_keywords", [])
 
     if current_url:
         # Validate existing URL
@@ -296,5 +326,7 @@ def validate_and_refresh_stock_image(recipe_data, user_id='anonymous'):
             print(f"Stock image URL invalid, refreshing for {recipe_name}")
 
     # Need to get a new URL - pass keywords, description for better image matching
-    new_url, metadata = get_smart_stock_image(recipe_name, user_id, description, image_keywords)
+    new_url, metadata = get_smart_stock_image(
+        recipe_name, user_metadata, description, image_keywords
+    )
     return new_url, metadata, True
