@@ -117,7 +117,7 @@
     <h1>Generate a New Recipe with AI</h1>
     <p>Enter a description of the recipe you want to create. For example, "a vegan gluten-free chocolate chip cookie recipe."</p>
 
-    <form id="generate-form" action="{{ url_for('generate_recipe') }}" method="post">
+    <form id="generate-form" action="{{ url_for('generation.generate_recipe') }}" method="post">
         <div class="model-controls">
             <label for="model-select"><strong>Select Model:</strong></label>
             <button type="button" id="refresh-models-btn" title="Fetch latest models from Gemini API">Refresh Models</button>

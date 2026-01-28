@@ -1,0 +1,240 @@
+"""
+API blueprint for Tastes Like Good application.
+
+Handles API routes for:
+- Model listing and refresh
+- AI image generation and regeneration
+- Recipe reporting
+- System status
+- Data migration
+- Jokes endpoint
+"""
+import os
+import json
+import csv
+import datetime
+from flask import Blueprint, jsonify, request, session
+
+from config import CONFIG, GOOGLE_API_KEY, DEFAULT_MODEL, RECIPES_DIR
+from repositories.recipe_repository import (
+    get_recipe, save_recipe, validate_recipe_filepath,
+    migrate_recipe_data, invalidate_cache
+)
+from services.model_service import (
+    load_models_from_cache, filter_and_sort_models, refresh_models_from_api
+)
+from services.image_service import generate_ai_image
+
+
+api_bp = Blueprint('api', __name__, url_prefix='/api')
+
+
+@api_bp.route('/models', methods=['GET'])
+def get_models():
+    """Returns a curated list of Gemini models for recipe generation."""
+    try:
+        cached_models = load_models_from_cache()
+
+        if cached_models:
+            return jsonify(filter_and_sort_models(cached_models))
+
+        # Fallback: return empty list if no cache available
+        return jsonify([])
+
+    except Exception as e:
+        print(f"Error fetching models: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/models/refresh', methods=['POST'])
+def refresh_models():
+    """Fetches fresh models from Gemini API and updates the cache."""
+    # Get session credentials if available
+    session_credentials = session.get('credentials')
+
+    # Refresh models from API
+    models, auth_method, error = refresh_models_from_api(session_credentials)
+
+    if error:
+        return jsonify({'error': error, 'auth_method': auth_method}), 401 if auth_method is None else 500
+
+    # Calculate total fetched (need to reload cache for full count)
+    cached_models = load_models_from_cache()
+    total_fetched = len(cached_models) if cached_models else len(models)
+
+    return jsonify({
+        'models': models,
+        'auth_method': auth_method,
+        'total_fetched': total_fetched,
+        'message': f'Successfully fetched {total_fetched} models using {auth_method}'
+    })
+
+
+@api_bp.route('/generate_image/<filename>', methods=['POST'])
+def generate_recipe_image(filename):
+    """
+    Generates an AI image for a recipe asynchronously.
+
+    Note: Uses file locking in the repository layer to prevent race conditions
+    during concurrent read/write operations.
+    """
+    try:
+        filepath = validate_recipe_filepath(filename)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    try:
+        # Load recipe with file locking
+        recipe_data = get_recipe(filename)
+
+        # Generate image (force_regenerate=False checks if image exists)
+        image_url, error = generate_ai_image(filepath, recipe_data, filename, force_regenerate=False)
+
+        if error:
+            return jsonify(error), error['status']
+
+        return jsonify({'image_url': image_url})
+
+    except FileNotFoundError:
+        return jsonify({'error': 'Recipe not found'}), 404
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/regenerate_image/<filename>', methods=['POST'])
+def regenerate_recipe_image(filename):
+    """Force regeneration of an AI image, even if one already exists."""
+    try:
+        filepath = validate_recipe_filepath(filename)
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+
+    try:
+        # Load recipe with file locking
+        recipe_data = get_recipe(filename)
+
+        # Generate image (force_regenerate=True overwrites existing)
+        image_url, error = generate_ai_image(filepath, recipe_data, filename, force_regenerate=True)
+
+        if error:
+            return jsonify(error), error['status']
+
+        return jsonify({'image_url': image_url})
+
+    except FileNotFoundError:
+        return jsonify({'error': 'Recipe not found'}), 404
+    except Exception as e:
+        print(f"Regeneration error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/report_recipe/<filename>', methods=['POST'])
+def report_recipe(filename):
+    """Log a user report about a recipe or image."""
+    try:
+        # Validate filename to prevent path traversal
+        try:
+            validate_recipe_filepath(filename)
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+
+        data = request.json
+        reason = data.get('reason', 'No reason provided')
+
+        # Sanitize reason input - limit length and escape HTML
+        reason = reason[:500]  # Limit to 500 characters
+
+        report_entry = {
+            'timestamp': datetime.datetime.now().isoformat(),
+            'filename': filename,
+            'reason': reason,
+            'user_id': session.get('user_id', 'anonymous')
+        }
+
+        # Log to a reports file as a JSON array
+        reports_path = 'user_reports.json'
+        reports = []
+
+        if os.path.exists(reports_path):
+            try:
+                with open(reports_path, 'r') as f:
+                    reports = json.load(f)
+            except json.JSONDecodeError:
+                # If file is corrupted, start fresh
+                reports = []
+
+        reports.append(report_entry)
+
+        with open(reports_path, 'w') as f:
+            json.dump(reports, f, indent=2)
+
+        return jsonify({'message': 'Report submitted successfully'})
+
+    except Exception as e:
+        print(f"Error logging report: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@api_bp.route('/status', methods=['GET'])
+def api_status():
+    """Return API status and configuration info."""
+    return jsonify({
+        'status': 'running',
+        'api_key_loaded': bool(GOOGLE_API_KEY),
+        'default_model': DEFAULT_MODEL
+    })
+
+
+@api_bp.route('/migrate', methods=['POST'])
+def run_migration():
+    """
+    Migrate all recipes in the recipes directory to the latest schema.
+
+    Updates recipes with:
+    - Unwrapped nested 'properties'
+    - Default user_id
+    - Default ai_metadata
+    - Fixed recipe names
+    """
+    count = 0
+    updated_files = []
+
+    for filename in os.listdir(RECIPES_DIR):
+        if not filename.endswith('.json'):
+            continue
+
+        try:
+            # Use repository methods with file locking
+            recipe_data = get_recipe(filename)
+
+            # Migrate data
+            recipe_data, changed = migrate_recipe_data(recipe_data, filename)
+
+            if changed:
+                save_recipe(filename, recipe_data)
+                count += 1
+                updated_files.append(filename)
+
+        except Exception as e:
+            print(f"Error migrating {filename}: {e}")
+
+    # Cache is already invalidated by save_recipe, but ensure it's cleared
+    if count > 0:
+        invalidate_cache()
+
+    return jsonify({'migrated_count': count, 'files': updated_files})
+
+
+@api_bp.route('/jokes', methods=['GET'])
+def get_jokes():
+    """Returns additional jokes from CSV file if it exists."""
+    joke_file = CONFIG.get('app', {}).get('joke_file', 'computer_jokes.csv')
+    if not os.path.exists(joke_file):
+        return jsonify([])
+    try:
+        with open(joke_file, 'r', newline='', encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            return jsonify([row['joke'] for row in reader if row.get('joke')])
+    except Exception as e:
+        print(f"Error loading jokes from {joke_file}: {e}")
+        return jsonify([])

@@ -6,7 +6,7 @@
     <h1>JSON for: {{ recipe.name }}</h1>
 
     <div class="json-nav">
-        <a href="{{ url_for('show_recipe', filename=recipe.filename) }}">&larr; Back to Recipe View</a>
+        <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">&larr; Back to Recipe View</a>
     </div>
 
     <div class="code-container">
@@ -42,7 +42,7 @@
     </script>
 
     <div class="json-nav">
-        <a href="{{ url_for('show_recipe', filename=recipe.filename) }}">&larr; Return to Recipe View</a>
+        <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">&larr; Return to Recipe View</a>
     </div>
 
 

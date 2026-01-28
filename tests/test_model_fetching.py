@@ -7,7 +7,8 @@ import json
 # Ensure app can be imported
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from app import app, filter_and_sort_models
+from app import app
+from services.model_service import filter_and_sort_models
 
 
 class TestModelFetching(unittest.TestCase):
@@ -124,7 +125,7 @@ class TestRefreshModels(unittest.TestCase):
         self.app = app.test_client()
         self.app.testing = True
 
-    @patch('app.Client')
+    @patch('services.model_service.Client')
     def test_refresh_models_success(self, MockClient):
         """Test that refresh fetches models from API and updates cache."""
         mock_client_instance = MockClient.return_value
@@ -136,7 +137,7 @@ class TestRefreshModels(unittest.TestCase):
 
         mock_client_instance.models.list.return_value = [mock_model]
 
-        with patch('app.GOOGLE_API_KEY', 'fake-key'):
+        with patch('services.model_service.GOOGLE_API_KEY', 'fake-key'):
             with patch('builtins.open', mock_open()) as mock_file:
                 response = self.app.post('/api/models/refresh')
 
@@ -147,7 +148,7 @@ class TestRefreshModels(unittest.TestCase):
 
     def test_refresh_models_no_auth(self):
         """Test that refresh fails without API key or credentials."""
-        with patch('app.GOOGLE_API_KEY', None):
+        with patch('services.model_service.GOOGLE_API_KEY', None):
             response = self.app.post('/api/models/refresh')
 
             self.assertEqual(response.status_code, 401)

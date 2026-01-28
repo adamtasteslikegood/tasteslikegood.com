@@ -6,7 +6,7 @@
 <h1>{{ recipe.name }}</h1>
 <p><em>{{ recipe.description }}</em></p>
 
-<a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
+<a href="{{ url_for('recipes.show_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
 
 <div class="converter">
     <h3>Portion Converter</h3>
@@ -156,7 +156,7 @@
     <p class="description"><em>{{ recipe.description }}</em></p>
 </div>
 
-<a href="{{ url_for('show_recipe_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
+<a href="{{ url_for('recipes.show_json', filename=recipe.filename) }}" style="font-size: 0.9em;">View Raw JSON</a>
 
 <h2>Ingredients</h2>
 <div class="ingredients-container">

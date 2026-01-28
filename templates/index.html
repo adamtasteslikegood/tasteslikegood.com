@@ -7,7 +7,7 @@
     <ul class="recipe-list">
         {% for recipe in recipes %}
         <li>
-            <a href="{{ url_for('show_recipe', filename=recipe.filename) }}">{{ recipe.name }}</a>
+            <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">{{ recipe.name }}</a>
         </li>
         {% endfor %}
     </ul>

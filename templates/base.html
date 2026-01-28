@@ -9,8 +9,8 @@
 </head>
 <body>
     <nav class="top-nav">
-        <a href="{{ url_for('index') }}">Home</a> | 
-        <a href="{{ url_for('generate_recipe') }}">Generate Recipe</a>
+        <a href="{{ url_for('recipes.index') }}">Home</a> | 
+        <a href="{{ url_for('generation.generate_recipe') }}">Generate Recipe</a>
         {% if session.get('credentials') %}
              | <a href="{{ url_for('auth.profile') }}">Profile</a>
              | <a href="{{ url_for('auth.logout') }}">Logout ({{ session['user_info'].get('name', 'User') }})</a>
@@ -26,8 +26,8 @@
 
     <hr>
     <nav class="bottom-nav">
-        <a href="{{ url_for('index') }}">Home</a> | 
-        <a href="{{ url_for('generate_recipe') }}">Generate Recipe</a>
+        <a href="{{ url_for('recipes.index') }}">Home</a> | 
+        <a href="{{ url_for('generation.generate_recipe') }}">Generate Recipe</a>
     </nav>
 </body>
 </html>

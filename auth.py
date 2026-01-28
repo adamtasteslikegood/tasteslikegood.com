@@ -86,7 +86,7 @@ def callback():
     except Exception as e:
         abort(500, description=f"Authentication failed: {str(e)}")
 
-    return redirect(url_for('index'))
+    return redirect(url_for('recipes.index'))
 
 
 @auth_bp.route('/profile')
@@ -98,7 +98,7 @@ def profile():
 @auth_bp.route('/logout')
 def logout():
     session.clear()
-    return redirect(url_for('index'))
+    return redirect(url_for('recipes.index'))
 
 def credentials_to_dict(credentials):
     return {'token': credentials.token,
