@@ -1,11 +1,6 @@
 {
   "models": [
     {
-      "name": "models/embedding-gecko-001",
-      "display_name": "Embedding Gecko",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-2.5-flash",
       "display_name": "Gemini 2.5 Flash",
       "supported_generation_methods": []
@@ -13,11 +8,6 @@
     {
       "name": "models/gemini-2.5-pro",
       "display_name": "Gemini 2.5 Pro",
-      "supported_generation_methods": []
-    },
-    {
-      "name": "models/gemini-2.0-flash-exp",
-      "display_name": "Gemini 2.0 Flash Experimental",
       "supported_generation_methods": []
     },
     {
@@ -43,16 +33,6 @@
     {
       "name": "models/gemini-2.0-flash-lite",
       "display_name": "Gemini 2.0 Flash-Lite",
-      "supported_generation_methods": []
-    },
-    {
-      "name": "models/gemini-2.0-flash-lite-preview-02-05",
-      "display_name": "Gemini 2.0 Flash-Lite Preview 02-05",
-      "supported_generation_methods": []
-    },
-    {
-      "name": "models/gemini-2.0-flash-lite-preview",
-      "display_name": "Gemini 2.0 Flash-Lite Preview",
       "supported_generation_methods": []
     },
     {
@@ -181,16 +161,6 @@
       "supported_generation_methods": []
     },
     {
-      "name": "models/gemini-embedding-exp-03-07",
-      "display_name": "Gemini Embedding Experimental 03-07",
-      "supported_generation_methods": []
-    },
-    {
-      "name": "models/gemini-embedding-exp",
-      "display_name": "Gemini Embedding Experimental",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-embedding-001",
       "display_name": "Gemini Embedding 001",
       "supported_generation_methods": []
@@ -266,5 +236,5 @@
       "supported_generation_methods": []
     }
   ],
-  "updated_at": "2026-01-27T22:25:54Z"
+  "updated_at": "2026-01-28T21:55:22Z"
 }

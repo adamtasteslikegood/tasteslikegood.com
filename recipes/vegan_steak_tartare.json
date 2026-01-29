@@ -162,6 +162,43 @@
     "model": "unknown",
     "timestamp": "2025-12-20T17:05:30.752841",
     "prompt": "unknown",
-    "images_working": false
-  }
+    "images_working": true,
+    "stock_image_generation": {
+      "source": "unsplash",
+      "user_id": "adamschoen3@tasteslikegood.org",
+      "user_display_name": "Adam Schoen",
+      "is_authenticated": true,
+      "session_id": "session_910683665e204802900f7ce103167dbe",
+      "search_query": "A sophisticated and savory plant-based",
+      "timestamp": "2026-01-28T13:59:00.064732",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false,
+      "attribution": {
+        "photographer_name": "Petr Bene\u0161",
+        "photographer_url": "https://unsplash.com/@beny_rfg?utm_source=tasteslikegood&utm_medium=referral",
+        "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+        "html": "Photo by <a href=\"https://unsplash.com/@beny_rfg?utm_source=tasteslikegood&utm_medium=referral\">Petr Bene\u0161</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+      }
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "adamschoen3@tasteslikegood.org",
+      "user_display_name": "Adam Schoen",
+      "is_authenticated": true,
+      "session_id": "session_910683665e204802900f7ce103167dbe",
+      "prompt": "A delicious, high-quality food photography shot of Vegan Steak Tartare. Professional lighting, appetizing.",
+      "timestamp": "2026-01-28T13:59:01.082154",
+      "success": true,
+      "image_path": "static/images/ai_vegan_steak_tartare.png"
+    }
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1739137616391-b9720637949e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDYyOTZ8MHwxfHNlYXJjaHwxfHx2ZWdhbiUyMEElMjBzb3BoaXN0aWNhdGVkJTIwYW5kJTIwc2F2b3J5JTIwcGxhbnQtYmFzZWR8ZW58MXwwfHx8MTc2OTYzNzU0MHww&ixlib=rb-4.1.0&q=80&w=1080",
+  "stock_image_attribution": {
+    "photographer_name": "Petr Bene\u0161",
+    "photographer_url": "https://unsplash.com/@beny_rfg?utm_source=tasteslikegood&utm_medium=referral",
+    "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+    "html": "Photo by <a href=\"https://unsplash.com/@beny_rfg?utm_source=tasteslikegood&utm_medium=referral\">Petr Bene\u0161</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+  },
+  "ai_image_url": "/static/images/ai_vegan_steak_tartare.png"
 }
