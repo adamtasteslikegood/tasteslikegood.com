@@ -16,6 +16,13 @@ import datetime
 from flask import Blueprint, jsonify, request, session
 
 from config import CONFIG, GOOGLE_API_KEY, DEFAULT_MODEL, RECIPES_DIR
+from repositories.recipe_repository import (
+    get_recipe, validate_recipe_filepath, invalidate_cache
+)
+from services.model_service import (
+    load_models_from_cache, filter_and_sort_models, refresh_models_from_api
+)
+from services.image_service import generate_ai_image
 from services.reporting_service import ReportingService
 from services.migration_service import MigrationService
 import logging
