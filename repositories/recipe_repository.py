@@ -13,11 +13,15 @@ import json
 import time
 import datetime
 import fcntl  # Unix file locking
+import logging
+from typing import List, Dict, Any, Tuple, Optional, Generator
 from contextlib import contextmanager
 from config import RECIPES_DIR, _recipes_cache, _RECIPES_CACHE_TTL
 
+logger = logging.getLogger(__name__)
 
-def sanitize_filename(filename):
+
+def sanitize_filename(filename: str) -> str:
     """
     Sanitize filename to prevent path traversal attacks.
 
@@ -34,11 +38,11 @@ def sanitize_filename(filename):
     safe_filename = os.path.basename(filename)
     # Additional validation: ensure it's not empty and ends with .json
     if not safe_filename or not safe_filename.endswith('.json'):
-        raise ValueError("Invalid filename")
+        raise ValueError(f"Invalid filename: {filename}")
     return safe_filename
 
 
-def validate_recipe_filepath(filename):
+def validate_recipe_filepath(filename: str) -> str:
     """
     Validate that a recipe filepath is safe and within RECIPES_DIR.
 
@@ -61,11 +65,12 @@ def validate_recipe_filepath(filename):
             raise ValueError("Path traversal detected")
         return filepath
     except (ValueError, OSError) as e:
+        logger.warning(f"Invalid filename validation attempt: {filename}. Error: {e}")
         raise ValueError(f"Invalid filename: {e}")
 
 
 @contextmanager
-def locked_file(filepath, mode='r'):
+def locked_file(filepath: str, mode: str = 'r') -> Generator:
     """
     Context manager for file locking to prevent race conditions.
 
@@ -90,7 +95,7 @@ def locked_file(filepath, mode='r'):
         f.close()
 
 
-def get_all_recipes():
+def get_all_recipes() -> List[Dict[str, str]]:
     """
     Gets a list of all recipes, with in-memory caching to reduce disk I/O.
 
@@ -120,7 +125,7 @@ def get_all_recipes():
                         'filename': filename
                     })
             except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Could not read or parse {filename}. Error: {e}")
+                logger.error(f"Could not read or parse {filename}: {e}")
 
     sorted_recipes = sorted(recipes, key=lambda r: r['name'])
 
@@ -131,7 +136,7 @@ def get_all_recipes():
     return sorted_recipes
 
 
-def get_recipe(filename):
+def get_recipe(filename: str) -> Dict[str, Any]:
     """
     Load a single recipe from disk with file locking.
 
@@ -155,7 +160,7 @@ def get_recipe(filename):
         return json.load(f)
 
 
-def save_recipe(filename, recipe_data):
+def save_recipe(filename: str, recipe_data: Dict[str, Any]) -> None:
     """
     Save a recipe to disk with file locking to prevent race conditions.
 
@@ -188,7 +193,7 @@ def invalidate_cache():
     _recipes_cache['timestamp'] = 0
 
 
-def migrate_recipe_data(data, filename):
+def migrate_recipe_data(data: Dict[str, Any], filename: str) -> Tuple[Dict[str, Any], bool]:
     """
     Migrates recipe data to the latest schema.
 
@@ -211,7 +216,7 @@ def migrate_recipe_data(data, filename):
 
     # 1. Fix nested 'properties'
     if 'properties' in data and 'name' not in data:
-        print(f"Migrating nested JSON in {filename}")
+        logger.info(f"Migrating nested JSON in {filename}")
         data = data['properties']
         changed = True
 

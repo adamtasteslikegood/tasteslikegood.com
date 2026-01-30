@@ -6,12 +6,16 @@ Handles:
 - Dual authentication fallback strategy
 - Content generation with error handling
 """
+from typing import Optional, Dict, Any
+import logging
 from google.genai import Client
 import google.oauth2.credentials
 from config import GOOGLE_API_KEY
 
+logger = logging.getLogger(__name__)
 
-def get_genai_client(session_credentials=None):
+
+def get_genai_client(session_credentials: Optional[Dict[str, Any]] = None) -> Optional[Client]:
     """
     Get an authenticated GenAI client.
 
@@ -30,18 +34,18 @@ def get_genai_client(session_credentials=None):
             creds = google.oauth2.credentials.Credentials(**session_credentials)
             return Client(credentials=creds)
         except Exception as e:
-            print(f"Failed to create client from user credentials: {e}")
+            logger.error(f"Failed to create client from user credentials: {e}")
 
     if GOOGLE_API_KEY:
         try:
             return Client(api_key=GOOGLE_API_KEY)
         except Exception as e:
-            print(f"Failed to create client from API key: {e}")
+            logger.error(f"Failed to create client from API key: {e}")
 
     return None
 
 
-def attempt_generation(client, model, prompt):
+def attempt_generation(client: Client, model: str, prompt: str) -> str:
     """
     Attempt content generation with the Gemini API.
 
@@ -56,8 +60,13 @@ def attempt_generation(client, model, prompt):
     Raises:
         Exception: If generation fails
     """
-    response = client.models.generate_content(
-        model=model,
-        contents=prompt
-    )
-    return response.text
+    logger.info(f"Attempting generation with model {model}")
+    try:
+        response = client.models.generate_content(
+            model=model,
+            contents=prompt
+        )
+        return response.text
+    except Exception as e:
+        logger.error(f"Generation failed: {e}")
+        raise

@@ -16,15 +16,11 @@ import datetime
 from flask import Blueprint, jsonify, request, session
 
 from config import CONFIG, GOOGLE_API_KEY, DEFAULT_MODEL, RECIPES_DIR
-from repositories.recipe_repository import (
-    get_recipe, save_recipe, validate_recipe_filepath,
-    migrate_recipe_data, invalidate_cache
-)
-from services.model_service import (
-    load_models_from_cache, filter_and_sort_models, refresh_models_from_api
-)
-from services.image_service import generate_ai_image
+from services.reporting_service import ReportingService
+from services.migration_service import MigrationService
+import logging
 
+logger = logging.getLogger(__name__)
 
 api_bp = Blueprint('api', __name__, url_prefix='/api')
 
@@ -42,7 +38,7 @@ def get_models():
         return jsonify([])
 
     except Exception as e:
-        print(f"Error fetching models: {e}")
+        logger.error(f"Error fetching models: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -98,6 +94,7 @@ def generate_recipe_image(filename):
     except FileNotFoundError:
         return jsonify({'error': 'Recipe not found'}), 404
     except Exception as e:
+        logger.error(f"Image generation error for {filename}: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -124,7 +121,7 @@ def regenerate_recipe_image(filename):
     except FileNotFoundError:
         return jsonify({'error': 'Recipe not found'}), 404
     except Exception as e:
-        print(f"Regeneration error: {e}")
+        logger.error(f"Regeneration error for {filename}: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -133,45 +130,18 @@ def report_recipe(filename):
     """Log a user report about a recipe or image."""
     try:
         # Validate filename to prevent path traversal
-        try:
-            validate_recipe_filepath(filename)
-        except ValueError as e:
-            return jsonify({'error': str(e)}), 400
+        validate_recipe_filepath(filename)
 
-        data = request.json
+        data = request.get_json()
         reason = data.get('reason', 'No reason provided')
 
-        # Sanitize reason input - limit length and escape HTML
-        reason = reason[:500]  # Limit to 500 characters
+        result = ReportingService.report_recipe(filename, reason)
+        return jsonify(result)
 
-        report_entry = {
-            'timestamp': datetime.datetime.now().isoformat(),
-            'filename': filename,
-            'reason': reason,
-            'user_id': session.get('user_id', 'anonymous')
-        }
-
-        # Log to a reports file as a JSON array
-        reports_path = 'user_reports.json'
-        reports = []
-
-        if os.path.exists(reports_path):
-            try:
-                with open(reports_path, 'r') as f:
-                    reports = json.load(f)
-            except json.JSONDecodeError:
-                # If file is corrupted, start fresh
-                reports = []
-
-        reports.append(report_entry)
-
-        with open(reports_path, 'w') as f:
-            json.dump(reports, f, indent=2)
-
-        return jsonify({'message': 'Report submitted successfully'})
-
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
     except Exception as e:
-        print(f"Error logging report: {e}")
+        logger.error(f"Error logging report for {filename}: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -189,40 +159,13 @@ def api_status():
 def run_migration():
     """
     Migrate all recipes in the recipes directory to the latest schema.
-
-    Updates recipes with:
-    - Unwrapped nested 'properties'
-    - Default user_id
-    - Default ai_metadata
-    - Fixed recipe names
     """
-    count = 0
-    updated_files = []
-
-    for filename in os.listdir(RECIPES_DIR):
-        if not filename.endswith('.json'):
-            continue
-
-        try:
-            # Use repository methods with file locking
-            recipe_data = get_recipe(filename)
-
-            # Migrate data
-            recipe_data, changed = migrate_recipe_data(recipe_data, filename)
-
-            if changed:
-                save_recipe(filename, recipe_data)
-                count += 1
-                updated_files.append(filename)
-
-        except Exception as e:
-            print(f"Error migrating {filename}: {e}")
-
-    # Cache is already invalidated by save_recipe, but ensure it's cleared
-    if count > 0:
-        invalidate_cache()
-
-    return jsonify({'migrated_count': count, 'files': updated_files})
+    try:
+        results = MigrationService.migrate_all_recipes()
+        return jsonify(results)
+    except Exception as e:
+        logger.error(f"Migration error: {e}")
+        return jsonify({'error': str(e)}), 500
 
 
 @api_bp.route('/jokes', methods=['GET'])
@@ -236,5 +179,5 @@ def get_jokes():
             reader = csv.DictReader(f)
             return jsonify([row['joke'] for row in reader if row.get('joke')])
     except Exception as e:
-        print(f"Error loading jokes from {joke_file}: {e}")
+        logger.error(f"Error loading jokes from {joke_file}: {e}")
         return jsonify([])

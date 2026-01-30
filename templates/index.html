@@ -30,64 +30,91 @@ endblock %} {% block head %}
 
     .alphabet-nav {
         flex-shrink: 0;
-        width: 40px;
+        width: 50px;
         position: sticky;
-        top: 20px;
-        height: fit-content;
+        top: 80px;
+        height: min-content;
+        background: rgba(255, 255, 255, 0.8);
+        backdrop-filter: blur(8px);
+        padding: 10px 5px;
+        border-radius: 25px;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        border: 1px solid rgba(76, 175, 80, 0.1);
+        z-index: 10;
     }
 
     .alphabet-nav a {
-        display: block;
-        text-align: center;
-        padding: 4px;
-        margin: 2px 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        margin: 4px auto;
         text-decoration: none;
         color: #4caf50;
-        font-weight: bold;
+        font-weight: 600;
         font-size: 14px;
-        border-radius: 3px;
-        transition:
-            background-color 0.2s,
-            color 0.2s;
+        border-radius: 50%;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    .alphabet-nav a:hover {
+    .alphabet-nav a:hover:not(.disabled) {
         background-color: #4caf50;
         color: white;
+        transform: scale(1.15);
+        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
     }
 
     .alphabet-nav a.disabled {
-        color: #ccc;
-        cursor: not-allowed;
+        color: #e0e0e0;
+        cursor: default;
         pointer-events: none;
     }
 
     .recipe-list-container {
         flex-grow: 1;
+        padding-left: 20px;
     }
 
     .recipe-list {
         list-style-type: none;
         padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+        gap: 20px;
     }
 
     .recipe-list li {
-        margin: 10px 0;
-        padding: 10px;
-        background-color: #f9f9f9;
-        border-radius: 5px;
-        transition: background-color 0.2s;
+        margin: 0;
+        padding: 0;
+        background-color: white;
+        border-radius: 12px;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        border: 1px solid #f0f0f0;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.02);
     }
 
     .recipe-list li:hover {
-        background-color: #e8f5e9;
+        transform: translateY(-5px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+        border-color: #e8f5e9;
     }
 
     .recipe-list li a {
         text-decoration: none;
-        color: #333;
-        font-size: 18px;
+        color: #2c3e50;
+        font-size: 17px;
+        font-weight: 500;
         display: block;
+        padding: 20px;
+        height: 100%;
+        display: flex;
+        align-items: center;
+    }
+
+    .recipe-list li a:hover {
+        color: #4caf50;
     }
 
     .recipe-list li.hidden {
@@ -98,28 +125,44 @@ endblock %} {% block head %}
         text-align: center;
         color: #666;
         font-style: italic;
-        padding: 40px 20px;
+        padding: 60px 20px;
         display: none;
+        background: #f9f9f9;
+        border-radius: 12px;
+        margin: 20px 0;
     }
 
     .recipe-count {
-        color: #666;
+        color: #7f8c8d;
         font-size: 14px;
-        margin-top: 10px;
+        margin-top: 15px;
+        font-weight: 400;
     }
 
     .letter-section {
-        margin-top: 30px;
-        scroll-margin-top: 20px;
+        margin-top: 40px;
+        scroll-margin-top: 100px;
     }
 
     .letter-header {
-        font-size: 24px;
-        font-weight: bold;
-        color: #4caf50;
+        font-size: 28px;
+        font-weight: 700;
+        color: #2c3e50;
         padding: 10px 0;
-        border-bottom: 2px solid #4caf50;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
+        position: relative;
+        display: inline-block;
+    }
+
+    .letter-header::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 4px;
+        background: linear-gradient(90deg, #4caf50, transparent);
+        border-radius: 2px;
     }
 
     @media (max-width: 768px) {
@@ -129,17 +172,34 @@ endblock %} {% block head %}
 
         .alphabet-nav {
             display: flex;
-            flex-wrap: wrap;
+            flex-direction: row;
+            overflow-x: auto;
             width: 100%;
-            position: static;
-            justify-content: center;
-            gap: 5px;
+            position: sticky;
+            top: 60px;
+            justify-content: flex-start;
+            gap: 8px;
             margin-bottom: 20px;
+            padding: 10px;
+            border-radius: 12px;
+            scrollbar-width: none;
+            /* Hide scrollbar Firefox */
+        }
+
+        .alphabet-nav::-webkit-scrollbar {
+            display: none;
+            /* Hide scrollbar Chrome/Safari */
         }
 
         .alphabet-nav a {
             flex: 0 0 auto;
-            width: 30px;
+            width: 35px;
+            height: 35px;
+            margin: 0;
+        }
+
+        .recipe-list-container {
+            padding-left: 0;
         }
     }
 </style>
@@ -147,14 +207,8 @@ endblock %} {% block head %}
 <h1>Welcome to TastesLikeGood.com!!!</h1>
 
 <div class="search-container">
-    <input
-        type="text"
-        id="search-box"
-        class="search-box"
-        placeholder="Search recipes..."
-        autocomplete="off"
-        aria-label="Search recipes"
-    />
+    <input type="text" id="search-box" class="search-box" placeholder="Search recipes..." autocomplete="off"
+        aria-label="Search recipes" />
     <div class="recipe-count" id="recipe-count">
         Showing <span id="visible-count">{{ recipes|length }}</span> of {{
         recipes|length }} recipes
@@ -162,18 +216,9 @@ endblock %} {% block head %}
 </div>
 
 <div class="recipe-container">
-    <nav
-        class="alphabet-nav"
-        role="navigation"
-        aria-label="Alphabetical navigation"
-    >
+    <nav class="alphabet-nav" role="navigation" aria-label="Alphabetical navigation">
         {% for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
-        <a
-            href="#letter-{{ letter }}"
-            class="letter-link"
-            data-letter="{{ letter }}"
-            >{{ letter }}</a
-        >
+        <a href="#letter-{{ letter }}" class="letter-link" data-letter="{{ letter }}">{{ letter }}</a>
         {% endfor %}
     </nav>
 
@@ -193,14 +238,8 @@ endblock %} {% block head %}
             <h2 class="letter-header">{{ letter }}</h2>
             <ul class="recipe-list">
                 {% for recipe in recipes_by_letter[letter] %}
-                <li
-                    data-recipe-name="{{ recipe.name|lower }}"
-                    data-letter="{{ letter }}"
-                >
-                    <a
-                        href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}"
-                        >{{ recipe.name }}</a
-                    >
+                <li data-recipe-name="{{ recipe.name|lower }}" data-letter="{{ letter }}">
+                    <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">{{ recipe.name }}</a>
                 </li>
                 {% endfor %}
             </ul>

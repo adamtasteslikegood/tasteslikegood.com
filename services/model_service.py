@@ -105,6 +105,7 @@ def filter_and_sort_models(models_list):
             {
                 "id": m.get("name"),
                 "name": m.get("display_name") or m.get("name"),
+                "label": m.get("display_name") or m.get("name"),
                 "supported_methods": supported_methods,
             }
         )

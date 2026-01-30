@@ -21,9 +21,9 @@ class TestModelFetching(unittest.TestCase):
         """Test that /api/models returns models from cache file."""
         mock_cache_data = {
             'models': [
-                {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash'},
-                {'name': 'models/gemini-2.5-pro', 'display_name': 'Gemini 2.5 Pro'},
-                {'name': 'models/gemini-2.0-flash', 'display_name': 'Gemini 2.0 Flash'},
+                {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash', 'supported_generation_methods': ['generateContent']},
+                {'name': 'models/gemini-2.5-pro', 'display_name': 'Gemini 2.5 Pro', 'supported_generation_methods': ['generateContent']},
+                {'name': 'models/gemini-2.0-flash', 'display_name': 'Gemini 2.0 Flash', 'supported_generation_methods': ['generateContent']},
             ],
             'updated_at': '2025-01-01T00:00:00Z'
         }
@@ -36,16 +36,16 @@ class TestModelFetching(unittest.TestCase):
 
             # Should return filtered/sorted models
             self.assertGreater(len(data), 0)
-            self.assertLessEqual(len(data), 8)  # Max 8 models returned
+            self.assertLessEqual(len(data), 10)  # Max 10 models returned
 
     def test_get_models_filter_unsupported(self):
         """Test that embedding and other non-generation models are filtered out."""
         mock_cache_data = {
             'models': [
-                {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash'},
-                {'name': 'models/embedding-001', 'display_name': 'Embedding Model'},
-                {'name': 'models/imagen-3', 'display_name': 'Imagen 3'},
-                {'name': 'models/text-embedding', 'display_name': 'Text Embedding'},
+                {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash', 'supported_generation_methods': ['generateContent']},
+                {'name': 'models/embedding-001', 'display_name': 'Embedding Model', 'supported_generation_methods': ['embedContent']},
+                {'name': 'models/imagen-3', 'display_name': 'Imagen 3', 'supported_generation_methods': ['generateImage']},
+                {'name': 'models/text-embedding', 'display_name': 'Text Embedding', 'supported_generation_methods': ['embedText']},
             ],
             'updated_at': '2025-01-01T00:00:00Z'
         }
@@ -82,8 +82,8 @@ class TestFilterAndSortModels(unittest.TestCase):
 
     def test_filters_embedding_models(self):
         models = [
-            {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash'},
-            {'name': 'models/embedding-001', 'display_name': 'Embedding'},
+            {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash', 'supported_generation_methods': ['generateContent']},
+            {'name': 'models/embedding-001', 'display_name': 'Embedding', 'supported_generation_methods': ['embedContent']},
         ]
         result = filter_and_sort_models(models)
         self.assertEqual(len(result), 1)
@@ -91,8 +91,8 @@ class TestFilterAndSortModels(unittest.TestCase):
 
     def test_filters_imagen_models(self):
         models = [
-            {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash'},
-            {'name': 'models/imagen-4', 'display_name': 'Imagen 4'},
+            {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash', 'supported_generation_methods': ['generateContent']},
+            {'name': 'models/imagen-4', 'display_name': 'Imagen 4', 'supported_generation_methods': ['generateImage']},
         ]
         result = filter_and_sort_models(models)
         self.assertEqual(len(result), 1)
@@ -100,9 +100,9 @@ class TestFilterAndSortModels(unittest.TestCase):
 
     def test_sorts_preferred_models_first(self):
         models = [
-            {'name': 'models/gemini-unknown', 'display_name': 'Gemini Unknown'},
-            {'name': 'models/gemini-2.5-pro', 'display_name': 'Gemini 2.5 Pro'},
-            {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash'},
+            {'name': 'models/gemini-unknown', 'display_name': 'Gemini Unknown', 'supported_generation_methods': ['generateContent']},
+            {'name': 'models/gemini-2.5-pro', 'display_name': 'Gemini 2.5 Pro', 'supported_generation_methods': ['generateContent']},
+            {'name': 'models/gemini-2.5-flash', 'display_name': 'Gemini 2.5 Flash', 'supported_generation_methods': ['generateContent']},
         ]
         result = filter_and_sort_models(models)
         # Preferred models should come first in defined order
@@ -111,11 +111,11 @@ class TestFilterAndSortModels(unittest.TestCase):
 
     def test_limits_to_8_models(self):
         models = [
-            {'name': f'models/gemini-{i}', 'display_name': f'Gemini {i}'}
+            {'name': f'models/gemini-{i}', 'display_name': f'Gemini {i}', 'supported_generation_methods': ['generateContent']}
             for i in range(15)
         ]
         result = filter_and_sort_models(models)
-        self.assertEqual(len(result), 8)
+        self.assertEqual(len(result), 10)
 
 
 class TestRefreshModels(unittest.TestCase):

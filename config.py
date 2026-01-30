@@ -10,7 +10,11 @@ Handles loading of:
 import os
 import json
 from dotenv import load_dotenv
+from typing import Dict, Any, Optional
 from jsonschema import Draft7Validator
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -39,7 +43,7 @@ _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
 _recipes_cache = {'data': None, 'timestamp': 0}
 
 
-def load_config():
+def load_config() -> Dict[str, Any]:
     """
     Load application configuration from config.json.
 
@@ -50,11 +54,11 @@ def load_config():
         with open(CONFIG_PATH, 'r') as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Warning: Could not load config.json: {e}")
+        logger.warning(f"Could not load config.json: {e}")
         return {}
 
 
-def load_recipe_schema():
+def load_recipe_schema() -> Optional[Dict[str, Any]]:
     """
     Load the recipe validation schema from recipe_schema.json.
 
@@ -65,11 +69,11 @@ def load_recipe_schema():
         with open(RECIPE_SCHEMA_PATH, 'r') as schema_file:
             return json.load(schema_file)
     except (FileNotFoundError, json.JSONDecodeError) as exc:
-        print(f"Warning: Unable to load recipe schema. Error: {exc}")
+        logger.warning(f"Unable to load recipe schema. Error: {exc}")
         return None
 
 
-def get_validator():
+def get_validator() -> Optional[Draft7Validator]:
     """
     Get a JSON Schema validator for recipe data.
 
@@ -80,7 +84,7 @@ def get_validator():
     return Draft7Validator(schema) if schema else None
 
 
-def get_api_key():
+def get_api_key() -> Optional[str]:
     """
     Get the Google API key from environment variables.
 

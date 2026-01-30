@@ -27,6 +27,12 @@ from blueprints.recipes_bp import recipes_bp
 from utils.session_utils import get_or_create_session_id
 
 
+from utils.logging_config import setup_logging
+import logging
+
+# Initialize logger
+logger = setup_logging()
+
 def create_app():
     """
     Application factory for creating the Flask app.
@@ -69,9 +75,10 @@ def create_app():
         """Handle 404 errors with a friendly message."""
         return render_template("404.html"), 404
 
-    @app.errorhandler(500)
-    def internal_error(error):
-        """Handle 500 errors with a friendly message."""
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(error):
+        """Log and handle unexpected exceptions."""
+        logger.exception(f"Unexpected error: {error}")
         return render_template("500.html"), 500
 
     return app

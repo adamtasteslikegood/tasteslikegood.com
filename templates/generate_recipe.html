@@ -207,8 +207,11 @@
                 // Populate with fetched models
                 models.forEach((model, index) => {
                     const option = document.createElement('option');
-                    option.value = model.id;
-                    option.text = model.name;
+                    // Use model.id or model.name for value
+                    option.value = model.id || model.name;
+                    // Use model.label, model.name, or model.id for text
+                    option.text = model.label || model.name || model.id;
+                    
                     // Mark first one as recommended
                     if (index === 0) {
                         option.text += ' (Recommended)';
@@ -259,8 +262,8 @@
                     // Add all models from the refreshed list
                     data.models.forEach((model, index) => {
                         const option = document.createElement('option');
-                        option.value = model.id;
-                        option.text = model.name;
+                        option.value = model.id || model.name;
+                        option.text = model.label || model.name || model.id;
                         // Mark first one as default if no prior selection matches
                         if (index === 0) {
                             option.text += ' (Recommended)';
