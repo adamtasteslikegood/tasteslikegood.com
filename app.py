@@ -8,12 +8,12 @@ import requests
 
 from dotenv import load_dotenv
 from flask import Flask, render_template, abort, request, redirect, url_for, Response, session, jsonify
-from google.genai import Client
+import google.generativeai as genai
 import google.oauth2.credentials
 
 from jsonschema import Draft7Validator, ValidationError
 from auth import auth_bp
-from utils import normalize_recipe_data
+from utils import normalize_recipe_data, get_available_models
 
 load_dotenv()
 
@@ -66,6 +66,9 @@ RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
 
 # Configure API Key (fallback)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+
 
 # Unsplash API for stock images (free tier: 50 requests/hour)
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
@@ -78,9 +81,9 @@ def get_genai_client():
     """Helper to get an authenticated GenAI client."""
     if 'credentials' in session:
         creds = google.oauth2.credentials.Credentials(**session['credentials'])
-        return Client(credentials=creds)
+        return genai.GenerativeModel(model_name=DEFAULT_MODEL, credentials=creds)
     elif GOOGLE_API_KEY:
-        return Client(api_key=GOOGLE_API_KEY)
+        return genai.GenerativeModel(model_name=DEFAULT_MODEL)
     return None
 
 
@@ -551,83 +554,15 @@ def show_recipe_json(filename):
         abort(500)
 
 
-MODELS_LIST_PATH = 'models_list.json'
-
-# Curated list of preferred Gemini models for recipe generation
-PREFERRED_MODELS = [
-    'models/gemini-2.5-pro',
-    'models/gemini-2.5-flash',
-    'models/gemini-2.0-flash',
-    'models/gemini-2.0-flash-exp',
-    'models/gemini-3-pro-preview',
-    'models/gemini-2.0-flash-lite',
-    'models/gemini-exp-1206',
-    'models/gemini-pro-latest',
-    'models/gemini-flash-latest',
-]
-
-
-def load_models_from_cache():
-    """Load models from the cached models_list.json file."""
-    try:
-        with open(MODELS_LIST_PATH, 'r') as f:
-            data = json.load(f)
-            return data.get('models', [])
-    except (FileNotFoundError, json.JSONDecodeError) as e:
-        print(f"Could not load models cache: {e}")
-        return None
-
-
-def filter_and_sort_models(models_list):
-    """Filter and sort models for recipe generation."""
-    exclude_patterns = ['embedding', 'imagen', 'veo', 'live', 'tts', 'audio', 'robotics', 'aqa']
-
-    filtered_models = []
-    for m in models_list:
-        model_name = m.get('name', '').lower()
-
-        # Skip non-generation models
-        if any(pattern in model_name for pattern in exclude_patterns):
-            continue
-
-        # Skip image generation specific models
-        if 'image' in model_name and 'gemini' in model_name:
-            continue
-
-        # Only include gemini/gemma models
-        if not ('gemini' in model_name or 'gemma' in model_name):
-            continue
-
-        filtered_models.append({
-            'id': m.get('name'),
-            'name': m.get('display_name') or m.get('name')
-        })
-
-    # Sort: preferred models first, then alphabetically
-    def sort_key(model):
-        model_id = model['id']
-        if model_id in PREFERRED_MODELS:
-            return (0, PREFERRED_MODELS.index(model_id))
-        return (1, model['name'])
-
-    filtered_models.sort(key=sort_key)
-    return filtered_models[:8]
-
-
 @app.route('/api/models')
 def get_models():
-    """Returns a curated list of Gemini models for recipe generation."""
+    """Returns a cached list of available Gemini models."""
     try:
-        cached_models = load_models_from_cache()
-        
-        if cached_models:
-            return jsonify(filter_and_sort_models(cached_models))
-
-        # Fallback: return empty list if no cache available
-        return jsonify([])
-
+        # Fetch from cache first
+        models = get_available_models(force_refresh=False)
+        return jsonify(models)
     except Exception as e:
-        print(f"Error fetching models: {e}")
+        print(f"Error fetching models from cache: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -662,9 +597,9 @@ def generate_recipe_image(filename):
             client = None
             if 'credentials' in session:
                 creds = google.oauth2.credentials.Credentials(**session['credentials'])
-                client = Client(credentials=creds)
+                client = genai.GenerativeModel(model_name='imagen-4.0-generate-001', credentials=creds)
             elif GOOGLE_API_KEY:
-                client = Client(api_key=GOOGLE_API_KEY)
+                client = genai.GenerativeModel(model_name='imagen-4.0-generate-001')
 
             if not client:
                 return jsonify({'error': 'No credentials available'}), 500
@@ -676,21 +611,22 @@ def generate_recipe_image(filename):
 
             print(f"DEBUG: Async AI image generation for {recipe_data.get('name')}...")
 
-            response = client.models.generate_images(
-                model=model_to_use,
-                prompt=image_prompt,
-                config={'number_of_images': 1}
+            response = client.generate_content(
+                contents=image_prompt,
+                generation_config={'number_of_images': 1}
             )
 
-            if response.generated_images:
-                image_data = response.generated_images[0].image.image_bytes
+            if response.candidates[0].content.parts[0].file_data:
+                image_data = response.candidates[0].content.parts[0].file_data.file_uri
                 safe_filename = sanitize_filename(filename)
                 image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
                 image_path = os.path.join('static', 'images', image_filename)
                 os.makedirs(os.path.dirname(image_path), exist_ok=True)
-
+                
+                #This is a hack because the client is not returning the bytes
+                r = requests.get(image_data, allow_redirects=True)
                 with open(image_path, 'wb') as img_f:
-                    img_f.write(image_data)
+                    img_f.write(r.content)
 
                 image_url = url_for('static', filename=f'images/{image_filename}')
 
@@ -773,21 +709,22 @@ def regenerate_recipe_image(filename):
 
         print(f"DEBUG: Regenerating AI image for {recipe_data.get('name')}...")
 
-        response = client.models.generate_images(
-            model=model_to_use,
-            prompt=image_prompt,
-            config={'number_of_images': 1}
+        response = client.generate_content(
+            contents=image_prompt,
+            generation_config={'number_of_images': 1}
         )
 
-        if response.generated_images:
-            image_data = response.generated_images[0].image.image_bytes
+        if response.candidates[0].content.parts[0].file_data:
+            image_data = response.candidates[0].content.parts[0].file_data.file_uri
             safe_filename = sanitize_filename(filename)
             image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
             image_path = os.path.join('static', 'images', image_filename)
             os.makedirs(os.path.dirname(image_path), exist_ok=True)
-
+            
+            #This is a hack because the client is not returning the bytes
+            r = requests.get(image_data, allow_redirects=True)
             with open(image_path, 'wb') as img_f:
-                img_f.write(image_data)
+                img_f.write(r.content)
 
             image_url = url_for('static', filename=f'images/{image_filename}')
 
@@ -878,69 +815,16 @@ def report_recipe(filename):
 
 @app.route('/api/models/refresh', methods=['POST'])
 def refresh_models():
-    """Fetches fresh models from Gemini API and updates the cache."""
-    client = None
-    auth_method = None
-
-    # 1. Try User Credentials first
-    if 'credentials' in session:
-        try:
-            creds = google.oauth2.credentials.Credentials(**session['credentials'])
-            client = Client(credentials=creds)
-            auth_method = "user_credentials"
-        except Exception as e:
-            print(f"User credential client failed: {e}")
-
-    # 2. Fallback to API Key
-    if client is None and GOOGLE_API_KEY:
-        try:
-            client = Client(api_key=GOOGLE_API_KEY)
-            auth_method = "api_key"
-        except Exception as e:
-            print(f"API Key client failed: {e}")
-
-    if client is None:
-        return jsonify({
-            'error': 'No valid authentication method available. Please login or configure API key.'
-        }), 401
-
+    """Fetches fresh models from the Gemini API and updates the cache."""
     try:
-        # Fetch models from Gemini API
-        models_response = client.models.list()
-
-        # Convert to list of dicts for caching
-        models_data = []
-        for model in models_response:
-            models_data.append({
-                'name': model.name,
-                'display_name': getattr(model, 'display_name', model.name),
-                'supported_generation_methods': getattr(model, 'supported_generation_methods', [])
-            })
-
-        # Update the cache file
-        cache_data = {
-            'models': models_data,
-            'updated_at': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-        }
-        with open(MODELS_LIST_PATH, 'w') as f:
-            json.dump(cache_data, f, indent=2)
-
-        # Return filtered models
-        filtered_models = filter_and_sort_models(models_data)
-
+        models = get_available_models(force_refresh=True)
         return jsonify({
-            'models': filtered_models,
-            'auth_method': auth_method,
-            'total_fetched': len(models_data),
-            'message': f'Successfully fetched {len(models_data)} models using {auth_method}'
+            'message': f'Successfully refreshed model list.',
+            'models': models
         })
-
     except Exception as e:
         print(f"Error refreshing models from API: {e}")
-        return jsonify({
-            'error': f'Failed to fetch models: {str(e)}',
-            'auth_method': auth_method
-        }), 500
+        return jsonify({'error': f'Failed to refresh models: {str(e)}'}), 500
 
 
 @app.route('/api/jokes')
@@ -995,14 +879,14 @@ def generate_recipe():
             f"Do not include any text before or after the JSON object."
         )
 
-        def attempt_generation(client, source_name, model_name):
+        def attempt_generation(model_name):
             """Helper to attempt generation with a specific client."""
-            print(f"Attempting generation with {source_name} using {model_name}...")
+            print(f"Attempting generation with {model_name}...")
             try:
-                response = client.models.generate_content(
-                    model=model_name,
+                client = genai.GenerativeModel(model_name)
+                response = client.generate_content(
                     contents=full_prompt,
-                    config={
+                    generation_config={
                         'response_mime_type': 'application/json',
                         'temperature': 0.7,
                     }
@@ -1028,17 +912,15 @@ def generate_recipe():
                         data = data['properties']
                     
                     # Validate against schema
-                    if not validate_recipe_data(data):
-                        print(f"Validation failed for {source_name}")
-                        return None, None
+                    validate_recipe_data(data)
                         
                     return data, text_response
-                except json.JSONDecodeError:
-                    print(f"JSON Decode Error for {source_name}: {text_response[:100]}...")
-                    return None, None
+                except (json.JSONDecodeError, ValidationError) as e:
+                    print(f"JSON/Validation Error for {model_name}: {e}")
+                    return None, text_response
                     
             except Exception as e:
-                print(f"Generation error with {source_name}: {e}")
+                print(f"Generation error with {model_name}: {e}")
                 raise e
 
         # 1. Try with User Credentials (if logged in)
@@ -1047,24 +929,11 @@ def generate_recipe():
         last_error_message = "Unknown error"
         start_time = time.time()
 
-        if 'credentials' in session:
-            try:
-                creds = google.oauth2.credentials.Credentials(**session['credentials'])
-                user_client = Client(credentials=creds)
-                recipe_data, recipe_json_str = attempt_generation(user_client, "User Credentials", selected_model)
-            except Exception as e:
-                print(f"User credential generation failed: {e}")
-                last_error_message = f"User Auth Error ({type(e).__name__}): {e}"
+        try:
+            recipe_data, recipe_json_str = attempt_generation(selected_model)
+        except Exception as e:
+            last_error_message = f"Generation Error ({type(e).__name__}): {e}"
         
-        # 2. Fallback to API Key if step 1 failed or wasn't attempted
-        if recipe_data is None and GOOGLE_API_KEY:
-            try:
-                api_client = Client(api_key=GOOGLE_API_KEY)
-                recipe_data, recipe_json_str = attempt_generation(api_client, "API Key", selected_model)
-            except Exception as e:
-                print(f"API Key generation failed: {e}")
-                last_error_message = f"API Key Error ({type(e).__name__}): {e}"
-
         if recipe_data:
             try:
                 # Add metadata

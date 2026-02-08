@@ -1,5 +1,9 @@
 import re
 import difflib
+import os
+import json
+import google.generativeai as genai
+from google.generativeai.client import get_default_model_client
 
 # Canonical units and their common variations
 UNIT_MAPPINGS = {
@@ -23,6 +27,55 @@ for canonical, variations in UNIT_MAPPINGS.items():
     CANONICAL_UNITS[canonical.lower()] = canonical
     for v in variations:
         CANONICAL_UNITS[v.lower()] = canonical
+
+def get_available_models(force_refresh=False):
+    """
+    Fetches available Gemini models, using a cache to avoid repeated API calls.
+    Filters for models that support 'generateContent' and are not legacy.
+    """
+    cache_file = 'models_cache.json'
+    
+    # If not forcing a refresh, try to load from cache
+    if not force_refresh and os.path.exists(cache_file):
+        try:
+            with open(cache_file, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass # If cache is invalid, fetch fresh
+
+    # Fetch from API
+    try:
+        client = get_default_model_client()
+        model_list = []
+        for m in genai.list_models():
+             if 'generateContent' in m.supported_generation_methods and "legacy" not in m.name:
+                model_list.append({
+                    "name": m.display_name,
+                    "id": m.name,
+                    "description": m.description,
+                })
+        
+        # Sort models to have preferred ones first (e.g., flash, pro)
+        model_list.sort(key=lambda x: (
+            'flash' not in x['id'], 
+            'pro' not in x['id'],
+            'vision' in x['id'], 
+            x['id']
+        ))
+
+        # Save to cache
+        with open(cache_file, 'w') as f:
+            json.dump(model_list, f)
+            
+        return model_list
+    except Exception as e:
+        print(f"Error fetching models from API: {e}")
+        # Return a fallback list
+        return [
+            {"name": "Gemini 2.5 Flash (Fallback)", "id": "models/gemini-1.5-flash"},
+            {"name": "Gemini 2.5 Pro (Fallback)", "id": "models/gemini-1.5-pro"},
+        ]
+
 
 def normalize_unit(unit_str):
     """

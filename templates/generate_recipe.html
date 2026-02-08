@@ -122,10 +122,10 @@
             <label for="model-select"><strong>Select Model:</strong></label>
             <button type="button" id="refresh-models-btn" title="Fetch latest models from Gemini API">Refresh Models</button>
         </div>
-        <div id="model-loading">Loading additional models...</div>
+        <div id="model-loading">Loading available models...</div>
         <div id="refresh-status" class="refresh-status" style="display: none;"></div>
         <select name="model" id="model-select">
-            <option value="" disabled selected>Loading models...</option>
+            <option value="models/gemini-1.5-flash-latest">Gemini 1.5 Flash (Default)</option>
         </select>
         <div id="model-error" class="error-message"></div>
 
@@ -181,9 +181,16 @@
         const modelError = document.getElementById('model-error');
         const refreshBtn = document.getElementById('refresh-models-btn');
         const refreshStatus = document.getElementById('refresh-status');
+        
+        const FALLBACK_MODEL = {
+            id: 'models/gemini-1.5-flash-latest',
+            name: 'Gemini 1.5 Flash (Default)'
+        };
 
         // Fetch Models from cache
         async function fetchModels() {
+            modelLoading.style.display = 'block';
+            modelError.textContent = '';
             try {
                 const response = await fetch('/api/models');
                 if (!response.ok) {
@@ -191,19 +198,13 @@
                 }
                 const models = await response.json();
 
-                // Clear all options and rebuild
-                modelSelect.innerHTML = '';
-
-                if (models.length === 0) {
-                    // Fallback if no models in cache
-                    const fallback = document.createElement('option');
-                    fallback.value = 'models/gemini-2.5-flash';
-                    fallback.text = 'Gemini 2.5 Flash (Default)';
-                    modelSelect.add(fallback);
-                    modelLoading.style.display = 'none';
-                    return;
+                if (!models || models.length === 0) {
+                    throw new Error("No models returned from API.");
                 }
 
+                // Clear all options and rebuild
+                modelSelect.innerHTML = '';
+                
                 // Populate with fetched models
                 models.forEach((model, index) => {
                     const option = document.createElement('option');
@@ -216,21 +217,19 @@
                     modelSelect.add(option);
                 });
 
-                modelLoading.style.display = 'none';
-
             } catch (error) {
                 console.error('Error fetching models:', error);
-                modelLoading.style.display = 'none';
-
+                modelError.textContent = "Could not load models. Using default.";
+                
                 // Ensure at least one option exists
                 if (modelSelect.options.length === 0) {
                     const fallback = document.createElement('option');
-                    fallback.value = 'models/gemini-2.5-flash';
-                    fallback.text = 'Gemini 2.5 Flash (Default)';
+                    fallback.value = FALLBACK_MODEL.id;
+                    fallback.text = FALLBACK_MODEL.name;
                     modelSelect.add(fallback);
                 }
-
-                modelError.textContent = "Could not load models from cache. Click 'Refresh Models' to fetch from API.";
+            } finally {
+                modelLoading.style.display = 'none';
             }
         }
 
@@ -252,35 +251,30 @@
                     throw new Error(data.error || 'Failed to refresh models');
                 }
 
+                if (!data.models || data.models.length === 0) {
+                     throw new Error("No models returned from refresh.");
+                }
+
                 // Clear ALL current options to rebuild fresh
                 modelSelect.innerHTML = '';
 
-                if (data.models && data.models.length > 0) {
-                    // Add all models from the refreshed list
-                    data.models.forEach((model, index) => {
-                        const option = document.createElement('option');
-                        option.value = model.id;
-                        option.text = model.name;
-                        // Mark first one as default if no prior selection matches
-                        if (index === 0) {
-                            option.text += ' (Recommended)';
-                        }
-                        modelSelect.add(option);
-                    });
-
-                    // Restore previous selection if it exists in new list
-                    const optionExists = Array.from(modelSelect.options).some(opt => opt.value === currentSelection);
-                    if (optionExists) {
-                        modelSelect.value = currentSelection;
+                // Add all models from the refreshed list
+                data.models.forEach((model, index) => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.text = model.name;
+                    if (index === 0) {
+                        option.text += ' (Recommended)';
                     }
-                } else {
-                    // Fallback if no models returned
-                    const fallback = document.createElement('option');
-                    fallback.value = 'models/gemini-2.5-flash';
-                    fallback.text = 'Gemini 2.5 Flash (Default)';
-                    modelSelect.add(fallback);
-                }
+                    modelSelect.add(option);
+                });
 
+                // Restore previous selection if it exists in new list
+                const optionExists = Array.from(modelSelect.options).some(opt => opt.value === currentSelection);
+                if (optionExists) {
+                    modelSelect.value = currentSelection;
+                }
+                
                 // Show success message
                 refreshStatus.className = 'refresh-status success';
                 refreshStatus.textContent = `${data.message} (${data.models?.length || 0} models available)`;
@@ -296,6 +290,15 @@
                 refreshStatus.className = 'refresh-status error';
                 refreshStatus.textContent = error.message || 'Failed to refresh models.';
                 refreshStatus.style.display = 'block';
+                
+                // Ensure at least one option exists on failure
+                if (modelSelect.options.length === 0) {
+                    const fallback = document.createElement('option');
+                    fallback.value = FALLBACK_MODEL.id;
+                    fallback.text = FALLBACK_MODEL.name;
+                    modelSelect.add(fallback);
+                }
+                
             } finally {
                 refreshBtn.disabled = false;
                 refreshBtn.textContent = 'Refresh Models';
@@ -316,7 +319,10 @@
             displayRandomJoke();
 
             // Cycle jokes every 5 seconds
-            setInterval(displayRandomJoke, 5000);
+            const jokeInterval = setInterval(displayRandomJoke, 5000);
+            
+            // Add reference to interval so we can clear it
+            form.dataset.jokeInterval = jokeInterval;
             
             // Focus on the overlay for accessibility
             overlay.focus();
@@ -334,6 +340,10 @@
                 overlay.style.display = 'none';
                 submitBtn.disabled = false;
                 submitBtn.innerText = 'Generate Recipe';
+                // Clear joke interval
+                if (form.dataset.jokeInterval) {
+                    clearInterval(parseInt(form.dataset.jokeInterval));
+                }
             }
         });
 
