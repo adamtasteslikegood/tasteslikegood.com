@@ -17,7 +17,7 @@ def test_generation():
     
     try:
         client = Client(api_key=GOOGLE_API_KEY)
-        model_to_use = 'imagen-3.0-generate-001'
+        model_to_use = 'imagen-4.0-generate-preview-06-06'
         
         with open("debug_output.txt", "a") as f:
             f.write(f"Calling generate_images with model {model_to_use}...\n")

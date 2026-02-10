@@ -5311,3 +5311,277 @@ CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it i
 Do not include any text before or after the JSON object.
 
 Last Error: API Key Error (ValidationError): 'wet' is a required property (at ingredients)
+
+Last Error (Recipe Gen): ValueError('Unknown field for GenerationConfig: number_of_images')
+Traceback:
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/marshal/rules/message.py", line 36, in to_proto
+    return self._descriptor(**value)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^
+ValueError: Protocol message GenerationConfig has no "number_of_images" field.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/app.py", line 614, in generate_recipe_image
+    response = client.generate_content(
+        contents=image_prompt,
+        generation_config={'number_of_images': 1}
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 305, in generate_content
+    request = self._prepare_request(
+        contents=contents,
+    ...<3 lines>...
+        tool_config=tool_config,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 165, in _prepare_request
+    return protos.GenerateContentRequest(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        model=self._model_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+        cached_content=self.cached_content,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/message.py", line 728, in __init__
+    pb_value = marshal.to_proto(pb_type, value)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/marshal/marshal.py", line 235, in to_proto
+    pb_value = self.get_rule(proto_type=proto_type).to_proto(value)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/marshal/rules/message.py", line 46, in to_proto
+    return self._wrapper(value)._pb
+           ~~~~~~~~~~~~~^^^^^^^
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/message.py", line 724, in __init__
+    raise ValueError(
+        "Unknown field for {}: {}".format(self.__class__.__name__, key)
+    )
+ValueError: Unknown field for GenerationConfig: number_of_images
+
+
+Last Error (Recipe Gen): ValueError('Unknown field for GenerationConfig: number_of_images')
+Traceback:
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/marshal/rules/message.py", line 36, in to_proto
+    return self._descriptor(**value)
+           ~~~~~~~~~~~~~~~~^^^^^^^^^
+ValueError: Protocol message GenerationConfig has no "number_of_images" field.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/app.py", line 614, in generate_recipe_image
+    response = client.generate_content(
+        contents=image_prompt,
+        generation_config={'number_of_images': 1}
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 305, in generate_content
+    request = self._prepare_request(
+        contents=contents,
+    ...<3 lines>...
+        tool_config=tool_config,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 165, in _prepare_request
+    return protos.GenerateContentRequest(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        model=self._model_name,
+        ^^^^^^^^^^^^^^^^^^^^^^^
+    ...<6 lines>...
+        cached_content=self.cached_content,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/message.py", line 728, in __init__
+    pb_value = marshal.to_proto(pb_type, value)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/marshal/marshal.py", line 235, in to_proto
+    pb_value = self.get_rule(proto_type=proto_type).to_proto(value)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/marshal/rules/message.py", line 46, in to_proto
+    return self._wrapper(value)._pb
+           ~~~~~~~~~~~~~^^^^^^^
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/proto/message.py", line 724, in __init__
+    raise ValueError(
+        "Unknown field for {}: {}".format(self.__class__.__name__, key)
+    )
+ValueError: Unknown field for GenerationConfig: number_of_images
+
+
+Last Error (Recipe Gen): NotFound('models/imagen-4.0-generate-001 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.')
+Traceback:
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/app.py", line 614, in generate_recipe_image
+    response = client.generate_content(
+        contents=image_prompt,
+        generation_config={'candidate_count': 1}
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 331, in generate_content
+    response = self._client.generate_content(
+        request,
+        **request_options,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/client.py", line 835, in generate_content
+    response = rpc(
+        request,
+    ...<2 lines>...
+        metadata=metadata,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/gapic_v1/method.py", line 131, in __call__
+    return wrapped_func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 294, in retry_wrapped_func
+    return retry_target(
+        target,
+    ...<3 lines>...
+        on_error=on_error,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 156, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 147, in retry_target
+    result = target()
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/timeout.py", line 130, in func_with_timeout
+    return func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers.py", line 77, in error_remapped_callable
+    raise exceptions.from_grpc_error(exc) from exc
+google.api_core.exceptions.NotFound: 404 models/imagen-4.0-generate-001 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+
+
+Last Error (Recipe Gen): NotFound('models/imagen-4.0-generate-preview-06-06 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.')
+Traceback:
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/app.py", line 614, in generate_recipe_image
+    response = client.generate_content(
+        contents=image_prompt,
+        generation_config={'candidate_count': 1}
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 331, in generate_content
+    response = self._client.generate_content(
+        request,
+        **request_options,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/client.py", line 835, in generate_content
+    response = rpc(
+        request,
+    ...<2 lines>...
+        metadata=metadata,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/gapic_v1/method.py", line 131, in __call__
+    return wrapped_func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 294, in retry_wrapped_func
+    return retry_target(
+        target,
+    ...<3 lines>...
+        on_error=on_error,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 156, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 147, in retry_target
+    result = target()
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/timeout.py", line 130, in func_with_timeout
+    return func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers.py", line 77, in error_remapped_callable
+    raise exceptions.from_grpc_error(exc) from exc
+google.api_core.exceptions.NotFound: 404 models/imagen-4.0-generate-preview-06-06 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+
+
+Last Error (Recipe Gen): NotFound('models/imagen-4.0-generate-001 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.')
+Traceback:
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/app.py", line 614, in generate_recipe_image
+    response = client.generate_content(
+        contents=image_prompt,
+        generation_config={'candidate_count': 1}
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 331, in generate_content
+    response = self._client.generate_content(
+        request,
+        **request_options,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/client.py", line 835, in generate_content
+    response = rpc(
+        request,
+    ...<2 lines>...
+        metadata=metadata,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/gapic_v1/method.py", line 131, in __call__
+    return wrapped_func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 294, in retry_wrapped_func
+    return retry_target(
+        target,
+    ...<3 lines>...
+        on_error=on_error,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 156, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 147, in retry_target
+    result = target()
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/timeout.py", line 130, in func_with_timeout
+    return func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers.py", line 77, in error_remapped_callable
+    raise exceptions.from_grpc_error(exc) from exc
+google.api_core.exceptions.NotFound: 404 models/imagen-4.0-generate-001 is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+
+
+Last Error (Recipe Gen): AttributeError("module 'google.generativeai' has no attribute 'Client'")
+Traceback:
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/app.py", line 602, in generate_recipe_image
+    client = genai.Client(api_key=GOOGLE_API_KEY)
+             ^^^^^^^^^^^^
+AttributeError: module 'google.generativeai' has no attribute 'Client'
+
+
+Last Error (Recipe Gen): NotFound('models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.')
+Traceback:
+Traceback (most recent call last):
+  File "/home/adamschoen3/projects/tasteslikegood.com/app.py", line 615, in generate_recipe_image
+    response = model.generate_content(image_prompt)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/generativeai/generative_models.py", line 331, in generate_content
+    response = self._client.generate_content(
+        request,
+        **request_options,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/ai/generativelanguage_v1beta/services/generative_service/client.py", line 835, in generate_content
+    response = rpc(
+        request,
+    ...<2 lines>...
+        metadata=metadata,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/gapic_v1/method.py", line 131, in __call__
+    return wrapped_func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 294, in retry_wrapped_func
+    return retry_target(
+        target,
+    ...<3 lines>...
+        on_error=on_error,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 156, in retry_target
+    next_sleep = _retry_error_helper(
+        exc,
+    ...<6 lines>...
+        timeout,
+    )
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_base.py", line 214, in _retry_error_helper
+    raise final_exc from source_exc
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/retry/retry_unary.py", line 147, in retry_target
+    result = target()
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/timeout.py", line 130, in func_with_timeout
+    return func(*args, **kwargs)
+  File "/home/adamschoen3/projects/tasteslikegood.com/.venv/lib/python3.13/site-packages/google/api_core/grpc_helpers.py", line 77, in error_remapped_callable
+    raise exceptions.from_grpc_error(exc) from exc
+google.api_core.exceptions.NotFound: 404 models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.
+

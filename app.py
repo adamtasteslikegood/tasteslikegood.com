@@ -594,39 +594,35 @@ def generate_recipe_image(filename):
 
         # Generate Image
         try:
-            client = None
+            model = None
+            model_to_use = 'gemini-1.5-flash'
+
             if 'credentials' in session:
                 creds = google.oauth2.credentials.Credentials(**session['credentials'])
-                client = genai.GenerativeModel(model_name='imagen-4.0-generate-001', credentials=creds)
+                model = genai.GenerativeModel(model_name=model_to_use, credentials=creds)
             elif GOOGLE_API_KEY:
-                client = genai.GenerativeModel(model_name='imagen-4.0-generate-001')
+                model = genai.GenerativeModel(model_name=model_to_use)
 
-            if not client:
+            if not model:
                 return jsonify({'error': 'No credentials available'}), 500
 
             user_id = session.get('user_id', 'anonymous')
-            model_to_use = 'imagen-4.0-generate-001'
             image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
             generation_timestamp = datetime.datetime.now().isoformat()
 
             print(f"DEBUG: Async AI image generation for {recipe_data.get('name')}...")
 
-            response = client.generate_content(
-                contents=image_prompt,
-                generation_config={'number_of_images': 1}
-            )
+            response = model.generate_content(image_prompt)
 
-            if response.candidates[0].content.parts[0].file_data:
-                image_data = response.candidates[0].content.parts[0].file_data.file_uri
+            if response.parts and response.parts[0].inline_data:
+                image_data = response.parts[0].inline_data.data
                 safe_filename = sanitize_filename(filename)
                 image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
                 image_path = os.path.join('static', 'images', image_filename)
                 os.makedirs(os.path.dirname(image_path), exist_ok=True)
                 
-                #This is a hack because the client is not returning the bytes
-                r = requests.get(image_data, allow_redirects=True)
                 with open(image_path, 'wb') as img_f:
-                    img_f.write(r.content)
+                    img_f.write(image_data)
 
                 image_url = url_for('static', filename=f'images/{image_filename}')
 
@@ -653,7 +649,7 @@ def generate_recipe_image(filename):
                 return jsonify({'image_url': image_url})
             else:
                 # No images generated but no exception raised
-                return jsonify({'error': 'No images generated'}), 500
+                print(f"DEBUG: No image data in response from {model_to_use}. Response: {response}"), 500
                     
         except Exception as e:
             import traceback
@@ -698,33 +694,35 @@ def regenerate_recipe_image(filename):
         if 'ai_image_url' in recipe_data:
             del recipe_data['ai_image_url']
             
-        client = get_genai_client()
-        if not client:
+        model = None
+        model_to_use = 'gemini-1.5-flash'
+
+        if 'credentials' in session:
+            creds = google.oauth2.credentials.Credentials(**session['credentials'])
+            model = genai.GenerativeModel(model_name=model_to_use, credentials=creds)
+        elif GOOGLE_API_KEY:
+            model = genai.GenerativeModel(model_name=model_to_use)
+
+        if not model:
             return jsonify({'error': 'No credentials available'}), 500
 
         user_id = session.get('user_id', 'anonymous')
-        model_to_use = 'imagen-4.0-generate-001'
         image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
         generation_timestamp = datetime.datetime.now().isoformat()
 
         print(f"DEBUG: Regenerating AI image for {recipe_data.get('name')}...")
 
-        response = client.generate_content(
-            contents=image_prompt,
-            generation_config={'number_of_images': 1}
-        )
+        response = model.generate_content(image_prompt)
 
-        if response.candidates[0].content.parts[0].file_data:
-            image_data = response.candidates[0].content.parts[0].file_data.file_uri
+        if response.parts and response.parts[0].inline_data:
+            image_data = response.parts[0].inline_data.data
             safe_filename = sanitize_filename(filename)
             image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
             image_path = os.path.join('static', 'images', image_filename)
             os.makedirs(os.path.dirname(image_path), exist_ok=True)
             
-            #This is a hack because the client is not returning the bytes
-            r = requests.get(image_data, allow_redirects=True)
             with open(image_path, 'wb') as img_f:
-                img_f.write(r.content)
+                img_f.write(image_data)
 
             image_url = url_for('static', filename=f'images/{image_filename}')
 
