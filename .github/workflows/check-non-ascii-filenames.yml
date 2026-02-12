@@ -1,0 +1,101 @@
+name: Check Non-ASCII Filenames
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - '**'
+  workflow_dispatch:
+    inputs:
+      fix_files:
+        description: 'Automatically fix non-ASCII filenames'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  check-filenames:
+    name: Check for Non-ASCII Characters in Filenames
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch all history for accurate checking
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      
+      - name: Check for non-ASCII filenames
+        id: check
+        run: |
+          echo "Running non-ASCII filename checker..."
+          python3 .github/scripts/check_non_ascii_filenames.py \
+            --root-dir . \
+            --log-file non_ascii_filenames.log \
+            --fail-on-found
+        continue-on-error: true
+      
+      - name: Upload log file
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: non-ascii-filenames-log
+          path: non_ascii_filenames.log
+          retention-days: 90
+      
+      - name: Display log contents
+        if: always()
+        run: |
+          if [ -f non_ascii_filenames.log ]; then
+            echo "=== Non-ASCII Filename Check Log ==="
+            cat non_ascii_filenames.log
+          fi
+      
+      - name: Auto-fix non-ASCII filenames (manual trigger only)
+        if: github.event_name == 'workflow_dispatch' && inputs.fix_files == 'true'
+        run: |
+          echo "Attempting to fix non-ASCII filenames..."
+          python3 .github/scripts/check_non_ascii_filenames.py \
+            --root-dir . \
+            --log-file non_ascii_filenames_fixed.log \
+            --fix
+          
+          # Check if any files were modified
+          if ! git diff --quiet; then
+            echo "Files were renamed. Creating commit..."
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "Auto-fix: Rename files with non-ASCII characters to ASCII-safe names"
+            git push
+          else
+            echo "No files needed to be renamed."
+          fi
+      
+      - name: Upload fix log
+        if: github.event_name == 'workflow_dispatch' && inputs.fix_files == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: non-ascii-filenames-fix-log
+          path: non_ascii_filenames_fixed.log
+          retention-days: 90
+      
+      - name: Check result
+        if: steps.check.outcome == 'failure'
+        run: |
+          echo "❌ Non-ASCII characters found in file or directory names!"
+          echo "Please review the log artifact for details."
+          echo ""
+          echo "To fix automatically, you can:"
+          echo "1. Run the workflow manually with 'fix_files' set to 'true'"
+          echo "2. Or run locally: python3 .github/scripts/check_non_ascii_filenames.py --fix"
+          exit 1

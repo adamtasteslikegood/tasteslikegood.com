@@ -13,6 +13,8 @@
 recipe_error.json
 recipe_error.txt
 models_list.json
+non_ascii_filenames.log
+non_ascii_filenames_fixed.log
 
 # Temporary / Editor files
 __pycache__/
