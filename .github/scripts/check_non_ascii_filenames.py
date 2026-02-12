@@ -89,7 +89,10 @@ def log_findings(non_ascii_paths, log_file, action_taken='detected'):
     Args:
         non_ascii_paths: List of tuples (full_path, name, is_directory)
         log_file: Path to log file
-        action_taken: Description of action ('detected', 'renamed', etc.)
+        action_taken: Description of action taken ('detected', 'renamed', or 'dry-run')
+    
+    Returns:
+        None
     """
     timestamp = datetime.now().isoformat()
     

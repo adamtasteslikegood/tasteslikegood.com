@@ -26,8 +26,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Fetch all history for accurate checking
       
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -70,7 +68,7 @@ jobs:
             --fix
           
           # Check if any files were modified
-          if ! git diff --quiet; then
+          if ! git diff --quiet HEAD; then
             echo "Files were renamed. Creating commit..."
             git config user.name "github-actions[bot]"
             git config user.email "github-actions[bot]@users.noreply.github.com"
