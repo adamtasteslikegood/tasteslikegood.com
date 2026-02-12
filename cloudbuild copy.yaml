@@ -1,0 +1,46 @@
+steps:
+  # 1. Build the container image
+  # This step uses the Dockerfile in the current directory to build the image.
+  # The image is tagged with the GCP project ID, the repository name 'tasteslikegood',
+  # and the short git commit SHA to uniquely identify the build.
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', 'gcr.io/${PROJECT_ID}/tasteslikegood:${SHORT_SHA}', '.']
+
+  # 2. Push the container image to Artifact Registry (or Container Registry)
+  # After the image is built, this step pushes it to a central registry
+  # where Cloud Run can access it.
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/${PROJECT_ID}/tasteslikegood:${SHORT_SHA}']
+
+  # 3. Deploy the container image to Cloud Run
+  # This final step deploys the image to the specified Cloud Run service.
+  # It sets the region, specifies the image to use, and allows unauthenticated
+  # access to make the web service public.
+  #
+  # IMPORTANT: Environment variables are set here. For sensitive data like
+  # a FLASK_SECRET_KEY, it is highly recommended to use Google Cloud Secret Manager.
+  # Example with a secret:
+  #   --set-secrets=FLASK_SECRET_KEY=tasteslikegood-flask-key:latest
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'tasteslikegood' # Your service name
+      - '--image'
+      - 'gcr.io/${PROJECT_ID}/tasteslikegood:${SHORT_SHA}'
+      - '--region'
+      - 'us-central1' # Specify your desired GCP region
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--set-env-vars'
+      - 'EXAMPLE_VARIABLE=example_value' # Add non-secret environment variables here
+
+# This specifies the image that will be created by this build.
+images:
+  - 'gcr.io/${PROJECT_ID}/tasteslikegood:${SHORT_SHA}'
+
+# You can define substitution variables here or pass them with the `gcloud builds submit` command.
+# substitutions:
+#   _EXAMPLE_VAR: "example-value"

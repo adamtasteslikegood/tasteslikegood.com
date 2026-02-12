@@ -1,64 +1,224 @@
-# Recipe Viewer
+# Tastes Like Good - Vegan Recipe Generator
 
 ## Description
 
-This project is a simple web application designed to display recipes. It provides a user-friendly interface to view recipe details and the underlying JSON data that represents them.
+Tastes Like Good is a Flask-based web application for viewing and generating vegan recipes using Google's Gemini AI models. The app features Google OAuth authentication, AI-powered recipe generation with schema validation, image generation with Imagen 3, and an intuitive recipe browsing interface.
 
 ## Features
 
-- **AI Recipe Generation**: Uses Google's Gemini models to create unique vegan recipes.
-- **Smart Image Strategy**:
-  - **Stock Images**: Automatically finds high-quality Unsplash images for recipes.
-  - **AI Images**: Asynchronously generates custom food photography using Imagen 3.
-  - **One-Two Punch**: Displays both stock and AI images side-by-side.
-- **Metadata & Feedback**:
-  - Tracks AI model, prompt, and timestamp for every recipe.
-  - Users can **Regenerate** AI images or **Report** issues directly from the UI.
-- **Robust JSON Schema**: Ensures consistent data structure for all recipes.
+### Core Features
+- **AI Recipe Generation**: Uses Google's Gemini models to create unique vegan recipes
+- **OAuth Authentication**: Secure Google OAuth 2.0 login with dual authentication strategy
+  - Primary: User OAuth credentials for personalized API access
+  - Fallback: Server API key when user is not authenticated
+- **Recipe Validation**: Robust JSON Schema validation ensures data consistency
+- **Smart Normalization**: Fuzzy matching handles typos, unit variations, and missing fields
+
+### Image Generation
+- **Stock Images**: Automatically finds high-quality Unsplash images for recipes
+- **AI Images**: Asynchronously generates custom food photography using Imagen 3
+- **One-Two Punch**: Displays both stock and AI images side-by-side
+- **Image Management**: Regenerate AI images or report issues directly from the UI
+
+### User Experience
+- **Code Viewer**: JSON data viewer with copy functionality
+- **Metadata Tracking**: Records AI model, prompt, and timestamp for every recipe
+- **Simple Navigation**: Easy navigation between recipe list, detail view, and JSON view
+- **Session Management**: Anonymous session tracking for personalized experiences
+- **Error Handling**: Comprehensive error logging and user-friendly error pages
+
+## Architecture
+
+### Modular Structure
+```
+app.py              # Main Flask application (factory pattern)
+config.py           # Configuration and environment loading
+auth.py             # Google OAuth 2.0 authentication blueprint
+
+blueprints/         # Route handlers (modular design)
+  ├── api_bp.py           # API endpoints
+  ├── generation_bp.py    # Recipe generation routes
+  └── recipes_bp.py       # Recipe browsing routes
+
+services/           # Business logic layer
+  ├── gemini_service.py   # Gemini API integration
+  ├── image_service.py    # Imagen AI image generation
+  ├── stock_image_service.py  # Unsplash stock images
+  └── models_service.py   # Model listing and management
+
+repositories/       # Data persistence layer
+  └── recipe_repository.py  # Recipe CRUD with file locking
+
+validators/         # Data validation
+  └── recipe_validator.py  # JSON Schema validation
+
+utils/              # Utility functions
+  ├── normalization.py    # Recipe data normalization
+  ├── session_utils.py    # Session management
+  └── logging_config.py   # Logging configuration
+
+templates/          # Jinja2 HTML templates
+static/             # CSS, JS, images
+tests/              # Pytest test suite
+recipes/            # Storage for generated recipes (JSON files)
+```
 
 ## API Endpoints
 
-- `POST /generate_recipe`: Generates a new recipe.
-- `GET /api/models`: Lists available Gemini models.
-- `POST /api/generate_image/<filename>`: Triggers async AI image generation.
-- `POST /api/regenerate_image/<filename>`: Forces regeneration of the AI image.
-- `POST /api/report_recipe/<filename>`: Logs user reports.
-- `POST /api/migrate`: Migrates old recipe JSONs to the latest schema.
+### Public Routes
+- `GET /` - Homepage with recipe list
+- `GET /recipe/<filename>` - View specific recipe
+- `GET /recipe/<filename>/json` - View raw JSON (add `?raw=true` for JSON response)
+- `GET /generate_recipe` - Recipe generation form
+- `POST /generate_recipe` - Generate new recipe (requires prompt & model)
 
-* **Code Viewer with Copy Functionality:** The JSON data is presented in a clean, readable format with a dedicated "Copy" button to easily copy the data to the clipboard.
-- **Simple Navigation:** Users can easily navigate back and forth between the recipe list, the recipe detail view, and the JSON view.
+### API Routes (`/api`)
+- `GET /api/models` - Lists available Gemini models
+- `POST /api/generate_image/<filename>` - Triggers async AI image generation
+- `POST /api/regenerate_image/<filename>` - Forces regeneration of the AI image
+- `POST /api/report_recipe/<filename>` - Logs user reports
+- `POST /api/migrate` - Migrates old recipe JSONs to the latest schema
 
-## How to Use
-
-1. Run the application.
-2. From the main page, click on a recipe to view its details.
-3. From the recipe detail page, you can choose to view the associated JSON data.
-4. In the JSON view, you can use the "Copy" button to copy the data.
+### Authentication Routes (`/auth`)
+- `GET /auth/login` - Initiate Google OAuth flow
+- `GET /auth/callback` - OAuth callback handler
+- `GET /auth/profile` - User profile (requires login)
+- `GET /auth/logout` - Clear session and logout
 
 ## Technologies
 
-- **Backend:** Python (likely with a web framework like Flask)
-- **Frontend:** HTML, CSS, JavaScript
+### Backend
+- **Python 3.13+** - Core language
+- **Flask 3.1.2** - Web framework
+- **Google Gemini API** - AI recipe generation
+- **Google Imagen 3** - AI image generation
+- **Google OAuth 2.0** - User authentication
+
+### Frontend
+- **HTML5** - Structure
+- **CSS3** - Styling
+- **JavaScript** - Interactivity
+- **Jinja2** - Templating engine
+
+### Data & Validation
+- **JSON Schema (Draft 7)** - Recipe validation
+- **Pydantic** - Data modeling and validation
+- **jsonschema** - Schema validation library
 
 ## Getting Started
 
-1. Create and activate a Python virtual environment (optional but recommended).
-2. Install the dependencies:
+> 🚀 **Want to get started fast?** Check out our [Quick Start Guide](QUICKSTART.md) for a 5-minute setup!
 
-    ```bash
-    pip install -r requirements.txt
-    ```
+### Prerequisites
+- Python 3.13 or higher
+- Google Cloud account with:
+  - Gemini API access
+  - Imagen API access (optional)
+  - OAuth 2.0 credentials configured
+- Unsplash API access key (optional, for stock images)
 
-3. Export your Google API key so the Gemini client can authenticate:
+### Installation
 
-    ```bash
-    export GOOGLE_API_KEY="your_google_api_key_here"
-    ```
+1. **Clone the repository**
+   ```bash
+   cd tasteslikegood.com
+   ```
 
-4. Start the Flask development server:
+2. **Create and activate a virtual environment**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   ```
 
-    ```bash
-    python app.py
-    ```
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-5. Open your browser to `http://localhost:5000` to view the recipes or generate a new one.
+4. **Configure environment variables**
+   
+   Create a `.env` file in the project root:
+   ```bash
+   # Google Cloud credentials
+   GOOGLE_API_KEY=your_google_api_key_here
+   GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+   GOOGLE_CLIENT_SECRET=your_client_secret
+   
+   # Optional: Unsplash integration
+   UNSPLASH_ACCESS_KEY=your_unsplash_access_key
+   
+   # Optional: Flask secret key (auto-generated if not set)
+   FLASK_SECRET_KEY=your_secret_key_here
+   
+   # Optional: Cache TTL in seconds
+   RECIPES_CACHE_TTL=60
+   ```
+
+5. **Run the application**
+   ```bash
+   python app.py
+   ```
+
+6. **Access the application**
+   
+   Open your browser to `http://localhost:5000`
+
+### Docker Deployment
+
+1. **Build the Docker image**
+   ```bash
+   docker build -t tasteslikegood .
+   ```
+
+2. **Run the container**
+   ```bash
+   docker run -p 5000:5000 --env-file .env tasteslikegood
+   ```
+
+## Testing
+
+Run the test suite with pytest:
+
+```bash
+# Run all tests
+pytest
+
+# Run with verbose output
+pytest -v
+
+# Run specific test file
+pytest tests/test_normalization.py
+
+# Run specific test function
+pytest tests/test_normalization.py::TestNormalization::test_normalize_unit
+```
+
+## Documentation
+
+- **[API.md](API.md)** - Detailed API endpoint documentation
+- **[CLAUDE.md](CLAUDE.md)** - Developer guide for working with this codebase
+- **[agents.md](agents.md)** - Agent configuration template
+- **[gemini.md](gemini.md)** - Gemini agent configuration notes
+
+## Contributing
+
+We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
+- Setting up your development environment
+- Code style guidelines
+- Testing requirements
+- Pull request process
+
+When contributing to this project:
+1. Follow the modular architecture pattern (blueprints/services/repositories)
+2. Add tests for new features
+3. Update schema and normalization logic when modifying recipe structure
+4. Use type hints and docstrings
+5. Follow PEP 8 style guidelines
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Support
+
+For issues, questions, or contributions, please refer to the documentation files or contact the maintainers.
