@@ -169,6 +169,12 @@ def scan_branch(repo_root, branch_name, skip_git=True):
             
             # If origin/branch doesn't exist, try local branch
             if check_result.returncode != 0:
+                # Only try local branch if it looks like a valid branch name
+                # Avoid inadvertently matching HEAD, tags, or other refs
+                if branch_name in ['HEAD', 'FETCH_HEAD', 'ORIG_HEAD', 'MERGE_HEAD']:
+                    result['checkout_error'] = f"Invalid branch name '{branch_name}' - use explicit branch names only"
+                    return result
+                
                 branch_ref = branch_name
                 check_result = subprocess.run(
                     ['git', 'rev-parse', '--verify', branch_ref],
