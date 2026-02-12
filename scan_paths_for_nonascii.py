@@ -4,6 +4,7 @@ Script to scan all file paths in the repository for non-ASCII characters.
 Generates a markdown report: repowidepathscannonascii.md
 """
 
+import argparse
 import os
 from datetime import datetime
 from pathlib import Path
@@ -18,12 +19,13 @@ def is_ascii_path(path_str):
         return False
 
 
-def scan_repository_paths(root_dir):
+def scan_repository_paths(root_dir, skip_git=True):
     """
     Scan all file paths in the repository for non-ASCII characters.
     
     Args:
         root_dir: The root directory of the repository
+        skip_git: If True, skip the .git directory (default: True)
         
     Returns:
         A tuple of (all_paths, non_ascii_paths)
@@ -33,8 +35,8 @@ def scan_repository_paths(root_dir):
     
     # Walk through the entire repository
     for dirpath, dirnames, filenames in os.walk(root_dir):
-        # Skip .git directory
-        if '.git' in dirnames:
+        # Conditionally skip .git directory
+        if skip_git and '.git' in dirnames:
             dirnames.remove('.git')
         
         # Get relative path from root
@@ -59,7 +61,7 @@ def scan_repository_paths(root_dir):
     return all_paths, non_ascii_paths
 
 
-def generate_report(all_paths, non_ascii_paths, output_file):
+def generate_report(all_paths, non_ascii_paths, output_file, git_included=False):
     """
     Generate a markdown report of the scan results.
     
@@ -67,6 +69,7 @@ def generate_report(all_paths, non_ascii_paths, output_file):
         all_paths: List of all paths scanned
         non_ascii_paths: List of tuples (type, path) with non-ASCII characters
         output_file: Path to the output markdown file
+        git_included: Whether .git directory was included in the scan
     """
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write("# Repository-Wide Path ASCII Scan Report\n\n")
@@ -75,6 +78,7 @@ def generate_report(all_paths, non_ascii_paths, output_file):
         f.write(f"**Scan Date:** {scan_date}\n\n")
         f.write(f"**Total Paths Scanned:** {len(all_paths)}\n\n")
         f.write(f"**Paths with Non-ASCII Characters:** {len(non_ascii_paths)}\n\n")
+        f.write(f"**.git Directory Included:** {'Yes' if git_included else 'No'}\n\n")
         
         if non_ascii_paths:
             f.write("## Paths Containing Non-ASCII Characters\n\n")
@@ -119,15 +123,38 @@ def generate_report(all_paths, non_ascii_paths, output_file):
 
 def main():
     """Main function to run the path scan."""
+    # Parse command-line arguments
+    parser = argparse.ArgumentParser(
+        description='Scan repository file paths for non-ASCII characters.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  %(prog)s                        # Scan repository, skip .git directory (default)
+  %(prog)s --include-git-dir      # Scan repository, include .git directory
+        """
+    )
+    parser.add_argument(
+        '--include-git-dir',
+        action='store_true',
+        help='Include .git directory in the scan (default: skip .git directory)'
+    )
+    
+    args = parser.parse_args()
+    
     # Get the repository root directory
     script_dir = Path(__file__).parent.absolute()
     repo_root = script_dir
     
     print(f"Scanning repository at: {repo_root}")
+    if args.include_git_dir:
+        print("Including .git directory in scan")
+    else:
+        print("Skipping .git directory (use --include-git-dir to include it)")
     print("This may take a moment for large repositories...\n")
     
     # Scan all paths
-    all_paths, non_ascii_paths = scan_repository_paths(repo_root)
+    skip_git = not args.include_git_dir
+    all_paths, non_ascii_paths = scan_repository_paths(repo_root, skip_git=skip_git)
     
     print(f"Total paths scanned: {len(all_paths)}")
     print(f"Paths with non-ASCII characters: {len(non_ascii_paths)}")
@@ -139,7 +166,7 @@ def main():
     
     # Generate the report
     output_file = repo_root / "repowidepathscannonascii.md"
-    generate_report(all_paths, non_ascii_paths, output_file)
+    generate_report(all_paths, non_ascii_paths, output_file, git_included=args.include_git_dir)
     
     print(f"\n✅ Report generated: {output_file}")
 
