@@ -5,6 +5,7 @@ Generates a markdown report: repowidepathscannonascii.md
 """
 
 import os
+from datetime import datetime
 from pathlib import Path
 
 
@@ -70,7 +71,8 @@ def generate_report(all_paths, non_ascii_paths, output_file):
     with open(output_file, 'w', encoding='utf-8') as f:
         f.write("# Repository-Wide Path ASCII Scan Report\n\n")
         
-        f.write(f"**Scan Date:** {Path().absolute()}\n\n")
+        scan_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        f.write(f"**Scan Date:** {scan_date}\n\n")
         f.write(f"**Total Paths Scanned:** {len(all_paths)}\n\n")
         f.write(f"**Paths with Non-ASCII Characters:** {len(non_ascii_paths)}\n\n")
         
