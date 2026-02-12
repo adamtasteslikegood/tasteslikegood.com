@@ -22,6 +22,9 @@ jobs:
   check-filenames:
     name: Check for Non-ASCII Characters in Filenames
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Needed for auto-fix to commit and push
+      actions: read    # Needed to read workflow inputs
     
     steps:
       - name: Checkout repository
