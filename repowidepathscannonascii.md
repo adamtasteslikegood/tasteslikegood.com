@@ -1,15 +1,40 @@
-# Repository-Wide Path ASCII Scan Report
+# Repository Branch-Wide Path ASCII Scan Report
 
-**Scan Date:** 2026-02-12 21:15:15
+**Scan Date:** 2026-02-12 21:39:59
 
-**Total Paths Scanned:** 159
+**Branches Scanned:** 2
 
-**Paths with Non-ASCII Characters:** 0
+**.git Directory Included:** No
 
-**.git Directory Included:** Yes
+## Summary by Branch
 
-## Results
+| Branch | Paths Scanned | Successful | Errors | Non-ASCII Paths |
+|--------|---------------|------------|--------|----------------|
+| copilot/add-ascii-check-repo | 84 | 84 | 0 | 0 |
+| copilot/set-up-copilot-instructions | N/A | N/A | Checkout Failed | N/A |
 
-✅ **All paths in the repository contain only ASCII characters.**
+## Detailed Results by Branch
 
-This is excellent for cross-platform compatibility and tooling support.
+### Branch: `copilot/add-ascii-check-repo`
+
+- **Paths Scanned:** 84
+- **Successful:** 84
+- **Errors:** 0
+- **Non-ASCII Paths:** 0
+
+✅ **All paths scanned successfully with no non-ASCII characters.**
+
+### Branch: `copilot/set-up-copilot-instructions`
+
+❌ **Checkout Error:** Failed to checkout branch: fatal: invalid reference: origin/copilot/set-up-copilot-instructions
+
+
+## Recommendations
+
+Non-ASCII characters in file paths can cause issues with:
+- Cross-platform compatibility (Windows, macOS, Linux)
+- Version control systems
+- Build and deployment tools
+- Shell scripts and command-line operations
+
+Consider renaming paths to use only ASCII characters (A-Z, a-z, 0-9, hyphens, underscores).
