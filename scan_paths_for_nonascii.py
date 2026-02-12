@@ -23,7 +23,7 @@ def is_ascii_path(path_str):
 
 def get_all_branches(repo_root):
     """
-    Get a list of all branch names in the repository.
+    Get a list of all remote branch names in the repository.
     
     Args:
         repo_root: Path to the repository root
@@ -32,7 +32,7 @@ def get_all_branches(repo_root):
         List of branch names (without 'origin/' prefix)
     """
     try:
-        # Try to get remote branches first
+        # Get only remote branches (origin/)
         result = subprocess.run(
             ['git', 'branch', '-r'],
             cwd=repo_root,
@@ -48,22 +48,6 @@ def get_all_branches(repo_root):
                 if line and '->' not in line:  # Skip HEAD -> references
                     # Remove 'origin/' prefix
                     branch = line.replace('origin/', '')
-                    branches.append(branch)
-        
-        # If no remote branches found, try local branches
-        if not branches:
-            result = subprocess.run(
-                ['git', 'branch'],
-                cwd=repo_root,
-                capture_output=True,
-                text=True,
-                check=True
-            )
-            for line in result.stdout.strip().split('\n'):
-                line = line.strip()
-                if line:
-                    # Remove the * indicator for current branch
-                    branch = line.lstrip('* ')
                     branches.append(branch)
         
         return sorted(set(branches))  # Remove duplicates and sort
@@ -155,10 +139,10 @@ def scan_branch(repo_root, branch_name, skip_git=True):
         worktree_path = Path(temp_dir) / 'scan_worktree'
         
         try:
-            # Try with origin/ prefix first, then without if that fails
+            # Only use origin/ prefix for remote branches
             branch_ref = f'origin/{branch_name}'
             
-            # Check if the reference exists
+            # Check if the remote branch reference exists
             check_result = subprocess.run(
                 ['git', 'rev-parse', '--verify', branch_ref],
                 cwd=repo_root,
@@ -167,26 +151,9 @@ def scan_branch(repo_root, branch_name, skip_git=True):
                 check=False
             )
             
-            # If origin/branch doesn't exist, try local branch
             if check_result.returncode != 0:
-                # Only try local branch if it looks like a valid branch name
-                # Avoid inadvertently matching HEAD, tags, or other refs
-                if branch_name in ['HEAD', 'FETCH_HEAD', 'ORIG_HEAD', 'MERGE_HEAD']:
-                    result['checkout_error'] = f"Invalid branch name '{branch_name}' - use explicit branch names only"
-                    return result
-                
-                branch_ref = branch_name
-                check_result = subprocess.run(
-                    ['git', 'rev-parse', '--verify', branch_ref],
-                    cwd=repo_root,
-                    capture_output=True,
-                    text=True,
-                    check=False
-                )
-                
-                if check_result.returncode != 0:
-                    result['checkout_error'] = f"Branch '{branch_name}' not found (tried 'origin/{branch_name}' and '{branch_name}')"
-                    return result
+                result['checkout_error'] = f"Remote branch 'origin/{branch_name}' not found (only remote branches are scanned)"
+                return result
             
             # Add a worktree for this branch
             subprocess.run(
