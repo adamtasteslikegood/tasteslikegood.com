@@ -13,25 +13,26 @@ Refactored into a modular architecture with:
 - blueprints/: Route handlers (recipes, generation, API)
 """
 
+import logging
 import os
 
 from flask import Flask, render_template, request, session
+from flask_cors import CORS
 
 # Import blueprints
 from auth import auth_bp
 from blueprints.api_bp import api_bp
+from blueprints.auth_api_bp import auth_api_bp
 from blueprints.generation_bp import generation_bp
 from blueprints.recipes_bp import recipes_bp
+from utils.logging_config import setup_logging
 
 # Import session utilities
 from utils.session_utils import get_or_create_session_id
 
-
-from utils.logging_config import setup_logging
-import logging
-
 # Initialize logger
 logger = setup_logging()
+
 
 def create_app():
     """
@@ -45,6 +46,27 @@ def create_app():
     # Configure secret key for sessions
     # In production, use a persistent secret key from environment variables
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
+
+    # Configure CORS to allow Angular frontend to call this API
+    # Allow both dev (4200, 8080) and production origins
+    cors_origins = [
+        "http://localhost:4200",  # Angular dev server
+        "http://localhost:8080",  # Express server dev
+        "http://127.0.0.1:4200",
+        "http://127.0.0.1:8080",
+    ]
+
+    # Add production origins from environment if set
+    if os.environ.get("PRODUCTION_ORIGIN"):
+        cors_origins.append(os.environ.get("PRODUCTION_ORIGIN"))
+
+    CORS(
+        app,
+        origins=cors_origins,
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    )
 
     # Session middleware to ensure all users have session IDs
     @app.before_request
@@ -65,6 +87,7 @@ def create_app():
 
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(auth_api_bp)  # /api/auth/* endpoints
     app.register_blueprint(recipes_bp)  # No prefix - includes '/' and '/recipe/*'
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
