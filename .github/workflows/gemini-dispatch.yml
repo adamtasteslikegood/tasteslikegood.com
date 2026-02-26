@@ -137,7 +137,7 @@ jobs:
       additional_context: '${{ needs.dispatch.outputs.additional_context }}'
     secrets: 'inherit'
 
-  ttriage:
+  triage:
   needs:  'dispatch'
   if:  |-
     ${{ needs. dispatch.outputs.command == 'triage' }}
