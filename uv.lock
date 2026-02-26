@@ -263,6 +263,18 @@ wheels = [
 ]
 
 [[package]]
+name = "flask-cors"
+version = "5.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "flask" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4f/d0/d9e52b154e603b0faccc0b7c2ad36a764d8755ef4036acbf1582a67fb86b/flask_cors-5.0.0.tar.gz", hash = "sha256:5aadb4b950c4e93745034594d9f3ea6591f734bb3662e16e255ffbf5e89c88ef", size = 30954, upload-time = "2024-08-31T00:44:26.395Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/56/07/1afa0514c876282bebc1c9aee83c6bb98fe6415cf57b88d9b06e7e29bf9c/Flask_Cors-5.0.0-py2.py3-none-any.whl", hash = "sha256:b9e307d082a9261c100d8fb0ba909eec6a228ed1b60a8315fd85f783d61910bc", size = 14463, upload-time = "2024-08-31T00:44:24.394Z" },
+]
+
+[[package]]
 name = "google-ai-generativelanguage"
 version = "0.6.15"
 source = { registry = "https://pypi.org/simple" }
@@ -1145,7 +1157,7 @@ wheels = [
 [[package]]
 name = "tasteslikegood-com"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "anyio" },
     { name = "blinker" },
@@ -1154,6 +1166,7 @@ dependencies = [
     { name = "charset-normalizer" },
     { name = "distro" },
     { name = "flask" },
+    { name = "flask-cors" },
     { name = "google-ai-generativelanguage" },
     { name = "google-api-python-client" },
     { name = "google-auth" },
@@ -1204,6 +1217,7 @@ requires-dist = [
     { name = "distro", specifier = "==1.9.0" },
     { name = "flake8", marker = "extra == 'dev'", specifier = ">=6.0.0" },
     { name = "flask", specifier = "==3.1.2" },
+    { name = "flask-cors", specifier = "==5.0.0" },
     { name = "google-ai-generativelanguage", specifier = "==0.6.15" },
     { name = "google-api-python-client", specifier = "==2.182.0" },
     { name = "google-auth", specifier = "==2.45.0" },
