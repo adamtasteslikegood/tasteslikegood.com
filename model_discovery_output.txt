@@ -1,0 +1,667 @@
+--- Client Configuration ---
+Client initialized.
+
+--- Listing Models (Standard) ---
+
+Model: models/gemini-2.5-flash
+  Display Name: Gemini 2.5 Flash
+  Description:  Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-2.5-pro
+  Display Name: Gemini 2.5 Pro
+  Description:  Stable release (June 17th, 2025) of Gemini 2.5 Pro
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-2.0-flash
+  Display Name: Gemini 2.0 Flash
+  Description:  Gemini 2.0 Flash
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: None
+----------
+
+Model: models/gemini-2.0-flash-001
+  Display Name: Gemini 2.0 Flash 001
+  Description:  Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: None
+----------
+
+Model: models/gemini-2.0-flash-exp-image-generation
+  Display Name: Gemini 2.0 Flash (Image Generation) Experimental
+  Description:  Gemini 2.0 Flash (Image Generation) Experimental
+  Methods: ['generateContent', 'countTokens', 'bidiGenerateContent']
+  Thinking: None
+----------
+
+Model: models/gemini-2.0-flash-lite-001
+  Display Name: Gemini 2.0 Flash-Lite 001
+  Description:  Stable version of Gemini 2.0 Flash-Lite
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: None
+----------
+
+Model: models/gemini-2.0-flash-lite
+  Display Name: Gemini 2.0 Flash-Lite
+  Description:  Gemini 2.0 Flash-Lite
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: None
+----------
+
+Model: models/gemini-2.5-flash-preview-tts
+  Display Name: Gemini 2.5 Flash Preview TTS
+  Description:  Gemini 2.5 Flash Preview TTS
+  Methods: ['countTokens', 'generateContent']
+  Thinking: None
+----------
+
+Model: models/gemini-2.5-pro-preview-tts
+  Display Name: Gemini 2.5 Pro Preview TTS
+  Description:  Gemini 2.5 Pro Preview TTS
+  Methods: ['countTokens', 'generateContent', 'batchGenerateContent']
+  Thinking: None
+----------
+
+Model: models/gemma-3-1b-it
+  Display Name: Gemma 3 1B
+  Description:  None
+  Methods: ['generateContent', 'countTokens']
+  Thinking: None
+----------
+
+Model: models/gemma-3-4b-it
+  Display Name: Gemma 3 4B
+  Description:  None
+  Methods: ['generateContent', 'countTokens']
+  Thinking: None
+----------
+
+Model: models/gemma-3-12b-it
+  Display Name: Gemma 3 12B
+  Description:  None
+  Methods: ['generateContent', 'countTokens']
+  Thinking: None
+----------
+
+Model: models/gemma-3-27b-it
+  Display Name: Gemma 3 27B
+  Description:  None
+  Methods: ['generateContent', 'countTokens']
+  Thinking: None
+----------
+
+Model: models/gemma-3n-e4b-it
+  Display Name: Gemma 3n E4B
+  Description:  None
+  Methods: ['generateContent', 'countTokens']
+  Thinking: None
+----------
+
+Model: models/gemma-3n-e2b-it
+  Display Name: Gemma 3n E2B
+  Description:  None
+  Methods: ['generateContent', 'countTokens']
+  Thinking: None
+----------
+
+Model: models/gemini-flash-latest
+  Display Name: Gemini Flash Latest
+  Description:  Latest release of Gemini Flash
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-flash-lite-latest
+  Display Name: Gemini Flash-Lite Latest
+  Description:  Latest release of Gemini Flash-Lite
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-pro-latest
+  Display Name: Gemini Pro Latest
+  Description:  Latest release of Gemini Pro
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-2.5-flash-lite
+  Display Name: Gemini 2.5 Flash-Lite
+  Description:  Stable version of Gemini 2.5 Flash-Lite, released in July of 2025
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-2.5-flash-image
+  Display Name: Nano Banana
+  Description:  Gemini 2.5 Flash Preview Image
+  Methods: ['generateContent', 'countTokens', 'batchGenerateContent']
+  Thinking: None
+----------
+
+Model: models/gemini-2.5-flash-lite-preview-09-2025
+  Display Name: Gemini 2.5 Flash-Lite Preview Sep 2025
+  Description:  Preview release (Septempber 25th, 2025) of Gemini 2.5 Flash-Lite
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-3-pro-preview
+  Display Name: Gemini 3 Pro Preview
+  Description:  Gemini 3 Pro Preview
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-3-flash-preview
+  Display Name: Gemini 3 Flash Preview
+  Description:  Gemini 3 Flash Preview
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-3.1-pro-preview
+  Display Name: Gemini 3.1 Pro Preview
+  Description:  Gemini 3.1 Pro Preview
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-3.1-pro-preview-customtools
+  Display Name: Gemini 3.1 Pro Preview Custom Tools
+  Description:  Gemini 3.1 Pro Preview optimized for custom tool usage
+  Methods: ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-3-pro-image-preview
+  Display Name: Nano Banana Pro
+  Description:  Gemini 3 Pro Image Preview
+  Methods: ['generateContent', 'countTokens', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/nano-banana-pro-preview
+  Display Name: Nano Banana Pro
+  Description:  Gemini 3 Pro Image Preview
+  Methods: ['generateContent', 'countTokens', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-3.1-flash-image-preview
+  Display Name: Nano Banana 2
+  Description:  Gemini 3.1 Flash Image Preview.
+  Methods: ['generateContent', 'countTokens', 'batchGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-robotics-er-1.5-preview
+  Display Name: Gemini Robotics-ER 1.5 Preview
+  Description:  Gemini Robotics-ER 1.5 Preview
+  Methods: ['generateContent', 'countTokens']
+  Thinking: True
+----------
+
+Model: models/gemini-2.5-computer-use-preview-10-2025
+  Display Name: Gemini 2.5 Computer Use Preview 10-2025
+  Description:  Gemini 2.5 Computer Use Preview 10-2025
+  Methods: ['generateContent', 'countTokens']
+  Thinking: True
+----------
+
+Model: models/deep-research-pro-preview-12-2025
+  Display Name: Deep Research Pro Preview (Dec-12-2025)
+  Description:  Preview release (December 12th, 2025) of Deep Research Pro
+  Methods: ['generateContent', 'countTokens']
+  Thinking: True
+----------
+
+Model: models/gemini-embedding-001
+  Display Name: Gemini Embedding 001
+  Description:  Obtain a distributed representation of a text.
+  Methods: ['embedContent', 'countTextTokens', 'countTokens', 'asyncBatchEmbedContent']
+  Thinking: None
+----------
+
+Model: models/aqa
+  Display Name: Model that performs Attributed Question Answering.
+  Description:  Model trained to return answers to questions that are grounded in provided sources, along with estimating answerable probability.
+  Methods: ['generateAnswer']
+  Thinking: None
+----------
+
+Model: models/imagen-4.0-generate-001
+  Display Name: Imagen 4
+  Description:  Vertex served Imagen 4.0 model
+  Methods: ['predict']
+  Thinking: None
+----------
+
+Model: models/imagen-4.0-ultra-generate-001
+  Display Name: Imagen 4 Ultra
+  Description:  Vertex served Imagen 4.0 ultra model
+  Methods: ['predict']
+  Thinking: None
+----------
+
+Model: models/imagen-4.0-fast-generate-001
+  Display Name: Imagen 4 Fast
+  Description:  Vertex served Imagen 4.0 Fast model
+  Methods: ['predict']
+  Thinking: None
+----------
+
+Model: models/veo-2.0-generate-001
+  Display Name: Veo 2
+  Description:  Vertex served Veo 2 model. Access to this model requires billing to be enabled on the associated Google Cloud Platform account. Please visit https://console.cloud.google.com/billing to enable it.
+  Methods: ['predictLongRunning']
+  Thinking: None
+----------
+
+Model: models/veo-3.0-generate-001
+  Display Name: Veo 3
+  Description:  Veo 3
+  Methods: ['predictLongRunning']
+  Thinking: None
+----------
+
+Model: models/veo-3.0-fast-generate-001
+  Display Name: Veo 3 fast
+  Description:  Veo 3 fast
+  Methods: ['predictLongRunning']
+  Thinking: None
+----------
+
+Model: models/veo-3.1-generate-preview
+  Display Name: Veo 3.1
+  Description:  Veo 3.1
+  Methods: ['predictLongRunning']
+  Thinking: None
+----------
+
+Model: models/veo-3.1-fast-generate-preview
+  Display Name: Veo 3.1 fast
+  Description:  Veo 3.1 fast
+  Methods: ['predictLongRunning']
+  Thinking: None
+----------
+
+Model: models/gemini-2.5-flash-native-audio-latest
+  Display Name: Gemini 2.5 Flash Native Audio Latest
+  Description:  Latest release of Gemini 2.5 Flash Native Audio
+  Methods: ['countTokens', 'bidiGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-2.5-flash-native-audio-preview-09-2025
+  Display Name: Gemini 2.5 Flash Native Audio Preview 09-2025
+  Description:  Gemini 2.5 Flash Native Audio Preview 09-2025
+  Methods: ['countTokens', 'bidiGenerateContent']
+  Thinking: True
+----------
+
+Model: models/gemini-2.5-flash-native-audio-preview-12-2025
+  Display Name: Gemini 2.5 Flash Native Audio Preview 12-2025
+  Description:  Gemini 2.5 Flash Native Audio Preview 12-2025
+  Methods: ['countTokens', 'bidiGenerateContent']
+  Thinking: True
+----------
+
+
+-+-^_-+-$--+-^_-+-$--+-^_-+-$- Here's that GOOD dict: -+-^_-+-$--+-^_-+-$--+-^_-+-$-
+
+  Model Name: models/gemini-2.5-flash
+     Item Number : 1
+     Display Name : Gemini 2.5 Flash
+     Description : Stable version of Gemini 2.5 Flash, our mid-size multimodal model that supports up to 1 million tokens, released in June of 2025.
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-2.5-pro
+     Item Number : 2
+     Display Name : Gemini 2.5 Pro
+     Description : Stable release (June 17th, 2025) of Gemini 2.5 Pro
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-2.0-flash
+     Item Number : 3
+     Display Name : Gemini 2.0 Flash
+     Description : Gemini 2.0 Flash
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.0-flash-001
+     Item Number : 4
+     Display Name : Gemini 2.0 Flash 001
+     Description : Stable version of Gemini 2.0 Flash, our fast and versatile multimodal model for scaling across diverse tasks, released in January of 2025.
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.0-flash-exp-image-generation
+     Item Number : 5
+     Display Name : Gemini 2.0 Flash (Image Generation) Experimental
+     Description : Gemini 2.0 Flash (Image Generation) Experimental
+     supported_actions : ['generateContent', 'countTokens', 'bidiGenerateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.0-flash-lite-001
+     Item Number : 6
+     Display Name : Gemini 2.0 Flash-Lite 001
+     Description : Stable version of Gemini 2.0 Flash-Lite
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.0-flash-lite
+     Item Number : 7
+     Display Name : Gemini 2.0 Flash-Lite
+     Description : Gemini 2.0 Flash-Lite
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.5-flash-preview-tts
+     Item Number : 8
+     Display Name : Gemini 2.5 Flash Preview TTS
+     Description : Gemini 2.5 Flash Preview TTS
+     supported_actions : ['countTokens', 'generateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.5-pro-preview-tts
+     Item Number : 9
+     Display Name : Gemini 2.5 Pro Preview TTS
+     Description : Gemini 2.5 Pro Preview TTS
+     supported_actions : ['countTokens', 'generateContent', 'batchGenerateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemma-3-1b-it
+     Item Number : 10
+     Display Name : Gemma 3 1B
+     Description : None
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : None
+----------
+
+  Model Name: models/gemma-3-4b-it
+     Item Number : 11
+     Display Name : Gemma 3 4B
+     Description : None
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : None
+----------
+
+  Model Name: models/gemma-3-12b-it
+     Item Number : 12
+     Display Name : Gemma 3 12B
+     Description : None
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : None
+----------
+
+  Model Name: models/gemma-3-27b-it
+     Item Number : 13
+     Display Name : Gemma 3 27B
+     Description : None
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : None
+----------
+
+  Model Name: models/gemma-3n-e4b-it
+     Item Number : 14
+     Display Name : Gemma 3n E4B
+     Description : None
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : None
+----------
+
+  Model Name: models/gemma-3n-e2b-it
+     Item Number : 15
+     Display Name : Gemma 3n E2B
+     Description : None
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : None
+----------
+
+  Model Name: models/gemini-flash-latest
+     Item Number : 16
+     Display Name : Gemini Flash Latest
+     Description : Latest release of Gemini Flash
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-flash-lite-latest
+     Item Number : 17
+     Display Name : Gemini Flash-Lite Latest
+     Description : Latest release of Gemini Flash-Lite
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-pro-latest
+     Item Number : 18
+     Display Name : Gemini Pro Latest
+     Description : Latest release of Gemini Pro
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-2.5-flash-lite
+     Item Number : 19
+     Display Name : Gemini 2.5 Flash-Lite
+     Description : Stable version of Gemini 2.5 Flash-Lite, released in July of 2025
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-2.5-flash-image
+     Item Number : 20
+     Display Name : Nano Banana
+     Description : Gemini 2.5 Flash Preview Image
+     supported_actions : ['generateContent', 'countTokens', 'batchGenerateContent']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.5-flash-lite-preview-09-2025
+     Item Number : 21
+     Display Name : Gemini 2.5 Flash-Lite Preview Sep 2025
+     Description : Preview release (Septempber 25th, 2025) of Gemini 2.5 Flash-Lite
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-3-pro-preview
+     Item Number : 22
+     Display Name : Gemini 3 Pro Preview
+     Description : Gemini 3 Pro Preview
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-3-flash-preview
+     Item Number : 23
+     Display Name : Gemini 3 Flash Preview
+     Description : Gemini 3 Flash Preview
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-3.1-pro-preview
+     Item Number : 24
+     Display Name : Gemini 3.1 Pro Preview
+     Description : Gemini 3.1 Pro Preview
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-3.1-pro-preview-customtools
+     Item Number : 25
+     Display Name : Gemini 3.1 Pro Preview Custom Tools
+     Description : Gemini 3.1 Pro Preview optimized for custom tool usage
+     supported_actions : ['generateContent', 'countTokens', 'createCachedContent', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-3-pro-image-preview
+     Item Number : 26
+     Display Name : Nano Banana Pro
+     Description : Gemini 3 Pro Image Preview
+     supported_actions : ['generateContent', 'countTokens', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/nano-banana-pro-preview
+     Item Number : 27
+     Display Name : Nano Banana Pro
+     Description : Gemini 3 Pro Image Preview
+     supported_actions : ['generateContent', 'countTokens', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-3.1-flash-image-preview
+     Item Number : 28
+     Display Name : Nano Banana 2
+     Description : Gemini 3.1 Flash Image Preview.
+     supported_actions : ['generateContent', 'countTokens', 'batchGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-robotics-er-1.5-preview
+     Item Number : 29
+     Display Name : Gemini Robotics-ER 1.5 Preview
+     Description : Gemini Robotics-ER 1.5 Preview
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : True
+----------
+
+  Model Name: models/gemini-2.5-computer-use-preview-10-2025
+     Item Number : 30
+     Display Name : Gemini 2.5 Computer Use Preview 10-2025
+     Description : Gemini 2.5 Computer Use Preview 10-2025
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : True
+----------
+
+  Model Name: models/deep-research-pro-preview-12-2025
+     Item Number : 31
+     Display Name : Deep Research Pro Preview (Dec-12-2025)
+     Description : Preview release (December 12th, 2025) of Deep Research Pro
+     supported_actions : ['generateContent', 'countTokens']
+     thinking : True
+----------
+
+  Model Name: models/gemini-embedding-001
+     Item Number : 32
+     Display Name : Gemini Embedding 001
+     Description : Obtain a distributed representation of a text.
+     supported_actions : ['embedContent', 'countTextTokens', 'countTokens', 'asyncBatchEmbedContent']
+     thinking : None
+----------
+
+  Model Name: models/aqa
+     Item Number : 33
+     Display Name : Model that performs Attributed Question Answering.
+     Description : Model trained to return answers to questions that are grounded in provided sources, along with estimating answerable probability.
+     supported_actions : ['generateAnswer']
+     thinking : None
+----------
+
+  Model Name: models/imagen-4.0-generate-001
+     Item Number : 34
+     Display Name : Imagen 4
+     Description : Vertex served Imagen 4.0 model
+     supported_actions : ['predict']
+     thinking : None
+----------
+
+  Model Name: models/imagen-4.0-ultra-generate-001
+     Item Number : 35
+     Display Name : Imagen 4 Ultra
+     Description : Vertex served Imagen 4.0 ultra model
+     supported_actions : ['predict']
+     thinking : None
+----------
+
+  Model Name: models/imagen-4.0-fast-generate-001
+     Item Number : 36
+     Display Name : Imagen 4 Fast
+     Description : Vertex served Imagen 4.0 Fast model
+     supported_actions : ['predict']
+     thinking : None
+----------
+
+  Model Name: models/veo-2.0-generate-001
+     Item Number : 37
+     Display Name : Veo 2
+     Description : Vertex served Veo 2 model. Access to this model requires billing to be enabled on the associated Google Cloud Platform account. Please visit https://console.cloud.google.com/billing to enable it.
+     supported_actions : ['predictLongRunning']
+     thinking : None
+----------
+
+  Model Name: models/veo-3.0-generate-001
+     Item Number : 38
+     Display Name : Veo 3
+     Description : Veo 3
+     supported_actions : ['predictLongRunning']
+     thinking : None
+----------
+
+  Model Name: models/veo-3.0-fast-generate-001
+     Item Number : 39
+     Display Name : Veo 3 fast
+     Description : Veo 3 fast
+     supported_actions : ['predictLongRunning']
+     thinking : None
+----------
+
+  Model Name: models/veo-3.1-generate-preview
+     Item Number : 40
+     Display Name : Veo 3.1
+     Description : Veo 3.1
+     supported_actions : ['predictLongRunning']
+     thinking : None
+----------
+
+  Model Name: models/veo-3.1-fast-generate-preview
+     Item Number : 41
+     Display Name : Veo 3.1 fast
+     Description : Veo 3.1 fast
+     supported_actions : ['predictLongRunning']
+     thinking : None
+----------
+
+  Model Name: models/gemini-2.5-flash-native-audio-latest
+     Item Number : 42
+     Display Name : Gemini 2.5 Flash Native Audio Latest
+     Description : Latest release of Gemini 2.5 Flash Native Audio
+     supported_actions : ['countTokens', 'bidiGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-2.5-flash-native-audio-preview-09-2025
+     Item Number : 43
+     Display Name : Gemini 2.5 Flash Native Audio Preview 09-2025
+     Description : Gemini 2.5 Flash Native Audio Preview 09-2025
+     supported_actions : ['countTokens', 'bidiGenerateContent']
+     thinking : True
+----------
+
+  Model Name: models/gemini-2.5-flash-native-audio-preview-12-2025
+     Item Number : 44
+     Display Name : Gemini 2.5 Flash Native Audio Preview 12-2025
+     Description : Gemini 2.5 Flash Native Audio Preview 12-2025
+     supported_actions : ['countTokens', 'bidiGenerateContent']
+     thinking : True
+----------

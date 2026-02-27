@@ -50,8 +50,10 @@ def create_app():
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins
     cors_origins = [
-        "http://localhost:4200",  # Angular dev server
+        "http://localhost:3000",  # Angular dev server (ng serve)
+        "http://localhost:4200",  # Angular dev server (legacy)
         "http://localhost:8080",  # Express server dev
+        "http://127.0.0.1:3000",
         "http://127.0.0.1:4200",
         "http://127.0.0.1:8080",
     ]

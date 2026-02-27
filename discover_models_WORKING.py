@@ -1,5 +1,6 @@
 import os
 
+import pandas as pd
 from dotenv import load_dotenv
 from google.genai import Client
 
@@ -27,18 +28,44 @@ with open("model_discovery_output.txt", "w") as f:
     log("\n--- Listing Models (Standard) ---")
     try:
         models = client.models.list()
+        model_dict = {}
         count = 0
         for m in models:
             count += 1
-            log(f"Model: {m.name}")
+            log(f"\nModel: {m.name}")
             log(f"  Display Name: {m.display_name}")
-            log(f"  Methods: {getattr(m, 'supported_actions', [])}")
+            log(f"  Description:  {m.description}")
+            supported_attrs_list = getattr(m, "supported_actions", [])
+            log(f"  Methods: {supported_attrs_list}")
+            log(f"  Thinking: {m.thinking}")
             log("-" * 10)
+            model_dict[m.name] = {
+                "Item Number": count,
+                "Display Name": m.display_name,
+                "Description": m.description,
+                "supported_actions": supported_attrs_list,
+                "thinking": m.thinking,
+            }
+        # Prints model_dict 'as is'
+        # log(f"Model Dictionary: {model_dict}")
+
+        log("\n")
+        log(("-+-^_-+-$-" * 3) + " Here's that GOOD dict: " + ("-+-^_-+-$-" * 3))
+
+        # Pretty Prints (logs actually) model_dict
+        for model_name, model_attribues in model_dict.items():
+            log(f"\n  Model Name: {model_name}")
+            for k, v in model_attribues.items():
+                log(f"     {k} : {v}")
+            log("-" * 10)
+
         if count == 0:
             log("No models returned by client.models.list()")
     except Exception as e:
         log(f"Error listing models: {e}")
 
+"""
+    # Old code for testing SPecific Model Names
     log("\n--- Testing Specific Model Names (Existence Check) ---")
     candidates = [
         "gemini-2.0-flash-exp",
@@ -57,3 +84,4 @@ with open("model_discovery_output.txt", "w") as f:
             log(f"FOUND! Name: {m.name}")
         except Exception as e:
             log(f"Not found or error: {e}")
+"""

@@ -150,8 +150,8 @@ def api_callback():
 
         # Redirect to frontend (Angular)
         # In production, redirect to your actual frontend URL
-        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:4200")
-        return f'<script>window.location.href = "{frontend_url}/dashboard";</script>'
+        frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+        return f'<script>window.location.href = "{frontend_url}?auth=success";</script>'
 
     except Exception as e:
         return jsonify({"error": f"Authentication failed: {str(e)}"}), 500
