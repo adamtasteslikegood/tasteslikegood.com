@@ -3,7 +3,7 @@ name = "tasteslikegood-com"
 version = "0.1.0"
 description = "A Flask-based web application for viewing and generating vegan recipes using Google's Gemini AI models"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.13"  # Only support Python 3.13+
 license = { text = "MIT" }
 authors = [
     { name = "Tastes Like Good Team", email = "contact@tasteslikegood.com" }
@@ -27,6 +27,10 @@ dependencies = [
     "jinja2==3.1.6",
     "blinker==1.9.0",
     "itsdangerous==2.2.0",
+    # Database (Phase 3) - psycopg2 is optional, only needed for PostgreSQL
+    "flask-sqlalchemy==3.1.1",
+    "flask-migrate==4.0.5",
+    "sqlalchemy>=2.0.35",  # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
     "google-genai==1.56.0",
     "google-generativeai==0.8.5",
@@ -74,6 +78,10 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
 ]
+postgres = [
+    # PostgreSQL support (for production deployments)
+    "psycopg2-binary>=2.9.0",
+]
 
 [project.urls]
 Homepage = "https://tasteslikegood.com"
@@ -105,4 +113,3 @@ disallow_untyped_defs = false
 
 [tool.uv]
 package = false
-

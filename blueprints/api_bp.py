@@ -10,27 +10,28 @@ Handles API routes for:
 - Jokes endpoint
 """
 
-import os
-import json
 import csv
 import datetime
+import json
+import logging
+import os
+
 from flask import Blueprint, jsonify, request, session
 
-from config import CONFIG, GOOGLE_API_KEY, DEFAULT_MODEL, RECIPES_DIR
+from config import CONFIG, DEFAULT_MODEL, GOOGLE_API_KEY, RECIPES_DIR
 from repositories.recipe_repository import (
     get_recipe,
-    validate_recipe_filepath,
     invalidate_cache,
-)
-from services.model_service import (
-    load_models_from_cache,
-    filter_and_sort_models,
-    refresh_models_from_api,
+    validate_recipe_filepath,
 )
 from services.image_service import generate_ai_image
-from services.reporting_service import ReportingService
 from services.migration_service import MigrationService
-import logging
+from services.model_service import (
+    filter_and_sort_models,
+    load_models_from_cache,
+    refresh_models_from_api,
+)
+from services.reporting_service import ReportingService
 
 logger = logging.getLogger(__name__)
 
@@ -213,11 +214,6 @@ def get_jokes():
         with open(joke_file, "r", newline="", encoding="utf-8") as f:
             reader = csv.DictReader(f)
             return jsonify([row["joke"] for row in reader if row.get("joke")])
-        return jsonify([])
-    try:
-        with open(joke_file, 'r', newline='', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            return jsonify([row['joke'] for row in reader if row.get('joke')])
     except Exception as e:
         logger.error(f"Error loading jokes from {joke_file}: {e}")
         return jsonify([])

@@ -34,6 +34,11 @@ fi
 
 # Sync dependencies with uv (creates venv automatically if needed)
 echo "📦 Syncing dependencies with uv..."
+# Remove old venv to ensure fresh install with updated dependencies
+if [ -d ".venv" ]; then
+    echo "   Removing old virtual environment to install updated dependencies..."
+    rm -rf .venv
+fi
 uv sync
 echo "✅ Dependencies synced"
 echo ""
@@ -64,11 +69,12 @@ echo "4️⃣  Verifying database connection..."
 uv run python -c "
 from app import create_app
 from extensions import db
+from sqlalchemy import text
 
 app = create_app()
 with app.app_context():
     try:
-        result = db.session.execute('SELECT 1').scalar()
+        result = db.session.execute(text('SELECT 1')).scalar()
         print('   ✅ Database connection successful!')
 
         # Count existing records

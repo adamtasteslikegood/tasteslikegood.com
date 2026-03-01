@@ -56,7 +56,21 @@ Your database is now ready! The SQLite file `tasteslikegood.db` will be created 
 
 For production deployment or if you want a more robust database:
 
-### 1. Install PostgreSQL
+### 1. Install PostgreSQL and psycopg2
+
+**First, install the optional PostgreSQL support:**
+
+```bash
+cd Backend
+
+# Add PostgreSQL support to your environment
+uv sync --extra postgres
+```
+
+Or manually install psycopg2:
+```bash
+uv add psycopg2-binary
+```
 
 **Ubuntu/Debian:**
 ```bash
@@ -68,6 +82,13 @@ sudo apt install postgresql postgresql-contrib
 ```bash
 brew install postgresql
 brew services start postgresql
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S postgresql
+sudo systemctl enable postgresql
+sudo systemctl start postgresql
 ```
 
 **Docker:**
