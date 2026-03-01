@@ -7,6 +7,7 @@ Provides RESTful API endpoints for frontend authentication:
 - /api/auth/logout - Clear authentication session
 """
 
+import logging
 import os
 from functools import wraps
 
@@ -17,6 +18,8 @@ from flask import Blueprint, jsonify, request, session, url_for
 from google_auth_oauthlib.flow import Flow
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 # Allow OAuth over HTTP for local development
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
@@ -142,11 +145,46 @@ def api_callback():
         user_info = userinfo_service.userinfo().get().execute()
         session["user_info"] = user_info
 
-        # Store user_id for easy access (prefer email, fallback to Google ID)
-        if "email" in user_info:
-            session["user_id"] = user_info["email"]
-        elif "id" in user_info:
-            session["user_id"] = f"google_id_{user_info['id']}"
+        # Persist user to database (Phase 3)
+        from extensions import db
+        from models import User
+
+        google_id = user_info.get("id")
+        email = user_info.get("email")
+        name = user_info.get("name")
+
+        # Find or create user
+        user = User.query.filter_by(google_id=google_id).first()
+
+        if not user and email:
+            # Check if user exists by email (might have signed up before)
+            user = User.query.filter_by(email=email).first()
+
+        if user:
+            # Update existing user info
+            user.name = name or user.name
+            user.google_id = google_id
+            if email and not user.email:
+                user.email = email
+        else:
+            # Create new user
+            if not email:
+                return jsonify({"error": "Email is required for registration"}), 400
+
+            user = User(email=email, name=name, google_id=google_id)
+            db.session.add(user)
+
+        try:
+            db.session.commit()
+            logger.info(f"User {user.id} ({email}) authenticated successfully")
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Database error during user creation: {e}")
+            return jsonify({"error": "Failed to save user data"}), 500
+
+        # Store database user ID in session (not just email)
+        session["user_id"] = user.id
+        session["db_user"] = user.to_dict()  # Cache user info
 
         # Redirect to frontend (Angular)
         # In production, redirect to your actual frontend URL
@@ -166,25 +204,45 @@ def api_me():
     Requires: Valid session cookie from /api/auth/callback
 
     Returns:
-        JSON with user info:
+        JSON with user info from database:
         {
-            "user_id": "user@example.com",
+            "id": 123,
             "email": "user@example.com",
             "name": "User Name",
             "picture": "https://...",
-            "authenticated": true
+            "authenticated": true,
+            "created_at": "2026-03-01T12:00:00"
         }
     """
+    from models import User
+
+    user_id = session.get("user_id")
     user_info = session.get("user_info", {})
-    return jsonify(
-        {
-            "user_id": session.get("user_id"),
-            "email": user_info.get("email"),
-            "name": user_info.get("name"),
-            "picture": user_info.get("picture"),
-            "authenticated": True,
-        }
-    ), 200
+
+    # Try to fetch fresh user data from database
+    user = None
+    if user_id:
+        user = User.query.get(user_id)
+
+    if user:
+        return jsonify(
+            {
+                **user.to_dict(),
+                "picture": user_info.get("picture"),  # Picture not stored in DB
+                "authenticated": True,
+            }
+        ), 200
+    else:
+        # Fallback to session data if database lookup fails
+        return jsonify(
+            {
+                "user_id": user_id,
+                "email": user_info.get("email"),
+                "name": user_info.get("name"),
+                "picture": user_info.get("picture"),
+                "authenticated": True,
+            }
+        ), 200
 
 
 @auth_api_bp.route("/logout", methods=["POST"])

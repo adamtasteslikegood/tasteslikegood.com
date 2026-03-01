@@ -24,6 +24,7 @@ from auth import auth_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
 from blueprints.generation_bp import generation_bp
+from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
 from utils.logging_config import setup_logging
 
@@ -49,11 +50,13 @@ def create_app():
 
     # Configure Database
     from config import SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
-    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 
     # Initialize extensions
     from extensions import db, migrate
+
     db.init_app(app)
     migrate.init_app(app, db)
 
@@ -108,6 +111,7 @@ def create_app():
     app.register_blueprint(recipes_bp)  # No prefix - includes '/' and '/recipe/*'
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
+    app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
 
     # Error handlers
     @app.errorhandler(404)
