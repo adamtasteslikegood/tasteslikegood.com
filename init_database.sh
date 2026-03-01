@@ -15,6 +15,14 @@ if [ ! -f "app.py" ]; then
     exit 1
 fi
 
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    echo "❌ Error: uv is not installed"
+    echo "   Install it with: curl -LsSf https://astral.sh/uv/install.sh | sh"
+    echo "   Or: pip install uv"
+    exit 1
+fi
+
 # Check if .env exists
 if [ ! -f ".env" ]; then
     echo "⚠️  No .env file found. Creating from .env.example..."
@@ -24,11 +32,11 @@ if [ ! -f ".env" ]; then
     echo ""
 fi
 
-# Check if Flask is installed
-if ! command -v flask &> /dev/null; then
-    echo "❌ Flask CLI not found. Installing dependencies..."
-    pip install -r requirements.txt
-fi
+# Sync dependencies with uv (creates venv automatically if needed)
+echo "📦 Syncing dependencies with uv..."
+uv sync
+echo "✅ Dependencies synced"
+echo ""
 
 # Set Flask app
 export FLASK_APP=app.py
@@ -37,23 +45,23 @@ echo "1️⃣  Initializing Flask-Migrate..."
 if [ -d "migrations" ]; then
     echo "   ⚠️  migrations/ directory already exists. Skipping init."
 else
-    flask db init
+    uv run flask db init
     echo "   ✅ Flask-Migrate initialized"
 fi
 echo ""
 
 echo "2️⃣  Creating database migration..."
-flask db migrate -m "Add User and Recipe models with timestamps"
+uv run flask db migrate -m "Add User and Recipe models with timestamps"
 echo "   ✅ Migration created"
 echo ""
 
 echo "3️⃣  Applying migration (creating tables)..."
-flask db upgrade
+uv run flask db upgrade
 echo "   ✅ Tables created"
 echo ""
 
 echo "4️⃣  Verifying database connection..."
-python -c "
+uv run python -c "
 from app import create_app
 from extensions import db
 
@@ -77,8 +85,9 @@ echo ""
 echo "🎉 Database setup complete!"
 echo ""
 echo "Next steps:"
-echo "  1. Migrate existing recipes: python scripts/migrate_recipes_to_db.py"
-echo "  2. Start the backend: python app.py"
+echo "  1. Migrate existing recipes: uv run python scripts/migrate_recipes_to_db.py"
+echo "  2. Start the backend: uv run python app.py"
 echo "  3. Test the API: curl http://localhost:5000/api/recipes"
 echo ""
+echo "Remember: All Python commands should be prefixed with 'uv run'"
 echo "For more info, see: DATABASE_SETUP.md"

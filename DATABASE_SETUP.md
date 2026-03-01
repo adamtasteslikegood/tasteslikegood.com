@@ -6,34 +6,47 @@ This guide walks you through setting up the database layer for persistent recipe
 
 ## Quick Start (SQLite - Development)
 
-The fastest way to get started is with SQLite (no separate database server needed):
+The fastest way to get started is with SQLite (no separate database server needed).
+
+**This project uses `uv` for dependency management** - it's faster and handles virtual environments automatically.
 
 ```bash
 cd Backend
+
+# 0. Make sure uv is installed
+# Install with: curl -LsSf https://astral.sh/uv/install.sh | sh
+# Or on Arch: yay -S uv
 
 # 1. Set up environment
 cp .env.example .env
 # Edit .env - DATABASE_URL should be: sqlite:///tasteslikegood.db
 
-# 2. Install dependencies (if not already done)
-pip install -r requirements.txt
+# 2. Sync dependencies (creates .venv automatically)
+uv sync
 
 # 3. Initialize database migrations
 export FLASK_APP=app.py
-flask db init
+uv run flask db init
 
 # 4. Create initial migration
-flask db migrate -m "Add User and Recipe models with timestamps"
+uv run flask db migrate -m "Add User and Recipe models with timestamps"
 
 # 5. Apply migration (create tables)
-flask db upgrade
+uv run flask db upgrade
 
 # 6. Verify database was created
 ls -lh tasteslikegood.db
 
 # 7. Start the Flask backend
-python app.py
+uv run python app.py
 ```
+
+**💡 Automated Setup:** You can run all of the above with one command:
+```bash
+./init_database.sh  # Automatically syncs deps, sets up database
+```
+
+**💡 Why `uv run`?** uv automatically manages the virtual environment - no need to activate it!
 
 Your database is now ready! The SQLite file `tasteslikegood.db` will be created in the `Backend/` directory.
 
@@ -167,18 +180,18 @@ CREATE TABLE recipe (
 ### Create a New Migration
 After modifying models in `models/`:
 ```bash
-flask db migrate -m "Description of changes"
-flask db upgrade
+uv run flask db migrate -m "Description of changes"
+uv run flask db upgrade
 ```
 
 ### Rollback Migration
 ```bash
-flask db downgrade
+uv run flask db downgrade
 ```
 
 ### View Migration History
 ```bash
-flask db history
+uv run flask db history
 ```
 
 ### Reset Database (Development Only)
@@ -186,13 +199,25 @@ flask db history
 # SQLite
 rm tasteslikegood.db
 rm -rf migrations/
-flask db init
-flask db migrate -m "Initial schema"
-flask db upgrade
+uv run flask db init
+uv run flask db migrate -m "Initial schema"
+uv run flask db upgrade
 
 # PostgreSQL
 psql -U postgres -d tasteslikegood -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
-flask db upgrade
+uv run flask db upgrade
+```
+
+### Update Dependencies
+```bash
+# Sync from uv.lock
+uv sync
+
+# Update all packages
+uv sync --upgrade
+
+# Add a new package
+uv add package-name
 ```
 
 ---
