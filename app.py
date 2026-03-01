@@ -47,6 +47,21 @@ def create_app():
     # In production, use a persistent secret key from environment variables
     app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 
+    # Configure Database
+    from config import SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
+    app.config['SQLALCHEMY_DATABASE_URI'] = SQLALCHEMY_DATABASE_URI
+    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = SQLALCHEMY_TRACK_MODIFICATIONS
+
+    # Initialize extensions
+    from extensions import db, migrate
+    db.init_app(app)
+    migrate.init_app(app, db)
+
+    # Import models so they are registered with SQLAlchemy
+    # This must be done after db is created / configured
+    with app.app_context():
+        import models
+
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins
     cors_origins = [

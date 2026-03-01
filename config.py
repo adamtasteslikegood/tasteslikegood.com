@@ -39,6 +39,15 @@ DEFAULT_MODEL = "gemini-2.0-flash-exp"
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
 
+# Database Configuration
+# Fallback to a local SQLite database if no connection string is provided
+SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", "sqlite:///tasteslikegood.db")
+# Fix Heroku/GCP URL format if needed (postgres:// to postgresql://)
+if SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URI = SQLALCHEMY_DATABASE_URI.replace("postgres://", "postgresql://", 1)
+
+SQLALCHEMY_TRACK_MODIFICATIONS = False
+
 # Simple cache for recipe list to avoid reading all files on every request
 _recipes_cache = {'data': None, 'timestamp': 0}
 
