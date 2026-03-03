@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from sqlalchemy import JSON as GenericJSON
-from sqlalchemy.dialects.postgresql import JSON
+from sqlalchemy.ext.mutable import MutableDict
 
 from extensions import db
 
@@ -9,9 +9,10 @@ from extensions import db
 class Recipe(db.Model):
     id = db.Column(db.String(36), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    guest_session_id = db.Column(db.String(64), nullable=True, index=True)
     name = db.Column(db.String(200), nullable=False)
-    # Using GenericJSON for SQLite compatibility but acts like JSON in Postgres
-    data = db.Column(GenericJSON, nullable=False)
+    # MutableDict ensures in-place JSON updates are tracked (important for SQLite dev).
+    data = db.Column(MutableDict.as_mutable(GenericJSON), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     updated_at = db.Column(
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
@@ -23,6 +24,7 @@ class Recipe(db.Model):
         return {
             "id": self.id,
             "user_id": self.user_id,
+            "guest_session_id": self.guest_session_id,
             "name": self.name,
             "data": self.data,
             "created_at": self.created_at.isoformat() if self.created_at else None,

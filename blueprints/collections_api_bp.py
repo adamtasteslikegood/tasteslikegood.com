@@ -18,6 +18,7 @@ from flask import Blueprint, jsonify, request, session
 
 from extensions import db
 from models import Cookbook
+from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -30,27 +31,51 @@ def _current_user_id():
     return session.get("user_id")
 
 
+def _current_guest_session_id():
+    return get_or_create_session_id()
+
+
+def _scope_collections_query(user_id, guest_session_id):
+    if user_id is not None:
+        return Cookbook.query.filter_by(user_id=user_id)
+    return Cookbook.query.filter_by(user_id=None, guest_session_id=guest_session_id)
+
+
 def _require_auth_or_guest(f):
     """Inject user_id (None for guests) into the route function."""
+
     def wrapper(*args, **kwargs):
-        return f(user_id=_current_user_id(), *args, **kwargs)
+        return f(
+            user_id=_current_user_id(),
+            guest_session_id=_current_guest_session_id(),
+            *args,
+            **kwargs,
+        )
+
     wrapper.__name__ = f.__name__
     return wrapper
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
 
+
 @collections_api_bp.route("", methods=["GET"])
 @_require_auth_or_guest
-def list_collections(user_id):
+def list_collections(user_id, guest_session_id):
     """List all cookbooks owned by the current user (or anonymous)."""
     try:
         cookbooks = (
-            Cookbook.query.filter_by(user_id=user_id)
+            _scope_collections_query(user_id, guest_session_id)
             .order_by(Cookbook.created_at.desc())
             .all()
         )
-        return jsonify({"collections": [cb.to_dict() for cb in cookbooks]}), 200
+        return jsonify(
+            {
+                "collections": [cb.to_dict() for cb in cookbooks],
+                "user_id": user_id,
+                "guest_session_id": guest_session_id,
+            }
+        ), 200
     except Exception as e:
         logger.error(f"Error listing collections: {e}")
         return jsonify({"error": "Failed to fetch collections"}), 500
@@ -58,7 +83,7 @@ def list_collections(user_id):
 
 @collections_api_bp.route("", methods=["POST"])
 @_require_auth_or_guest
-def create_collection(user_id):
+def create_collection(user_id, guest_session_id):
     """
     Create a new cookbook.
 
@@ -72,6 +97,7 @@ def create_collection(user_id):
         cookbook = Cookbook(
             id=data.get("id") or str(uuid.uuid4()),
             user_id=user_id,
+            guest_session_id=None if user_id is not None else guest_session_id,
             name=data["name"],
             description=data.get("description", ""),
             cover_image=data.get("coverImage"),
@@ -88,10 +114,14 @@ def create_collection(user_id):
 
 @collections_api_bp.route("/<collection_id>", methods=["GET"])
 @_require_auth_or_guest
-def get_collection(user_id, collection_id):
+def get_collection(user_id, guest_session_id, collection_id):
     """Get a specific cookbook by ID."""
     try:
-        cookbook = Cookbook.query.filter_by(id=collection_id, user_id=user_id).first()
+        cookbook = (
+            _scope_collections_query(user_id, guest_session_id)
+            .filter_by(id=collection_id)
+            .first()
+        )
         if not cookbook:
             return jsonify({"error": "Collection not found"}), 404
         return jsonify(cookbook.to_dict()), 200
@@ -102,10 +132,14 @@ def get_collection(user_id, collection_id):
 
 @collections_api_bp.route("/<collection_id>", methods=["DELETE"])
 @_require_auth_or_guest
-def delete_collection(user_id, collection_id):
+def delete_collection(user_id, guest_session_id, collection_id):
     """Delete a cookbook."""
     try:
-        cookbook = Cookbook.query.filter_by(id=collection_id, user_id=user_id).first()
+        cookbook = (
+            _scope_collections_query(user_id, guest_session_id)
+            .filter_by(id=collection_id)
+            .first()
+        )
         if not cookbook:
             return jsonify({"error": "Collection not found"}), 404
         db.session.delete(cookbook)
@@ -119,7 +153,7 @@ def delete_collection(user_id, collection_id):
 
 @collections_api_bp.route("/<collection_id>/recipes", methods=["POST"])
 @_require_auth_or_guest
-def add_recipe_to_collection(user_id, collection_id):
+def add_recipe_to_collection(user_id, guest_session_id, collection_id):
     """
     Add a recipe ID to a cookbook.
 
@@ -131,7 +165,11 @@ def add_recipe_to_collection(user_id, collection_id):
         if not recipe_id:
             return jsonify({"error": "recipe_id is required"}), 400
 
-        cookbook = Cookbook.query.filter_by(id=collection_id, user_id=user_id).first()
+        cookbook = (
+            _scope_collections_query(user_id, guest_session_id)
+            .filter_by(id=collection_id)
+            .first()
+        )
         if not cookbook:
             return jsonify({"error": "Collection not found"}), 404
 
@@ -151,10 +189,14 @@ def add_recipe_to_collection(user_id, collection_id):
 
 @collections_api_bp.route("/<collection_id>/recipes/<recipe_id>", methods=["DELETE"])
 @_require_auth_or_guest
-def remove_recipe_from_collection(user_id, collection_id, recipe_id):
+def remove_recipe_from_collection(user_id, guest_session_id, collection_id, recipe_id):
     """Remove a recipe ID from a cookbook."""
     try:
-        cookbook = Cookbook.query.filter_by(id=collection_id, user_id=user_id).first()
+        cookbook = (
+            _scope_collections_query(user_id, guest_session_id)
+            .filter_by(id=collection_id)
+            .first()
+        )
         if not cookbook:
             return jsonify({"error": "Collection not found"}), 404
 

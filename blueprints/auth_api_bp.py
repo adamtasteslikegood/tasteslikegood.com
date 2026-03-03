@@ -147,11 +147,14 @@ def api_callback():
 
         # Persist user to database (Phase 3)
         from extensions import db
-        from models import User
+        from models import Cookbook, Recipe, User
 
         google_id = user_info.get("id")
         email = user_info.get("email")
         name = user_info.get("name")
+
+        # Capture current anonymous session scope before assigning authenticated user.
+        previous_guest_session_id = session.get("session_id")
 
         # Find or create user
         user = User.query.filter_by(google_id=google_id).first()
@@ -185,6 +188,32 @@ def api_callback():
         # Store database user ID in session (not just email)
         session["user_id"] = user.id
         session["db_user"] = user.to_dict()  # Cache user info
+
+        # Merge anonymous rows for this browser session into the authenticated user.
+        if previous_guest_session_id:
+            try:
+                Recipe.query.filter_by(
+                    user_id=None, guest_session_id=previous_guest_session_id
+                ).update(
+                    {"user_id": user.id, "guest_session_id": None},
+                    synchronize_session=False,
+                )
+
+                Cookbook.query.filter_by(
+                    user_id=None, guest_session_id=previous_guest_session_id
+                ).update(
+                    {"user_id": user.id, "guest_session_id": None},
+                    synchronize_session=False,
+                )
+
+                db.session.commit()
+            except Exception as merge_error:
+                db.session.rollback()
+                logger.warning(
+                    "Guest session migration failed for user %s: %s",
+                    user.id,
+                    merge_error,
+                )
 
         # Redirect to frontend (Angular)
         # In production, redirect to your actual frontend URL

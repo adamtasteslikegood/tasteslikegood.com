@@ -15,6 +15,7 @@ from flask import Blueprint, jsonify, request, session
 
 from extensions import db
 from repositories import db_recipe_repository
+from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,9 @@ def require_auth_or_guest(f):
 
     def decorated_function(*args, **kwargs):
         user_id = get_current_user_id()
-        # Pass user_id to the route (None for guests)
-        return f(user_id=user_id, *args, **kwargs)
+        guest_session_id = get_or_create_session_id()
+        # Pass both scopes; route/repository chooses the correct one.
+        return f(user_id=user_id, guest_session_id=guest_session_id, *args, **kwargs)
 
     decorated_function.__name__ = f.__name__
     return decorated_function
@@ -48,7 +50,7 @@ def require_auth_or_guest(f):
 
 @recipes_api_bp.route("", methods=["GET"])
 @require_auth_or_guest
-def list_recipes(user_id):
+def list_recipes(user_id, guest_session_id):
     """
     List all recipes for the current user.
 
@@ -56,7 +58,7 @@ def list_recipes(user_id):
         JSON array of recipes with metadata (id, name, created_at, etc.)
     """
     try:
-        recipes = db_recipe_repository.get_user_recipes(user_id)
+        recipes = db_recipe_repository.get_user_recipes(user_id, guest_session_id)
 
         return jsonify(
             {
@@ -76,6 +78,7 @@ def list_recipes(user_id):
                 ],
                 "count": len(recipes),
                 "user_id": user_id,
+                "guest_session_id": guest_session_id,
             }
         ), 200
 
@@ -86,7 +89,7 @@ def list_recipes(user_id):
 
 @recipes_api_bp.route("", methods=["POST"])
 @require_auth_or_guest
-def create_recipe(user_id):
+def create_recipe(user_id, guest_session_id):
     """
     Create a new recipe.
 
@@ -110,7 +113,9 @@ def create_recipe(user_id):
         if "name" not in recipe_data:
             return jsonify({"error": "Recipe name is required"}), 400
 
-        recipe = db_recipe_repository.create_recipe(recipe_data, user_id)
+        recipe = db_recipe_repository.create_recipe(
+            recipe_data, user_id, guest_session_id
+        )
 
         if not recipe:
             return jsonify({"error": "Failed to create recipe"}), 500
@@ -124,14 +129,16 @@ def create_recipe(user_id):
 
 @recipes_api_bp.route("/<recipe_id>", methods=["GET"])
 @require_auth_or_guest
-def get_recipe(user_id, recipe_id):
+def get_recipe(user_id, guest_session_id, recipe_id):
     """
     Get a specific recipe by ID.
 
     Only returns recipe if it belongs to the current user (or is anonymous for guests).
     """
     try:
-        recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id)
+        recipe = db_recipe_repository.get_recipe_by_id(
+            recipe_id, user_id, guest_session_id
+        )
 
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
@@ -145,7 +152,7 @@ def get_recipe(user_id, recipe_id):
 
 @recipes_api_bp.route("/<recipe_id>", methods=["PUT"])
 @require_auth_or_guest
-def update_recipe(user_id, recipe_id):
+def update_recipe(user_id, guest_session_id, recipe_id):
     """
     Update an existing recipe.
 
@@ -162,7 +169,9 @@ def update_recipe(user_id, recipe_id):
         if not recipe_data:
             return jsonify({"error": "No recipe data provided"}), 400
 
-        recipe = db_recipe_repository.update_recipe(recipe_id, recipe_data, user_id)
+        recipe = db_recipe_repository.update_recipe(
+            recipe_id, recipe_data, user_id, guest_session_id
+        )
 
         if not recipe:
             return jsonify({"error": "Recipe not found or update failed"}), 404
@@ -176,14 +185,16 @@ def update_recipe(user_id, recipe_id):
 
 @recipes_api_bp.route("/<recipe_id>", methods=["DELETE"])
 @require_auth_or_guest
-def delete_recipe(user_id, recipe_id):
+def delete_recipe(user_id, guest_session_id, recipe_id):
     """
     Delete a recipe.
 
     Only allows deletion if recipe belongs to current user (or is anonymous for guests).
     """
     try:
-        success = db_recipe_repository.delete_recipe(recipe_id, user_id)
+        success = db_recipe_repository.delete_recipe(
+            recipe_id, user_id, guest_session_id
+        )
 
         if not success:
             return jsonify({"error": "Recipe not found or delete failed"}), 404
@@ -197,7 +208,7 @@ def delete_recipe(user_id, recipe_id):
 
 @recipes_api_bp.route("/stats", methods=["GET"])
 @require_auth_or_guest
-def get_recipe_stats(user_id):
+def get_recipe_stats(user_id, guest_session_id):
     """
     Get statistics about user's recipes.
 
@@ -208,9 +219,15 @@ def get_recipe_stats(user_id):
         }
     """
     try:
-        count = db_recipe_repository.count_user_recipes(user_id)
+        count = db_recipe_repository.count_user_recipes(user_id, guest_session_id)
 
-        return jsonify({"total_recipes": count, "user_id": user_id}), 200
+        return jsonify(
+            {
+                "total_recipes": count,
+                "user_id": user_id,
+                "guest_session_id": guest_session_id,
+            }
+        ), 200
 
     except Exception as e:
         logger.error(f"Error fetching recipe stats: {e}")
