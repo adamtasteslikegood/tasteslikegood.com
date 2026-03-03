@@ -64,6 +64,7 @@ def list_recipes(user_id):
                     {
                         "id": recipe.id,
                         "name": recipe.name,
+                        "data": recipe.data,
                         "created_at": recipe.created_at.isoformat()
                         if recipe.created_at
                         else None,

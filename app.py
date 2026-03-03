@@ -23,6 +23,7 @@ from flask_cors import CORS
 from auth import auth_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
+from blueprints.collections_api_bp import collections_api_bp
 from blueprints.generation_bp import generation_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
@@ -112,6 +113,7 @@ def create_app():
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
+    app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
 
     # Error handlers
     @app.errorhandler(404)
