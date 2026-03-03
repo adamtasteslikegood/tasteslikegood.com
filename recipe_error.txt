@@ -6531,3 +6531,281 @@ CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it i
 Do not include any text before or after the JSON object.
 
 Last Error: API Key Error (ValidationError): None is not of type 'string' (at image)
+Full prompt:
+Generate a Vegan recipe based on the following request: 'hot dogs with mustard'. The output must be a valid JSON object that strictly follows this schema:
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Recipe",
+  "description": "Schema for a cooking recipe",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Name of the recipe"
+    },
+    "stock_image_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL of a stock image for the recipe"
+    },
+    "ai_image_url": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "URL of an AI-generated image for the recipe"
+    },
+    "description": {
+      "type": "string",
+      "description": "Short description of the recipe"
+    },
+    "prepTime": {
+      "type": "integer",
+      "description": "Preparation time in minutes"
+    },
+    "cookTime": {
+      "type": "integer",
+      "description": "Cooking time in minutes"
+    },
+    "servings": {
+      "type": "integer",
+      "description": "Number of servings the recipe yields"
+    },
+    "ingredients": {
+      "type": "object",
+      "description": "Ingredients grouped by type (wet, dry, etc.)",
+      "properties": {
+        "wet": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "dry": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          }
+        },
+        "other": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ingredient"
+          },
+          "description": "Optional group for ingredients that don't fit in wet or dry"
+        }
+      },
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "$ref": "#/definitions/ingredient"
+        }
+      },
+      "required": ["wet", "dry"]
+    },
+    "instructions": {
+      "type": "array",
+      "description": "Ordered list of instructions",
+      "items": {
+        "oneOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "step": {
+                "type": "integer",
+                "minimum": 1,
+                "description": "Step number in the sequence"
+              },
+              "description": {
+                "type": "string",
+                "description": "Instructional text for the step"
+              }
+            },
+            "required": ["description"],
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "notes": {
+      "type": "string",
+      "description": "Optional notes, tips, or variations"
+    },
+    "tags": {
+      "type": "array",
+      "description": "Keywords or tags for searching and filtering",
+      "items": {
+        "type": "string"
+      }
+    },
+    "image_keywords": {
+      "type": "array",
+      "description": "Keywords optimized for stock photo searches (e.g., 'vegan curry bowl', 'colorful salad')",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1,
+      "maxItems": 5
+    },
+    "image": {
+      "type": ["string", "null"],
+      "format": "uri",
+      "description": "Optional URL of an image of the finished dish"
+    },
+    "user_id": {
+      "type": "string",
+      "description": "ID of the user who generated the recipe, or 'anonymous'"
+    },
+    "ai_metadata": {
+      "type": "object",
+      "description": "Metadata about all AI generation processes",
+      "properties": {
+        "recipe_generation": {
+          "type": "object",
+          "description": "Metadata for the recipe text generation",
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "Model used for generation"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "User who triggered the generation"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Original user prompt"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO timestamp of generation"
+            },
+            "success": {
+              "type": "boolean",
+              "description": "Whether generation succeeded"
+            }
+          }
+        },
+        "image_generation": {
+          "type": ["object", "null"],
+          "description": "Metadata for AI image generation (Imagen)",
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "Model used for image generation"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "User who triggered the generation"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Image generation prompt"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO timestamp of generation"
+            },
+            "success": {
+              "type": "boolean",
+              "description": "Whether generation succeeded"
+            },
+            "image_path": {
+              "type": ["string", "null"],
+              "description": "Path to generated image"
+            }
+          }
+        },
+        "stock_image_generation": {
+          "type": ["object", "null"],
+          "description": "Metadata for stock image URL generation",
+          "properties": {
+            "model": {
+              "type": "string",
+              "description": "Model used to find stock image"
+            },
+            "user_id": {
+              "type": "string",
+              "description": "User who triggered the generation"
+            },
+            "prompt": {
+              "type": "string",
+              "description": "Prompt used to find stock image"
+            },
+            "timestamp": {
+              "type": "string",
+              "description": "ISO timestamp of generation"
+            },
+            "success": {
+              "type": "boolean",
+              "description": "Whether a valid URL was found"
+            },
+            "url_validated": {
+              "type": "boolean",
+              "description": "Whether the URL was validated as working"
+            }
+          }
+        },
+        "model": {
+          "type": "string",
+          "description": "Legacy: Primary model used (for backwards compatibility)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Legacy: Primary timestamp (for backwards compatibility)"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Legacy: Primary prompt (for backwards compatibility)"
+        },
+        "images_working": {
+          "type": "boolean",
+          "description": "Whether images are currently working/valid"
+        }
+      }
+    }
+  },
+  "required": [
+    "name",
+    "prepTime",
+    "cookTime",
+    "servings",
+    "ingredients",
+    "instructions"
+  ],
+  "definitions": {
+    "ingredient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Name of the ingredient"
+        },
+        "amount": {
+          "type": ["number", "array"],
+          "description": "Amount of the ingredient. Can be a single number or an array for a range.",
+          "items": {
+            "type": "number"
+          }
+        },
+        "units": {
+          "type": "string",
+          "description": "Unit of measurement"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional preparation notes, such as chopped, sliced, etc."
+        }
+      },
+      "required": ["name", "amount", "units"]
+    }
+  }
+}
+
+IMPORTANT: Include 'image_keywords' - an array of 3-5 descriptive terms optimized for stock photo searches (e.g., ['vegan buddha bowl', 'colorful vegetables', 'healthy lunch']). Focus on visual descriptions of the finished dish, not recipe names.
+Do NOT include these fields (we handle them separately): 'stock_image_url', 'ai_image_url', 'image', 'user_id', 'ai_metadata'. Just omit them entirely - do not set them to null.
+CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it inside a 'properties' or 'type' object. The top-level keys must be 'name', 'description', 'ingredients', etc.
+Do not include any text before or after the JSON object.
+
+Last Error: API Key Error (ServerError): 503 UNAVAILABLE. {'error': {'code': 503, 'message': 'This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.', 'status': 'UNAVAILABLE'}}

@@ -36,11 +36,6 @@
       "supported_generation_methods": []
     },
     {
-      "name": "models/gemini-exp-1206",
-      "display_name": "Gemini Experimental 1206",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-2.5-flash-preview-tts",
       "display_name": "Gemini 2.5 Flash Preview TTS",
       "supported_generation_methods": []
@@ -106,11 +101,6 @@
       "supported_generation_methods": []
     },
     {
-      "name": "models/gemini-2.5-flash-preview-09-2025",
-      "display_name": "Gemini 2.5 Flash Preview Sep 2025",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-2.5-flash-lite-preview-09-2025",
       "display_name": "Gemini 2.5 Flash-Lite Preview Sep 2025",
       "supported_generation_methods": []
@@ -126,6 +116,16 @@
       "supported_generation_methods": []
     },
     {
+      "name": "models/gemini-3.1-pro-preview",
+      "display_name": "Gemini 3.1 Pro Preview",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-3.1-pro-preview-customtools",
+      "display_name": "Gemini 3.1 Pro Preview Custom Tools",
+      "supported_generation_methods": []
+    },
+    {
       "name": "models/gemini-3-pro-image-preview",
       "display_name": "Nano Banana Pro",
       "supported_generation_methods": []
@@ -133,6 +133,11 @@
     {
       "name": "models/nano-banana-pro-preview",
       "display_name": "Nano Banana Pro",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-3.1-flash-image-preview",
+      "display_name": "Nano Banana 2",
       "supported_generation_methods": []
     },
     {
@@ -151,16 +156,6 @@
       "supported_generation_methods": []
     },
     {
-      "name": "models/embedding-001",
-      "display_name": "Embedding 001",
-      "supported_generation_methods": []
-    },
-    {
-      "name": "models/text-embedding-004",
-      "display_name": "Text Embedding 004",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-embedding-001",
       "display_name": "Gemini Embedding 001",
       "supported_generation_methods": []
@@ -168,16 +163,6 @@
     {
       "name": "models/aqa",
       "display_name": "Model that performs Attributed Question Answering.",
-      "supported_generation_methods": []
-    },
-    {
-      "name": "models/imagen-4.0-generate-preview-06-06",
-      "display_name": "Imagen 4 (Preview)",
-      "supported_generation_methods": []
-    },
-    {
-      "name": "models/imagen-4.0-ultra-generate-preview-06-06",
-      "display_name": "Imagen 4 Ultra (Preview)",
       "supported_generation_methods": []
     },
     {
@@ -236,5 +221,5 @@
       "supported_generation_methods": []
     }
   ],
-  "updated_at": "2026-01-30T23:56:57Z"
+  "updated_at": "2026-03-03T06:17:17Z"
 }

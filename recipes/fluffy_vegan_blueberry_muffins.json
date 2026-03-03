@@ -109,6 +109,43 @@
     "model": "unknown",
     "timestamp": "2025-12-20T17:05:30.743172",
     "prompt": "unknown",
-    "images_working": false
-  }
+    "images_working": true,
+    "stock_image_generation": {
+      "source": "unsplash",
+      "user_id": "session_8c65a42df3de4d3eb9570d424eea46a2",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8c65a42df3de4d3eb9570d424eea46a2",
+      "search_query": "A delicious and fluffy vegan",
+      "timestamp": "2026-03-02T22:12:07.422418",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false,
+      "attribution": {
+        "photographer_name": "Darya Tryfanava",
+        "photographer_url": "https://unsplash.com/@darya_tryfanava?utm_source=tasteslikegood&utm_medium=referral",
+        "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+        "html": "Photo by <a href=\"https://unsplash.com/@darya_tryfanava?utm_source=tasteslikegood&utm_medium=referral\">Darya Tryfanava</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+      }
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "session_8c65a42df3de4d3eb9570d424eea46a2",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8c65a42df3de4d3eb9570d424eea46a2",
+      "prompt": "A delicious, high-quality food photography shot of Fluffy Vegan Blueberry Muffins. Professional lighting, appetizing.",
+      "timestamp": "2026-03-02T22:12:09.128823",
+      "success": true,
+      "image_path": "static/images/ai_fluffy_vegan_blueberry_muffins.png"
+    }
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1572950947301-fb417712da10?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDYyOTZ8MHwxfHNlYXJjaHwxfHxBJTIwZGVsaWNpb3VzJTIwYW5kJTIwZmx1ZmZ5JTIwdmVnYW58ZW58MXwwfHx8MTc3MjUxODMyN3ww&ixlib=rb-4.1.0&q=80&w=1080",
+  "stock_image_attribution": {
+    "photographer_name": "Darya Tryfanava",
+    "photographer_url": "https://unsplash.com/@darya_tryfanava?utm_source=tasteslikegood&utm_medium=referral",
+    "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+    "html": "Photo by <a href=\"https://unsplash.com/@darya_tryfanava?utm_source=tasteslikegood&utm_medium=referral\">Darya Tryfanava</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+  },
+  "ai_image_url": "/static/images/ai_fluffy_vegan_blueberry_muffins.png"
 }
