@@ -32,6 +32,7 @@ import ssl
 @dataclass
 class RequestResult:
     """Result of a single HTTP request."""
+
     success: bool
     status_code: int
     latency_ms: float
@@ -42,6 +43,7 @@ class RequestResult:
 @dataclass
 class LoadTestResults:
     """Aggregated load test results."""
+
     target_url: str
     method: str
     duration_seconds: float
@@ -88,8 +90,12 @@ def calculate_percentile(data: List[float], percentile: float) -> float:
 class HTTPClient:
     """HTTP client with configurable settings."""
 
-    def __init__(self, timeout: float = 30.0, headers: Optional[Dict[str, str]] = None,
-                 verify_ssl: bool = True):
+    def __init__(
+        self,
+        timeout: float = 30.0,
+        headers: Optional[Dict[str, str]] = None,
+        verify_ssl: bool = True,
+    ):
         self.timeout = timeout
         self.headers = headers or {}
         self.verify_ssl = verify_ssl
@@ -102,7 +108,7 @@ class HTTPClient:
         else:
             self.ssl_context = None
 
-    def request(self, url: str, method: str = 'GET', body: Optional[bytes] = None) -> RequestResult:
+    def request(self, url: str, method: str = "GET", body: Optional[bytes] = None) -> RequestResult:
         """Execute HTTP request and return result."""
         start_time = time.perf_counter()
 
@@ -114,9 +120,9 @@ class HTTPClient:
                 request.add_header(key, value)
 
             # Add content-type for POST/PUT
-            if body and method in ['POST', 'PUT', 'PATCH']:
-                if 'Content-Type' not in self.headers:
-                    request.add_header('Content-Type', 'application/json')
+            if body and method in ["POST", "PUT", "PATCH"]:
+                if "Content-Type" not in self.headers:
+                    request.add_header("Content-Type", "application/json")
 
             # Execute request
             with urlopen(request, timeout=self.timeout, context=self.ssl_context) as response:
@@ -170,9 +176,17 @@ class HTTPClient:
 class LoadTester:
     """HTTP load testing engine."""
 
-    def __init__(self, url: str, method: str = 'GET', body: Optional[str] = None,
-                 headers: Optional[Dict[str, str]] = None, concurrency: int = 10,
-                 duration: float = 10.0, timeout: float = 30.0, verify_ssl: bool = True):
+    def __init__(
+        self,
+        url: str,
+        method: str = "GET",
+        body: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        concurrency: int = 10,
+        duration: float = 10.0,
+        timeout: float = 30.0,
+        verify_ssl: bool = True,
+    ):
         self.url = url
         self.method = method.upper()
         self.body = body.encode() if body else None
@@ -267,7 +281,7 @@ class LoadTester:
         # Error breakdown
         errors_by_type: Dict[str, int] = {}
         for r in failed:
-            error_type = r.error or 'Unknown'
+            error_type = r.error or "Unknown"
             errors_by_type[error_type] = errors_by_type.get(error_type, 0) + 1
 
         # Calculate throughput
@@ -421,10 +435,19 @@ def compare_results(results1: LoadTestResults, results2: LoadTestResults):
 class APILoadTester:
     """Main load tester class with CLI integration."""
 
-    def __init__(self, urls: List[str], method: str = 'GET', body: Optional[str] = None,
-                 headers: Optional[Dict[str, str]] = None, concurrency: int = 10,
-                 duration: float = 10.0, timeout: float = 30.0, compare: bool = False,
-                 verbose: bool = False, verify_ssl: bool = True):
+    def __init__(
+        self,
+        urls: List[str],
+        method: str = "GET",
+        body: Optional[str] = None,
+        headers: Optional[Dict[str, str]] = None,
+        concurrency: int = 10,
+        duration: float = 10.0,
+        timeout: float = 30.0,
+        compare: bool = False,
+        verbose: bool = False,
+        verify_ssl: bool = True,
+    ):
         self.urls = urls
         self.method = method
         self.body = body
@@ -462,8 +485,8 @@ class APILoadTester:
             compare_results(results[0], results[1])
 
         return {
-            'status': 'success',
-            'results': [asdict(r) for r in results],
+            "status": "success",
+            "results": [asdict(r) for r in results],
         }
 
 
@@ -472,8 +495,8 @@ def parse_headers(header_args: Optional[List[str]]) -> Dict[str, str]:
     headers = {}
     if header_args:
         for h in header_args:
-            if ':' in h:
-                key, value = h.split(':', 1)
+            if ":" in h:
+                key, value = h.split(":", 1)
                 headers[key.strip()] = value.strip()
     return headers
 
@@ -481,80 +504,55 @@ def parse_headers(header_args: Optional[List[str]]) -> Dict[str, str]:
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='HTTP load testing tool',
+        description="HTTP load testing tool",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
+        epilog="""
 Examples:
   %(prog)s https://api.example.com/users --concurrency 50 --duration 30
   %(prog)s https://api.example.com/orders --method POST --body '{"item": 1}'
   %(prog)s https://api.example.com/v1 https://api.example.com/v2 --compare
   %(prog)s https://api.example.com/health --header "Authorization: Bearer token"
-        '''
+        """,
     )
 
+    parser.add_argument("urls", nargs="+", help="URL(s) to test")
     parser.add_argument(
-        'urls',
-        nargs='+',
-        help='URL(s) to test'
+        "--method",
+        "-m",
+        default="GET",
+        choices=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        help="HTTP method (default: GET)",
+    )
+    parser.add_argument("--body", "-b", help="Request body (JSON string)")
+    parser.add_argument(
+        "--header",
+        "-H",
+        action="append",
+        dest="headers",
+        help='HTTP header (format: "Name: Value")',
     )
     parser.add_argument(
-        '--method', '-m',
-        default='GET',
-        choices=['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-        help='HTTP method (default: GET)'
-    )
-    parser.add_argument(
-        '--body', '-b',
-        help='Request body (JSON string)'
-    )
-    parser.add_argument(
-        '--header', '-H',
-        action='append',
-        dest='headers',
-        help='HTTP header (format: "Name: Value")'
-    )
-    parser.add_argument(
-        '--concurrency', '-c',
+        "--concurrency",
+        "-c",
         type=int,
         default=10,
-        help='Number of concurrent requests (default: 10)'
+        help="Number of concurrent requests (default: 10)",
     )
     parser.add_argument(
-        '--duration', '-d',
-        type=float,
-        default=10.0,
-        help='Test duration in seconds (default: 10)'
+        "--duration", "-d", type=float, default=10.0, help="Test duration in seconds (default: 10)"
     )
     parser.add_argument(
-        '--timeout', '-t',
-        type=float,
-        default=30.0,
-        help='Request timeout in seconds (default: 30)'
+        "--timeout", "-t", type=float, default=30.0, help="Request timeout in seconds (default: 30)"
     )
     parser.add_argument(
-        '--compare',
-        action='store_true',
-        help='Compare two endpoints (requires two URLs)'
+        "--compare", action="store_true", help="Compare two endpoints (requires two URLs)"
     )
     parser.add_argument(
-        '--no-verify-ssl',
-        action='store_true',
-        help='Disable SSL certificate verification'
+        "--no-verify-ssl", action="store_true", help="Disable SSL certificate verification"
     )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Output results as JSON'
-    )
-    parser.add_argument(
-        '--output', '-o',
-        help='Output file path for results'
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
+    parser.add_argument("--output", "-o", help="Output file path for results")
 
     args = parser.parse_args()
 
@@ -585,13 +583,13 @@ Examples:
         if args.json:
             output = json.dumps(results, indent=2)
             if args.output:
-                with open(args.output, 'w') as f:
+                with open(args.output, "w") as f:
                     f.write(output)
                 print(f"\nResults written to: {args.output}")
             else:
                 print(output)
         elif args.output:
-            with open(args.output, 'w') as f:
+            with open(args.output, "w") as f:
                 json.dump(results, f, indent=2)
             print(f"\nResults written to: {args.output}")
 
@@ -603,5 +601,5 @@ Examples:
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

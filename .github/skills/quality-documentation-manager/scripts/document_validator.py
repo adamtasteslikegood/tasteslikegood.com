@@ -91,13 +91,13 @@ class DocumentValidator:
     """Validator for quality documentation compliance."""
 
     # Document number pattern: PREFIX-CATEGORY-SEQUENCE-REVISION
-    DOC_NUMBER_PATTERN = r'^([A-Z]{2,4})-(\d{2,3})-(\d{3,4})(?:-([A-Z]|\d{2}))?$'
+    DOC_NUMBER_PATTERN = r"^([A-Z]{2,4})-(\d{2,3})-(\d{3,4})(?:-([A-Z]|\d{2}))?$"
 
     # Valid document type prefixes
-    VALID_PREFIXES = ['QM', 'SOP', 'WI', 'TF', 'POL', 'SPEC', 'PLN', 'RPT']
+    VALID_PREFIXES = ["QM", "SOP", "WI", "TF", "POL", "SPEC", "PLN", "RPT"]
 
     # Category codes
-    VALID_CATEGORIES = ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']
+    VALID_CATEGORIES = ["01", "02", "03", "04", "05", "06", "07", "08", "09", "10"]
 
     def __init__(self, document: Document):
         self.document = document
@@ -134,7 +134,7 @@ class DocumentValidator:
             minor_findings=minor,
             compliance_score=round(score, 1),
             findings=[asdict(f) for f in self.findings],
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     def _validate_document_number(self):
@@ -142,111 +142,133 @@ class DocumentValidator:
         number = self.document.number
 
         if not number:
-            self.findings.append(ValidationFinding(
-                rule="DOC-NUM-001",
-                severity=Severity.CRITICAL,
-                message="Document number is missing",
-                recommendation="Assign document number per numbering procedure"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-NUM-001",
+                    severity=Severity.CRITICAL,
+                    message="Document number is missing",
+                    recommendation="Assign document number per numbering procedure",
+                )
+            )
             return
 
         match = re.match(self.DOC_NUMBER_PATTERN, number)
         if not match:
-            self.findings.append(ValidationFinding(
-                rule="DOC-NUM-002",
-                severity=Severity.MAJOR,
-                message=f"Document number '{number}' does not match standard format",
-                recommendation="Use format: PREFIX-CATEGORY-SEQUENCE[-REVISION] (e.g., SOP-02-001-A)"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-NUM-002",
+                    severity=Severity.MAJOR,
+                    message=f"Document number '{number}' does not match standard format",
+                    recommendation="Use format: PREFIX-CATEGORY-SEQUENCE[-REVISION] (e.g., SOP-02-001-A)",
+                )
+            )
             return
 
         prefix, category, sequence, revision = match.groups()
 
         if prefix not in self.VALID_PREFIXES:
-            self.findings.append(ValidationFinding(
-                rule="DOC-NUM-003",
-                severity=Severity.MAJOR,
-                message=f"Invalid document type prefix: {prefix}",
-                recommendation=f"Use one of: {', '.join(self.VALID_PREFIXES)}"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-NUM-003",
+                    severity=Severity.MAJOR,
+                    message=f"Invalid document type prefix: {prefix}",
+                    recommendation=f"Use one of: {', '.join(self.VALID_PREFIXES)}",
+                )
+            )
 
         if category not in self.VALID_CATEGORIES:
-            self.findings.append(ValidationFinding(
-                rule="DOC-NUM-004",
-                severity=Severity.MINOR,
-                message=f"Non-standard category code: {category}",
-                recommendation=f"Standard categories are: {', '.join(self.VALID_CATEGORIES)}"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-NUM-004",
+                    severity=Severity.MINOR,
+                    message=f"Non-standard category code: {category}",
+                    recommendation=f"Standard categories are: {', '.join(self.VALID_CATEGORIES)}",
+                )
+            )
 
     def _validate_title(self):
         """Validate document title."""
         title = self.document.title
 
         if not title:
-            self.findings.append(ValidationFinding(
-                rule="DOC-TTL-001",
-                severity=Severity.MAJOR,
-                message="Document title is missing",
-                recommendation="Provide descriptive document title"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-TTL-001",
+                    severity=Severity.MAJOR,
+                    message="Document title is missing",
+                    recommendation="Provide descriptive document title",
+                )
+            )
             return
 
         if len(title) < 10:
-            self.findings.append(ValidationFinding(
-                rule="DOC-TTL-002",
-                severity=Severity.MINOR,
-                message="Document title is very short",
-                recommendation="Use descriptive title that clearly identifies content"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-TTL-002",
+                    severity=Severity.MINOR,
+                    message="Document title is very short",
+                    recommendation="Use descriptive title that clearly identifies content",
+                )
+            )
 
         if len(title) > 100:
-            self.findings.append(ValidationFinding(
-                rule="DOC-TTL-003",
-                severity=Severity.MINOR,
-                message="Document title exceeds recommended length",
-                recommendation="Keep title under 100 characters"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-TTL-003",
+                    severity=Severity.MINOR,
+                    message="Document title exceeds recommended length",
+                    recommendation="Keep title under 100 characters",
+                )
+            )
 
     def _validate_status_lifecycle(self):
         """Validate document status and lifecycle."""
         status = self.document.status
 
         if not status:
-            self.findings.append(ValidationFinding(
-                rule="DOC-STS-001",
-                severity=Severity.MAJOR,
-                message="Document status is missing",
-                recommendation="Assign appropriate document status"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-STS-001",
+                    severity=Severity.MAJOR,
+                    message="Document status is missing",
+                    recommendation="Assign appropriate document status",
+                )
+            )
             return
 
         valid_statuses = [s.value for s in DocumentStatus]
         if status not in valid_statuses:
-            self.findings.append(ValidationFinding(
-                rule="DOC-STS-002",
-                severity=Severity.MAJOR,
-                message=f"Invalid document status: {status}",
-                recommendation=f"Use one of: {', '.join(valid_statuses)}"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-STS-002",
+                    severity=Severity.MAJOR,
+                    message=f"Invalid document status: {status}",
+                    recommendation=f"Use one of: {', '.join(valid_statuses)}",
+                )
+            )
 
         # Check status-specific requirements
         if status == DocumentStatus.EFFECTIVE.value:
             if not self.document.effective_date:
-                self.findings.append(ValidationFinding(
-                    rule="DOC-STS-003",
-                    severity=Severity.MAJOR,
-                    message="Effective document missing effective date",
-                    recommendation="Add effective date for effective documents"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-STS-003",
+                        severity=Severity.MAJOR,
+                        message="Effective document missing effective date",
+                        recommendation="Add effective date for effective documents",
+                    )
+                )
 
         if status == DocumentStatus.APPROVED.value:
             if not self.document.approval_date:
-                self.findings.append(ValidationFinding(
-                    rule="DOC-STS-004",
-                    severity=Severity.MAJOR,
-                    message="Approved document missing approval date",
-                    recommendation="Add approval date for approved documents"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-STS-004",
+                        severity=Severity.MAJOR,
+                        message="Approved document missing approval date",
+                        recommendation="Add approval date for approved documents",
+                    )
+                )
 
     def _validate_dates(self):
         """Validate document dates."""
@@ -255,139 +277,172 @@ class DocumentValidator:
             try:
                 eff_date = datetime.strptime(self.document.effective_date, "%Y-%m-%d")
                 if eff_date > self.today:
-                    self.findings.append(ValidationFinding(
-                        rule="DOC-DTE-001",
-                        severity=Severity.INFO,
-                        message="Effective date is in the future",
-                        recommendation="Verify planned effective date is correct"
-                    ))
+                    self.findings.append(
+                        ValidationFinding(
+                            rule="DOC-DTE-001",
+                            severity=Severity.INFO,
+                            message="Effective date is in the future",
+                            recommendation="Verify planned effective date is correct",
+                        )
+                    )
             except ValueError:
-                self.findings.append(ValidationFinding(
-                    rule="DOC-DTE-002",
-                    severity=Severity.MINOR,
-                    message="Invalid effective date format",
-                    recommendation="Use YYYY-MM-DD format for dates"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-DTE-002",
+                        severity=Severity.MINOR,
+                        message="Invalid effective date format",
+                        recommendation="Use YYYY-MM-DD format for dates",
+                    )
+                )
 
         # Check review date
         if self.document.review_date:
             try:
                 review_date = datetime.strptime(self.document.review_date, "%Y-%m-%d")
                 if review_date < self.today:
-                    self.findings.append(ValidationFinding(
-                        rule="DOC-DTE-003",
-                        severity=Severity.MAJOR,
-                        message="Document is overdue for review",
-                        recommendation="Initiate periodic review process"
-                    ))
+                    self.findings.append(
+                        ValidationFinding(
+                            rule="DOC-DTE-003",
+                            severity=Severity.MAJOR,
+                            message="Document is overdue for review",
+                            recommendation="Initiate periodic review process",
+                        )
+                    )
                 elif review_date < self.today + timedelta(days=30):
-                    self.findings.append(ValidationFinding(
-                        rule="DOC-DTE-004",
-                        severity=Severity.MINOR,
-                        message="Document review due within 30 days",
-                        recommendation="Plan for upcoming review"
-                    ))
+                    self.findings.append(
+                        ValidationFinding(
+                            rule="DOC-DTE-004",
+                            severity=Severity.MINOR,
+                            message="Document review due within 30 days",
+                            recommendation="Plan for upcoming review",
+                        )
+                    )
             except ValueError:
-                self.findings.append(ValidationFinding(
-                    rule="DOC-DTE-005",
-                    severity=Severity.MINOR,
-                    message="Invalid review date format",
-                    recommendation="Use YYYY-MM-DD format for dates"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-DTE-005",
+                        severity=Severity.MINOR,
+                        message="Invalid review date format",
+                        recommendation="Use YYYY-MM-DD format for dates",
+                    )
+                )
         else:
             if self.document.status == DocumentStatus.EFFECTIVE.value:
-                self.findings.append(ValidationFinding(
-                    rule="DOC-DTE-006",
-                    severity=Severity.MINOR,
-                    message="Effective document missing review date",
-                    recommendation="Add next review date (typically 1-3 years from effective)"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-DTE-006",
+                        severity=Severity.MINOR,
+                        message="Effective document missing review date",
+                        recommendation="Add next review date (typically 1-3 years from effective)",
+                    )
+                )
 
     def _validate_approvals(self):
         """Validate document approval information."""
         if self.document.status in [DocumentStatus.APPROVED.value, DocumentStatus.EFFECTIVE.value]:
             if not self.document.author:
-                self.findings.append(ValidationFinding(
-                    rule="DOC-APR-001",
-                    severity=Severity.MAJOR,
-                    message="Document author not identified",
-                    recommendation="Document author on signature page"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-APR-001",
+                        severity=Severity.MAJOR,
+                        message="Document author not identified",
+                        recommendation="Document author on signature page",
+                    )
+                )
 
             if not self.document.approver:
-                self.findings.append(ValidationFinding(
-                    rule="DOC-APR-002",
-                    severity=Severity.CRITICAL,
-                    message="Document approver not identified",
-                    recommendation="Obtain required approval signatures"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-APR-002",
+                        severity=Severity.CRITICAL,
+                        message="Document approver not identified",
+                        recommendation="Obtain required approval signatures",
+                    )
+                )
 
     def _validate_change_history(self):
         """Validate change history completeness."""
         history = self.document.change_history
 
         if not history:
-            self.findings.append(ValidationFinding(
-                rule="DOC-CHG-001",
-                severity=Severity.MAJOR,
-                message="Document change history is missing",
-                recommendation="Include change history table with revision descriptions"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="DOC-CHG-001",
+                    severity=Severity.MAJOR,
+                    message="Document change history is missing",
+                    recommendation="Include change history table with revision descriptions",
+                )
+            )
             return
 
         for i, entry in enumerate(history):
-            if not entry.get('revision'):
-                self.findings.append(ValidationFinding(
-                    rule="DOC-CHG-002",
-                    severity=Severity.MINOR,
-                    message=f"Change history entry {i+1} missing revision number",
-                    recommendation="Include revision number for each history entry"
-                ))
+            if not entry.get("revision"):
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-CHG-002",
+                        severity=Severity.MINOR,
+                        message=f"Change history entry {i+1} missing revision number",
+                        recommendation="Include revision number for each history entry",
+                    )
+                )
 
-            if not entry.get('description'):
-                self.findings.append(ValidationFinding(
-                    rule="DOC-CHG-003",
-                    severity=Severity.MINOR,
-                    message=f"Change history entry {i+1} missing description",
-                    recommendation="Include description of changes for each revision"
-                ))
+            if not entry.get("description"):
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-CHG-003",
+                        severity=Severity.MINOR,
+                        message=f"Change history entry {i+1} missing description",
+                        recommendation="Include description of changes for each revision",
+                    )
+                )
 
-            if not entry.get('date'):
-                self.findings.append(ValidationFinding(
-                    rule="DOC-CHG-004",
-                    severity=Severity.MINOR,
-                    message=f"Change history entry {i+1} missing date",
-                    recommendation="Include date for each history entry"
-                ))
+            if not entry.get("date"):
+                self.findings.append(
+                    ValidationFinding(
+                        rule="DOC-CHG-004",
+                        severity=Severity.MINOR,
+                        message=f"Change history entry {i+1} missing date",
+                        recommendation="Include date for each history entry",
+                    )
+                )
 
     def _validate_electronic_controls(self):
         """Validate 21 CFR Part 11 requirements for electronic documents."""
         # Audit trail check
         if not self.document.has_audit_trail:
-            self.findings.append(ValidationFinding(
-                rule="P11-AUD-001",
-                severity=Severity.MAJOR,
-                message="Electronic document lacks audit trail",
-                recommendation="Enable audit trail for 21 CFR Part 11 compliance"
-            ))
+            self.findings.append(
+                ValidationFinding(
+                    rule="P11-AUD-001",
+                    severity=Severity.MAJOR,
+                    message="Electronic document lacks audit trail",
+                    recommendation="Enable audit trail for 21 CFR Part 11 compliance",
+                )
+            )
 
         # Electronic signature check
         if self.document.has_electronic_signature:
             if self.document.signature_components < 2:
-                self.findings.append(ValidationFinding(
-                    rule="P11-SIG-001",
-                    severity=Severity.CRITICAL,
-                    message="Electronic signature uses fewer than 2 identification components",
-                    recommendation="Use at least 2 components (e.g., user ID + password)"
-                ))
+                self.findings.append(
+                    ValidationFinding(
+                        rule="P11-SIG-001",
+                        severity=Severity.CRITICAL,
+                        message="Electronic signature uses fewer than 2 identification components",
+                        recommendation="Use at least 2 components (e.g., user ID + password)",
+                    )
+                )
         else:
-            if self.document.status in [DocumentStatus.APPROVED.value, DocumentStatus.EFFECTIVE.value]:
-                self.findings.append(ValidationFinding(
-                    rule="P11-SIG-002",
-                    severity=Severity.INFO,
-                    message="Document uses handwritten signatures",
-                    recommendation="Consider electronic signatures for efficiency"
-                ))
+            if self.document.status in [
+                DocumentStatus.APPROVED.value,
+                DocumentStatus.EFFECTIVE.value,
+            ]:
+                self.findings.append(
+                    ValidationFinding(
+                        rule="P11-SIG-002",
+                        severity=Severity.INFO,
+                        message="Document uses handwritten signatures",
+                        recommendation="Consider electronic signatures for efficiency",
+                    )
+                )
 
     def _calculate_compliance_score(self) -> float:
         """Calculate compliance score based on findings."""
@@ -399,7 +454,7 @@ class DocumentValidator:
             Severity.CRITICAL: 25,
             Severity.MAJOR: 10,
             Severity.MINOR: 3,
-            Severity.INFO: 0
+            Severity.INFO: 0,
         }
 
         total_deduction = sum(deductions[f.severity] for f in self.findings)
@@ -464,23 +519,27 @@ def format_text_output(result: ValidationResult) -> str:
     ]
 
     if result.findings:
-        lines.extend([
-            "",
-            "DETAILED FINDINGS",
-            "-" * 40,
-        ])
+        lines.extend(
+            [
+                "",
+                "DETAILED FINDINGS",
+                "-" * 40,
+            ]
+        )
 
         for finding in result.findings:
-            severity = finding['severity']
+            severity = finding["severity"]
             lines.append(f"\n[{severity}] {finding['rule']}")
             lines.append(f"  Issue: {finding['message']}")
             lines.append(f"  Action: {finding['recommendation']}")
 
-    lines.extend([
-        "",
-        "RECOMMENDATIONS",
-        "-" * 40,
-    ])
+    lines.extend(
+        [
+            "",
+            "RECOMMENDATIONS",
+            "-" * 40,
+        ]
+    )
 
     for i, rec in enumerate(result.recommendations, 1):
         lines.append(f"{i}. {rec}")
@@ -514,8 +573,8 @@ def interactive_mode():
     author = input("Author Name (or Enter to skip): ").strip() or None
     approver = input("Approver Name (or Enter to skip): ").strip() or None
 
-    has_audit = input("Has Audit Trail? (y/n): ").strip().lower() == 'y'
-    has_esig = input("Uses Electronic Signatures? (y/n): ").strip().lower() == 'y'
+    has_audit = input("Has Audit Trail? (y/n): ").strip().lower() == "y"
+    has_esig = input("Uses Electronic Signatures? (y/n): ").strip().lower() == "y"
 
     sig_components = 0
     if has_esig:
@@ -534,7 +593,7 @@ def interactive_mode():
         approver=approver,
         has_audit_trail=has_audit,
         has_electronic_signature=has_esig,
-        signature_components=sig_components
+        signature_components=sig_components,
     )
 
     validator = DocumentValidator(doc)
@@ -543,30 +602,11 @@ def interactive_mode():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Quality Documentation Validator"
-    )
-    parser.add_argument(
-        "--doc",
-        type=str,
-        help="JSON file with document metadata"
-    )
-    parser.add_argument(
-        "--output",
-        choices=["text", "json"],
-        default="text",
-        help="Output format"
-    )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode"
-    )
-    parser.add_argument(
-        "--sample",
-        action="store_true",
-        help="Generate sample document JSON"
-    )
+    parser = argparse.ArgumentParser(description="Quality Documentation Validator")
+    parser.add_argument("--doc", type=str, help="JSON file with document metadata")
+    parser.add_argument("--output", choices=["text", "json"], default="text", help="Output format")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
+    parser.add_argument("--sample", action="store_true", help="Generate sample document JSON")
 
     args = parser.parse_args()
 
@@ -588,12 +628,20 @@ def main():
             "approval_date": "2024-01-10",
             "change_history": [
                 {"revision": "01", "date": "2022-01-01", "description": "Initial release"},
-                {"revision": "02", "date": "2023-01-15", "description": "Updated approval workflow"},
-                {"revision": "03", "date": "2024-01-15", "description": "Added electronic signature requirements"}
+                {
+                    "revision": "02",
+                    "date": "2023-01-15",
+                    "description": "Updated approval workflow",
+                },
+                {
+                    "revision": "03",
+                    "date": "2024-01-15",
+                    "description": "Added electronic signature requirements",
+                },
             ],
             "has_audit_trail": True,
             "has_electronic_signature": True,
-            "signature_components": 2
+            "signature_components": 2,
         }
         print(json.dumps(sample, indent=2))
         return
@@ -616,7 +664,7 @@ def main():
             change_history=data.get("change_history", []),
             has_audit_trail=data.get("has_audit_trail", False),
             has_electronic_signature=data.get("has_electronic_signature", False),
-            signature_components=data.get("signature_components", 0)
+            signature_components=data.get("signature_components", 0),
         )
     else:
         # Demo document
@@ -630,7 +678,7 @@ def main():
             author="J. Smith",
             has_audit_trail=True,
             has_electronic_signature=True,
-            signature_components=2
+            signature_components=2,
         )
 
     validator = DocumentValidator(doc)

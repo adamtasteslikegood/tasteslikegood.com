@@ -33,22 +33,22 @@ class FormatDetector:
         """
         # Try JSON first
         if self._is_json():
-            self.detected_format = 'json'
-            return 'json'
+            self.detected_format = "json"
+            return "json"
 
         # Try YAML
         if self._is_yaml():
-            self.detected_format = 'yaml'
-            return 'yaml'
+            self.detected_format = "yaml"
+            return "yaml"
 
         # Check for URLs
         if self._contains_urls():
-            self.detected_format = 'url'
-            return 'url'
+            self.detected_format = "url"
+            return "url"
 
         # Default to conversational text
-        self.detected_format = 'text'
-        return 'text'
+        self.detected_format = "text"
+        return "text"
 
     def _is_json(self) -> bool:
         """Check if input is valid JSON."""
@@ -67,9 +67,9 @@ class FormatDetector:
         """
         # YAML indicators
         yaml_patterns = [
-            r'^\s*[\w\-]+\s*:',  # Key-value pairs
-            r'^\s*-\s+',  # List items
-            r':\s*$',  # Trailing colons
+            r"^\s*[\w\-]+\s*:",  # Key-value pairs
+            r"^\s*-\s+",  # List items
+            r":\s*$",  # Trailing colons
         ]
 
         # Must not be JSON
@@ -77,7 +77,7 @@ class FormatDetector:
             return False
 
         # Check for YAML patterns
-        lines = self.raw_input.split('\n')
+        lines = self.raw_input.split("\n")
         yaml_line_count = 0
 
         for line in lines:
@@ -94,7 +94,7 @@ class FormatDetector:
 
     def _contains_urls(self) -> bool:
         """Check if input contains URLs."""
-        url_pattern = r'https?://[^\s]+'
+        url_pattern = r"https?://[^\s]+"
         return bool(re.search(url_pattern, self.raw_input))
 
     def parse(self) -> Dict[str, Any]:
@@ -107,11 +107,11 @@ class FormatDetector:
         if self.detected_format is None:
             self.detect_format()
 
-        if self.detected_format == 'json':
+        if self.detected_format == "json":
             self.parsed_data = self._parse_json()
-        elif self.detected_format == 'yaml':
+        elif self.detected_format == "yaml":
             self.parsed_data = self._parse_yaml()
-        elif self.detected_format == 'url':
+        elif self.detected_format == "url":
             self.parsed_data = self._parse_urls()
         else:  # text
             self.parsed_data = self._parse_text()
@@ -124,7 +124,7 @@ class FormatDetector:
             data = json.loads(self.raw_input)
             return self._normalize_structure(data)
         except json.JSONDecodeError:
-            return {'error': 'Invalid JSON', 'raw': self.raw_input}
+            return {"error": "Invalid JSON", "raw": self.raw_input}
 
     def _parse_yaml(self) -> Dict[str, Any]:
         """
@@ -137,16 +137,16 @@ class FormatDetector:
         current_section = None
         current_list = None
 
-        lines = self.raw_input.split('\n')
+        lines = self.raw_input.split("\n")
 
         for line in lines:
             stripped = line.strip()
-            if not stripped or stripped.startswith('#'):
+            if not stripped or stripped.startswith("#"):
                 continue
 
             # Key-value pair
-            if ':' in stripped:
-                key, value = stripped.split(':', 1)
+            if ":" in stripped:
+                key, value = stripped.split(":", 1)
                 key = key.strip()
                 value = value.strip()
 
@@ -162,7 +162,7 @@ class FormatDetector:
                         result[key] = self._parse_value(value)
 
             # List item
-            elif stripped.startswith('-'):
+            elif stripped.startswith("-"):
                 item = stripped[1:].strip()
                 if current_section:
                     if current_list is None:
@@ -185,14 +185,14 @@ class FormatDetector:
         value = value.strip()
 
         # Boolean
-        if value.lower() in ['true', 'yes']:
+        if value.lower() in ["true", "yes"]:
             return True
-        if value.lower() in ['false', 'no']:
+        if value.lower() in ["false", "no"]:
             return False
 
         # Number
         try:
-            if '.' in value:
+            if "." in value:
                 return float(value)
             else:
                 return int(value)
@@ -209,25 +209,21 @@ class FormatDetector:
 
     def _parse_urls(self) -> Dict[str, Any]:
         """Parse URLs from input."""
-        url_pattern = r'https?://[^\s]+'
+        url_pattern = r"https?://[^\s]+"
         urls = re.findall(url_pattern, self.raw_input)
 
         # Categorize URLs
-        github_urls = [u for u in urls if 'github.com' in u]
-        npm_urls = [u for u in urls if 'npmjs.com' in u or 'npm.io' in u]
+        github_urls = [u for u in urls if "github.com" in u]
+        npm_urls = [u for u in urls if "npmjs.com" in u or "npm.io" in u]
         other_urls = [u for u in urls if u not in github_urls and u not in npm_urls]
 
         # Also extract any text context
-        text_without_urls = re.sub(url_pattern, '', self.raw_input).strip()
+        text_without_urls = re.sub(url_pattern, "", self.raw_input).strip()
 
         result = {
-            'format': 'url',
-            'urls': {
-                'github': github_urls,
-                'npm': npm_urls,
-                'other': other_urls
-            },
-            'context': text_without_urls
+            "format": "url",
+            "urls": {"github": github_urls, "npm": npm_urls, "other": other_urls},
+            "context": text_without_urls,
         }
 
         return self._normalize_structure(result)
@@ -249,12 +245,12 @@ class FormatDetector:
         analysis_type = self._detect_analysis_type(text)
 
         result = {
-            'format': 'text',
-            'technologies': technologies,
-            'use_case': use_case,
-            'priorities': priorities,
-            'analysis_type': analysis_type,
-            'raw_text': self.raw_input
+            "format": "text",
+            "technologies": technologies,
+            "use_case": use_case,
+            "priorities": priorities,
+            "analysis_type": analysis_type,
+            "raw_text": self.raw_input,
         }
 
         return self._normalize_structure(result)
@@ -271,12 +267,35 @@ class FormatDetector:
         """
         # Common technologies pattern
         tech_keywords = [
-            'react', 'vue', 'angular', 'svelte', 'next.js', 'nuxt.js',
-            'node.js', 'python', 'java', 'go', 'rust', 'ruby',
-            'postgresql', 'postgres', 'mysql', 'mongodb', 'redis',
-            'aws', 'azure', 'gcp', 'google cloud',
-            'docker', 'kubernetes', 'k8s',
-            'express', 'fastapi', 'django', 'flask', 'spring boot'
+            "react",
+            "vue",
+            "angular",
+            "svelte",
+            "next.js",
+            "nuxt.js",
+            "node.js",
+            "python",
+            "java",
+            "go",
+            "rust",
+            "ruby",
+            "postgresql",
+            "postgres",
+            "mysql",
+            "mongodb",
+            "redis",
+            "aws",
+            "azure",
+            "gcp",
+            "google cloud",
+            "docker",
+            "kubernetes",
+            "k8s",
+            "express",
+            "fastapi",
+            "django",
+            "flask",
+            "spring boot",
         ]
 
         found = []
@@ -284,18 +303,18 @@ class FormatDetector:
             if tech in text:
                 # Normalize names
                 normalized = {
-                    'postgres': 'PostgreSQL',
-                    'next.js': 'Next.js',
-                    'nuxt.js': 'Nuxt.js',
-                    'node.js': 'Node.js',
-                    'k8s': 'Kubernetes',
-                    'gcp': 'Google Cloud Platform'
+                    "postgres": "PostgreSQL",
+                    "next.js": "Next.js",
+                    "nuxt.js": "Nuxt.js",
+                    "node.js": "Node.js",
+                    "k8s": "Kubernetes",
+                    "gcp": "Google Cloud Platform",
                 }.get(tech, tech.title())
 
                 if normalized not in found:
                     found.append(normalized)
 
-        return found if found else ['Unknown']
+        return found if found else ["Unknown"]
 
     def _extract_use_case(self, text: str) -> str:
         """
@@ -308,21 +327,21 @@ class FormatDetector:
             Use case description
         """
         use_case_keywords = {
-            'real-time': 'Real-time application',
-            'collaboration': 'Collaboration platform',
-            'saas': 'SaaS application',
-            'dashboard': 'Dashboard application',
-            'api': 'API-heavy application',
-            'data-intensive': 'Data-intensive application',
-            'e-commerce': 'E-commerce platform',
-            'enterprise': 'Enterprise application'
+            "real-time": "Real-time application",
+            "collaboration": "Collaboration platform",
+            "saas": "SaaS application",
+            "dashboard": "Dashboard application",
+            "api": "API-heavy application",
+            "data-intensive": "Data-intensive application",
+            "e-commerce": "E-commerce platform",
+            "enterprise": "Enterprise application",
         }
 
         for keyword, description in use_case_keywords.items():
             if keyword in text:
                 return description
 
-        return 'General purpose application'
+        return "General purpose application"
 
     def _extract_priorities(self, text: str) -> list:
         """
@@ -335,14 +354,14 @@ class FormatDetector:
             List of priorities
         """
         priority_keywords = {
-            'performance': 'Performance',
-            'scalability': 'Scalability',
-            'developer experience': 'Developer experience',
-            'ecosystem': 'Ecosystem',
-            'learning curve': 'Learning curve',
-            'cost': 'Cost',
-            'security': 'Security',
-            'compliance': 'Compliance'
+            "performance": "Performance",
+            "scalability": "Scalability",
+            "developer experience": "Developer experience",
+            "ecosystem": "Ecosystem",
+            "learning curve": "Learning curve",
+            "cost": "Cost",
+            "security": "Security",
+            "compliance": "Compliance",
         }
 
         priorities = []
@@ -350,7 +369,7 @@ class FormatDetector:
             if keyword in text:
                 priorities.append(priority)
 
-        return priorities if priorities else ['Developer experience', 'Performance']
+        return priorities if priorities else ["Developer experience", "Performance"]
 
     def _detect_analysis_type(self, text: str) -> str:
         """
@@ -363,22 +382,22 @@ class FormatDetector:
             Analysis type
         """
         type_keywords = {
-            'migration': 'migration_analysis',
-            'migrate': 'migration_analysis',
-            'tco': 'tco_analysis',
-            'total cost': 'tco_analysis',
-            'security': 'security_analysis',
-            'compliance': 'security_analysis',
-            'compare': 'comparison',
-            'vs': 'comparison',
-            'evaluate': 'evaluation'
+            "migration": "migration_analysis",
+            "migrate": "migration_analysis",
+            "tco": "tco_analysis",
+            "total cost": "tco_analysis",
+            "security": "security_analysis",
+            "compliance": "security_analysis",
+            "compare": "comparison",
+            "vs": "comparison",
+            "evaluate": "evaluation",
         }
 
         for keyword, analysis_type in type_keywords.items():
             if keyword in text:
                 return analysis_type
 
-        return 'comparison'  # Default
+        return "comparison"  # Default
 
     def _normalize_structure(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -391,13 +410,7 @@ class FormatDetector:
             Normalized data structure
         """
         # Ensure standard keys exist
-        standard_keys = [
-            'technologies',
-            'use_case',
-            'priorities',
-            'analysis_type',
-            'format'
-        ]
+        standard_keys = ["technologies", "use_case", "priorities", "analysis_type", "format"]
 
         normalized = data.copy()
 
@@ -405,11 +418,11 @@ class FormatDetector:
             if key not in normalized:
                 # Set defaults
                 defaults = {
-                    'technologies': [],
-                    'use_case': 'general',
-                    'priorities': [],
-                    'analysis_type': 'comparison',
-                    'format': self.detected_format or 'unknown'
+                    "technologies": [],
+                    "use_case": "general",
+                    "priorities": [],
+                    "analysis_type": "comparison",
+                    "format": self.detected_format or "unknown",
                 }
                 normalized[key] = defaults.get(key)
 
@@ -423,8 +436,8 @@ class FormatDetector:
             Format detection metadata
         """
         return {
-            'detected_format': self.detected_format,
-            'input_length': len(self.raw_input),
-            'line_count': len(self.raw_input.split('\n')),
-            'parsing_successful': self.parsed_data is not None
+            "detected_format": self.detected_format,
+            "input_length": len(self.raw_input),
+            "line_count": len(self.raw_input.split("\n")),
+            "parsing_successful": self.parsed_data is not None,
         }

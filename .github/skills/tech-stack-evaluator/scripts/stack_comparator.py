@@ -21,7 +21,7 @@ class StackComparator:
         "learning_curve",
         "documentation",
         "community_support",
-        "enterprise_readiness"
+        "enterprise_readiness",
     ]
 
     # Default weights if not provided
@@ -33,7 +33,7 @@ class StackComparator:
         "learning_curve": 10,
         "documentation": 10,
         "community_support": 10,
-        "enterprise_readiness": 5
+        "enterprise_readiness": 5,
     }
 
     def __init__(self, comparison_data: Dict[str, Any]):
@@ -43,10 +43,10 @@ class StackComparator:
         Args:
             comparison_data: Dictionary containing technologies to compare and criteria
         """
-        self.technologies = comparison_data.get('technologies', [])
-        self.use_case = comparison_data.get('use_case', 'general')
-        self.priorities = comparison_data.get('priorities', {})
-        self.weights = self._normalize_weights(comparison_data.get('weights', {}))
+        self.technologies = comparison_data.get("technologies", [])
+        self.use_case = comparison_data.get("use_case", "general")
+        self.priorities = comparison_data.get("priorities", {})
+        self.weights = self._normalize_weights(comparison_data.get("weights", {}))
         self.scores = {}
 
     def _normalize_weights(self, custom_weights: Dict[str, float]) -> Dict[str, float]:
@@ -87,7 +87,7 @@ class StackComparator:
 
         for category in self.FEATURE_CATEGORIES:
             # Get raw score from tech data (0-100 scale)
-            raw_score = tech_data.get(category, {}).get('score', 50.0)
+            raw_score = tech_data.get(category, {}).get("score", 50.0)
 
             # Apply use-case specific adjustments
             adjusted_score = self._adjust_for_use_case(category, raw_score, tech_name)
@@ -110,18 +110,12 @@ class StackComparator:
         """
         # Use case specific bonuses/penalties
         adjustments = {
-            'real-time': {
-                'performance': 1.1,  # 10% bonus for real-time use cases
-                'scalability': 1.1
+            "real-time": {
+                "performance": 1.1,  # 10% bonus for real-time use cases
+                "scalability": 1.1,
             },
-            'enterprise': {
-                'enterprise_readiness': 1.2,  # 20% bonus
-                'documentation': 1.1
-            },
-            'startup': {
-                'developer_experience': 1.15,
-                'learning_curve': 1.1
-            }
+            "enterprise": {"enterprise_readiness": 1.2, "documentation": 1.1},  # 20% bonus
+            "startup": {"developer_experience": 1.15, "learning_curve": 1.1},
         }
 
         # Determine use case type
@@ -169,37 +163,41 @@ class StackComparator:
             Comparison results with scores and recommendation
         """
         results = {
-            'technologies': {},
-            'recommendation': None,
-            'confidence': 0.0,
-            'decision_factors': [],
-            'comparison_matrix': []
+            "technologies": {},
+            "recommendation": None,
+            "confidence": 0.0,
+            "decision_factors": [],
+            "comparison_matrix": [],
         }
 
         # Score each technology
         tech_scores = {}
         for tech_data in tech_data_list:
-            tech_name = tech_data.get('name', 'Unknown')
+            tech_name = tech_data.get("name", "Unknown")
             category_scores = self.score_technology(tech_name, tech_data)
             weighted_score = self.calculate_weighted_score(category_scores)
 
             tech_scores[tech_name] = {
-                'category_scores': category_scores,
-                'weighted_total': weighted_score,
-                'strengths': self._identify_strengths(category_scores),
-                'weaknesses': self._identify_weaknesses(category_scores)
+                "category_scores": category_scores,
+                "weighted_total": weighted_score,
+                "strengths": self._identify_strengths(category_scores),
+                "weaknesses": self._identify_weaknesses(category_scores),
             }
 
-        results['technologies'] = tech_scores
+        results["technologies"] = tech_scores
 
         # Generate recommendation
-        results['recommendation'], results['confidence'] = self._generate_recommendation(tech_scores)
-        results['decision_factors'] = self._extract_decision_factors(tech_scores)
-        results['comparison_matrix'] = self._build_comparison_matrix(tech_scores)
+        results["recommendation"], results["confidence"] = self._generate_recommendation(
+            tech_scores
+        )
+        results["decision_factors"] = self._extract_decision_factors(tech_scores)
+        results["comparison_matrix"] = self._build_comparison_matrix(tech_scores)
 
         return results
 
-    def _identify_strengths(self, category_scores: Dict[str, float], threshold: float = 75.0) -> List[str]:
+    def _identify_strengths(
+        self, category_scores: Dict[str, float], threshold: float = 75.0
+    ) -> List[str]:
         """
         Identify strength categories (scores above threshold).
 
@@ -210,12 +208,11 @@ class StackComparator:
         Returns:
             List of strength categories
         """
-        return [
-            category for category, score in category_scores.items()
-            if score >= threshold
-        ]
+        return [category for category, score in category_scores.items() if score >= threshold]
 
-    def _identify_weaknesses(self, category_scores: Dict[str, float], threshold: float = 50.0) -> List[str]:
+    def _identify_weaknesses(
+        self, category_scores: Dict[str, float], threshold: float = 50.0
+    ) -> List[str]:
         """
         Identify weakness categories (scores below threshold).
 
@@ -226,10 +223,7 @@ class StackComparator:
         Returns:
             List of weakness categories
         """
-        return [
-            category for category, score in category_scores.items()
-            if score < threshold
-        ]
+        return [category for category, score in category_scores.items() if score < threshold]
 
     def _generate_recommendation(self, tech_scores: Dict[str, Dict[str, Any]]) -> Tuple[str, float]:
         """
@@ -246,17 +240,15 @@ class StackComparator:
 
         # Sort by weighted total score
         sorted_techs = sorted(
-            tech_scores.items(),
-            key=lambda x: x[1]['weighted_total'],
-            reverse=True
+            tech_scores.items(), key=lambda x: x[1]["weighted_total"], reverse=True
         )
 
         top_tech = sorted_techs[0][0]
-        top_score = sorted_techs[0][1]['weighted_total']
+        top_score = sorted_techs[0][1]["weighted_total"]
 
         # Calculate confidence based on score gap
         if len(sorted_techs) > 1:
-            second_score = sorted_techs[1][1]['weighted_total']
+            second_score = sorted_techs[1][1]["weighted_total"]
             score_gap = top_score - second_score
 
             # Confidence increases with score gap
@@ -274,7 +266,9 @@ class StackComparator:
 
         return top_tech, min(100.0, confidence)
 
-    def _extract_decision_factors(self, tech_scores: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _extract_decision_factors(
+        self, tech_scores: Dict[str, Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Extract key decision factors from comparison.
 
@@ -287,32 +281,34 @@ class StackComparator:
         factors = []
 
         # Get top weighted categories
-        sorted_weights = sorted(
-            self.weights.items(),
-            key=lambda x: x[1],
-            reverse=True
-        )[:3]  # Top 3 factors
+        sorted_weights = sorted(self.weights.items(), key=lambda x: x[1], reverse=True)[
+            :3
+        ]  # Top 3 factors
 
         for category, weight in sorted_weights:
             # Get scores for this category across all techs
             category_scores = {
-                tech: scores['category_scores'].get(category, 0.0)
+                tech: scores["category_scores"].get(category, 0.0)
                 for tech, scores in tech_scores.items()
             }
 
             # Find best performer
             best_tech = max(category_scores.items(), key=lambda x: x[1])
 
-            factors.append({
-                'category': category,
-                'importance': f"{weight:.1f}%",
-                'best_performer': best_tech[0],
-                'score': best_tech[1]
-            })
+            factors.append(
+                {
+                    "category": category,
+                    "importance": f"{weight:.1f}%",
+                    "best_performer": best_tech[0],
+                    "score": best_tech[1],
+                }
+            )
 
         return factors
 
-    def _build_comparison_matrix(self, tech_scores: Dict[str, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _build_comparison_matrix(
+        self, tech_scores: Dict[str, Dict[str, Any]]
+    ) -> List[Dict[str, Any]]:
         """
         Build comparison matrix for display.
 
@@ -326,32 +322,30 @@ class StackComparator:
 
         for category in self.FEATURE_CATEGORIES:
             row = {
-                'category': category,
-                'weight': f"{self.weights.get(category, 0):.1f}%",
-                'scores': {}
+                "category": category,
+                "weight": f"{self.weights.get(category, 0):.1f}%",
+                "scores": {},
             }
 
             for tech_name, scores in tech_scores.items():
-                category_score = scores['category_scores'].get(category, 0.0)
-                row['scores'][tech_name] = f"{category_score:.1f}"
+                category_score = scores["category_scores"].get(category, 0.0)
+                row["scores"][tech_name] = f"{category_score:.1f}"
 
             matrix.append(row)
 
         # Add weighted totals row
-        totals_row = {
-            'category': 'WEIGHTED TOTAL',
-            'weight': '100%',
-            'scores': {}
-        }
+        totals_row = {"category": "WEIGHTED TOTAL", "weight": "100%", "scores": {}}
 
         for tech_name, scores in tech_scores.items():
-            totals_row['scores'][tech_name] = f"{scores['weighted_total']:.1f}"
+            totals_row["scores"][tech_name] = f"{scores['weighted_total']:.1f}"
 
         matrix.append(totals_row)
 
         return matrix
 
-    def generate_pros_cons(self, tech_name: str, tech_scores: Dict[str, Any]) -> Dict[str, List[str]]:
+    def generate_pros_cons(
+        self, tech_name: str, tech_scores: Dict[str, Any]
+    ) -> Dict[str, List[str]]:
         """
         Generate pros and cons for a technology.
 
@@ -362,9 +356,9 @@ class StackComparator:
         Returns:
             Dictionary with 'pros' and 'cons' lists
         """
-        category_scores = tech_scores['category_scores']
-        strengths = tech_scores['strengths']
-        weaknesses = tech_scores['weaknesses']
+        category_scores = tech_scores["category_scores"]
+        strengths = tech_scores["strengths"]
+        weaknesses = tech_scores["weaknesses"]
 
         pros = []
         cons = []
@@ -386,4 +380,4 @@ class StackComparator:
         if len(cons) == 0:
             cons.append(f"No significant weaknesses identified")
 
-        return {'pros': pros, 'cons': cons}
+        return {"pros": pros, "cons": cons}

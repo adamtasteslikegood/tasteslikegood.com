@@ -53,20 +53,14 @@ def fix_recipe_ids():
                 else:
                     # Handle string data (shouldn't happen, but just in case)
                     if isinstance(recipe.data, str):
-                        logger.warning(
-                            f"Recipe '{recipe.name}' has string data - parsing"
-                        )
+                        logger.warning(f"Recipe '{recipe.name}' has string data - parsing")
                         try:
                             data = json.loads(recipe.data)
                         except:
-                            logger.error(
-                                f"Failed to parse data for '{recipe.name}' - skipping"
-                            )
+                            logger.error(f"Failed to parse data for '{recipe.name}' - skipping")
                             continue
                     else:
-                        data = (
-                            recipe.data.copy() if isinstance(recipe.data, dict) else {}
-                        )
+                        data = recipe.data.copy() if isinstance(recipe.data, dict) else {}
 
                     # Check if data has an id field and if it differs from the database id
                     data_id = data.get("id")
@@ -89,9 +83,7 @@ def fix_recipe_ids():
 
                     # Verify the change took effect
                     db.session.flush()
-                    logger.debug(
-                        f"  Verified: recipe.data['id'] = {recipe.data.get('id')}"
-                    )
+                    logger.debug(f"  Verified: recipe.data['id'] = {recipe.data.get('id')}")
 
             if updated_count > 0:
                 logger.info(f"Committing {updated_count} changes to database...")

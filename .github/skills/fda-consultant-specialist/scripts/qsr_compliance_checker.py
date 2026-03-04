@@ -20,7 +20,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 
-
 # QSR sections and requirements
 QSR_REQUIREMENTS = {
     "820.20": {
@@ -30,21 +29,21 @@ QSR_REQUIREMENTS = {
                 "title": "Quality Policy",
                 "required_evidence": ["quality_policy", "quality_manual", "quality_objectives"],
                 "doc_patterns": ["quality_policy*", "quality_manual*", "qms_manual*"],
-                "keywords": ["quality policy", "quality objectives", "management commitment"]
+                "keywords": ["quality policy", "quality objectives", "management commitment"],
             },
             "820.20(b)": {
                 "title": "Organization",
                 "required_evidence": ["org_chart", "job_descriptions", "authority_matrix"],
                 "doc_patterns": ["org_chart*", "organization*", "job_desc*", "authority*"],
-                "keywords": ["organizational structure", "responsibility", "authority"]
+                "keywords": ["organizational structure", "responsibility", "authority"],
             },
             "820.20(c)": {
                 "title": "Management Review",
                 "required_evidence": ["management_review_procedure", "management_review_records"],
                 "doc_patterns": ["management_review*", "mgmt_review*", "qmr*"],
-                "keywords": ["management review", "review meeting", "quality system effectiveness"]
-            }
-        }
+                "keywords": ["management review", "review meeting", "quality system effectiveness"],
+            },
+        },
     },
     "820.30": {
         "title": "Design Controls",
@@ -53,57 +52,57 @@ QSR_REQUIREMENTS = {
                 "title": "Design and Development Planning",
                 "required_evidence": ["design_plan", "development_plan"],
                 "doc_patterns": ["design_plan*", "dev_plan*", "development_plan*"],
-                "keywords": ["design planning", "development phases", "design milestones"]
+                "keywords": ["design planning", "development phases", "design milestones"],
             },
             "820.30(b)": {
                 "title": "Design Input",
                 "required_evidence": ["design_input", "requirements_specification"],
                 "doc_patterns": ["design_input*", "requirement*", "srs*", "prs*"],
-                "keywords": ["design input", "requirements", "user needs", "intended use"]
+                "keywords": ["design input", "requirements", "user needs", "intended use"],
             },
             "820.30(c)": {
                 "title": "Design Output",
                 "required_evidence": ["design_output", "specifications", "drawings"],
                 "doc_patterns": ["design_output*", "specification*", "drawing*", "bom*"],
-                "keywords": ["design output", "specifications", "acceptance criteria"]
+                "keywords": ["design output", "specifications", "acceptance criteria"],
             },
             "820.30(d)": {
                 "title": "Design Review",
                 "required_evidence": ["design_review_procedure", "design_review_records"],
                 "doc_patterns": ["design_review*", "dr_record*", "dr_minutes*"],
-                "keywords": ["design review", "review meeting", "design evaluation"]
+                "keywords": ["design review", "review meeting", "design evaluation"],
             },
             "820.30(e)": {
                 "title": "Design Verification",
                 "required_evidence": ["verification_plan", "verification_results"],
                 "doc_patterns": ["verification*", "test_report*", "dv_*"],
-                "keywords": ["verification", "testing", "design verification"]
+                "keywords": ["verification", "testing", "design verification"],
             },
             "820.30(f)": {
                 "title": "Design Validation",
                 "required_evidence": ["validation_plan", "validation_results"],
                 "doc_patterns": ["validation*", "clinical*", "usability*", "val_*"],
-                "keywords": ["validation", "user needs", "intended use", "clinical evaluation"]
+                "keywords": ["validation", "user needs", "intended use", "clinical evaluation"],
             },
             "820.30(g)": {
                 "title": "Design Transfer",
                 "required_evidence": ["transfer_checklist", "transfer_verification"],
                 "doc_patterns": ["transfer*", "production_release*"],
-                "keywords": ["design transfer", "manufacturing", "production"]
+                "keywords": ["design transfer", "manufacturing", "production"],
             },
             "820.30(h)": {
                 "title": "Design Changes",
                 "required_evidence": ["change_control_procedure", "change_records"],
                 "doc_patterns": ["change_control*", "ecn*", "eco*", "dcr*"],
-                "keywords": ["design change", "change control", "modification"]
+                "keywords": ["design change", "change control", "modification"],
             },
             "820.30(i)": {
                 "title": "Design History File",
                 "required_evidence": ["dhf_index", "dhf"],
                 "doc_patterns": ["dhf*", "design_history*"],
-                "keywords": ["design history file", "DHF", "design records"]
-            }
-        }
+                "keywords": ["design history file", "DHF", "design records"],
+            },
+        },
     },
     "820.40": {
         "title": "Document Controls",
@@ -112,15 +111,15 @@ QSR_REQUIREMENTS = {
                 "title": "Document Approval and Distribution",
                 "required_evidence": ["document_control_procedure"],
                 "doc_patterns": ["document_control*", "doc_control*", "sop_document*"],
-                "keywords": ["document approval", "document distribution", "controlled documents"]
+                "keywords": ["document approval", "document distribution", "controlled documents"],
             },
             "820.40(b)": {
                 "title": "Document Changes",
                 "required_evidence": ["document_change_procedure", "revision_history"],
                 "doc_patterns": ["revision_history*", "document_change*"],
-                "keywords": ["document change", "revision", "document modification"]
-            }
-        }
+                "keywords": ["document change", "revision", "document modification"],
+            },
+        },
     },
     "820.50": {
         "title": "Purchasing Controls",
@@ -129,15 +128,15 @@ QSR_REQUIREMENTS = {
                 "title": "Evaluation of Suppliers",
                 "required_evidence": ["supplier_qualification_procedure", "approved_supplier_list"],
                 "doc_patterns": ["supplier*", "asl*", "vendor*"],
-                "keywords": ["supplier evaluation", "approved supplier", "vendor qualification"]
+                "keywords": ["supplier evaluation", "approved supplier", "vendor qualification"],
             },
             "820.50(b)": {
                 "title": "Purchasing Data",
                 "required_evidence": ["purchasing_procedure", "purchase_order_requirements"],
                 "doc_patterns": ["purchas*", "procurement*"],
-                "keywords": ["purchasing data", "specifications", "quality requirements"]
-            }
-        }
+                "keywords": ["purchasing data", "specifications", "quality requirements"],
+            },
+        },
     },
     "820.70": {
         "title": "Production and Process Controls",
@@ -146,57 +145,57 @@ QSR_REQUIREMENTS = {
                 "title": "General Process Controls",
                 "required_evidence": ["manufacturing_procedures", "work_instructions"],
                 "doc_patterns": ["manufacturing*", "production*", "work_instruction*", "wi_*"],
-                "keywords": ["manufacturing process", "production", "process parameters"]
+                "keywords": ["manufacturing process", "production", "process parameters"],
             },
             "820.70(b)": {
                 "title": "Production and Process Changes",
                 "required_evidence": ["process_change_procedure"],
                 "doc_patterns": ["process_change*", "manufacturing_change*"],
-                "keywords": ["process change", "production change", "change control"]
+                "keywords": ["process change", "production change", "change control"],
             },
             "820.70(c)": {
                 "title": "Environmental Control",
                 "required_evidence": ["environmental_control_procedure", "monitoring_records"],
                 "doc_patterns": ["environmental*", "cleanroom*", "env_monitoring*"],
-                "keywords": ["environmental control", "cleanroom", "contamination"]
+                "keywords": ["environmental control", "cleanroom", "contamination"],
             },
             "820.70(d)": {
                 "title": "Personnel",
                 "required_evidence": ["training_procedure", "training_records"],
                 "doc_patterns": ["training*", "personnel*", "competency*"],
-                "keywords": ["training", "personnel qualification", "competency"]
+                "keywords": ["training", "personnel qualification", "competency"],
             },
             "820.70(e)": {
                 "title": "Contamination Control",
                 "required_evidence": ["contamination_control_procedure"],
                 "doc_patterns": ["contamination*", "cleaning*", "hygiene*"],
-                "keywords": ["contamination", "cleaning", "hygiene"]
+                "keywords": ["contamination", "cleaning", "hygiene"],
             },
             "820.70(f)": {
                 "title": "Buildings",
                 "required_evidence": ["facility_requirements"],
                 "doc_patterns": ["facility*", "building*"],
-                "keywords": ["facility", "buildings", "manufacturing area"]
+                "keywords": ["facility", "buildings", "manufacturing area"],
             },
             "820.70(g)": {
                 "title": "Equipment",
                 "required_evidence": ["equipment_maintenance_procedure", "maintenance_records"],
                 "doc_patterns": ["equipment*", "maintenance*", "preventive_maintenance*"],
-                "keywords": ["equipment", "maintenance", "calibration"]
+                "keywords": ["equipment", "maintenance", "calibration"],
             },
             "820.70(h)": {
                 "title": "Manufacturing Material",
                 "required_evidence": ["material_handling_procedure"],
                 "doc_patterns": ["material*", "handling*", "storage*"],
-                "keywords": ["manufacturing material", "handling", "storage"]
+                "keywords": ["manufacturing material", "handling", "storage"],
             },
             "820.70(i)": {
                 "title": "Automated Processes",
                 "required_evidence": ["software_validation", "automated_process_validation"],
                 "doc_patterns": ["software_val*", "csv*", "automation*"],
-                "keywords": ["software validation", "automated", "computer system"]
-            }
-        }
+                "keywords": ["software validation", "automated", "computer system"],
+            },
+        },
     },
     "820.72": {
         "title": "Inspection, Measuring, and Test Equipment",
@@ -205,15 +204,15 @@ QSR_REQUIREMENTS = {
                 "title": "Calibration",
                 "required_evidence": ["calibration_procedure", "calibration_records"],
                 "doc_patterns": ["calibration*", "cal_*"],
-                "keywords": ["calibration", "accuracy", "measurement"]
+                "keywords": ["calibration", "accuracy", "measurement"],
             },
             "820.72(b)": {
                 "title": "Calibration Standards",
                 "required_evidence": ["calibration_standards", "traceability_records"],
                 "doc_patterns": ["calibration_standard*", "nist*", "traceability*"],
-                "keywords": ["calibration standards", "NIST", "traceability"]
-            }
-        }
+                "keywords": ["calibration standards", "NIST", "traceability"],
+            },
+        },
     },
     "820.75": {
         "title": "Process Validation",
@@ -222,15 +221,15 @@ QSR_REQUIREMENTS = {
                 "title": "Process Validation Requirements",
                 "required_evidence": ["process_validation_procedure", "validation_protocols"],
                 "doc_patterns": ["process_validation*", "pv_*", "validation_protocol*"],
-                "keywords": ["process validation", "IQ", "OQ", "PQ"]
+                "keywords": ["process validation", "IQ", "OQ", "PQ"],
             },
             "820.75(b)": {
                 "title": "Validation Monitoring",
                 "required_evidence": ["validation_monitoring", "revalidation_criteria"],
                 "doc_patterns": ["revalidation*", "validation_monitoring*"],
-                "keywords": ["monitoring", "revalidation", "process performance"]
-            }
-        }
+                "keywords": ["monitoring", "revalidation", "process performance"],
+            },
+        },
     },
     "820.90": {
         "title": "Nonconforming Product",
@@ -239,15 +238,15 @@ QSR_REQUIREMENTS = {
                 "title": "Nonconforming Product Control",
                 "required_evidence": ["ncr_procedure", "nonconforming_records"],
                 "doc_patterns": ["ncr*", "nonconform*", "nc_*"],
-                "keywords": ["nonconforming", "NCR", "disposition"]
+                "keywords": ["nonconforming", "NCR", "disposition"],
             },
             "820.90(b)": {
                 "title": "Nonconformance Review",
                 "required_evidence": ["ncr_review_procedure"],
                 "doc_patterns": ["ncr_review*", "mrb*"],
-                "keywords": ["review", "disposition", "concession"]
-            }
-        }
+                "keywords": ["review", "disposition", "concession"],
+            },
+        },
     },
     "820.100": {
         "title": "Corrective and Preventive Action",
@@ -256,9 +255,9 @@ QSR_REQUIREMENTS = {
                 "title": "CAPA Procedure",
                 "required_evidence": ["capa_procedure", "capa_records"],
                 "doc_patterns": ["capa*", "corrective*", "preventive*"],
-                "keywords": ["CAPA", "corrective action", "preventive action", "root cause"]
+                "keywords": ["CAPA", "corrective action", "preventive action", "root cause"],
             }
-        }
+        },
     },
     "820.120": {
         "title": "Device Labeling",
@@ -267,9 +266,9 @@ QSR_REQUIREMENTS = {
                 "title": "Labeling Controls",
                 "required_evidence": ["labeling_procedure", "label_inspection"],
                 "doc_patterns": ["label*", "labeling*"],
-                "keywords": ["labeling", "label inspection", "UDI"]
+                "keywords": ["labeling", "label inspection", "UDI"],
             }
-        }
+        },
     },
     "820.180": {
         "title": "General Requirements - Records",
@@ -278,9 +277,9 @@ QSR_REQUIREMENTS = {
                 "title": "Records Requirements",
                 "required_evidence": ["records_management_procedure", "retention_schedule"],
                 "doc_patterns": ["record*", "retention*", "archive*"],
-                "keywords": ["records", "retention", "archive", "backup"]
+                "keywords": ["records", "retention", "archive", "backup"],
             }
-        }
+        },
     },
     "820.181": {
         "title": "Device Master Record",
@@ -289,9 +288,9 @@ QSR_REQUIREMENTS = {
                 "title": "DMR Contents",
                 "required_evidence": ["dmr_index", "dmr"],
                 "doc_patterns": ["dmr*", "device_master*"],
-                "keywords": ["device master record", "DMR", "specifications"]
+                "keywords": ["device master record", "DMR", "specifications"],
             }
-        }
+        },
     },
     "820.184": {
         "title": "Device History Record",
@@ -300,9 +299,9 @@ QSR_REQUIREMENTS = {
                 "title": "DHR Contents",
                 "required_evidence": ["dhr_template", "dhr_records"],
                 "doc_patterns": ["dhr*", "device_history*", "batch_record*"],
-                "keywords": ["device history record", "DHR", "production record"]
+                "keywords": ["device history record", "DHR", "production record"],
             }
-        }
+        },
     },
     "820.198": {
         "title": "Complaint Files",
@@ -311,20 +310,16 @@ QSR_REQUIREMENTS = {
                 "title": "Complaint Handling",
                 "required_evidence": ["complaint_procedure", "complaint_records"],
                 "doc_patterns": ["complaint*", "customer_feedback*"],
-                "keywords": ["complaint", "customer feedback", "MDR"]
+                "keywords": ["complaint", "customer feedback", "MDR"],
             }
-        }
-    }
+        },
+    },
 }
 
 
 def search_documentation(project_dir: Path, patterns: List[str], keywords: List[str]) -> Dict:
     """Search for documentation matching patterns and keywords."""
-    result = {
-        "documents_found": [],
-        "keyword_matches": [],
-        "evidence_strength": "none"
-    }
+    result = {"documents_found": [], "keyword_matches": [], "evidence_strength": "none"}
 
     # Common documentation directories
     doc_dirs = [
@@ -336,7 +331,7 @@ def search_documentation(project_dir: Path, patterns: List[str], keywords: List[
         project_dir / "sops",
         project_dir / "dhf",
         project_dir / "dmr",
-        project_dir
+        project_dir,
     ]
 
     # Search for document patterns
@@ -346,7 +341,9 @@ def search_documentation(project_dir: Path, patterns: List[str], keywords: List[
 
         for pattern in patterns:
             for ext in ["*.md", "*.pdf", "*.docx", "*.doc", "*.txt"]:
-                full_pattern = f"**/{pattern}{ext}" if not pattern.endswith("*") else f"**/{pattern[:-1]}{ext}"
+                full_pattern = (
+                    f"**/{pattern}{ext}" if not pattern.endswith("*") else f"**/{pattern[:-1]}{ext}"
+                )
                 try:
                     matches = list(doc_dir.glob(full_pattern))
                     for match in matches:
@@ -365,7 +362,7 @@ def search_documentation(project_dir: Path, patterns: List[str], keywords: List[
             try:
                 for file_path in doc_dir.glob(f"**/{ext}"):
                     try:
-                        content = file_path.read_text(encoding='utf-8', errors='ignore').lower()
+                        content = file_path.read_text(encoding="utf-8", errors="ignore").lower()
                         for keyword in keywords:
                             if keyword.lower() in content:
                                 rel_path = str(file_path.relative_to(project_dir))
@@ -395,14 +392,12 @@ def assess_section(project_dir: Path, section_id: str, section_data: Dict) -> Di
         "subsections": [],
         "compliance_score": 0,
         "total_subsections": len(section_data["subsections"]),
-        "compliant_subsections": 0
+        "compliant_subsections": 0,
     }
 
     for subsection_id, subsection_data in section_data["subsections"].items():
         evidence = search_documentation(
-            project_dir,
-            subsection_data["doc_patterns"],
-            subsection_data["keywords"]
+            project_dir, subsection_data["doc_patterns"], subsection_data["keywords"]
         )
 
         subsection_result = {
@@ -410,9 +405,11 @@ def assess_section(project_dir: Path, section_id: str, section_data: Dict) -> Di
             "title": subsection_data["title"],
             "required_evidence": subsection_data["required_evidence"],
             "evidence_found": evidence,
-            "status": "gap" if evidence["evidence_strength"] == "none" else (
-                "partial" if evidence["evidence_strength"] == "partial" else "compliant"
-            )
+            "status": (
+                "gap"
+                if evidence["evidence_strength"] == "none"
+                else ("partial" if evidence["evidence_strength"] == "partial" else "compliant")
+            ),
         }
 
         if subsection_result["status"] == "compliant":
@@ -442,7 +439,7 @@ def generate_gap_report(assessment_results: List[Dict]) -> Dict:
                     "section": subsection["subsection"],
                     "title": subsection["title"],
                     "status": subsection["status"],
-                    "missing_evidence": subsection["required_evidence"]
+                    "missing_evidence": subsection["required_evidence"],
                 }
                 gaps.append(gap)
 
@@ -459,7 +456,7 @@ def generate_gap_report(assessment_results: List[Dict]) -> Dict:
         "total_gaps": len([g for g in gaps if g["status"] == "gap"]),
         "total_partial": len([g for g in gaps if g["status"] == "partial"]),
         "gaps": gaps,
-        "priority_recommendations": recommendations[:10]  # Top 10
+        "priority_recommendations": recommendations[:10],  # Top 10
     }
 
 
@@ -474,7 +471,9 @@ def calculate_overall_compliance(assessment_results: List[Dict]) -> Dict:
         compliant_subsections += section["compliant_subsections"]
         section_scores[section["section"]] = section["compliance_score"]
 
-    overall_score = round((compliant_subsections / total_subsections) * 100, 1) if total_subsections > 0 else 0
+    overall_score = (
+        round((compliant_subsections / total_subsections) * 100, 1) if total_subsections > 0 else 0
+    )
 
     # Determine compliance level
     if overall_score >= 90:
@@ -495,7 +494,7 @@ def calculate_overall_compliance(assessment_results: List[Dict]) -> Dict:
         "compliance_level": level,
         "total_subsections": total_subsections,
         "compliant_subsections": compliant_subsections,
-        "section_scores": section_scores
+        "section_scores": section_scores,
     }
 
 
@@ -515,7 +514,9 @@ def print_text_report(result: Dict) -> None:
     print("\n--- SECTION SCORES ---")
     for section in result["assessment"]:
         status = "OK" if section["compliance_score"] >= 70 else "GAP"
-        print(f"  {section['section']} {section['title']}: {section['compliance_score']}% [{status}]")
+        print(
+            f"  {section['section']} {section['title']}: {section['compliance_score']}% [{status}]"
+        )
 
     # Gap analysis
     gap_report = result["gap_report"]
@@ -548,21 +549,12 @@ def main():
         "project_dir",
         nargs="?",
         default=".",
-        help="Project directory to analyze (default: current directory)"
+        help="Project directory to analyze (default: current directory)",
     )
+    parser.add_argument("--section", help="Analyze specific QSR section only (e.g., 820.30)")
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
     parser.add_argument(
-        "--section",
-        help="Analyze specific QSR section only (e.g., 820.30)"
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format"
-    )
-    parser.add_argument(
-        "--detailed",
-        action="store_true",
-        help="Include detailed evidence in output"
+        "--detailed", action="store_true", help="Include detailed evidence in output"
     )
 
     args = parser.parse_args()
@@ -596,16 +588,20 @@ def main():
         "project_dir": str(project_dir),
         "assessment_date": datetime.now().isoformat(),
         "overall_compliance": overall_compliance,
-        "assessment": assessment_results if args.detailed else [
-            {
-                "section": s["section"],
-                "title": s["title"],
-                "compliance_score": s["compliance_score"],
-                "status": "compliant" if s["compliance_score"] >= 70 else "gap"
-            }
-            for s in assessment_results
-        ],
-        "gap_report": gap_report
+        "assessment": (
+            assessment_results
+            if args.detailed
+            else [
+                {
+                    "section": s["section"],
+                    "title": s["title"],
+                    "compliance_score": s["compliance_score"],
+                    "status": "compliant" if s["compliance_score"] >= 70 else "gap",
+                }
+                for s in assessment_results
+            ]
+        ),
+        "gap_report": gap_report,
     }
 
     if args.json:

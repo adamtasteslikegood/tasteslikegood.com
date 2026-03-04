@@ -20,7 +20,6 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
 
-
 # HIPAA Security Rule safeguards
 HIPAA_SAFEGUARDS = {
     "administrative": {
@@ -31,65 +30,65 @@ HIPAA_SAFEGUARDS = {
                 "requirement": "Risk analysis, risk management, sanction policy",
                 "doc_patterns": ["risk_assessment*", "security_policy*", "sanction*"],
                 "code_patterns": [],
-                "weight": 10
+                "weight": 10,
             },
             "security_officer": {
                 "title": "Assigned Security Responsibility",
                 "requirement": "Designated security official",
                 "doc_patterns": ["security_officer*", "hipaa_officer*", "privacy_officer*"],
                 "code_patterns": [],
-                "weight": 5
+                "weight": 5,
             },
             "workforce_security": {
                 "title": "Workforce Security",
                 "requirement": "Authorization/supervision, clearance, termination procedures",
                 "doc_patterns": ["access_control*", "termination*", "hr_security*"],
                 "code_patterns": [],
-                "weight": 5
+                "weight": 5,
             },
             "access_management": {
                 "title": "Information Access Management",
                 "requirement": "Access authorization, establishment, modification",
                 "doc_patterns": ["access_management*", "role_definition*", "access_control*"],
                 "code_patterns": [r"role.*based", r"permission", r"authorization"],
-                "weight": 8
+                "weight": 8,
             },
             "security_training": {
                 "title": "Security Awareness and Training",
                 "requirement": "Training program, security reminders",
                 "doc_patterns": ["training*", "security_awareness*"],
                 "code_patterns": [],
-                "weight": 5
+                "weight": 5,
             },
             "incident_procedures": {
                 "title": "Security Incident Procedures",
                 "requirement": "Incident response and reporting",
                 "doc_patterns": ["incident*", "breach*", "security_event*"],
                 "code_patterns": [r"incident.*report", r"security.*alert", r"breach.*notify"],
-                "weight": 8
+                "weight": 8,
             },
             "contingency_plan": {
                 "title": "Contingency Plan",
                 "requirement": "Backup, disaster recovery, emergency mode",
                 "doc_patterns": ["contingency*", "disaster_recovery*", "backup*", "dr_plan*"],
                 "code_patterns": [r"backup", r"recovery", r"failover"],
-                "weight": 8
+                "weight": 8,
             },
             "evaluation": {
                 "title": "Evaluation",
                 "requirement": "Periodic security evaluations",
                 "doc_patterns": ["security_audit*", "hipaa_audit*", "compliance_review*"],
                 "code_patterns": [],
-                "weight": 5
+                "weight": 5,
             },
             "baa": {
                 "title": "Business Associate Contracts",
                 "requirement": "Written contracts with business associates",
                 "doc_patterns": ["baa*", "business_associate*", "vendor_agreement*"],
                 "code_patterns": [],
-                "weight": 5
-            }
-        }
+                "weight": 5,
+            },
+        },
     },
     "physical": {
         "title": "Physical Safeguards (§164.310)",
@@ -99,23 +98,23 @@ HIPAA_SAFEGUARDS = {
                 "requirement": "Physical access procedures and controls",
                 "doc_patterns": ["facility_access*", "physical_security*", "access_control*"],
                 "code_patterns": [],
-                "weight": 5
+                "weight": 5,
             },
             "workstation_use": {
                 "title": "Workstation Use",
                 "requirement": "Policies for workstation use and security",
                 "doc_patterns": ["workstation*", "endpoint*", "device_policy*"],
                 "code_patterns": [],
-                "weight": 3
+                "weight": 3,
             },
             "device_media": {
                 "title": "Device and Media Controls",
                 "requirement": "Disposal, media re-use, accountability",
                 "doc_patterns": ["media_disposal*", "device_disposal*", "data_sanitization*"],
                 "code_patterns": [r"secure.*delete", r"wipe", r"sanitize"],
-                "weight": 5
-            }
-        }
+                "weight": 5,
+            },
+        },
     },
     "technical": {
         "title": "Technical Safeguards (§164.312)",
@@ -130,9 +129,9 @@ HIPAA_SAFEGUARDS = {
                     r"session.*timeout",
                     r"auto.*logout",
                     r"unique.*id",
-                    r"user.*id"
+                    r"user.*id",
                 ],
-                "weight": 10
+                "weight": 10,
             },
             "audit_controls": {
                 "title": "Audit Controls",
@@ -143,9 +142,9 @@ HIPAA_SAFEGUARDS = {
                     r"access.*log",
                     r"log.*access",
                     r"security.*event",
-                    r"logger"
+                    r"logger",
                 ],
-                "weight": 10
+                "weight": 10,
             },
             "integrity": {
                 "title": "Integrity Controls",
@@ -156,9 +155,9 @@ HIPAA_SAFEGUARDS = {
                     r"hash",
                     r"hmac",
                     r"integrity.*check",
-                    r"digital.*signature"
+                    r"digital.*signature",
                 ],
-                "weight": 8
+                "weight": 8,
             },
             "authentication": {
                 "title": "Person or Entity Authentication",
@@ -171,9 +170,9 @@ HIPAA_SAFEGUARDS = {
                     r"2fa",
                     r"multi.*factor",
                     r"oauth",
-                    r"jwt"
+                    r"jwt",
                 ],
-                "weight": 10
+                "weight": 10,
             },
             "transmission_security": {
                 "title": "Transmission Security",
@@ -184,12 +183,12 @@ HIPAA_SAFEGUARDS = {
                     r"tls",
                     r"ssl",
                     r"encrypt.*transit",
-                    r"secure.*connection"
+                    r"secure.*connection",
                 ],
-                "weight": 10
-            }
-        }
-    }
+                "weight": 10,
+            },
+        },
+    },
 }
 
 # PHI data patterns to detect in code
@@ -205,7 +204,7 @@ PHI_PATTERNS = [
     (r"phone.*number|telephone", "Phone Number"),
     (r"email.*address", "Email Address"),
     (r"address|street|city|zip", "Physical Address"),
-    (r"biometric", "Biometric Data")
+    (r"biometric", "Biometric Data"),
 ]
 
 # Security vulnerability patterns (dynamic code execution, hardcoded secrets)
@@ -217,7 +216,7 @@ VULNERABILITY_PATTERNS = [
     (r"verify.*=.*False", "SSL verification disabled"),
     (r"dynamic.*code.*execution", "Dynamic code execution risk"),
     (r"disable.*ssl", "SSL disabled"),
-    (r"insecure", "Insecure configuration")
+    (r"insecure", "Insecure configuration"),
 ]
 
 
@@ -230,7 +229,7 @@ def scan_documentation(project_dir: Path, patterns: List[str]) -> List[str]:
         project_dir / "policies",
         project_dir / "compliance",
         project_dir / "hipaa",
-        project_dir
+        project_dir,
     ]
 
     for doc_dir in doc_dirs:
@@ -255,12 +254,7 @@ def scan_code_patterns(project_dir: Path, patterns: List[str]) -> List[Dict]:
     matches = []
     code_extensions = ["*.py", "*.js", "*.ts", "*.java", "*.cs", "*.go", "*.rb"]
 
-    src_dirs = [
-        project_dir / "src",
-        project_dir / "app",
-        project_dir / "lib",
-        project_dir
-    ]
+    src_dirs = [project_dir / "src", project_dir / "app", project_dir / "lib", project_dir]
 
     for src_dir in src_dirs:
         if not src_dir.exists():
@@ -270,18 +264,18 @@ def scan_code_patterns(project_dir: Path, patterns: List[str]) -> List[Dict]:
             try:
                 for file_path in src_dir.glob(f"**/{ext}"):
                     # Skip node_modules, venv, etc.
-                    if any(skip in str(file_path) for skip in ["node_modules", "venv", ".venv", "__pycache__", ".git"]):
+                    if any(
+                        skip in str(file_path)
+                        for skip in ["node_modules", "venv", ".venv", "__pycache__", ".git"]
+                    ):
                         continue
 
                     try:
-                        content = file_path.read_text(encoding='utf-8', errors='ignore')
+                        content = file_path.read_text(encoding="utf-8", errors="ignore")
                         for pattern in patterns:
                             if re.search(pattern, content, re.IGNORECASE):
                                 rel_path = str(file_path.relative_to(project_dir))
-                                matches.append({
-                                    "file": rel_path,
-                                    "pattern": pattern
-                                })
+                                matches.append({"file": rel_path, "pattern": pattern})
                                 break  # One match per file per control is enough
                     except Exception:
                         continue
@@ -299,19 +293,19 @@ def detect_phi_handling(project_dir: Path) -> Dict:
     for ext in code_extensions:
         try:
             for file_path in project_dir.glob(f"**/{ext}"):
-                if any(skip in str(file_path) for skip in ["node_modules", "venv", ".venv", "__pycache__", ".git"]):
+                if any(
+                    skip in str(file_path)
+                    for skip in ["node_modules", "venv", ".venv", "__pycache__", ".git"]
+                ):
                     continue
 
                 try:
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
                     rel_path = str(file_path.relative_to(project_dir))
 
                     for pattern, phi_type in PHI_PATTERNS:
                         if re.search(pattern, content, re.IGNORECASE):
-                            phi_found.append({
-                                "file": rel_path,
-                                "phi_type": phi_type
-                            })
+                            phi_found.append({"file": rel_path, "phi_type": phi_type})
                             break
                 except Exception:
                     continue
@@ -321,33 +315,48 @@ def detect_phi_handling(project_dir: Path) -> Dict:
     return {
         "phi_detected": len(phi_found) > 0,
         "files_with_phi": phi_found,
-        "phi_types": list(set(p["phi_type"] for p in phi_found))
+        "phi_types": list(set(p["phi_type"] for p in phi_found)),
     }
 
 
 def detect_security_vulnerabilities(project_dir: Path) -> List[Dict]:
     """Scan for security vulnerabilities."""
     vulnerabilities = []
-    code_extensions = ["*.py", "*.js", "*.ts", "*.java", "*.cs", "*.go", "*.yaml", "*.yml", "*.json"]
+    code_extensions = [
+        "*.py",
+        "*.js",
+        "*.ts",
+        "*.java",
+        "*.cs",
+        "*.go",
+        "*.yaml",
+        "*.yml",
+        "*.json",
+    ]
 
     for ext in code_extensions:
         try:
             for file_path in project_dir.glob(f"**/{ext}"):
-                if any(skip in str(file_path) for skip in ["node_modules", "venv", ".venv", "__pycache__", ".git"]):
+                if any(
+                    skip in str(file_path)
+                    for skip in ["node_modules", "venv", ".venv", "__pycache__", ".git"]
+                ):
                     continue
 
                 try:
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
                     rel_path = str(file_path.relative_to(project_dir))
 
                     for pattern, vuln_type in VULNERABILITY_PATTERNS:
                         matches = re.findall(pattern, content, re.IGNORECASE)
                         if matches:
-                            vulnerabilities.append({
-                                "file": rel_path,
-                                "vulnerability": vuln_type,
-                                "count": len(matches)
-                            })
+                            vulnerabilities.append(
+                                {
+                                    "file": rel_path,
+                                    "vulnerability": vuln_type,
+                                    "count": len(matches),
+                                }
+                            )
                 except Exception:
                     continue
         except Exception:
@@ -359,7 +368,11 @@ def detect_security_vulnerabilities(project_dir: Path) -> List[Dict]:
 def assess_control(project_dir: Path, control_id: str, control_data: Dict) -> Dict:
     """Assess a single HIPAA control."""
     doc_evidence = scan_documentation(project_dir, control_data["doc_patterns"])
-    code_evidence = scan_code_patterns(project_dir, control_data["code_patterns"]) if control_data["code_patterns"] else []
+    code_evidence = (
+        scan_code_patterns(project_dir, control_data["code_patterns"])
+        if control_data["code_patterns"]
+        else []
+    )
 
     # Determine compliance status
     has_docs = len(doc_evidence) > 0
@@ -384,7 +397,7 @@ def assess_control(project_dir: Path, control_id: str, control_data: Dict) -> Di
         "weight": control_data["weight"],
         "weighted_score": (score * control_data["weight"]) / 100,
         "documentation": doc_evidence,
-        "code_evidence": [e["file"] for e in code_evidence]
+        "code_evidence": [e["file"] for e in code_evidence],
     }
 
 
@@ -409,7 +422,7 @@ def assess_category(project_dir: Path, category_id: str, category_data: Dict) ->
         "controls": control_results,
         "compliant": sum(1 for c in control_results if c["status"] == "implemented"),
         "partial": sum(1 for c in control_results if c["status"] == "partial"),
-        "gaps": sum(1 for c in control_results if c["status"] == "gap")
+        "gaps": sum(1 for c in control_results if c["status"] == "gap"),
     }
 
 
@@ -430,7 +443,11 @@ def calculate_risk_level(overall_score: float, vulnerabilities: List[Dict], phi_
         base_score = 4
 
     # Adjust for vulnerabilities
-    critical_vulns = sum(1 for v in vulnerabilities if "password" in v["vulnerability"].lower() or "secret" in v["vulnerability"].lower())
+    critical_vulns = sum(
+        1
+        for v in vulnerabilities
+        if "password" in v["vulnerability"].lower() or "secret" in v["vulnerability"].lower()
+    )
     if critical_vulns > 0:
         base_score = min(4, base_score + 1)
 
@@ -446,7 +463,7 @@ def calculate_risk_level(overall_score: float, vulnerabilities: List[Dict], phi_
         "risk_level": final_risk,
         "compliance_score": overall_score,
         "vulnerability_count": len(vulnerabilities),
-        "phi_handling_detected": phi_data["phi_detected"]
+        "phi_handling_detected": phi_data["phi_detected"],
     }
 
 
@@ -459,7 +476,9 @@ def generate_recommendations(assessment: Dict) -> List[str]:
         if cat["category"] == "technical":
             for control in cat["controls"]:
                 if control["status"] == "gap":
-                    recommendations.append(f"CRITICAL: Implement {control['title']} - {control['requirement']}")
+                    recommendations.append(
+                        f"CRITICAL: Implement {control['title']} - {control['requirement']}"
+                    )
                 elif control["status"] == "partial":
                     recommendations.append(f"HIGH: Complete {control['title']} implementation")
 
@@ -495,7 +514,9 @@ def print_text_report(result: Dict) -> None:
     for cat in result["categories"]:
         status = "OK" if cat["score"] >= 70 else "NEEDS ATTENTION"
         print(f"  {cat['title']}: {cat['score']}% [{status}]")
-        print(f"    Implemented: {cat['compliant']}, Partial: {cat['partial']}, Gaps: {cat['gaps']}")
+        print(
+            f"    Implemented: {cat['compliant']}, Partial: {cat['partial']}, Gaps: {cat['gaps']}"
+        )
 
     # Gaps
     print("\n--- COMPLIANCE GAPS ---")
@@ -540,22 +561,16 @@ def main():
         "project_dir",
         nargs="?",
         default=".",
-        help="Project directory to analyze (default: current directory)"
+        help="Project directory to analyze (default: current directory)",
     )
     parser.add_argument(
         "--category",
         choices=["administrative", "physical", "technical"],
-        help="Assess specific safeguard category only"
+        help="Assess specific safeguard category only",
     )
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
     parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format"
-    )
-    parser.add_argument(
-        "--detailed",
-        action="store_true",
-        help="Include detailed evidence in output"
+        "--detailed", action="store_true", help="Include detailed evidence in output"
     )
 
     args = parser.parse_args()
@@ -598,20 +613,24 @@ def main():
         "assessment_date": datetime.now().isoformat(),
         "overall_score": overall_score,
         "risk_assessment": risk_assessment,
-        "categories": category_results if args.detailed else [
-            {
-                "category": c["category"],
-                "title": c["title"],
-                "score": c["score"],
-                "compliant": c["compliant"],
-                "partial": c["partial"],
-                "gaps": c["gaps"]
-            }
-            for c in category_results
-        ],
+        "categories": (
+            category_results
+            if args.detailed
+            else [
+                {
+                    "category": c["category"],
+                    "title": c["title"],
+                    "score": c["score"],
+                    "compliant": c["compliant"],
+                    "partial": c["partial"],
+                    "gaps": c["gaps"],
+                }
+                for c in category_results
+            ]
+        ),
         "phi_detection": phi_detection,
         "vulnerabilities": vulnerabilities,
-        "recommendations": []
+        "recommendations": [],
     }
 
     result["recommendations"] = generate_recommendations(result)

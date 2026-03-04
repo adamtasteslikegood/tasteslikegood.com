@@ -118,9 +118,7 @@ class FinancialRatioCalculator:
                 "name": "Current Ratio",
             },
             "quick_ratio": {
-                "value": safe_divide(
-                    current_assets - inventory, current_liabilities
-                ),
+                "value": safe_divide(current_assets - inventory, current_liabilities),
                 "formula": "(Current Assets - Inventory) / Current Liabilities",
                 "name": "Quick Ratio",
             },
@@ -144,9 +142,7 @@ class FinancialRatioCalculator:
         operating_income = self.income.get("operating_income", 0)
         interest_expense = self.income.get("interest_expense", 0)
         operating_cash_flow = self.cash_flow.get("operating_cash_flow", 0)
-        total_debt_service = self.cash_flow.get(
-            "total_debt_service", interest_expense
-        )
+        total_debt_service = self.cash_flow.get("total_debt_service", interest_expense)
 
         ratios = {
             "debt_to_equity": {
@@ -199,9 +195,11 @@ class FinancialRatioCalculator:
                 "name": "Receivables Turnover",
             },
             "dso": {
-                "value": safe_divide(365, receivables_turnover_val)
-                if receivables_turnover_val > 0
-                else 0.0,
+                "value": (
+                    safe_divide(365, receivables_turnover_val)
+                    if receivables_turnover_val > 0
+                    else 0.0
+                ),
                 "formula": "365 / Receivables Turnover",
                 "name": "Days Sales Outstanding",
             },
@@ -247,9 +245,7 @@ class FinancialRatioCalculator:
                 "name": "Price-to-Book Ratio",
             },
             "ps_ratio": {
-                "value": safe_divide(
-                    market_cap, revenue
-                ),
+                "value": safe_divide(market_cap, revenue),
                 "formula": "Market Cap / Revenue",
                 "name": "Price-to-Sales Ratio",
             },
@@ -259,9 +255,9 @@ class FinancialRatioCalculator:
                 "name": "EV/EBITDA",
             },
             "peg_ratio": {
-                "value": safe_divide(pe, earnings_growth_rate * 100)
-                if earnings_growth_rate > 0
-                else 0.0,
+                "value": (
+                    safe_divide(pe, earnings_growth_rate * 100) if earnings_growth_rate > 0 else 0.0
+                ),
                 "formula": "P/E Ratio / Earnings Growth Rate (%)",
                 "name": "PEG Ratio",
             },
@@ -345,9 +341,7 @@ class FinancialRatioCalculator:
             else self.results
         )
 
-        percentage_ratios = {
-            "roe", "roa", "gross_margin", "operating_margin", "net_margin"
-        }
+        percentage_ratios = {"roe", "roa", "gross_margin", "operating_margin", "net_margin"}
 
         for cat_name, ratios in categories.items():
             lines.append(f"\n--- {cat_name.upper()} ---")
@@ -370,9 +364,7 @@ class FinancialRatioCalculator:
 
 def main() -> None:
     """Main entry point."""
-    parser = argparse.ArgumentParser(
-        description="Calculate and interpret financial ratios"
-    )
+    parser = argparse.ArgumentParser(description="Calculate and interpret financial ratios")
     parser.add_argument(
         "input_file",
         help="Path to JSON file with financial statement data",

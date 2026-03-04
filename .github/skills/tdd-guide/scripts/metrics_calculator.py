@@ -21,7 +21,7 @@ class MetricsCalculator:
         source_code: str,
         test_code: str,
         coverage_data: Optional[Dict[str, Any]] = None,
-        execution_data: Optional[Dict[str, Any]] = None
+        execution_data: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
         Calculate all available metrics.
@@ -36,10 +36,10 @@ class MetricsCalculator:
             Complete metrics dictionary
         """
         metrics = {
-            'complexity': self.calculate_complexity(source_code),
-            'test_quality': self.calculate_test_quality(test_code),
-            'coverage': coverage_data or {},
-            'execution': execution_data or {}
+            "complexity": self.calculate_complexity(source_code),
+            "test_quality": self.calculate_test_quality(test_code),
+            "coverage": coverage_data or {},
+            "execution": execution_data or {},
         }
 
         self.metrics = metrics
@@ -60,10 +60,10 @@ class MetricsCalculator:
         testability = self._testability_score(code, cyclomatic)
 
         return {
-            'cyclomatic_complexity': cyclomatic,
-            'cognitive_complexity': cognitive,
-            'testability_score': testability,
-            'assessment': self._complexity_assessment(cyclomatic, cognitive)
+            "cyclomatic_complexity": cyclomatic,
+            "cognitive_complexity": cognitive,
+            "testability_score": testability,
+            "assessment": self._complexity_assessment(cyclomatic, cognitive),
         }
 
     def _cyclomatic_complexity(self, code: str) -> int:
@@ -76,14 +76,14 @@ class MetricsCalculator:
         decision_points = 0
 
         # Control flow keywords
-        keywords = ['if', 'for', 'while', 'case', 'catch', 'except']
+        keywords = ["if", "for", "while", "case", "catch", "except"]
         for keyword in keywords:
             # Use word boundaries to avoid matching substrings
-            pattern = r'\b' + keyword + r'\b'
+            pattern = r"\b" + keyword + r"\b"
             decision_points += len(re.findall(pattern, code))
 
         # Logical operators
-        decision_points += len(re.findall(r'\&\&|\|\|', code))
+        decision_points += len(re.findall(r"\&\&|\|\|", code))
 
         # Base complexity is 1
         return decision_points + 1
@@ -94,7 +94,7 @@ class MetricsCalculator:
 
         Similar to cyclomatic but penalizes nesting and non-obvious flow.
         """
-        lines = code.split('\n')
+        lines = code.split("\n")
         cognitive_score = 0
         nesting_level = 0
 
@@ -102,17 +102,22 @@ class MetricsCalculator:
             stripped = line.strip()
 
             # Increase nesting level
-            if any(keyword in stripped for keyword in ['if ', 'for ', 'while ', 'def ', 'function ', 'class ']):
-                cognitive_score += (1 + nesting_level)
-                if stripped.endswith(':') or stripped.endswith('{'):
+            if any(
+                keyword in stripped
+                for keyword in ["if ", "for ", "while ", "def ", "function ", "class "]
+            ):
+                cognitive_score += 1 + nesting_level
+                if stripped.endswith(":") or stripped.endswith("{"):
                     nesting_level += 1
 
             # Decrease nesting level
-            if stripped.startswith('}') or (stripped and not stripped.startswith(' ') and nesting_level > 0):
+            if stripped.startswith("}") or (
+                stripped and not stripped.startswith(" ") and nesting_level > 0
+            ):
                 nesting_level = max(0, nesting_level - 1)
 
             # Penalize complex conditions
-            if '&&' in stripped or '||' in stripped:
+            if "&&" in stripped or "||" in stripped:
                 cognitive_score += 1
 
         return cognitive_score
@@ -135,13 +140,13 @@ class MetricsCalculator:
             score -= (cyclomatic - 5) * 2
 
         # Penalize many dependencies
-        imports = len(re.findall(r'import |require\(|from .* import', code))
+        imports = len(re.findall(r"import |require\(|from .* import", code))
         if imports > 10:
             score -= (imports - 10) * 2
 
         # Reward small functions
-        functions = len(re.findall(r'def |function ', code))
-        lines = len(code.split('\n'))
+        functions = len(re.findall(r"def |function ", code))
+        lines = len(code.split("\n"))
         if functions > 0:
             avg_function_size = lines / functions
             if avg_function_size < 20:
@@ -181,26 +186,26 @@ class MetricsCalculator:
         avg_assertions = assertions / test_functions if test_functions > 0 else 0
 
         return {
-            'total_tests': test_functions,
-            'total_assertions': assertions,
-            'avg_assertions_per_test': round(avg_assertions, 2),
-            'isolation_score': isolation_score,
-            'naming_quality': naming_quality,
-            'test_smells': test_smells,
-            'quality_score': self._calculate_quality_score(
+            "total_tests": test_functions,
+            "total_assertions": assertions,
+            "avg_assertions_per_test": round(avg_assertions, 2),
+            "isolation_score": isolation_score,
+            "naming_quality": naming_quality,
+            "test_smells": test_smells,
+            "quality_score": self._calculate_quality_score(
                 avg_assertions, isolation_score, naming_quality, test_smells
-            )
+            ),
         }
 
     def _count_assertions(self, test_code: str) -> int:
         """Count assertion statements."""
         # Common assertion patterns
         patterns = [
-            r'\bassert[A-Z]\w*\(',  # JUnit: assertTrue, assertEquals
-            r'\bexpect\(',  # Jest/Vitest: expect()
-            r'\bassert\s+',  # Python: assert
-            r'\.should\.',  # Chai: should
-            r'\.to\.',  # Chai: expect().to
+            r"\bassert[A-Z]\w*\(",  # JUnit: assertTrue, assertEquals
+            r"\bexpect\(",  # Jest/Vitest: expect()
+            r"\bassert\s+",  # Python: assert
+            r"\.should\.",  # Chai: should
+            r"\.to\.",  # Chai: expect().to
         ]
 
         count = 0
@@ -212,11 +217,11 @@ class MetricsCalculator:
     def _count_test_functions(self, test_code: str) -> int:
         """Count test functions."""
         patterns = [
-            r'\btest_\w+',  # Python: test_*
-            r'\bit\(',  # Jest/Mocha: it()
-            r'\btest\(',  # Jest: test()
-            r'@Test',  # JUnit: @Test
-            r'\bdef test_',  # Python def test_
+            r"\btest_\w+",  # Python: test_*
+            r"\bit\(",  # Jest/Mocha: it()
+            r"\btest\(",  # Jest: test()
+            r"@Test",  # JUnit: @Test
+            r"\bdef test_",  # Python def test_
         ]
 
         count = 0
@@ -234,17 +239,17 @@ class MetricsCalculator:
         score = 100.0
 
         # Penalize global state
-        globals_used = len(re.findall(r'\bglobal\s+\w+', test_code))
+        globals_used = len(re.findall(r"\bglobal\s+\w+", test_code))
         score -= globals_used * 10
 
         # Penalize shared setup without proper cleanup
-        setup_count = len(re.findall(r'beforeAll|beforeEach|setUp', test_code))
-        cleanup_count = len(re.findall(r'afterAll|afterEach|tearDown', test_code))
+        setup_count = len(re.findall(r"beforeAll|beforeEach|setUp", test_code))
+        cleanup_count = len(re.findall(r"afterAll|afterEach|tearDown", test_code))
         if setup_count > cleanup_count:
             score -= (setup_count - cleanup_count) * 5
 
         # Reward mocking
-        mocks = len(re.findall(r'mock|stub|spy', test_code, re.IGNORECASE))
+        mocks = len(re.findall(r"mock|stub|spy", test_code, re.IGNORECASE))
         score += min(mocks * 2, 10)
 
         return max(0.0, min(100.0, score))
@@ -271,16 +276,16 @@ class MetricsCalculator:
                 name_score += 15
 
             # Check for descriptive words
-            descriptive_words = ['should', 'when', 'given', 'returns', 'throws', 'handles']
+            descriptive_words = ["should", "when", "given", "returns", "throws", "handles"]
             if any(word in name.lower() for word in descriptive_words):
                 name_score += 30
 
             # Check for underscores or camelCase (not just letters)
-            if '_' in name or re.search(r'[a-z][A-Z]', name):
+            if "_" in name or re.search(r"[a-z][A-Z]", name):
                 name_score += 20
 
             # Avoid generic names
-            generic = ['test1', 'test2', 'testit', 'mytest']
+            generic = ["test1", "test2", "testit", "mytest"]
             if name.lower() not in generic:
                 name_score += 20
 
@@ -293,48 +298,52 @@ class MetricsCalculator:
         smells = []
 
         # Test smell 1: No assertions
-        if 'assert' not in test_code.lower() and 'expect' not in test_code.lower():
-            smells.append({
-                'smell': 'missing_assertions',
-                'description': 'Tests without assertions',
-                'severity': 'high'
-            })
+        if "assert" not in test_code.lower() and "expect" not in test_code.lower():
+            smells.append(
+                {
+                    "smell": "missing_assertions",
+                    "description": "Tests without assertions",
+                    "severity": "high",
+                }
+            )
 
         # Test smell 2: Too many assertions
         test_count = self._count_test_functions(test_code)
         assertion_count = self._count_assertions(test_code)
         avg_assertions = assertion_count / test_count if test_count > 0 else 0
         if avg_assertions > 5:
-            smells.append({
-                'smell': 'assertion_roulette',
-                'description': f'Too many assertions per test (avg: {avg_assertions:.1f})',
-                'severity': 'medium'
-            })
+            smells.append(
+                {
+                    "smell": "assertion_roulette",
+                    "description": f"Too many assertions per test (avg: {avg_assertions:.1f})",
+                    "severity": "medium",
+                }
+            )
 
         # Test smell 3: Sleeps in tests
-        if 'sleep' in test_code.lower() or 'wait' in test_code.lower():
-            smells.append({
-                'smell': 'sleepy_test',
-                'description': 'Tests using sleep/wait (potential flakiness)',
-                'severity': 'high'
-            })
+        if "sleep" in test_code.lower() or "wait" in test_code.lower():
+            smells.append(
+                {
+                    "smell": "sleepy_test",
+                    "description": "Tests using sleep/wait (potential flakiness)",
+                    "severity": "high",
+                }
+            )
 
         # Test smell 4: Conditional logic in tests
-        if re.search(r'\bif\s*\(', test_code):
-            smells.append({
-                'smell': 'conditional_test_logic',
-                'description': 'Tests contain conditional logic',
-                'severity': 'medium'
-            })
+        if re.search(r"\bif\s*\(", test_code):
+            smells.append(
+                {
+                    "smell": "conditional_test_logic",
+                    "description": "Tests contain conditional logic",
+                    "severity": "medium",
+                }
+            )
 
         return smells
 
     def _calculate_quality_score(
-        self,
-        avg_assertions: float,
-        isolation: float,
-        naming: float,
-        smells: List[Dict[str, str]]
+        self, avg_assertions: float, isolation: float, naming: float, smells: List[Dict[str, str]]
     ) -> float:
         """Calculate overall test quality score."""
         score = 0.0
@@ -356,9 +365,9 @@ class MetricsCalculator:
         # Smells (20 points - deduct based on severity)
         smell_penalty = 0
         for smell in smells:
-            if smell['severity'] == 'high':
+            if smell["severity"] == "high":
                 smell_penalty += 10
-            elif smell['severity'] == 'medium':
+            elif smell["severity"] == "medium":
                 smell_penalty += 5
             else:
                 smell_penalty += 2
@@ -367,10 +376,7 @@ class MetricsCalculator:
 
         return round(min(100.0, score), 2)
 
-    def analyze_execution_metrics(
-        self,
-        execution_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def analyze_execution_metrics(self, execution_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Analyze test execution metrics.
 
@@ -380,37 +386,33 @@ class MetricsCalculator:
         Returns:
             Execution analysis
         """
-        tests = execution_data.get('tests', [])
+        tests = execution_data.get("tests", [])
 
         if not tests:
             return {}
 
         # Calculate timing statistics
-        timings = [test.get('duration', 0) for test in tests]
+        timings = [test.get("duration", 0) for test in tests]
         total_time = sum(timings)
         avg_time = total_time / len(tests) if tests else 0
 
         # Identify slow tests (>100ms for unit tests)
-        slow_tests = [
-            test for test in tests
-            if test.get('duration', 0) > 100
-        ]
+        slow_tests = [test for test in tests if test.get("duration", 0) > 100]
 
         # Identify flaky tests (if failure history available)
         flaky_tests = [
-            test for test in tests
-            if test.get('failure_rate', 0) > 0.1  # Failed >10% of time
+            test for test in tests if test.get("failure_rate", 0) > 0.1  # Failed >10% of time
         ]
 
         return {
-            'total_tests': len(tests),
-            'total_time_ms': round(total_time, 2),
-            'avg_time_ms': round(avg_time, 2),
-            'slow_tests': len(slow_tests),
-            'slow_test_details': slow_tests[:5],  # Top 5
-            'flaky_tests': len(flaky_tests),
-            'flaky_test_details': flaky_tests,
-            'pass_rate': self._calculate_pass_rate(tests)
+            "total_tests": len(tests),
+            "total_time_ms": round(total_time, 2),
+            "avg_time_ms": round(avg_time, 2),
+            "slow_tests": len(slow_tests),
+            "slow_test_details": slow_tests[:5],  # Top 5
+            "flaky_tests": len(flaky_tests),
+            "flaky_test_details": flaky_tests,
+            "pass_rate": self._calculate_pass_rate(tests),
         }
 
     def _calculate_pass_rate(self, tests: List[Dict[str, Any]]) -> float:
@@ -418,7 +420,7 @@ class MetricsCalculator:
         if not tests:
             return 0.0
 
-        passed = sum(1 for test in tests if test.get('status') == 'passed')
+        passed = sum(1 for test in tests if test.get("status") == "passed")
         return round((passed / len(tests)) * 100, 2)
 
     def generate_metrics_summary(self) -> str:
@@ -429,8 +431,8 @@ class MetricsCalculator:
         lines = ["# Test Metrics Summary\n"]
 
         # Complexity
-        if 'complexity' in self.metrics:
-            comp = self.metrics['complexity']
+        if "complexity" in self.metrics:
+            comp = self.metrics["complexity"]
             lines.append(f"## Code Complexity")
             lines.append(f"- Cyclomatic Complexity: {comp['cyclomatic_complexity']}")
             lines.append(f"- Cognitive Complexity: {comp['cognitive_complexity']}")
@@ -438,8 +440,8 @@ class MetricsCalculator:
             lines.append(f"- Assessment: {comp['assessment']}\n")
 
         # Test Quality
-        if 'test_quality' in self.metrics:
-            qual = self.metrics['test_quality']
+        if "test_quality" in self.metrics:
+            qual = self.metrics["test_quality"]
             lines.append(f"## Test Quality")
             lines.append(f"- Total Tests: {qual['total_tests']}")
             lines.append(f"- Assertions per Test: {qual['avg_assertions_per_test']}")
@@ -447,9 +449,9 @@ class MetricsCalculator:
             lines.append(f"- Naming Quality: {qual['naming_quality']:.1f}/100")
             lines.append(f"- Quality Score: {qual['quality_score']:.1f}/100\n")
 
-            if qual['test_smells']:
+            if qual["test_smells"]:
                 lines.append(f"### Test Smells Detected:")
-                for smell in qual['test_smells']:
+                for smell in qual["test_smells"]:
                     lines.append(f"- {smell['description']} (severity: {smell['severity']})")
                 lines.append("")
 

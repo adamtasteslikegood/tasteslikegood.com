@@ -187,12 +187,14 @@ def analyze_trend(periods: list[dict]) -> dict[str, Any]:
             error_pct = abs(actual - forecast) / abs(actual) * 100
         else:
             error_pct = 0.0
-        period_errors.append({
-            "period": p.get("period", "Unknown"),
-            "error_pct": round(error_pct, 1),
-            "forecast": forecast,
-            "actual": actual,
-        })
+        period_errors.append(
+            {
+                "period": p.get("period", "Unknown"),
+                "error_pct": round(error_pct, 1),
+                "forecast": forecast,
+                "actual": actual,
+            }
+        )
 
     improving = 0
     declining = 0
@@ -263,15 +265,17 @@ def analyze_categories(category_breakdowns: dict) -> dict[str, Any]:
 
             rating = get_accuracy_rating(error_pct)
 
-            category_results.append({
-                "category": entry["category"],
-                "forecast": forecast,
-                "actual": actual,
-                "error_pct": round(error_pct, 1),
-                "bias": bias,
-                "variance": round(diff, 2),
-                "rating": rating["rating"],
-            })
+            category_results.append(
+                {
+                    "category": entry["category"],
+                    "forecast": forecast,
+                    "actual": actual,
+                    "error_pct": round(error_pct, 1),
+                    "bias": bias,
+                    "variance": round(diff, 2),
+                    "rating": rating["rating"],
+                }
+            )
 
         # Sort by error percentage (worst first)
         category_results.sort(key=lambda x: x["error_pct"], reverse=True)
@@ -286,9 +290,7 @@ def analyze_categories(category_breakdowns: dict) -> dict[str, Any]:
     return results
 
 
-def generate_recommendations(
-    mape: float, bias: dict, trend: dict, categories: dict
-) -> list[str]:
+def generate_recommendations(mape: float, bias: dict, trend: dict, categories: dict) -> list[str]:
     """Generate actionable recommendations based on analysis results.
 
     Args:
@@ -341,9 +343,7 @@ def generate_recommendations(
 
     # Category-based recommendations
     for cat_name, cat_data in categories.items():
-        worst_entries = [
-            e for e in cat_data["entries"] if e["error_pct"] > 25
-        ]
+        worst_entries = [e for e in cat_data["entries"] if e["error_pct"] > 25]
         if worst_entries:
             names = ", ".join(e["category"] for e in worst_entries[:3])
             recommendations.append(

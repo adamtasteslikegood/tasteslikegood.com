@@ -18,7 +18,6 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 # Language-specific file extensions
 LANGUAGE_EXTENSIONS = {
     "python": [".py"],
@@ -26,7 +25,7 @@ LANGUAGE_EXTENSIONS = {
     "javascript": [".js", ".jsx", ".mjs"],
     "go": [".go"],
     "swift": [".swift"],
-    "kotlin": [".kt", ".kts"]
+    "kotlin": [".kt", ".kts"],
 }
 
 # Code smell thresholds
@@ -35,7 +34,7 @@ THRESHOLDS = {
     "too_many_parameters": 5,
     "high_complexity": 10,
     "god_class_methods": 20,
-    "max_imports": 15
+    "max_imports": 15,
 }
 
 
@@ -81,7 +80,7 @@ def calculate_cyclomatic_complexity(content: str) -> int:
         r"\band\b",
         r"\bor\b",
         r"\|\|",
-        r"&&"
+        r"&&",
     ]
 
     for pattern in patterns:
@@ -107,12 +106,7 @@ def count_lines(content: str) -> Dict[str, int]:
 
     code = total - blank - comment
 
-    return {
-        "total": total,
-        "code": code,
-        "blank": blank,
-        "comment": comment
-    }
+    return {"total": total, "code": code, "blank": blank, "comment": comment}
 
 
 def find_functions(content: str, language: str) -> List[Dict]:
@@ -126,7 +120,7 @@ def find_functions(content: str, language: str) -> List[Dict]:
         "javascript": r"(?:function\s+(\w+)|(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>)",
         "go": r"func\s+(?:\([^)]+\)\s+)?(\w+)\s*\(([^)]*)\)",
         "swift": r"func\s+(\w+)\s*\(([^)]*)\)",
-        "kotlin": r"fun\s+(\w+)\s*\(([^)]*)\)"
+        "kotlin": r"fun\s+(\w+)\s*\(([^)]*)\)",
     }
 
     pattern = patterns.get(language, patterns["python"])
@@ -146,19 +140,16 @@ def find_functions(content: str, language: str) -> List[Dict]:
 
         next_func = re.search(pattern, remaining)
         if next_func:
-            func_body = remaining[:next_func.start()]
+            func_body = remaining[: next_func.start()]
         else:
-            func_body = remaining[:min(2000, len(remaining))]
+            func_body = remaining[: min(2000, len(remaining))]
 
         line_count = len(func_body.split("\n"))
         complexity = calculate_cyclomatic_complexity(func_body)
 
-        functions.append({
-            "name": name,
-            "parameters": param_count,
-            "lines": line_count,
-            "complexity": complexity
-        })
+        functions.append(
+            {"name": name, "parameters": param_count, "lines": line_count, "complexity": complexity}
+        )
 
     return functions
 
@@ -173,7 +164,7 @@ def find_classes(content: str, language: str) -> List[Dict]:
         "javascript": r"class\s+(\w+)",
         "go": r"type\s+(\w+)\s+struct",
         "swift": r"class\s+(\w+)",
-        "kotlin": r"class\s+(\w+)"
+        "kotlin": r"class\s+(\w+)",
     }
 
     pattern = patterns.get(language, patterns["python"])
@@ -187,7 +178,7 @@ def find_classes(content: str, language: str) -> List[Dict]:
 
         next_class = re.search(pattern, remaining)
         if next_class:
-            class_body = remaining[:next_class.start()]
+            class_body = remaining[: next_class.start()]
         else:
             class_body = remaining
 
@@ -198,16 +189,12 @@ def find_classes(content: str, language: str) -> List[Dict]:
             "javascript": r"\w+\s*\([^)]*\)\s*\{",
             "go": r"func\s+\(",
             "swift": r"func\s+\w+",
-            "kotlin": r"fun\s+\w+"
+            "kotlin": r"fun\s+\w+",
         }
         method_pattern = method_patterns.get(language, method_patterns["python"])
         methods = len(re.findall(method_pattern, class_body))
 
-        classes.append({
-            "name": name,
-            "methods": methods,
-            "lines": len(class_body.split("\n"))
-        })
+        classes.append({"name": name, "methods": methods, "lines": len(class_body.split("\n"))})
 
     return classes
 
@@ -219,43 +206,51 @@ def check_code_smells(content: str, functions: List[Dict], classes: List[Dict]) 
     # Long functions
     for func in functions:
         if func["lines"] > THRESHOLDS["long_function_lines"]:
-            smells.append({
-                "type": "long_function",
-                "severity": "medium",
-                "message": f"Function '{func['name']}' has {func['lines']} lines (max: {THRESHOLDS['long_function_lines']})",
-                "location": func["name"]
-            })
+            smells.append(
+                {
+                    "type": "long_function",
+                    "severity": "medium",
+                    "message": f"Function '{func['name']}' has {func['lines']} lines (max: {THRESHOLDS['long_function_lines']})",
+                    "location": func["name"],
+                }
+            )
 
     # Too many parameters
     for func in functions:
         if func["parameters"] > THRESHOLDS["too_many_parameters"]:
-            smells.append({
-                "type": "too_many_parameters",
-                "severity": "low",
-                "message": f"Function '{func['name']}' has {func['parameters']} parameters (max: {THRESHOLDS['too_many_parameters']})",
-                "location": func["name"]
-            })
+            smells.append(
+                {
+                    "type": "too_many_parameters",
+                    "severity": "low",
+                    "message": f"Function '{func['name']}' has {func['parameters']} parameters (max: {THRESHOLDS['too_many_parameters']})",
+                    "location": func["name"],
+                }
+            )
 
     # High complexity
     for func in functions:
         if func["complexity"] > THRESHOLDS["high_complexity"]:
             severity = "high" if func["complexity"] > 20 else "medium"
-            smells.append({
-                "type": "high_complexity",
-                "severity": severity,
-                "message": f"Function '{func['name']}' has complexity {func['complexity']} (max: {THRESHOLDS['high_complexity']})",
-                "location": func["name"]
-            })
+            smells.append(
+                {
+                    "type": "high_complexity",
+                    "severity": severity,
+                    "message": f"Function '{func['name']}' has complexity {func['complexity']} (max: {THRESHOLDS['high_complexity']})",
+                    "location": func["name"],
+                }
+            )
 
     # God classes
     for cls in classes:
         if cls["methods"] > THRESHOLDS["god_class_methods"]:
-            smells.append({
-                "type": "god_class",
-                "severity": "high",
-                "message": f"Class '{cls['name']}' has {cls['methods']} methods (max: {THRESHOLDS['god_class_methods']})",
-                "location": cls["name"]
-            })
+            smells.append(
+                {
+                    "type": "god_class",
+                    "severity": "high",
+                    "message": f"Class '{cls['name']}' has {cls['methods']} methods (max: {THRESHOLDS['god_class_methods']})",
+                    "location": cls["name"],
+                }
+            )
 
     # Magic numbers
     magic_pattern = r"\b(?<![.\"\'])\d{3,}\b(?!\.\d)"
@@ -264,23 +259,27 @@ def check_code_smells(content: str, functions: List[Dict], classes: List[Dict]) 
             continue
         matches = re.findall(magic_pattern, line)
         for match in matches[:1]:  # One per line
-            smells.append({
-                "type": "magic_number",
-                "severity": "low",
-                "message": f"Magic number {match} should be a named constant",
-                "location": f"line {i}"
-            })
+            smells.append(
+                {
+                    "type": "magic_number",
+                    "severity": "low",
+                    "message": f"Magic number {match} should be a named constant",
+                    "location": f"line {i}",
+                }
+            )
 
     # Commented code patterns
     commented_code_pattern = r"^\s*[#//]+\s*(if|for|while|def|function|class|const|let|var)\s"
     for i, line in enumerate(content.split("\n"), 1):
         if re.match(commented_code_pattern, line, re.IGNORECASE):
-            smells.append({
-                "type": "commented_code",
-                "severity": "low",
-                "message": "Commented-out code should be removed",
-                "location": f"line {i}"
-            })
+            smells.append(
+                {
+                    "type": "commented_code",
+                    "severity": "low",
+                    "message": "Commented-out code should be removed",
+                    "location": f"line {i}",
+                }
+            )
 
     return smells
 
@@ -292,32 +291,40 @@ def check_solid_violations(content: str) -> List[Dict]:
     # OCP: Type checking instead of polymorphism
     type_checks = len(re.findall(r"isinstance\(|type\(.*\)\s*==|typeof\s+\w+\s*===", content))
     if type_checks > 2:
-        violations.append({
-            "principle": "OCP",
-            "name": "Open/Closed Principle",
-            "severity": "medium",
-            "message": f"Found {type_checks} type checks - consider using polymorphism"
-        })
+        violations.append(
+            {
+                "principle": "OCP",
+                "name": "Open/Closed Principle",
+                "severity": "medium",
+                "message": f"Found {type_checks} type checks - consider using polymorphism",
+            }
+        )
 
     # LSP/ISP: NotImplementedError
-    not_impl = len(re.findall(r"raise\s+NotImplementedError|not\s+implemented", content, re.IGNORECASE))
+    not_impl = len(
+        re.findall(r"raise\s+NotImplementedError|not\s+implemented", content, re.IGNORECASE)
+    )
     if not_impl:
-        violations.append({
-            "principle": "LSP/ISP",
-            "name": "Liskov/Interface Segregation",
-            "severity": "low",
-            "message": f"Found {not_impl} unimplemented methods - may indicate oversized interface"
-        })
+        violations.append(
+            {
+                "principle": "LSP/ISP",
+                "name": "Liskov/Interface Segregation",
+                "severity": "low",
+                "message": f"Found {not_impl} unimplemented methods - may indicate oversized interface",
+            }
+        )
 
     # DIP: Too many direct imports
     imports = len(re.findall(r"^(?:import|from)\s+", content, re.MULTILINE))
     if imports > THRESHOLDS["max_imports"]:
-        violations.append({
-            "principle": "DIP",
-            "name": "Dependency Inversion Principle",
-            "severity": "low",
-            "message": f"File has {imports} imports - consider dependency injection"
-        })
+        violations.append(
+            {
+                "principle": "DIP",
+                "name": "Dependency Inversion Principle",
+                "severity": "low",
+                "message": f"File has {imports} imports - consider dependency injection",
+            }
+        )
 
     return violations
 
@@ -327,7 +334,7 @@ def calculate_quality_score(
     functions: List[Dict],
     classes: List[Dict],
     smells: List[Dict],
-    violations: List[Dict]
+    violations: List[Dict],
 ) -> int:
     """Calculate overall quality score (0-100)."""
     score = 100
@@ -403,21 +410,21 @@ def analyze_file(filepath: Path) -> Dict:
             "lines": line_metrics,
             "functions": len(functions),
             "classes": len(classes),
-            "avg_complexity": round(sum(f["complexity"] for f in functions) / max(1, len(functions)), 1)
+            "avg_complexity": round(
+                sum(f["complexity"] for f in functions) / max(1, len(functions)), 1
+            ),
         },
         "quality_score": score,
         "grade": get_grade(score),
         "smells": smells,
         "solid_violations": violations,
         "function_details": functions[:10],
-        "class_details": classes[:10]
+        "class_details": classes[:10],
     }
 
 
 def analyze_directory(
-    dir_path: Path,
-    recursive: bool = True,
-    language: Optional[str] = None
+    dir_path: Path, recursive: bool = True, language: Optional[str] = None
 ) -> Dict:
     """Analyze all files in a directory."""
     results = []
@@ -454,7 +461,7 @@ def analyze_directory(
         "overall_grade": get_grade(int(avg_score)),
         "total_code_smells": total_smells,
         "total_solid_violations": total_violations,
-        "files": sorted(results, key=lambda x: x["quality_score"])
+        "files": sorted(results, key=lambda x: x["quality_score"]),
     }
 
 
@@ -474,7 +481,9 @@ def print_report(analysis: Dict) -> None:
         print(f"Quality Score: {analysis['quality_score']}/100 ({analysis['grade']})")
 
         metrics = analysis["metrics"]
-        print(f"\nLines: {metrics['lines']['total']} ({metrics['lines']['code']} code, {metrics['lines']['comment']} comments)")
+        print(
+            f"\nLines: {metrics['lines']['total']} ({metrics['lines']['code']} code, {metrics['lines']['comment']} comments)"
+        )
         print(f"Functions: {metrics['functions']}")
         print(f"Classes: {metrics['classes']}")
         print(f"Avg Complexity: {metrics['avg_complexity']}")
@@ -506,30 +515,22 @@ def main():
     parser = argparse.ArgumentParser(
         description="Analyze code quality, smells, and SOLID violations"
     )
+    parser.add_argument("path", help="File or directory to analyze")
     parser.add_argument(
-        "path",
-        help="File or directory to analyze"
-    )
-    parser.add_argument(
-        "--recursive", "-r",
+        "--recursive",
+        "-r",
         action="store_true",
         default=True,
-        help="Recursively analyze directories (default: true)"
+        help="Recursively analyze directories (default: true)",
     )
     parser.add_argument(
-        "--language", "-l",
+        "--language",
+        "-l",
         choices=list(LANGUAGE_EXTENSIONS.keys()),
-        help="Filter by programming language"
+        help="Filter by programming language",
     )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        help="Write output to file"
-    )
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
+    parser.add_argument("--output", "-o", help="Write output to file")
 
     args = parser.parse_args()
 

@@ -8,6 +8,7 @@ Handles:
 - Filename sanitization and validation
 - Recipe data migration to latest schema
 """
+
 import os
 import json
 import time
@@ -37,7 +38,7 @@ def sanitize_filename(filename: str) -> str:
     # Use only the basename to prevent directory traversal
     safe_filename = os.path.basename(filename)
     # Additional validation: ensure it's not empty and ends with .json
-    if not safe_filename or not safe_filename.endswith('.json'):
+    if not safe_filename or not safe_filename.endswith(".json"):
         raise ValueError(f"Invalid filename: {filename}")
     return safe_filename
 
@@ -70,7 +71,7 @@ def validate_recipe_filepath(filename: str) -> str:
 
 
 @contextmanager
-def locked_file(filepath: str, mode: str = 'r') -> Generator:
+def locked_file(filepath: str, mode: str = "r") -> Generator:
     """
     Context manager for file locking to prevent race conditions.
 
@@ -87,7 +88,7 @@ def locked_file(filepath: str, mode: str = 'r') -> Generator:
     f = open(filepath, mode)
     try:
         # Exclusive lock for writing, shared lock for reading
-        lock_type = fcntl.LOCK_EX if 'w' in mode or 'a' in mode else fcntl.LOCK_SH
+        lock_type = fcntl.LOCK_EX if "w" in mode or "a" in mode else fcntl.LOCK_SH
         fcntl.flock(f.fileno(), lock_type)
         yield f
     finally:
@@ -108,30 +109,32 @@ def get_all_recipes() -> List[Dict[str, str]]:
 
     current_time = time.time()
     # Return cached data if still valid
-    if _recipes_cache['data'] is not None and (current_time - _recipes_cache['timestamp']) < _RECIPES_CACHE_TTL:
-        return _recipes_cache['data']
+    if (
+        _recipes_cache["data"] is not None
+        and (current_time - _recipes_cache["timestamp"]) < _RECIPES_CACHE_TTL
+    ):
+        return _recipes_cache["data"]
 
     # Cache miss or expired - read from disk
     recipes = []
     for filename in os.listdir(RECIPES_DIR):
-        if filename.endswith('.json'):
+        if filename.endswith(".json"):
             filepath = os.path.join(RECIPES_DIR, filename)
             try:
                 # Use locked file reading to prevent reading during writes
-                with locked_file(filepath, 'r') as f:
+                with locked_file(filepath, "r") as f:
                     data = json.load(f)
-                    recipes.append({
-                        'name': data.get('name', 'Unnamed Recipe'),
-                        'filename': filename
-                    })
+                    recipes.append(
+                        {"name": data.get("name", "Unnamed Recipe"), "filename": filename}
+                    )
             except (json.JSONDecodeError, IOError) as e:
                 logger.error(f"Could not read or parse {filename}: {e}")
 
-    sorted_recipes = sorted(recipes, key=lambda r: r['name'])
+    sorted_recipes = sorted(recipes, key=lambda r: r["name"])
 
     # Update cache
-    _recipes_cache['data'] = sorted_recipes
-    _recipes_cache['timestamp'] = current_time
+    _recipes_cache["data"] = sorted_recipes
+    _recipes_cache["timestamp"] = current_time
 
     return sorted_recipes
 
@@ -156,7 +159,7 @@ def get_recipe(filename: str) -> Dict[str, Any]:
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"Recipe {filename} not found")
 
-    with locked_file(filepath, 'r') as f:
+    with locked_file(filepath, "r") as f:
         return json.load(f)
 
 
@@ -175,7 +178,7 @@ def save_recipe(filename: str, recipe_data: Dict[str, Any]) -> None:
     filepath = validate_recipe_filepath(filename)
 
     # Use locked file writing to prevent concurrent modifications
-    with locked_file(filepath, 'w') as f:
+    with locked_file(filepath, "w") as f:
         json.dump(recipe_data, f, indent=2)
 
     # Invalidate cache after save
@@ -189,8 +192,8 @@ def invalidate_cache():
     Call this after any recipe create/update/delete operation.
     """
     global _recipes_cache
-    _recipes_cache['data'] = None
-    _recipes_cache['timestamp'] = 0
+    _recipes_cache["data"] = None
+    _recipes_cache["timestamp"] = 0
 
 
 def migrate_recipe_data(data: Dict[str, Any], filename: str) -> Tuple[Dict[str, Any], bool]:
@@ -215,31 +218,31 @@ def migrate_recipe_data(data: Dict[str, Any], filename: str) -> Tuple[Dict[str, 
     changed = False
 
     # 1. Fix nested 'properties'
-    if 'properties' in data and 'name' not in data:
+    if "properties" in data and "name" not in data:
         logger.info(f"Migrating nested JSON in {filename}")
-        data = data['properties']
+        data = data["properties"]
         changed = True
 
     # 2. Add user_id
-    if 'user_id' not in data:
-        data['user_id'] = 'anonymous'
+    if "user_id" not in data:
+        data["user_id"] = "anonymous"
         changed = True
 
     # 3. Add ai_metadata
-    if 'ai_metadata' not in data:
-        data['ai_metadata'] = {
-            'model': 'unknown',
-            'timestamp': datetime.datetime.now().isoformat(),
-            'prompt': 'unknown',
-            'images_working': True if data.get('stock_image_url') else False
+    if "ai_metadata" not in data:
+        data["ai_metadata"] = {
+            "model": "unknown",
+            "timestamp": datetime.datetime.now().isoformat(),
+            "prompt": "unknown",
+            "images_working": True if data.get("stock_image_url") else False,
         }
         changed = True
 
     # 4. Fix "Untitled Recipe" if name is generic and filename is specific
-    if data.get('name') == "Untitled Recipe":
+    if data.get("name") == "Untitled Recipe":
         # Try to derive from filename
-        derived_name = filename.replace('_', ' ').replace('.json', '').title()
-        data['name'] = derived_name
+        derived_name = filename.replace("_", " ").replace(".json", "").title()
+        data["name"] = derived_name
         changed = True
 
     return data, changed

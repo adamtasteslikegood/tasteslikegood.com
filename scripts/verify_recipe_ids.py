@@ -60,9 +60,7 @@ def verify_recipe_ids():
                     consistent += 1
                 else:
                     inconsistent += 1
-                    logger.warning(
-                        f"  ⚠️  IDs don't match! Run fix_recipe_ids.py again."
-                    )
+                    logger.warning(f"  ⚠️  IDs don't match! Run fix_recipe_ids.py again.")
 
                 # Show what the API returns
                 logger.info(f"\n  API Response Structure:")
@@ -89,12 +87,8 @@ def verify_recipe_ids():
                 return False
             else:
                 logger.info("✅ All recipes have consistent IDs!")
-                logger.info(
-                    "\n📝 Note: The API response will still show BOTH 'id' and 'data'"
-                )
-                logger.info(
-                    "   fields - this is normal! What matters is they now MATCH."
-                )
+                logger.info("\n📝 Note: The API response will still show BOTH 'id' and 'data'")
+                logger.info("   fields - this is normal! What matters is they now MATCH.")
                 return True
 
         except Exception as e:

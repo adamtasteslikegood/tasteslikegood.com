@@ -108,12 +108,8 @@ def migrate_recipes(user_id=None, dry_run=False):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Migrate file-based recipes to database"
-    )
-    parser.add_argument(
-        "--user-id", type=int, help="Assign all recipes to this user ID"
-    )
+    parser = argparse.ArgumentParser(description="Migrate file-based recipes to database")
+    parser.add_argument("--user-id", type=int, help="Assign all recipes to this user ID")
     parser.add_argument(
         "--dry-run",
         action="store_true",

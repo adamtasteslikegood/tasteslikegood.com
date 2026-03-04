@@ -1,34 +1,65 @@
-# environmental vars./secrets and virtual enviroments
-/templates/.env
-/api_key.py
-
-/.venv/
-/.venv_313/
-/.new_venv/
-/.idea/
-.env
-
-# Recipe data and error logs
-/recipes/*.json
-recipe_error.json
-recipe_error.txt
-models_list.json
-non_ascii_filenames.log
-non_ascii_filenames_fixed.log
-
-# Temporary / Editor files
+# Python cache
 __pycache__/
 *.py[cod]
 *$py.class
-#temp_sratch.txt#
-#recipe_error.json#
-#recipe_error.txt#
-temp_sratch.txt
-requiremnets.txt.old
+*.so
 
-# Google/Cloud Specifics
-.gemini/
-gha-creds-*.json
+# Testing
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
-.github/.DS_Store
-static/images/duplicates/
+.zed/
+.cursor/
+.ai/
+.agent/
+.codex/
+.claude/
+
+# Flask
+instance/
+*.db
+*.sqlite
+
+# Environment
+.env
+.env.local
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Database migrations (don't ignore the migrations folder itself)
+migrations/versions/*.pyc
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# uv
+uv.lock
+
+# Temporary files
+*.tmp
+#*#
+.#*

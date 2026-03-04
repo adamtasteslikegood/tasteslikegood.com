@@ -16,7 +16,6 @@ import json
 import sys
 from typing import Any, Dict, List, Optional, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -31,7 +30,7 @@ TIER_UPLIFT: Dict[str, float] = {
 
 # Module revenue estimates as a fraction of base ARR
 MODULE_REVENUE_FRACTION: Dict[str, float] = {
-    "core_platform": 0.00,        # Already included in base
+    "core_platform": 0.00,  # Already included in base
     "analytics_module": 0.15,
     "integrations_module": 0.12,
     "api_access": 0.10,
@@ -54,7 +53,7 @@ EFFORT_MAP: Dict[str, str] = {
 }
 
 # Usage thresholds for recommendations
-HIGH_USAGE_THRESHOLD = 75   # % usage indicates readiness for more
+HIGH_USAGE_THRESHOLD = 75  # % usage indicates readiness for more
 LOW_ADOPTION_THRESHOLD = 30  # % usage is too low to push expansion there
 
 
@@ -88,7 +87,10 @@ def estimate_seat_expansion_revenue(
         growth_factor = {"enterprise": 0.25, "mid-market": 0.20, "smb": 0.15}
         factor = growth_factor.get(segment.lower(), 0.15)
         revenue = round(arr * factor, 0)
-        return revenue, f"Seat utilisation at {utilisation:.0%} -- likely needs {int(licensed * factor)} additional seats"
+        return (
+            revenue,
+            f"Seat utilisation at {utilisation:.0%} -- likely needs {int(licensed * factor)} additional seats",
+        )
     return 0.0, f"Seat utilisation at {utilisation:.0%} -- not yet at expansion threshold"
 
 
@@ -116,7 +118,9 @@ def estimate_tier_upgrade_revenue(
                 if best_tier is None or tier_mult < TIER_UPLIFT.get(best_tier.lower(), 999):
                     best_revenue = round(incremental, 0)
                     best_tier = tier
-                    rationale = f"Upgrade from {current_tier} to {tier} adds ${incremental:,.0f} ARR"
+                    rationale = (
+                        f"Upgrade from {current_tier} to {tier} adds ${incremental:,.0f} ARR"
+                    )
 
     return best_revenue, best_tier, rationale
 
@@ -137,13 +141,15 @@ def estimate_module_revenue(
 
         if not adopted and fraction > 0:
             revenue = round(arr * fraction, 0)
-            opportunities.append({
-                "module": module_name,
-                "type": "cross_sell",
-                "estimated_revenue": revenue,
-                "effort": "low",
-                "rationale": f"Module not adopted -- ${revenue:,.0f} potential ARR",
-            })
+            opportunities.append(
+                {
+                    "module": module_name,
+                    "type": "cross_sell",
+                    "estimated_revenue": revenue,
+                    "effort": "low",
+                    "rationale": f"Module not adopted -- ${revenue:,.0f} potential ARR",
+                }
+            )
         elif adopted and usage_pct < LOW_ADOPTION_THRESHOLD and fraction > 0:
             # Already adopted but underutilised -- focus on enablement, not expansion
             pass  # Skip -- needs enablement, not a sales motion
@@ -166,13 +172,15 @@ def estimate_department_expansion_revenue(
         if dept.lower() not in current_set:
             # Estimate each new department at the average per-department ARR
             revenue = round(per_dept_estimate * 0.8, 0)  # Slight discount for new dept
-            opportunities.append({
-                "department": dept,
-                "type": "expansion",
-                "estimated_revenue": revenue,
-                "effort": "high",
-                "rationale": f"Expand to {dept} department -- est. ${revenue:,.0f} ARR",
-            })
+            opportunities.append(
+                {
+                    "department": dept,
+                    "type": "expansion",
+                    "estimated_revenue": revenue,
+                    "effort": "high",
+                    "rationale": f"Expand to {dept} department -- est. ${revenue:,.0f} ARR",
+                }
+            )
 
     return opportunities
 
@@ -214,29 +222,35 @@ def analyse_expansion(customer: Dict[str, Any]) -> Dict[str, Any]:
     active = contract.get("active_seats", 0)
     seat_rev, seat_rationale = estimate_seat_expansion_revenue(arr, licensed, active, segment)
     if seat_rev > 0:
-        all_opportunities.append({
-            "type": "expansion",
-            "category": "seat_expansion",
-            "estimated_revenue": seat_rev,
-            "effort": "low",
-            "rationale": seat_rationale,
-            "priority_score": priority_score(seat_rev, "low"),
-        })
+        all_opportunities.append(
+            {
+                "type": "expansion",
+                "category": "seat_expansion",
+                "estimated_revenue": seat_rev,
+                "effort": "low",
+                "rationale": seat_rationale,
+                "priority_score": priority_score(seat_rev, "low"),
+            }
+        )
 
     # 2. Tier upgrade
     current_tier = contract.get("plan_tier", "").lower()
     available_tiers = contract.get("available_tiers", [])
-    tier_rev, target_tier, tier_rationale = estimate_tier_upgrade_revenue(arr, current_tier, available_tiers)
+    tier_rev, target_tier, tier_rationale = estimate_tier_upgrade_revenue(
+        arr, current_tier, available_tiers
+    )
     if tier_rev > 0 and target_tier:
-        all_opportunities.append({
-            "type": "upsell",
-            "category": "tier_upgrade",
-            "target_tier": target_tier,
-            "estimated_revenue": tier_rev,
-            "effort": "medium",
-            "rationale": tier_rationale,
-            "priority_score": priority_score(tier_rev, "medium"),
-        })
+        all_opportunities.append(
+            {
+                "type": "upsell",
+                "category": "tier_upgrade",
+                "target_tier": target_tier,
+                "estimated_revenue": tier_rev,
+                "effort": "medium",
+                "rationale": tier_rationale,
+                "priority_score": priority_score(tier_rev, "medium"),
+            }
+        )
 
     # 3. Module cross-sell
     module_opps = estimate_module_revenue(arr, product_usage)
@@ -278,7 +292,11 @@ def analyse_expansion(customer: Dict[str, Any]) -> Dict[str, Any]:
         "adoption_summary": {
             "total_modules": total_modules,
             "adopted_modules": adopted_modules,
-            "adoption_rate": round(safe_divide(adopted_modules, total_modules) * 100, 1) if total_modules > 0 else 0,
+            "adoption_rate": (
+                round(safe_divide(adopted_modules, total_modules) * 100, 1)
+                if total_modules > 0
+                else 0
+            ),
             "avg_usage_pct": avg_usage,
             "seat_utilisation": round(safe_divide(active, max(licensed, 1)) * 100, 1),
             "current_tier": current_tier,
@@ -319,16 +337,22 @@ def format_text(results: List[Dict[str, Any]]) -> str:
         lines.append("-" * 72)
         lines.append(f"Customer: {r['name']} ({r['customer_id']})")
         lines.append(f"Segment:  {r['segment'].title()}  |  Current ARR: ${r['arr']:,.0f}")
-        lines.append(f"Total Expansion Potential: ${r['total_estimated_revenue']:,.0f}  ({r['opportunity_count']} opportunities)")
+        lines.append(
+            f"Total Expansion Potential: ${r['total_estimated_revenue']:,.0f}  ({r['opportunity_count']} opportunities)"
+        )
         lines.append("")
 
         adoption = r["adoption_summary"]
         lines.append("  Adoption Summary:")
-        lines.append(f"    Modules Adopted:    {adoption['adopted_modules']}/{adoption['total_modules']} ({adoption['adoption_rate']}%)")
+        lines.append(
+            f"    Modules Adopted:    {adoption['adopted_modules']}/{adoption['total_modules']} ({adoption['adoption_rate']}%)"
+        )
         lines.append(f"    Avg Module Usage:   {adoption['avg_usage_pct']}%")
         lines.append(f"    Seat Utilisation:   {adoption['seat_utilisation']}%")
         lines.append(f"    Current Tier:       {adoption['current_tier'].title()}")
-        lines.append(f"    Departments:        {adoption['departments_covered']} active, {adoption['departments_potential']} potential")
+        lines.append(
+            f"    Departments:        {adoption['departments_covered']} active, {adoption['departments_potential']} potential"
+        )
 
         if r["opportunities"]:
             lines.append("")
@@ -340,7 +364,9 @@ def format_text(results: List[Dict[str, Any]]) -> str:
                 effort = opp.get("effort", "unknown").title()
                 pri = opp.get("priority_score", 0)
                 lines.append(f"    {i}. [{opp_type}] {category}")
-                lines.append(f"       Revenue: ${rev:,.0f}  |  Effort: {effort}  |  Priority: {pri}")
+                lines.append(
+                    f"       Revenue: ${rev:,.0f}  |  Effort: {effort}  |  Priority: {pri}"
+                )
                 lines.append(f"       {opp.get('rationale', '')}")
         else:
             lines.append("")

@@ -37,7 +37,7 @@ class Threat:
     attack_vector: str
     impact: str
     likelihood: int  # 1-5
-    severity: int    # 1-5
+    severity: int  # 1-5
     mitigations: List[str]
 
     @property
@@ -72,8 +72,8 @@ THREAT_DATABASE = {
                 "Implement multi-factor authentication (MFA)",
                 "Use phishing-resistant authentication (FIDO2/WebAuthn)",
                 "Deploy credential monitoring and breach detection",
-                "Enforce strong password policies with complexity requirements"
-            ]
+                "Enforce strong password policies with complexity requirements",
+            ],
         ),
         Threat(
             category="Spoofing",
@@ -87,8 +87,8 @@ THREAT_DATABASE = {
                 "Use secure, HttpOnly, SameSite cookies",
                 "Implement session binding (IP, user agent)",
                 "Rotate session tokens after authentication",
-                "Use short session timeouts for sensitive operations"
-            ]
+                "Use short session timeouts for sensitive operations",
+            ],
         ),
         Threat(
             category="Tampering",
@@ -102,8 +102,8 @@ THREAT_DATABASE = {
                 "Use asymmetric algorithms (RS256, ES256)",
                 "Validate algorithm in code, not from token",
                 "Implement proper key management",
-                "Add expiration and audience validation"
-            ]
+                "Add expiration and audience validation",
+            ],
         ),
         Threat(
             category="Repudiation",
@@ -117,8 +117,8 @@ THREAT_DATABASE = {
                 "Log all authentication events with timestamps",
                 "Capture device fingerprints and IP addresses",
                 "Implement tamper-evident audit logs",
-                "Use digital signatures for critical actions"
-            ]
+                "Use digital signatures for critical actions",
+            ],
         ),
         Threat(
             category="Information Disclosure",
@@ -132,8 +132,8 @@ THREAT_DATABASE = {
                 "Use strong password hashing (Argon2id, bcrypt)",
                 "Implement database encryption at rest",
                 "Apply parameterized queries everywhere",
-                "Segment database access by function"
-            ]
+                "Segment database access by function",
+            ],
         ),
         Threat(
             category="Denial of Service",
@@ -147,8 +147,8 @@ THREAT_DATABASE = {
                 "Implement progressive rate limiting",
                 "Use CAPTCHA after failed attempts",
                 "Deploy account lockout with notification",
-                "Use distributed denial of service protection"
-            ]
+                "Use distributed denial of service protection",
+            ],
         ),
         Threat(
             category="Elevation of Privilege",
@@ -162,9 +162,9 @@ THREAT_DATABASE = {
                 "Implement server-side authorization checks",
                 "Use role-based access control (RBAC)",
                 "Validate permissions on every request",
-                "Audit privilege changes"
-            ]
-        )
+                "Audit privilege changes",
+            ],
+        ),
     ],
     "api": [
         Threat(
@@ -179,8 +179,8 @@ THREAT_DATABASE = {
                 "Implement API key rotation policies",
                 "Use short-lived tokens where possible",
                 "Monitor for exposed secrets in repositories",
-                "Implement IP allowlisting for API keys"
-            ]
+                "Implement IP allowlisting for API keys",
+            ],
         ),
         Threat(
             category="Tampering",
@@ -194,8 +194,8 @@ THREAT_DATABASE = {
                 "Enforce TLS 1.3 for all connections",
                 "Implement request signing (HMAC)",
                 "Use certificate pinning for mobile apps",
-                "Validate request integrity on server"
-            ]
+                "Validate request integrity on server",
+            ],
         ),
         Threat(
             category="Information Disclosure",
@@ -209,8 +209,8 @@ THREAT_DATABASE = {
                 "Implement field-level access control",
                 "Use GraphQL with depth limiting",
                 "Apply response filtering based on role",
-                "Audit API responses for sensitive fields"
-            ]
+                "Audit API responses for sensitive fields",
+            ],
         ),
         Threat(
             category="Denial of Service",
@@ -224,9 +224,9 @@ THREAT_DATABASE = {
                 "Implement layered rate limiting",
                 "Use token bucket or leaky bucket algorithms",
                 "Rate limit by user, IP, and API key",
-                "Deploy API gateway with DoS protection"
-            ]
-        )
+                "Deploy API gateway with DoS protection",
+            ],
+        ),
     ],
     "database": [
         Threat(
@@ -241,8 +241,8 @@ THREAT_DATABASE = {
                 "Use parameterized queries exclusively",
                 "Apply input validation and sanitization",
                 "Implement least privilege database accounts",
-                "Deploy web application firewall (WAF)"
-            ]
+                "Deploy web application firewall (WAF)",
+            ],
         ),
         Threat(
             category="Information Disclosure",
@@ -256,8 +256,8 @@ THREAT_DATABASE = {
                 "Implement transparent data encryption (TDE)",
                 "Use field-level encryption for PII",
                 "Encrypt database backups",
-                "Manage encryption keys securely"
-            ]
+                "Manage encryption keys securely",
+            ],
         ),
         Threat(
             category="Repudiation",
@@ -271,9 +271,9 @@ THREAT_DATABASE = {
                 "Write audit logs to immutable storage",
                 "Implement cryptographic log chaining",
                 "Use separate audit database with restricted access",
-                "Monitor for log gaps and anomalies"
-            ]
-        )
+                "Monitor for log gaps and anomalies",
+            ],
+        ),
     ],
     "network": [
         Threat(
@@ -288,8 +288,8 @@ THREAT_DATABASE = {
                 "Enforce TLS everywhere (no HTTP)",
                 "Implement HSTS with preloading",
                 "Use mutual TLS for service-to-service",
-                "Deploy network segmentation"
-            ]
+                "Deploy network segmentation",
+            ],
         ),
         Threat(
             category="Denial of Service",
@@ -303,9 +303,9 @@ THREAT_DATABASE = {
                 "Deploy CDN with DDoS protection",
                 "Implement rate limiting at edge",
                 "Use anycast DNS distribution",
-                "Have incident response runbook ready"
-            ]
-        )
+                "Have incident response runbook ready",
+            ],
+        ),
     ],
     "storage": [
         Threat(
@@ -320,8 +320,8 @@ THREAT_DATABASE = {
                 "Generate random file names",
                 "Store files outside web root",
                 "Implement signed URLs with expiration",
-                "Scan uploads for malware"
-            ]
+                "Scan uploads for malware",
+            ],
         ),
         Threat(
             category="Tampering",
@@ -335,10 +335,10 @@ THREAT_DATABASE = {
                 "Implement file integrity monitoring",
                 "Use cryptographic hashes for verification",
                 "Apply immutable storage for critical files",
-                "Version control with audit trail"
-            ]
-        )
-    ]
+                "Version control with audit trail",
+            ],
+        ),
+    ],
 }
 
 # Component to threat category mapping
@@ -410,7 +410,7 @@ def calculate_dread_score(threat: Threat) -> Dict:
         "reproducibility": reproducibility,
         "exploitability": min(exploitability, 10),
         "affected_users": affected_users,
-        "discoverability": discoverability
+        "discoverability": discoverability,
     }
     dread["total"] = sum(dread.values()) / 5
     return dread
@@ -465,15 +465,15 @@ def format_json_report(component: str, threats: List[Threat]) -> Dict:
     """Format threats as JSON structure."""
     return {
         "component": component,
-        "analysis_date": __import__('datetime').datetime.now().isoformat(),
+        "analysis_date": __import__("datetime").datetime.now().isoformat(),
         "summary": {
             "total_threats": len(threats),
             "by_risk_level": {
                 "critical": sum(1 for t in threats if t.risk_level == "Critical"),
                 "high": sum(1 for t in threats if t.risk_level == "High"),
                 "medium": sum(1 for t in threats if t.risk_level == "Medium"),
-                "low": sum(1 for t in threats if t.risk_level == "Low")
-            }
+                "low": sum(1 for t in threats if t.risk_level == "Low"),
+            },
         },
         "threats": [
             {
@@ -487,10 +487,10 @@ def format_json_report(component: str, threats: List[Threat]) -> Dict:
                 "risk_score": t.risk_score,
                 "risk_level": t.risk_level,
                 "dread": calculate_dread_score(t),
-                "mitigations": t.mitigations
+                "mitigations": t.mitigations,
             }
             for t in threats
-        ]
+        ],
     }
 
 
@@ -546,36 +546,21 @@ Examples:
 
   # List all threats in database
   python threat_modeler.py --list-threats
-        """
+        """,
     )
 
     parser.add_argument(
-        "--component", "-c",
-        help="Component to analyze (e.g., 'User Authentication', 'API Gateway')"
+        "--component",
+        "-c",
+        help="Component to analyze (e.g., 'User Authentication', 'API Gateway')",
     )
+    parser.add_argument("--assets", "-a", help="Comma-separated list of assets to protect")
+    parser.add_argument("--json", action="store_true", help="Output as JSON")
+    parser.add_argument("--interactive", "-i", action="store_true", help="Run in interactive mode")
     parser.add_argument(
-        "--assets", "-a",
-        help="Comma-separated list of assets to protect"
+        "--list-threats", "-l", action="store_true", help="List all threats in database"
     )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output as JSON"
-    )
-    parser.add_argument(
-        "--interactive", "-i",
-        action="store_true",
-        help="Run in interactive mode"
-    )
-    parser.add_argument(
-        "--list-threats", "-l",
-        action="store_true",
-        help="List all threats in database"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        help="Output file path"
-    )
+    parser.add_argument("--output", "-o", help="Output file path")
 
     args = parser.parse_args()
 
@@ -598,7 +583,7 @@ Examples:
         output = format_threat_report(args.component, threats)
 
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(output)
         print(f"Report written to {args.output}")
     else:

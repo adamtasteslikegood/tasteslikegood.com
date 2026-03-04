@@ -74,9 +74,7 @@ class DCFModel:
 
         # WACC = (E/V * Re) + (D/V * Rd * (1 - T))
         after_tax_cost_of_debt = cost_of_debt * (1 - tax_rate)
-        self.wacc = (equity_weight * cost_of_equity) + (
-            debt_weight * after_tax_cost_of_debt
-        )
+        self.wacc = (equity_weight * cost_of_equity) + (debt_weight * after_tax_cost_of_debt)
 
         return self.wacc
 
@@ -101,15 +99,9 @@ class DCFModel:
 
         for year in range(self.projection_years):
             growth = (
-                revenue_growth_rates[year]
-                if year < len(revenue_growth_rates)
-                else default_growth
+                revenue_growth_rates[year] if year < len(revenue_growth_rates) else default_growth
             )
-            fcf_margin = (
-                fcf_margins[year]
-                if year < len(fcf_margins)
-                else default_fcf_margin
-            )
+            fcf_margin = fcf_margins[year] if year < len(fcf_margins) else default_fcf_margin
 
             current_revenue = current_revenue * (1 + growth)
             fcf = current_revenue * fcf_margin
@@ -130,9 +122,9 @@ class DCFModel:
 
         # Perpetuity growth method: TV = FCF * (1+g) / (WACC - g)
         if self.wacc > terminal_growth:
-            self.terminal_value_perpetuity = (
-                terminal_fcf * (1 + terminal_growth)
-            ) / (self.wacc - terminal_growth)
+            self.terminal_value_perpetuity = (terminal_fcf * (1 + terminal_growth)) / (
+                self.wacc - terminal_growth
+            )
         else:
             self.terminal_value_perpetuity = 0.0
 
@@ -171,12 +163,8 @@ class DCFModel:
         net_debt = self.historical.get("net_debt", 0)
         shares_outstanding = self.historical.get("shares_outstanding", 1)
 
-        self.equity_value_perpetuity = (
-            self.enterprise_value_perpetuity - net_debt
-        )
-        self.equity_value_exit_multiple = (
-            self.enterprise_value_exit_multiple - net_debt
-        )
+        self.equity_value_perpetuity = self.enterprise_value_perpetuity - net_debt
+        self.equity_value_exit_multiple = self.enterprise_value_exit_multiple - net_debt
 
         self.value_per_share_perpetuity = safe_divide(
             self.equity_value_perpetuity, shares_outstanding
@@ -248,9 +236,7 @@ class DCFModel:
                 net_debt = self.historical.get("net_debt", 0)
                 shares = self.historical.get("shares_outstanding", 1)
                 equity = ev - net_debt
-                share_price_table[i][j] = round(
-                    safe_divide(equity, shares), 2
-                )
+                share_price_table[i][j] = round(safe_divide(equity, shares), 2)
 
         return {
             "wacc_values": wacc_range,
@@ -346,8 +332,7 @@ class DCFModel:
             f"{fmt_money(results['equity_value']['perpetuity_growth'])}"
         )
         lines.append(
-            f"  Exit Multiple Method:     "
-            f"{fmt_money(results['equity_value']['exit_multiple'])}"
+            f"  Exit Multiple Method:     " f"{fmt_money(results['equity_value']['exit_multiple'])}"
         )
 
         lines.append(f"\n--- VALUE PER SHARE ---")

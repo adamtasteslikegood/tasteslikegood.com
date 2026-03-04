@@ -4,6 +4,7 @@ Recipe validation module.
 Provides JSON Schema validation for recipe data to ensure
 all recipes conform to the expected structure before saving.
 """
+
 import json
 from jsonschema import Draft7Validator, ValidationError
 from config import RECIPE_SCHEMA_PATH, RECIPE_SCHEMA, RECIPE_VALIDATOR
@@ -17,7 +18,7 @@ def load_schema():
         dict: Recipe schema dictionary, or None if loading fails
     """
     try:
-        with open(RECIPE_SCHEMA_PATH, 'r') as schema_file:
+        with open(RECIPE_SCHEMA_PATH, "r") as schema_file:
             return json.load(schema_file)
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         print(f"Warning: Unable to load recipe schema. Error: {exc}")

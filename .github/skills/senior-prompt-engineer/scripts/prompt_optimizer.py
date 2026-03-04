@@ -24,30 +24,25 @@ from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, asdict
 
-
 # Token estimation ratios (chars per token approximation)
-TOKEN_RATIOS = {
-    'gpt-4': 4.0,
-    'gpt-3.5': 4.0,
-    'claude': 3.5,
-    'default': 4.0
-}
+TOKEN_RATIOS = {"gpt-4": 4.0, "gpt-3.5": 4.0, "claude": 3.5, "default": 4.0}
 
 # Cost per 1K tokens (input)
 COST_PER_1K = {
-    'gpt-4': 0.03,
-    'gpt-4-turbo': 0.01,
-    'gpt-3.5-turbo': 0.0005,
-    'claude-3-opus': 0.015,
-    'claude-3-sonnet': 0.003,
-    'claude-3-haiku': 0.00025,
-    'default': 0.01
+    "gpt-4": 0.03,
+    "gpt-4-turbo": 0.01,
+    "gpt-3.5-turbo": 0.0005,
+    "claude-3-opus": 0.015,
+    "claude-3-sonnet": 0.003,
+    "claude-3-haiku": 0.00025,
+    "default": 0.01,
 }
 
 
 @dataclass
 class PromptAnalysis:
     """Results of prompt analysis"""
+
     token_count: int
     estimated_cost: float
     model: str
@@ -66,20 +61,21 @@ class PromptAnalysis:
 @dataclass
 class FewShotExample:
     """A single few-shot example"""
+
     input_text: str
     output_text: str
     index: int
 
 
-def estimate_tokens(text: str, model: str = 'default') -> int:
+def estimate_tokens(text: str, model: str = "default") -> int:
     """Estimate token count based on character ratio"""
-    ratio = TOKEN_RATIOS.get(model, TOKEN_RATIOS['default'])
+    ratio = TOKEN_RATIOS.get(model, TOKEN_RATIOS["default"])
     return int(len(text) / ratio)
 
 
-def estimate_cost(token_count: int, model: str = 'default') -> float:
+def estimate_cost(token_count: int, model: str = "default") -> float:
     """Estimate cost based on token count"""
-    cost_per_1k = COST_PER_1K.get(model, COST_PER_1K['default'])
+    cost_per_1k = COST_PER_1K.get(model, COST_PER_1K["default"])
     return round((token_count / 1000) * cost_per_1k, 6)
 
 
@@ -89,25 +85,30 @@ def find_ambiguous_instructions(text: str) -> List[Dict[str, str]]:
 
     # Vague verbs that need specificity
     vague_patterns = [
-        (r'\b(analyze|process|handle|deal with)\b', 'Vague verb - specify the exact action'),
-        (r'\b(good|nice|appropriate|suitable)\b', 'Subjective term - define specific criteria'),
-        (r'\b(etc\.|and so on|and more)\b', 'Open-ended list - enumerate all items explicitly'),
-        (r'\b(if needed|as necessary|when appropriate)\b', 'Conditional without criteria - specify when'),
-        (r'\b(some|several|many|few|various)\b', 'Vague quantity - use specific numbers'),
+        (r"\b(analyze|process|handle|deal with)\b", "Vague verb - specify the exact action"),
+        (r"\b(good|nice|appropriate|suitable)\b", "Subjective term - define specific criteria"),
+        (r"\b(etc\.|and so on|and more)\b", "Open-ended list - enumerate all items explicitly"),
+        (
+            r"\b(if needed|as necessary|when appropriate)\b",
+            "Conditional without criteria - specify when",
+        ),
+        (r"\b(some|several|many|few|various)\b", "Vague quantity - use specific numbers"),
     ]
 
-    lines = text.split('\n')
+    lines = text.split("\n")
     for i, line in enumerate(lines, 1):
         for pattern, message in vague_patterns:
             matches = re.finditer(pattern, line, re.IGNORECASE)
             for match in matches:
-                issues.append({
-                    'type': 'ambiguity',
-                    'line': i,
-                    'text': match.group(),
-                    'message': message,
-                    'context': line.strip()[:80]
-                })
+                issues.append(
+                    {
+                        "type": "ambiguity",
+                        "line": i,
+                        "text": match.group(),
+                        "message": message,
+                        "context": line.strip()[:80],
+                    }
+                )
 
     return issues
 
@@ -115,24 +116,26 @@ def find_ambiguous_instructions(text: str) -> List[Dict[str, str]]:
 def find_redundant_content(text: str) -> List[Dict[str, str]]:
     """Find potentially redundant content"""
     issues = []
-    lines = text.split('\n')
+    lines = text.split("\n")
 
     # Check for repeated phrases (3+ words)
     seen_phrases = {}
     for i, line in enumerate(lines, 1):
         words = line.split()
         for j in range(len(words) - 2):
-            phrase = ' '.join(words[j:j+3]).lower()
-            phrase = re.sub(r'[^\w\s]', '', phrase)
+            phrase = " ".join(words[j : j + 3]).lower()
+            phrase = re.sub(r"[^\w\s]", "", phrase)
             if phrase and len(phrase) > 10:
                 if phrase in seen_phrases:
-                    issues.append({
-                        'type': 'redundancy',
-                        'line': i,
-                        'text': phrase,
-                        'message': f'Phrase repeated from line {seen_phrases[phrase]}',
-                        'context': line.strip()[:80]
-                    })
+                    issues.append(
+                        {
+                            "type": "redundancy",
+                            "line": i,
+                            "text": phrase,
+                            "message": f"Phrase repeated from line {seen_phrases[phrase]}",
+                            "context": line.strip()[:80],
+                        }
+                    )
                 else:
                     seen_phrases[phrase] = i
 
@@ -144,18 +147,20 @@ def check_output_format(text: str) -> Tuple[bool, List[str]]:
     suggestions = []
 
     format_indicators = [
-        r'respond\s+(in|with)\s+(json|xml|csv|markdown)',
-        r'output\s+format',
-        r'return\s+(only|just)',
-        r'format:\s*\n',
+        r"respond\s+(in|with)\s+(json|xml|csv|markdown)",
+        r"output\s+format",
+        r"return\s+(only|just)",
+        r"format:\s*\n",
         r'\{["\']?\w+["\']?\s*:',  # JSON-like structure
-        r'```\w*\n',  # Code block
+        r"```\w*\n",  # Code block
     ]
 
     has_format = any(re.search(p, text, re.IGNORECASE) for p in format_indicators)
 
     if not has_format:
-        suggestions.append('Add explicit output format specification (e.g., "Respond in JSON with keys: ...")')
+        suggestions.append(
+            'Add explicit output format specification (e.g., "Respond in JSON with keys: ...")'
+        )
 
     return has_format, suggestions
 
@@ -166,38 +171,38 @@ def extract_sections(text: str) -> List[Dict[str, any]]:
 
     # Common section patterns
     section_patterns = [
-        r'^#+\s+(.+)$',  # Markdown headers
-        r'^([A-Z][A-Za-z\s]+):\s*$',  # Title Case Label:
-        r'^(Instructions|Context|Examples?|Input|Output|Task|Role|Format)[:.]',
+        r"^#+\s+(.+)$",  # Markdown headers
+        r"^([A-Z][A-Za-z\s]+):\s*$",  # Title Case Label:
+        r"^(Instructions|Context|Examples?|Input|Output|Task|Role|Format)[:.]",
     ]
 
-    lines = text.split('\n')
-    current_section = {'name': 'Introduction', 'start': 1, 'content': []}
+    lines = text.split("\n")
+    current_section = {"name": "Introduction", "start": 1, "content": []}
 
     for i, line in enumerate(lines, 1):
         is_header = False
         for pattern in section_patterns:
             match = re.match(pattern, line.strip(), re.IGNORECASE)
             if match:
-                if current_section['content']:
-                    current_section['end'] = i - 1
-                    current_section['line_count'] = len(current_section['content'])
+                if current_section["content"]:
+                    current_section["end"] = i - 1
+                    current_section["line_count"] = len(current_section["content"])
                     sections.append(current_section)
                 current_section = {
-                    'name': match.group(1).strip() if match.groups() else line.strip(),
-                    'start': i,
-                    'content': []
+                    "name": match.group(1).strip() if match.groups() else line.strip(),
+                    "start": i,
+                    "content": [],
                 }
                 is_header = True
                 break
 
         if not is_header:
-            current_section['content'].append(line)
+            current_section["content"].append(line)
 
     # Add last section
-    if current_section['content']:
-        current_section['end'] = len(lines)
-        current_section['line_count'] = len(current_section['content'])
+    if current_section["content"]:
+        current_section["end"] = len(lines)
+        current_section["line_count"] = len(current_section["content"])
         sections.append(current_section)
 
     return sections
@@ -208,26 +213,30 @@ def extract_few_shot_examples(text: str) -> List[FewShotExample]:
     examples = []
 
     # Pattern 1: "Example N:" or "Example:" blocks
-    example_pattern = r'Example\s*\d*:\s*\n(Input:\s*(.+?)\n(?:Output:\s*(.+?)(?=\n\nExample|\n\n[A-Z]|\Z)))'
+    example_pattern = (
+        r"Example\s*\d*:\s*\n(Input:\s*(.+?)\n(?:Output:\s*(.+?)(?=\n\nExample|\n\n[A-Z]|\Z)))"
+    )
 
     matches = re.finditer(example_pattern, text, re.DOTALL | re.IGNORECASE)
     for i, match in enumerate(matches, 1):
-        examples.append(FewShotExample(
-            input_text=match.group(2).strip() if match.group(2) else '',
-            output_text=match.group(3).strip() if match.group(3) else '',
-            index=i
-        ))
+        examples.append(
+            FewShotExample(
+                input_text=match.group(2).strip() if match.group(2) else "",
+                output_text=match.group(3).strip() if match.group(3) else "",
+                index=i,
+            )
+        )
 
     # Pattern 2: Input/Output pairs without "Example" label
     if not examples:
         io_pattern = r'Input:\s*["\']?(.+?)["\']?\s*\nOutput:\s*(.+?)(?=\nInput:|\Z)'
         matches = re.finditer(io_pattern, text, re.DOTALL)
         for i, match in enumerate(matches, 1):
-            examples.append(FewShotExample(
-                input_text=match.group(1).strip(),
-                output_text=match.group(2).strip(),
-                index=i
-            ))
+            examples.append(
+                FewShotExample(
+                    input_text=match.group(1).strip(), output_text=match.group(2).strip(), index=i
+                )
+            )
 
     return examples
 
@@ -237,15 +246,15 @@ def calculate_clarity_score(text: str, issues: List[Dict]) -> int:
     score = 100
 
     # Deduct for issues
-    score -= len([i for i in issues if i['type'] == 'ambiguity']) * 5
-    score -= len([i for i in issues if i['type'] == 'redundancy']) * 3
+    score -= len([i for i in issues if i["type"] == "ambiguity"]) * 5
+    score -= len([i for i in issues if i["type"] == "redundancy"]) * 3
 
     # Check for structure
-    if not re.search(r'^#+\s|^[A-Z][a-z]+:', text, re.MULTILINE):
+    if not re.search(r"^#+\s|^[A-Z][a-z]+:", text, re.MULTILINE):
         score -= 10  # No clear sections
 
     # Check for instruction clarity
-    if not re.search(r'(you (should|must|will)|please|your task)', text, re.IGNORECASE):
+    if not re.search(r"(you (should|must|will)|please|your task)", text, re.IGNORECASE):
         score -= 5  # No clear directives
 
     return max(0, min(100, score))
@@ -280,33 +289,41 @@ def generate_suggestions(analysis: PromptAnalysis) -> List[str]:
         suggestions.append('Add explicit output format: "Respond in JSON with keys: ..."')
 
     if analysis.example_count == 0:
-        suggestions.append('Consider adding 2-3 few-shot examples for consistent outputs')
+        suggestions.append("Consider adding 2-3 few-shot examples for consistent outputs")
     elif analysis.example_count == 1:
-        suggestions.append('Add 1-2 more examples to improve consistency')
+        suggestions.append("Add 1-2 more examples to improve consistency")
     elif analysis.example_count > 5:
-        suggestions.append(f'Consider reducing examples from {analysis.example_count} to 3-5 to save tokens')
+        suggestions.append(
+            f"Consider reducing examples from {analysis.example_count} to 3-5 to save tokens"
+        )
 
     if analysis.clarity_score < 70:
-        suggestions.append('Improve clarity: replace vague terms with specific instructions')
+        suggestions.append("Improve clarity: replace vague terms with specific instructions")
 
     if analysis.token_count > 2000:
-        suggestions.append(f'Prompt is {analysis.token_count} tokens - consider condensing for cost efficiency')
+        suggestions.append(
+            f"Prompt is {analysis.token_count} tokens - consider condensing for cost efficiency"
+        )
 
     # Check for role prompting
-    if not re.search(r'you are|act as|as a\s+\w+', analysis.sections[0].get('content', [''])[0] if analysis.sections else '', re.IGNORECASE):
+    if not re.search(
+        r"you are|act as|as a\s+\w+",
+        analysis.sections[0].get("content", [""])[0] if analysis.sections else "",
+        re.IGNORECASE,
+    ):
         suggestions.append('Consider adding role context: "You are an expert..."')
 
     return suggestions
 
 
-def analyze_prompt(text: str, model: str = 'gpt-4') -> PromptAnalysis:
+def analyze_prompt(text: str, model: str = "gpt-4") -> PromptAnalysis:
     """Perform comprehensive prompt analysis"""
 
     # Basic metrics
     token_count = estimate_tokens(text, model)
     cost = estimate_cost(token_count, model)
     word_count = len(text.split())
-    line_count = len(text.split('\n'))
+    line_count = len(text.split("\n"))
 
     # Find issues
     ambiguity_issues = find_ambiguous_instructions(text)
@@ -330,12 +347,15 @@ def analyze_prompt(text: str, model: str = 'gpt-4') -> PromptAnalysis:
         structure_score=structure_score,
         issues=all_issues,
         suggestions=[],
-        sections=[{'name': s['name'], 'lines': f"{s['start']}-{s.get('end', s['start'])}"} for s in sections],
+        sections=[
+            {"name": s["name"], "lines": f"{s['start']}-{s.get('end', s['start'])}"}
+            for s in sections
+        ],
         has_examples=len(examples) > 0,
         example_count=len(examples),
         has_output_format=has_format,
         word_count=word_count,
-        line_count=line_count
+        line_count=line_count,
     )
 
     analysis.suggestions = generate_suggestions(analysis) + format_suggestions
@@ -348,12 +368,12 @@ def optimize_prompt(text: str) -> str:
     optimized = text
 
     # Remove redundant whitespace
-    optimized = re.sub(r'\n{3,}', '\n\n', optimized)
-    optimized = re.sub(r' {2,}', ' ', optimized)
+    optimized = re.sub(r"\n{3,}", "\n\n", optimized)
+    optimized = re.sub(r" {2,}", " ", optimized)
 
     # Trim lines
-    lines = [line.rstrip() for line in optimized.split('\n')]
-    optimized = '\n'.join(lines)
+    lines = [line.rstrip() for line in optimized.split("\n")]
+    optimized = "\n".join(lines)
 
     return optimized.strip()
 
@@ -374,14 +394,22 @@ def format_report(analysis: PromptAnalysis) -> str:
     report.append("")
 
     report.append("📈 SCORES")
-    report.append(f"  Clarity:    {analysis.clarity_score}/100 {'✅' if analysis.clarity_score >= 70 else '⚠️'}")
-    report.append(f"  Structure:  {analysis.structure_score}/100 {'✅' if analysis.structure_score >= 70 else '⚠️'}")
+    report.append(
+        f"  Clarity:    {analysis.clarity_score}/100 {'✅' if analysis.clarity_score >= 70 else '⚠️'}"
+    )
+    report.append(
+        f"  Structure:  {analysis.structure_score}/100 {'✅' if analysis.structure_score >= 70 else '⚠️'}"
+    )
     report.append("")
 
     report.append("📋 STRUCTURE")
     report.append(f"  Sections:      {len(analysis.sections)}")
-    report.append(f"  Examples:      {analysis.example_count} {'✅' if analysis.has_examples else '❌'}")
-    report.append(f"  Output format: {'✅ Specified' if analysis.has_output_format else '❌ Missing'}")
+    report.append(
+        f"  Examples:      {analysis.example_count} {'✅' if analysis.has_examples else '❌'}"
+    )
+    report.append(
+        f"  Output format: {'✅ Specified' if analysis.has_output_format else '❌ Missing'}"
+    )
     report.append("")
 
     if analysis.sections:
@@ -407,7 +435,7 @@ def format_report(analysis: PromptAnalysis) -> str:
 
     report.append("=" * 50)
 
-    return '\n'.join(report)
+    return "\n".join(report)
 
 
 def main():
@@ -420,20 +448,33 @@ Examples:
   %(prog)s prompt.txt --tokens --model claude-3-sonnet
   %(prog)s prompt.txt --optimize --output optimized.txt
   %(prog)s prompt.txt --extract-examples --output examples.json
-        """
+        """,
     )
 
-    parser.add_argument('prompt', help='Prompt file to analyze')
-    parser.add_argument('--analyze', '-a', action='store_true', help='Run full analysis')
-    parser.add_argument('--tokens', '-t', action='store_true', help='Count tokens only')
-    parser.add_argument('--optimize', '-O', action='store_true', help='Generate optimized version')
-    parser.add_argument('--extract-examples', '-e', action='store_true', help='Extract few-shot examples')
-    parser.add_argument('--model', '-m', default='gpt-4',
-                       choices=['gpt-4', 'gpt-4-turbo', 'gpt-3.5-turbo', 'claude-3-opus', 'claude-3-sonnet', 'claude-3-haiku'],
-                       help='Model for token/cost estimation')
-    parser.add_argument('--output', '-o', help='Output file path')
-    parser.add_argument('--json', '-j', action='store_true', help='Output as JSON')
-    parser.add_argument('--compare', '-c', help='Compare with baseline analysis JSON')
+    parser.add_argument("prompt", help="Prompt file to analyze")
+    parser.add_argument("--analyze", "-a", action="store_true", help="Run full analysis")
+    parser.add_argument("--tokens", "-t", action="store_true", help="Count tokens only")
+    parser.add_argument("--optimize", "-O", action="store_true", help="Generate optimized version")
+    parser.add_argument(
+        "--extract-examples", "-e", action="store_true", help="Extract few-shot examples"
+    )
+    parser.add_argument(
+        "--model",
+        "-m",
+        default="gpt-4",
+        choices=[
+            "gpt-4",
+            "gpt-4-turbo",
+            "gpt-3.5-turbo",
+            "claude-3-opus",
+            "claude-3-sonnet",
+            "claude-3-haiku",
+        ],
+        help="Model for token/cost estimation",
+    )
+    parser.add_argument("--output", "-o", help="Output file path")
+    parser.add_argument("--json", "-j", action="store_true", help="Output as JSON")
+    parser.add_argument("--compare", "-c", help="Compare with baseline analysis JSON")
 
     args = parser.parse_args()
 
@@ -443,18 +484,14 @@ Examples:
         print(f"Error: File not found: {args.prompt}", file=sys.stderr)
         sys.exit(1)
 
-    text = prompt_path.read_text(encoding='utf-8')
+    text = prompt_path.read_text(encoding="utf-8")
 
     # Tokens only
     if args.tokens:
         token_count = estimate_tokens(text, args.model)
         cost = estimate_cost(token_count, args.model)
         if args.json:
-            print(json.dumps({
-                'tokens': token_count,
-                'cost': cost,
-                'model': args.model
-            }, indent=2))
+            print(json.dumps({"tokens": token_count, "cost": cost, "model": args.model}, indent=2))
         else:
             print(f"Tokens: {token_count:,}")
             print(f"Estimated cost: ${cost:.4f} ({args.model})")
@@ -515,5 +552,5 @@ Examples:
         print(f"\nAnalysis saved to {args.output}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

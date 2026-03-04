@@ -17,22 +17,37 @@ import json
 import sys
 from typing import Tuple, Optional
 
-
 # Standard 5x5 Risk Matrix per ISO 14971 common practice
 PROBABILITY_LEVELS = {
     1: {"name": "Improbable", "description": "Very unlikely to occur", "frequency": "<10^-6"},
     2: {"name": "Remote", "description": "Unlikely to occur", "frequency": "10^-5 to 10^-6"},
     3: {"name": "Occasional", "description": "May occur", "frequency": "10^-4 to 10^-5"},
     4: {"name": "Probable", "description": "Likely to occur", "frequency": "10^-3 to 10^-4"},
-    5: {"name": "Frequent", "description": "Expected to occur", "frequency": ">10^-3"}
+    5: {"name": "Frequent", "description": "Expected to occur", "frequency": ">10^-3"},
 }
 
 SEVERITY_LEVELS = {
-    1: {"name": "Negligible", "description": "Inconvenience or temporary discomfort", "harm": "No injury"},
-    2: {"name": "Minor", "description": "Temporary injury not requiring intervention", "harm": "Temporary discomfort"},
-    3: {"name": "Serious", "description": "Injury requiring professional intervention", "harm": "Reversible injury"},
-    4: {"name": "Critical", "description": "Permanent impairment or life-threatening", "harm": "Permanent impairment"},
-    5: {"name": "Catastrophic", "description": "Death", "harm": "Death"}
+    1: {
+        "name": "Negligible",
+        "description": "Inconvenience or temporary discomfort",
+        "harm": "No injury",
+    },
+    2: {
+        "name": "Minor",
+        "description": "Temporary injury not requiring intervention",
+        "harm": "Temporary discomfort",
+    },
+    3: {
+        "name": "Serious",
+        "description": "Injury requiring professional intervention",
+        "harm": "Reversible injury",
+    },
+    4: {
+        "name": "Critical",
+        "description": "Permanent impairment or life-threatening",
+        "harm": "Permanent impairment",
+    },
+    5: {"name": "Catastrophic", "description": "Death", "harm": "Death"},
 }
 
 # Risk matrix: RISK_MATRIX[probability][severity] = risk_level
@@ -41,7 +56,7 @@ RISK_MATRIX = {
     2: {1: "Low", 2: "Low", 3: "Medium", 4: "Medium", 5: "High"},
     3: {1: "Low", 2: "Medium", 3: "Medium", 4: "High", 5: "High"},
     4: {1: "Medium", 2: "Medium", 3: "High", 4: "High", 5: "Unacceptable"},
-    5: {1: "Medium", 2: "High", 3: "High", 4: "Unacceptable", 5: "Unacceptable"}
+    5: {1: "Medium", 2: "High", 3: "High", 4: "Unacceptable", 5: "Unacceptable"},
 }
 
 # Risk level definitions and required actions
@@ -49,23 +64,23 @@ RISK_ACTIONS = {
     "Low": {
         "acceptable": True,
         "action": "Document and accept. No further action required.",
-        "color": "green"
+        "color": "green",
     },
     "Medium": {
         "acceptable": "ALARP",
         "action": "Reduce risk if practicable. Document ALARP rationale if not reduced.",
-        "color": "yellow"
+        "color": "yellow",
     },
     "High": {
         "acceptable": "ALARP",
         "action": "Risk reduction required. Must demonstrate ALARP if residual risk remains high.",
-        "color": "orange"
+        "color": "orange",
     },
     "Unacceptable": {
         "acceptable": False,
         "action": "Risk reduction mandatory. Design change required before proceeding.",
-        "color": "red"
-    }
+        "color": "red",
+    },
 }
 
 # FMEA scales (1-10)
@@ -79,7 +94,7 @@ FMEA_SEVERITY = {
     7: "High effect",
     8: "Very high effect",
     9: "Hazardous with warning",
-    10: "Hazardous without warning"
+    10: "Hazardous without warning",
 }
 
 FMEA_OCCURRENCE = {
@@ -92,7 +107,7 @@ FMEA_OCCURRENCE = {
     7: "High (1 in 20)",
     8: "Very high (1 in 8)",
     9: "Extremely high (1 in 3)",
-    10: "Almost certain (>1 in 2)"
+    10: "Almost certain (>1 in 2)",
 }
 
 FMEA_DETECTION = {
@@ -105,7 +120,7 @@ FMEA_DETECTION = {
     7: "Very low detection",
     8: "Remote detection",
     9: "Very remote detection",
-    10: "Cannot detect"
+    10: "Cannot detect",
 }
 
 
@@ -120,18 +135,12 @@ def calculate_risk_level(probability: int, severity: int) -> dict:
     risk_info = RISK_ACTIONS[risk_level]
 
     return {
-        "probability": {
-            "rating": probability,
-            **PROBABILITY_LEVELS[probability]
-        },
-        "severity": {
-            "rating": severity,
-            **SEVERITY_LEVELS[severity]
-        },
+        "probability": {"rating": probability, **PROBABILITY_LEVELS[probability]},
+        "severity": {"rating": severity, **SEVERITY_LEVELS[severity]},
         "risk_level": risk_level,
         "acceptable": risk_info["acceptable"],
         "action_required": risk_info["action"],
-        "risk_index": probability * severity
+        "risk_index": probability * severity,
     }
 
 
@@ -157,23 +166,14 @@ def calculate_rpn(severity: int, occurrence: int, detection: int) -> dict:
         action = "Monitor"
 
     return {
-        "severity": {
-            "rating": severity,
-            "description": FMEA_SEVERITY[severity]
-        },
-        "occurrence": {
-            "rating": occurrence,
-            "description": FMEA_OCCURRENCE[occurrence]
-        },
-        "detection": {
-            "rating": detection,
-            "description": FMEA_DETECTION[detection]
-        },
+        "severity": {"rating": severity, "description": FMEA_SEVERITY[severity]},
+        "occurrence": {"rating": occurrence, "description": FMEA_OCCURRENCE[occurrence]},
+        "detection": {"rating": detection, "description": FMEA_DETECTION[detection]},
         "rpn": rpn,
         "priority": priority,
         "action_required": action,
         "max_rpn": 1000,
-        "rpn_percentage": round(rpn / 10, 1)
+        "rpn_percentage": round(rpn / 10, 1),
     }
 
 
@@ -231,7 +231,11 @@ def display_criteria():
     print("RISK LEVEL ACTIONS")
     print("=" * 70)
     for level, info in RISK_ACTIONS.items():
-        acceptable = "Yes" if info['acceptable'] == True else ("ALARP" if info['acceptable'] == "ALARP" else "No")
+        acceptable = (
+            "Yes"
+            if info["acceptable"] == True
+            else ("ALARP" if info["acceptable"] == "ALARP" else "No")
+        )
         print(f"\n{level}:")
         print(f"   Acceptable: {acceptable}")
         print(f"   Action: {info['action']}")
@@ -245,7 +249,9 @@ def format_result_text(result: dict, analysis_type: str) -> str:
     if analysis_type == "risk":
         lines.append("RISK ASSESSMENT RESULT")
         lines.append("=" * 50)
-        lines.append(f"\nProbability: P{result['probability']['rating']} - {result['probability']['name']}")
+        lines.append(
+            f"\nProbability: P{result['probability']['rating']} - {result['probability']['name']}"
+        )
         lines.append(f"  {result['probability']['description']}")
         lines.append(f"\nSeverity: S{result['severity']['rating']} - {result['severity']['name']}")
         lines.append(f"  {result['severity']['description']}")
@@ -359,17 +365,21 @@ Examples:
 
   # JSON output
   python risk_matrix_calculator.py -p 4 -s 3 --output json
-        """
+        """,
     )
 
     parser.add_argument("-p", "--probability", type=int, help="Probability rating (1-5)")
-    parser.add_argument("-s", "--severity", type=int, help="Severity rating (1-5 for risk, 1-10 for FMEA)")
+    parser.add_argument(
+        "-s", "--severity", type=int, help="Severity rating (1-5 for risk, 1-10 for FMEA)"
+    )
     parser.add_argument("-o", "--occurrence", type=int, help="FMEA occurrence rating (1-10)")
     parser.add_argument("-d", "--detection", type=int, help="FMEA detection rating (1-10)")
     parser.add_argument("--fmea", action="store_true", help="Use FMEA RPN calculation")
     parser.add_argument("--output", choices=["text", "json"], default="text", help="Output format")
     parser.add_argument("--show-matrix", action="store_true", help="Display risk matrix")
-    parser.add_argument("--list-criteria", action="store_true", help="Display probability and severity criteria")
+    parser.add_argument(
+        "--list-criteria", action="store_true", help="Display probability and severity criteria"
+    )
     parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
 
     args = parser.parse_args()

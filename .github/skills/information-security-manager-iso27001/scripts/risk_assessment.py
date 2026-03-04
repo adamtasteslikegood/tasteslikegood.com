@@ -17,7 +17,6 @@ import sys
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 
-
 # Threat catalogs by template
 THREAT_CATALOGS = {
     "general": [
@@ -29,31 +28,66 @@ THREAT_CATALOGS = {
         {"id": "T06", "name": "Insider threat", "category": "Personnel", "likelihood": 2},
         {"id": "T07", "name": "Physical theft", "category": "Physical", "likelihood": 2},
         {"id": "T08", "name": "System misconfiguration", "category": "Technical", "likelihood": 4},
-        {"id": "T09", "name": "Third-party compromise", "category": "Supply Chain", "likelihood": 3},
+        {
+            "id": "T09",
+            "name": "Third-party compromise",
+            "category": "Supply Chain",
+            "likelihood": 3,
+        },
         {"id": "T10", "name": "Natural disaster", "category": "Environmental", "likelihood": 1},
     ],
     "healthcare": [
-        {"id": "T01", "name": "Patient data breach", "category": "Confidentiality", "likelihood": 4},
+        {
+            "id": "T01",
+            "name": "Patient data breach",
+            "category": "Confidentiality",
+            "likelihood": 4,
+        },
         {"id": "T02", "name": "Ransomware attack", "category": "Availability", "likelihood": 4},
         {"id": "T03", "name": "Medical device tampering", "category": "Integrity", "likelihood": 3},
         {"id": "T04", "name": "EHR unauthorized access", "category": "Access", "likelihood": 4},
         {"id": "T05", "name": "HIPAA violation", "category": "Compliance", "likelihood": 3},
         {"id": "T06", "name": "Clinical data corruption", "category": "Integrity", "likelihood": 2},
-        {"id": "T07", "name": "Telemedicine interception", "category": "Confidentiality", "likelihood": 3},
+        {
+            "id": "T07",
+            "name": "Telemedicine interception",
+            "category": "Confidentiality",
+            "likelihood": 3,
+        },
         {"id": "T08", "name": "Credential theft", "category": "Access", "likelihood": 5},
-        {"id": "T09", "name": "Third-party vendor breach", "category": "Supply Chain", "likelihood": 3},
+        {
+            "id": "T09",
+            "name": "Third-party vendor breach",
+            "category": "Supply Chain",
+            "likelihood": 3,
+        },
         {"id": "T10", "name": "Insider data theft", "category": "Personnel", "likelihood": 2},
     ],
     "cloud": [
         {"id": "T01", "name": "Cloud misconfiguration", "category": "Technical", "likelihood": 5},
-        {"id": "T02", "name": "API vulnerability exploit", "category": "Application", "likelihood": 4},
+        {
+            "id": "T02",
+            "name": "API vulnerability exploit",
+            "category": "Application",
+            "likelihood": 4,
+        },
         {"id": "T03", "name": "Account hijacking", "category": "Access", "likelihood": 4},
         {"id": "T04", "name": "Data exfiltration", "category": "Confidentiality", "likelihood": 3},
-        {"id": "T05", "name": "Shared tenancy attack", "category": "Infrastructure", "likelihood": 2},
+        {
+            "id": "T05",
+            "name": "Shared tenancy attack",
+            "category": "Infrastructure",
+            "likelihood": 2,
+        },
         {"id": "T06", "name": "Service outage", "category": "Availability", "likelihood": 3},
         {"id": "T07", "name": "Compliance violation", "category": "Compliance", "likelihood": 3},
         {"id": "T08", "name": "Shadow IT exposure", "category": "Governance", "likelihood": 4},
-        {"id": "T09", "name": "Encryption key exposure", "category": "Cryptography", "likelihood": 2},
+        {
+            "id": "T09",
+            "name": "Encryption key exposure",
+            "category": "Cryptography",
+            "likelihood": 2,
+        },
         {"id": "T10", "name": "CSP vendor lock-in", "category": "Strategic", "likelihood": 3},
     ],
 }
@@ -62,7 +96,12 @@ THREAT_CATALOGS = {
 VULNERABILITY_PATTERNS = {
     "access": ["No MFA", "Weak passwords", "Excessive privileges", "Shared accounts"],
     "technical": ["Unpatched systems", "Weak encryption", "Missing logging", "Open ports"],
-    "process": ["No incident response", "Missing backups", "No change control", "Lack of monitoring"],
+    "process": [
+        "No incident response",
+        "Missing backups",
+        "No change control",
+        "Lack of monitoring",
+    ],
     "people": ["Untrained staff", "No security awareness", "Social engineering susceptibility"],
 }
 
@@ -133,36 +172,180 @@ def generate_sample_assets(scope: str, template: str) -> List[Dict[str, Any]]:
 
     if template == "healthcare":
         base_assets = [
-            {"id": "A001", "name": "Patient Database", "type": "Information", "owner": "DBA Team", "classification": "critical"},
-            {"id": "A002", "name": "EHR Application", "type": "Software", "owner": "App Team", "classification": "critical"},
-            {"id": "A003", "name": "Medical Imaging System", "type": "Software", "owner": "Radiology", "classification": "high"},
-            {"id": "A004", "name": "Database Servers", "type": "Hardware", "owner": "Infrastructure", "classification": "high"},
-            {"id": "A005", "name": "Admin Credentials", "type": "Access", "owner": "Security", "classification": "critical"},
-            {"id": "A006", "name": "Backup Systems", "type": "Service", "owner": "IT Ops", "classification": "high"},
-            {"id": "A007", "name": "Network Infrastructure", "type": "Hardware", "owner": "Network Team", "classification": "high"},
-            {"id": "A008", "name": "API Gateway", "type": "Software", "owner": "Platform Team", "classification": "high"},
+            {
+                "id": "A001",
+                "name": "Patient Database",
+                "type": "Information",
+                "owner": "DBA Team",
+                "classification": "critical",
+            },
+            {
+                "id": "A002",
+                "name": "EHR Application",
+                "type": "Software",
+                "owner": "App Team",
+                "classification": "critical",
+            },
+            {
+                "id": "A003",
+                "name": "Medical Imaging System",
+                "type": "Software",
+                "owner": "Radiology",
+                "classification": "high",
+            },
+            {
+                "id": "A004",
+                "name": "Database Servers",
+                "type": "Hardware",
+                "owner": "Infrastructure",
+                "classification": "high",
+            },
+            {
+                "id": "A005",
+                "name": "Admin Credentials",
+                "type": "Access",
+                "owner": "Security",
+                "classification": "critical",
+            },
+            {
+                "id": "A006",
+                "name": "Backup Systems",
+                "type": "Service",
+                "owner": "IT Ops",
+                "classification": "high",
+            },
+            {
+                "id": "A007",
+                "name": "Network Infrastructure",
+                "type": "Hardware",
+                "owner": "Network Team",
+                "classification": "high",
+            },
+            {
+                "id": "A008",
+                "name": "API Gateway",
+                "type": "Software",
+                "owner": "Platform Team",
+                "classification": "high",
+            },
         ]
     elif template == "cloud":
         base_assets = [
-            {"id": "A001", "name": "Cloud Storage Buckets", "type": "Service", "owner": "Platform", "classification": "high"},
-            {"id": "A002", "name": "Container Registry", "type": "Service", "owner": "DevOps", "classification": "high"},
-            {"id": "A003", "name": "API Services", "type": "Software", "owner": "Engineering", "classification": "critical"},
-            {"id": "A004", "name": "Database Instances", "type": "Service", "owner": "DBA Team", "classification": "critical"},
-            {"id": "A005", "name": "IAM Configuration", "type": "Access", "owner": "Security", "classification": "critical"},
-            {"id": "A006", "name": "Secrets Manager", "type": "Service", "owner": "Security", "classification": "critical"},
-            {"id": "A007", "name": "Load Balancers", "type": "Infrastructure", "owner": "Platform", "classification": "high"},
-            {"id": "A008", "name": "Monitoring Systems", "type": "Service", "owner": "SRE", "classification": "medium"},
+            {
+                "id": "A001",
+                "name": "Cloud Storage Buckets",
+                "type": "Service",
+                "owner": "Platform",
+                "classification": "high",
+            },
+            {
+                "id": "A002",
+                "name": "Container Registry",
+                "type": "Service",
+                "owner": "DevOps",
+                "classification": "high",
+            },
+            {
+                "id": "A003",
+                "name": "API Services",
+                "type": "Software",
+                "owner": "Engineering",
+                "classification": "critical",
+            },
+            {
+                "id": "A004",
+                "name": "Database Instances",
+                "type": "Service",
+                "owner": "DBA Team",
+                "classification": "critical",
+            },
+            {
+                "id": "A005",
+                "name": "IAM Configuration",
+                "type": "Access",
+                "owner": "Security",
+                "classification": "critical",
+            },
+            {
+                "id": "A006",
+                "name": "Secrets Manager",
+                "type": "Service",
+                "owner": "Security",
+                "classification": "critical",
+            },
+            {
+                "id": "A007",
+                "name": "Load Balancers",
+                "type": "Infrastructure",
+                "owner": "Platform",
+                "classification": "high",
+            },
+            {
+                "id": "A008",
+                "name": "Monitoring Systems",
+                "type": "Service",
+                "owner": "SRE",
+                "classification": "medium",
+            },
         ]
     else:  # general
         base_assets = [
-            {"id": "A001", "name": "Corporate Data", "type": "Information", "owner": "Data Team", "classification": "high"},
-            {"id": "A002", "name": "Business Applications", "type": "Software", "owner": "IT", "classification": "high"},
-            {"id": "A003", "name": "Server Infrastructure", "type": "Hardware", "owner": "Infrastructure", "classification": "high"},
-            {"id": "A004", "name": "User Credentials", "type": "Access", "owner": "Security", "classification": "critical"},
-            {"id": "A005", "name": "Email System", "type": "Service", "owner": "IT", "classification": "medium"},
-            {"id": "A006", "name": "File Servers", "type": "Hardware", "owner": "Infrastructure", "classification": "medium"},
-            {"id": "A007", "name": "Network Equipment", "type": "Hardware", "owner": "Network", "classification": "high"},
-            {"id": "A008", "name": "Backup Infrastructure", "type": "Service", "owner": "IT Ops", "classification": "high"},
+            {
+                "id": "A001",
+                "name": "Corporate Data",
+                "type": "Information",
+                "owner": "Data Team",
+                "classification": "high",
+            },
+            {
+                "id": "A002",
+                "name": "Business Applications",
+                "type": "Software",
+                "owner": "IT",
+                "classification": "high",
+            },
+            {
+                "id": "A003",
+                "name": "Server Infrastructure",
+                "type": "Hardware",
+                "owner": "Infrastructure",
+                "classification": "high",
+            },
+            {
+                "id": "A004",
+                "name": "User Credentials",
+                "type": "Access",
+                "owner": "Security",
+                "classification": "critical",
+            },
+            {
+                "id": "A005",
+                "name": "Email System",
+                "type": "Service",
+                "owner": "IT",
+                "classification": "medium",
+            },
+            {
+                "id": "A006",
+                "name": "File Servers",
+                "type": "Hardware",
+                "owner": "Infrastructure",
+                "classification": "medium",
+            },
+            {
+                "id": "A007",
+                "name": "Network Equipment",
+                "type": "Hardware",
+                "owner": "Network",
+                "classification": "high",
+            },
+            {
+                "id": "A008",
+                "name": "Backup Infrastructure",
+                "type": "Service",
+                "owner": "IT Ops",
+                "classification": "high",
+            },
         ]
 
     # Tag assets with scope
@@ -172,10 +355,7 @@ def generate_sample_assets(scope: str, template: str) -> List[Dict[str, Any]]:
     return base_assets
 
 
-def assess_risks(
-    assets: List[Dict[str, Any]],
-    template: str
-) -> List[Dict[str, Any]]:
+def assess_risks(assets: List[Dict[str, Any]], template: str) -> List[Dict[str, Any]]:
     """Perform risk assessment on assets."""
     threats = THREAT_CATALOGS.get(template, THREAT_CATALOGS["general"])
     risks = []
@@ -223,7 +403,9 @@ def assess_risks(
     return risks
 
 
-def calculate_residual_risk(risk: Dict[str, Any], control_effectiveness: float = 0.7) -> Dict[str, Any]:
+def calculate_residual_risk(
+    risk: Dict[str, Any], control_effectiveness: float = 0.7
+) -> Dict[str, Any]:
     """Calculate residual risk after applying controls."""
     residual_likelihood = max(1, int(risk["likelihood"] * (1 - control_effectiveness)))
     residual_score = calculate_risk_score(residual_likelihood, risk["impact"])
@@ -243,7 +425,7 @@ def generate_report(
     template: str,
     assets: List[Dict[str, Any]],
     risks: List[Dict[str, Any]],
-    output_format: str
+    output_format: str,
 ) -> str:
     """Generate risk assessment report."""
     timestamp = datetime.now().isoformat()
@@ -313,13 +495,15 @@ def generate_report(
                 f"{asset['owner']} | {asset['classification'].capitalize()} |"
             )
 
-        lines.extend([
-            f"",
-            f"## Risk Register",
-            f"",
-            f"| Risk ID | Asset | Threat | L | I | Score | Level |",
-            f"|---------|-------|--------|---|---|-------|-------|",
-        ])
+        lines.extend(
+            [
+                f"",
+                f"## Risk Register",
+                f"",
+                f"| Risk ID | Asset | Threat | L | I | Score | Level |",
+                f"|---------|-------|--------|---|---|-------|-------|",
+            ]
+        )
         for risk in risks[:20]:  # Top 20 risks
             lines.append(
                 f"| {risk['id']} | {risk['asset_name']} | {risk['threat_name']} | "
@@ -327,11 +511,13 @@ def generate_report(
                 f"{risk['level'].capitalize()} |"
             )
 
-        lines.extend([
-            f"",
-            f"## Treatment Recommendations",
-            f"",
-        ])
+        lines.extend(
+            [
+                f"",
+                f"## Treatment Recommendations",
+                f"",
+            ]
+        )
         for level, treatment in TREATMENT_OPTIONS.items():
             count = risk_counts[level]
             if count > 0:
@@ -344,30 +530,22 @@ def main():
     parser = argparse.ArgumentParser(
         description="Security Risk Assessment Tool - ISO 27001 Clause 6.1.2"
     )
+    parser.add_argument("--scope", "-s", required=True, help="System or area to assess")
     parser.add_argument(
-        "--scope", "-s",
-        required=True,
-        help="System or area to assess"
-    )
-    parser.add_argument(
-        "--template", "-t",
+        "--template",
+        "-t",
         choices=["general", "healthcare", "cloud"],
         default="general",
-        help="Assessment template (default: general)"
+        help="Assessment template (default: general)",
     )
+    parser.add_argument("--assets", "-a", help="CSV file with asset inventory")
+    parser.add_argument("--output", "-o", help="Output file path (default: stdout)")
     parser.add_argument(
-        "--assets", "-a",
-        help="CSV file with asset inventory"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        help="Output file path (default: stdout)"
-    )
-    parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["json", "csv", "markdown"],
         default="markdown",
-        help="Output format (default: markdown)"
+        help="Output format (default: markdown)",
     )
 
     args = parser.parse_args()
@@ -382,13 +560,7 @@ def main():
     risks = assess_risks(assets, args.template)
 
     # Generate report
-    report = generate_report(
-        args.scope,
-        args.template,
-        assets,
-        risks,
-        args.format
-    )
+    report = generate_report(args.scope, args.template, assets, risks, args.format)
 
     # Output
     if args.output:

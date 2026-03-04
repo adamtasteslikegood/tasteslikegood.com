@@ -51,9 +51,7 @@ class BudgetVarianceAnalyzer:
         self.material_variances: List[Dict[str, Any]] = []
         self.summary: Dict[str, Any] = {}
 
-    def classify_favorability(
-        self, line_type: str, variance_amount: float
-    ) -> str:
+    def classify_favorability(self, line_type: str, variance_amount: float) -> str:
         """
         Classify variance as favorable or unfavorable.
 
@@ -86,9 +84,7 @@ class BudgetVarianceAnalyzer:
             # Prior year variance (if available)
             py_var_amt = (actual - prior_year) if prior_year is not None else None
             py_var_pct = (
-                safe_divide(py_var_amt, prior_year) * 100
-                if prior_year is not None
-                else None
+                safe_divide(py_var_amt, prior_year) * 100 if prior_year is not None else None
             )
 
             favorability = self.classify_favorability(line_type, budget_var_amt)
@@ -151,10 +147,7 @@ class BudgetVarianceAnalyzer:
         # Add variance percentage
         for dept_data in departments.values():
             dept_data["variance_pct"] = round(
-                safe_divide(
-                    dept_data["total_variance"], dept_data["total_budget"]
-                )
-                * 100,
+                safe_divide(dept_data["total_variance"], dept_data["total_budget"]) * 100,
                 2,
             )
 
@@ -181,10 +174,7 @@ class BudgetVarianceAnalyzer:
 
         for cat_data in categories.values():
             cat_data["variance_pct"] = round(
-                safe_divide(
-                    cat_data["total_variance"], cat_data["total_budget"]
-                )
-                * 100,
+                safe_divide(cat_data["total_variance"], cat_data["total_budget"]) * 100,
                 2,
             )
 
@@ -193,27 +183,31 @@ class BudgetVarianceAnalyzer:
     def generate_executive_summary(self) -> Dict[str, Any]:
         """Generate an executive summary of the variance analysis."""
         total_actual = sum(
-            v["actual"] for v in self.variances if v["type"].lower() in ("revenue", "income", "sales")
+            v["actual"]
+            for v in self.variances
+            if v["type"].lower() in ("revenue", "income", "sales")
         )
         total_budget = sum(
-            v["budget"] for v in self.variances if v["type"].lower() in ("revenue", "income", "sales")
+            v["budget"]
+            for v in self.variances
+            if v["type"].lower() in ("revenue", "income", "sales")
         )
         total_expense_actual = sum(
-            v["actual"] for v in self.variances if v["type"].lower() not in ("revenue", "income", "sales")
+            v["actual"]
+            for v in self.variances
+            if v["type"].lower() not in ("revenue", "income", "sales")
         )
         total_expense_budget = sum(
-            v["budget"] for v in self.variances if v["type"].lower() not in ("revenue", "income", "sales")
+            v["budget"]
+            for v in self.variances
+            if v["type"].lower() not in ("revenue", "income", "sales")
         )
 
         revenue_variance = total_actual - total_budget
         expense_variance = total_expense_actual - total_expense_budget
 
-        favorable_count = sum(
-            1 for v in self.variances if v["favorability"] == "Favorable"
-        )
-        unfavorable_count = sum(
-            1 for v in self.variances if v["favorability"] == "Unfavorable"
-        )
+        favorable_count = sum(1 for v in self.variances if v["favorability"] == "Favorable")
+        unfavorable_count = sum(1 for v in self.variances if v["favorability"] == "Unfavorable")
 
         self.summary = {
             "period": self.period,
@@ -226,17 +220,13 @@ class BudgetVarianceAnalyzer:
                 "actual": total_actual,
                 "budget": total_budget,
                 "variance_amount": revenue_variance,
-                "variance_pct": round(
-                    safe_divide(revenue_variance, total_budget) * 100, 2
-                ),
+                "variance_pct": round(safe_divide(revenue_variance, total_budget) * 100, 2),
             },
             "expenses": {
                 "actual": total_expense_actual,
                 "budget": total_expense_budget,
                 "variance_amount": expense_variance,
-                "variance_pct": round(
-                    safe_divide(expense_variance, total_expense_budget) * 100, 2
-                ),
+                "variance_pct": round(safe_divide(expense_variance, total_expense_budget) * 100, 2),
             },
             "net_impact": revenue_variance - expense_variance,
             "materiality_thresholds": {
@@ -306,17 +296,11 @@ class BudgetVarianceAnalyzer:
         material = results["material_variances"]
         if material:
             lines.append(f"\n--- MATERIAL VARIANCES ---")
-            lines.append(
-                f"  (Threshold: {self.threshold_pct}% or "
-                f"${self.threshold_amt:,.0f})"
-            )
+            lines.append(f"  (Threshold: {self.threshold_pct}% or " f"${self.threshold_amt:,.0f})")
             for v in material:
+                lines.append(f"\n  {v['name']} ({v['department']})")
                 lines.append(
-                    f"\n  {v['name']} ({v['department']})"
-                )
-                lines.append(
-                    f"    Actual: {fmt_money(v['actual'])} | "
-                    f"Budget: {fmt_money(v['budget'])}"
+                    f"    Actual: {fmt_money(v['actual'])} | " f"Budget: {fmt_money(v['budget'])}"
                 )
                 lines.append(
                     f"    Variance: {fmt_money(v['budget_variance_amount'])} "

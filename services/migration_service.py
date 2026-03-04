@@ -3,17 +3,21 @@ import logging
 from typing import List, Dict, Any
 from config import RECIPES_DIR
 from repositories.recipe_repository import (
-    get_recipe, save_recipe, migrate_recipe_data, invalidate_cache
+    get_recipe,
+    save_recipe,
+    migrate_recipe_data,
+    invalidate_cache,
 )
 
 logger = logging.getLogger(__name__)
+
 
 class MigrationService:
     @staticmethod
     def migrate_all_recipes() -> Dict[str, Any]:
         """
         Migrate all recipes in the recipes directory to the latest schema.
-        
+
         Returns:
             Dict[str, Any]: Results of the migration including count and files updated.
         """
@@ -22,10 +26,10 @@ class MigrationService:
 
         if not os.path.exists(RECIPES_DIR):
             logger.warning(f"Recipes directory {RECIPES_DIR} does not exist.")
-            return {'migrated_count': 0, 'files': []}
+            return {"migrated_count": 0, "files": []}
 
         for filename in os.listdir(RECIPES_DIR):
-            if not filename.endswith('.json'):
+            if not filename.endswith(".json"):
                 continue
 
             try:
@@ -49,4 +53,4 @@ class MigrationService:
             invalidate_cache()
             logger.info(f"Completed migration of {count} files.")
 
-        return {'migrated_count': count, 'files': updated_files}
+        return {"migrated_count": count, "files": updated_files}

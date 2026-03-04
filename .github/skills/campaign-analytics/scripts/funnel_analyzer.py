@@ -167,22 +167,30 @@ def format_single_funnel_text(analysis: Dict[str, Any], title: str = "FUNNEL") -
     lines.append(f"  Overall Conversion: {analysis['overall_conversion_rate']}%")
     lines.append("")
 
-    lines.append(f"  {'Stage':<20} {'Count':>10} {'Conv Rate':>12} {'Drop-off':>12} {'Cumulative':>12}")
+    lines.append(
+        f"  {'Stage':<20} {'Count':>10} {'Conv Rate':>12} {'Drop-off':>12} {'Cumulative':>12}"
+    )
     lines.append(f"  {'-'*20} {'-'*10} {'-'*12} {'-'*12} {'-'*12}")
 
     for m in analysis["stage_metrics"]:
         stage = m["stage"]
         count = m["count"]
         conv = f"{m['conversion_rate']:.1f}%"
-        drop = f"-{m['dropoff_count']:,} ({m['dropoff_rate']:.1f}%)" if m["dropoff_count"] > 0 else "-"
+        drop = (
+            f"-{m['dropoff_count']:,} ({m['dropoff_rate']:.1f}%)" if m["dropoff_count"] > 0 else "-"
+        )
         cumul = f"{m['cumulative_conversion']:.1f}%"
         lines.append(f"  {stage:<20} {count:>10,} {conv:>12} {drop:>12} {cumul:>12}")
 
     lines.append("")
     bn_abs = analysis["bottleneck_absolute"]
     bn_rel = analysis["bottleneck_relative"]
-    lines.append(f"  BOTTLENECK (Absolute): {bn_abs['transition']} (lost {bn_abs['dropoff_count']:,})")
-    lines.append(f"  BOTTLENECK (Relative): {bn_rel['transition']} ({bn_rel['dropoff_rate']}% drop-off)")
+    lines.append(
+        f"  BOTTLENECK (Absolute): {bn_abs['transition']} (lost {bn_abs['dropoff_count']:,})"
+    )
+    lines.append(
+        f"  BOTTLENECK (Relative): {bn_rel['transition']} ({bn_rel['dropoff_rate']}% drop-off)"
+    )
 
     return "\n".join(lines)
 
@@ -198,7 +206,9 @@ def format_text(results: Dict[str, Any]) -> str:
         # Multi-segment output
         lines.append("")
         lines.append("SEGMENT RANKINGS")
-        lines.append(f"  {'Rank':>4} {'Segment':<25} {'Conversion':>12} {'Entries':>10} {'Conversions':>12}")
+        lines.append(
+            f"  {'Rank':>4} {'Segment':<25} {'Conversion':>12} {'Entries':>10} {'Conversions':>12}"
+        )
         lines.append(f"  {'-'*4} {'-'*25} {'-'*12} {'-'*10} {'-'*12}")
         for r in results["rankings"]:
             lines.append(
@@ -209,7 +219,9 @@ def format_text(results: Dict[str, Any]) -> str:
         lines.append("")
         for seg_name, seg_result in results["segment_results"].items():
             lines.append("")
-            lines.append(format_single_funnel_text(seg_result, title=f"SEGMENT: {seg_name.upper()}"))
+            lines.append(
+                format_single_funnel_text(seg_result, title=f"SEGMENT: {seg_name.upper()}")
+            )
 
         # Stage comparison table
         lines.append("")

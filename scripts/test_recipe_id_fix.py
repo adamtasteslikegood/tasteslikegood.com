@@ -54,16 +54,12 @@ def test_create_with_existing_id():
 
         # Verify database ID matches the provided ID
         if recipe.id != test_id:
-            logger.error(
-                f"✗ Database ID {recipe.id} doesn't match provided ID {test_id}"
-            )
+            logger.error(f"✗ Database ID {recipe.id} doesn't match provided ID {test_id}")
             return False
 
         # Verify data.id matches database ID
         if recipe.data.get("id") != recipe.id:
-            logger.error(
-                f"✗ data.id {recipe.data.get('id')} doesn't match DB id {recipe.id}"
-            )
+            logger.error(f"✗ data.id {recipe.data.get('id')} doesn't match DB id {recipe.id}")
             return False
 
         logger.info(f"✓ Recipe created with consistent ID: {recipe.id}")
@@ -103,9 +99,7 @@ def test_create_without_id():
 
         # Verify data.id matches database ID
         if recipe.data.get("id") != recipe.id:
-            logger.error(
-                f"✗ data.id {recipe.data.get('id')} doesn't match DB id {recipe.id}"
-            )
+            logger.error(f"✗ data.id {recipe.data.get('id')} doesn't match DB id {recipe.id}")
             return False
 
         logger.info(f"✓ Recipe created with generated UUID: {recipe.id}")
@@ -149,9 +143,7 @@ def test_update_maintains_id():
             "servings": 6,
         }
 
-        updated = db_recipe_repository.update_recipe(
-            recipe.id, update_data, user_id=None
-        )
+        updated = db_recipe_repository.update_recipe(recipe.id, update_data, user_id=None)
 
         if not updated:
             logger.error("✗ Failed to update recipe")
@@ -163,9 +155,7 @@ def test_update_maintains_id():
             return False
 
         if updated.data.get("id") != updated.id:
-            logger.error(
-                f"✗ data.id {updated.data.get('id')} doesn't match DB id {updated.id}"
-            )
+            logger.error(f"✗ data.id {updated.data.get('id')} doesn't match DB id {updated.id}")
             return False
 
         logger.info(f"✓ Recipe updated with consistent ID: {updated.id}")

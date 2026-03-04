@@ -12,17 +12,17 @@ class ABTestPlanner:
 
     # Minimum detectable effect sizes (conservative estimates)
     MIN_EFFECT_SIZES = {
-        'icon': 0.10,  # 10% conversion improvement
-        'screenshot': 0.08,  # 8% conversion improvement
-        'title': 0.05,  # 5% conversion improvement
-        'description': 0.03  # 3% conversion improvement
+        "icon": 0.10,  # 10% conversion improvement
+        "screenshot": 0.08,  # 8% conversion improvement
+        "title": 0.05,  # 5% conversion improvement
+        "description": 0.03,  # 3% conversion improvement
     }
 
     # Statistical confidence levels
     CONFIDENCE_LEVELS = {
-        'high': 0.95,  # 95% confidence
-        'standard': 0.90,  # 90% confidence
-        'exploratory': 0.80  # 80% confidence
+        "high": 0.95,  # 95% confidence
+        "standard": 0.90,  # 90% confidence
+        "exploratory": 0.80,  # 80% confidence
     }
 
     def __init__(self):
@@ -35,7 +35,7 @@ class ABTestPlanner:
         variant_a: Dict[str, Any],
         variant_b: Dict[str, Any],
         hypothesis: str,
-        success_metric: str = 'conversion_rate'
+        success_metric: str = "conversion_rate",
     ) -> Dict[str, Any]:
         """
         Design an A/B test with hypothesis and variables.
@@ -51,26 +51,18 @@ class ABTestPlanner:
             Test design with configuration
         """
         test_design = {
-            'test_id': self._generate_test_id(test_type),
-            'test_type': test_type,
-            'hypothesis': hypothesis,
-            'variants': {
-                'a': {
-                    'name': 'Control',
-                    'details': variant_a,
-                    'traffic_split': 0.5
-                },
-                'b': {
-                    'name': 'Variation',
-                    'details': variant_b,
-                    'traffic_split': 0.5
-                }
+            "test_id": self._generate_test_id(test_type),
+            "test_type": test_type,
+            "hypothesis": hypothesis,
+            "variants": {
+                "a": {"name": "Control", "details": variant_a, "traffic_split": 0.5},
+                "b": {"name": "Variation", "details": variant_b, "traffic_split": 0.5},
             },
-            'success_metric': success_metric,
-            'secondary_metrics': self._get_secondary_metrics(test_type),
-            'minimum_effect_size': self.MIN_EFFECT_SIZES.get(test_type, 0.05),
-            'recommended_confidence': 'standard',
-            'best_practices': self._get_test_best_practices(test_type)
+            "success_metric": success_metric,
+            "secondary_metrics": self._get_secondary_metrics(test_type),
+            "minimum_effect_size": self.MIN_EFFECT_SIZES.get(test_type, 0.05),
+            "recommended_confidence": "standard",
+            "best_practices": self._get_test_best_practices(test_type),
         }
 
         self.active_tests.append(test_design)
@@ -80,8 +72,8 @@ class ABTestPlanner:
         self,
         baseline_conversion: float,
         minimum_detectable_effect: float,
-        confidence_level: str = 'standard',
-        power: float = 0.80
+        confidence_level: str = "standard",
+        power: float = 0.80,
     ) -> Dict[str, Any]:
         """
         Calculate required sample size for statistical significance.
@@ -111,31 +103,27 @@ class ABTestPlanner:
 
         # Sample size per variant
         n_per_variant = math.ceil(
-            ((z_alpha + z_beta) ** 2 * sd_pooled ** 2) /
-            ((expected_conversion_b - baseline_conversion) ** 2)
+            ((z_alpha + z_beta) ** 2 * sd_pooled**2)
+            / ((expected_conversion_b - baseline_conversion) ** 2)
         )
 
         total_sample_size = n_per_variant * 2
 
         # Estimate duration based on typical traffic
-        duration_estimates = self._estimate_test_duration(
-            total_sample_size,
-            baseline_conversion
-        )
+        duration_estimates = self._estimate_test_duration(total_sample_size, baseline_conversion)
 
         return {
-            'sample_size_per_variant': n_per_variant,
-            'total_sample_size': total_sample_size,
-            'baseline_conversion': baseline_conversion,
-            'expected_conversion_improvement': minimum_detectable_effect,
-            'expected_conversion_b': expected_conversion_b,
-            'confidence_level': confidence_level,
-            'statistical_power': power,
-            'duration_estimates': duration_estimates,
-            'recommendations': self._generate_sample_size_recommendations(
-                n_per_variant,
-                duration_estimates
-            )
+            "sample_size_per_variant": n_per_variant,
+            "total_sample_size": total_sample_size,
+            "baseline_conversion": baseline_conversion,
+            "expected_conversion_improvement": minimum_detectable_effect,
+            "expected_conversion_b": expected_conversion_b,
+            "confidence_level": confidence_level,
+            "statistical_power": power,
+            "duration_estimates": duration_estimates,
+            "recommendations": self._generate_sample_size_recommendations(
+                n_per_variant, duration_estimates
+            ),
         }
 
     def calculate_significance(
@@ -143,7 +131,7 @@ class ABTestPlanner:
         variant_a_conversions: int,
         variant_a_visitors: int,
         variant_b_conversions: int,
-        variant_b_visitors: int
+        variant_b_visitors: int,
     ) -> Dict[str, Any]:
         """
         Calculate statistical significance of test results.
@@ -170,8 +158,12 @@ class ABTestPlanner:
         absolute_improvement = rate_b - rate_a
 
         # Calculate standard error
-        se_a = math.sqrt(rate_a * (1 - rate_a) / variant_a_visitors) if variant_a_visitors > 0 else 0
-        se_b = math.sqrt(rate_b * (1 - rate_b) / variant_b_visitors) if variant_b_visitors > 0 else 0
+        se_a = (
+            math.sqrt(rate_a * (1 - rate_a) / variant_a_visitors) if variant_a_visitors > 0 else 0
+        )
+        se_b = (
+            math.sqrt(rate_b * (1 - rate_b) / variant_b_visitors) if variant_b_visitors > 0 else 0
+        )
         se_diff = math.sqrt(se_a**2 + se_b**2)
 
         # Calculate z-score
@@ -189,39 +181,39 @@ class ABTestPlanner:
             relative_improvement,
             is_significant_95,
             is_significant_90,
-            variant_a_visitors + variant_b_visitors
+            variant_a_visitors + variant_b_visitors,
         )
 
         return {
-            'variant_a': {
-                'conversions': variant_a_conversions,
-                'visitors': variant_a_visitors,
-                'conversion_rate': round(rate_a, 4)
+            "variant_a": {
+                "conversions": variant_a_conversions,
+                "visitors": variant_a_visitors,
+                "conversion_rate": round(rate_a, 4),
             },
-            'variant_b': {
-                'conversions': variant_b_conversions,
-                'visitors': variant_b_visitors,
-                'conversion_rate': round(rate_b, 4)
+            "variant_b": {
+                "conversions": variant_b_conversions,
+                "visitors": variant_b_visitors,
+                "conversion_rate": round(rate_b, 4),
             },
-            'improvement': {
-                'absolute': round(absolute_improvement, 4),
-                'relative_percentage': round(relative_improvement * 100, 2)
+            "improvement": {
+                "absolute": round(absolute_improvement, 4),
+                "relative_percentage": round(relative_improvement * 100, 2),
             },
-            'statistical_analysis': {
-                'z_score': round(z_score, 3),
-                'p_value': round(p_value, 4),
-                'is_significant_95': is_significant_95,
-                'is_significant_90': is_significant_90,
-                'confidence_level': '95%' if is_significant_95 else ('90%' if is_significant_90 else 'Not significant')
+            "statistical_analysis": {
+                "z_score": round(z_score, 3),
+                "p_value": round(p_value, 4),
+                "is_significant_95": is_significant_95,
+                "is_significant_90": is_significant_90,
+                "confidence_level": (
+                    "95%"
+                    if is_significant_95
+                    else ("90%" if is_significant_90 else "Not significant")
+                ),
             },
-            'decision': decision
+            "decision": decision,
         }
 
-    def track_test_results(
-        self,
-        test_id: str,
-        results_data: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def track_test_results(self, test_id: str, results_data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Track ongoing test results and provide recommendations.
 
@@ -233,52 +225,43 @@ class ABTestPlanner:
             Test tracking report with next steps
         """
         # Find test
-        test = next((t for t in self.active_tests if t['test_id'] == test_id), None)
+        test = next((t for t in self.active_tests if t["test_id"] == test_id), None)
         if not test:
-            return {'error': f'Test {test_id} not found'}
+            return {"error": f"Test {test_id} not found"}
 
         # Calculate significance
         significance = self.calculate_significance(
-            results_data['variant_a_conversions'],
-            results_data['variant_a_visitors'],
-            results_data['variant_b_conversions'],
-            results_data['variant_b_visitors']
+            results_data["variant_a_conversions"],
+            results_data["variant_a_visitors"],
+            results_data["variant_b_conversions"],
+            results_data["variant_b_visitors"],
         )
 
         # Calculate test progress
-        total_visitors = results_data['variant_a_visitors'] + results_data['variant_b_visitors']
-        required_sample = results_data.get('required_sample_size', 10000)
+        total_visitors = results_data["variant_a_visitors"] + results_data["variant_b_visitors"]
+        required_sample = results_data.get("required_sample_size", 10000)
         progress_percentage = min((total_visitors / required_sample) * 100, 100)
 
         # Generate recommendations
         recommendations = self._generate_tracking_recommendations(
-            significance,
-            progress_percentage,
-            test['test_type']
+            significance, progress_percentage, test["test_type"]
         )
 
         return {
-            'test_id': test_id,
-            'test_type': test['test_type'],
-            'progress': {
-                'total_visitors': total_visitors,
-                'required_sample_size': required_sample,
-                'progress_percentage': round(progress_percentage, 1),
-                'is_complete': progress_percentage >= 100
+            "test_id": test_id,
+            "test_type": test["test_type"],
+            "progress": {
+                "total_visitors": total_visitors,
+                "required_sample_size": required_sample,
+                "progress_percentage": round(progress_percentage, 1),
+                "is_complete": progress_percentage >= 100,
             },
-            'current_results': significance,
-            'recommendations': recommendations,
-            'next_steps': self._determine_next_steps(
-                significance,
-                progress_percentage
-            )
+            "current_results": significance,
+            "recommendations": recommendations,
+            "next_steps": self._determine_next_steps(significance, progress_percentage),
         }
 
-    def generate_test_report(
-        self,
-        test_id: str,
-        final_results: Dict[str, Any]
-    ) -> Dict[str, Any]:
+    def generate_test_report(self, test_id: str, final_results: Dict[str, Any]) -> Dict[str, Any]:
         """
         Generate final test report with insights and recommendations.
 
@@ -289,117 +272,107 @@ class ABTestPlanner:
         Returns:
             Comprehensive test report
         """
-        test = next((t for t in self.active_tests if t['test_id'] == test_id), None)
+        test = next((t for t in self.active_tests if t["test_id"] == test_id), None)
         if not test:
-            return {'error': f'Test {test_id} not found'}
+            return {"error": f"Test {test_id} not found"}
 
         significance = self.calculate_significance(
-            final_results['variant_a_conversions'],
-            final_results['variant_a_visitors'],
-            final_results['variant_b_conversions'],
-            final_results['variant_b_visitors']
+            final_results["variant_a_conversions"],
+            final_results["variant_a_visitors"],
+            final_results["variant_b_conversions"],
+            final_results["variant_b_visitors"],
         )
 
         # Generate insights
-        insights = self._generate_test_insights(
-            test,
-            significance,
-            final_results
-        )
+        insights = self._generate_test_insights(test, significance, final_results)
 
         # Implementation plan
-        implementation_plan = self._create_implementation_plan(
-            test,
-            significance
-        )
+        implementation_plan = self._create_implementation_plan(test, significance)
 
         return {
-            'test_summary': {
-                'test_id': test_id,
-                'test_type': test['test_type'],
-                'hypothesis': test['hypothesis'],
-                'duration_days': final_results.get('duration_days', 'N/A')
+            "test_summary": {
+                "test_id": test_id,
+                "test_type": test["test_type"],
+                "hypothesis": test["hypothesis"],
+                "duration_days": final_results.get("duration_days", "N/A"),
             },
-            'results': significance,
-            'insights': insights,
-            'implementation_plan': implementation_plan,
-            'learnings': self._extract_learnings(test, significance)
+            "results": significance,
+            "insights": insights,
+            "implementation_plan": implementation_plan,
+            "learnings": self._extract_learnings(test, significance),
         }
 
     def _generate_test_id(self, test_type: str) -> str:
         """Generate unique test ID."""
         import time
+
         timestamp = int(time.time())
         return f"{test_type}_{timestamp}"
 
     def _get_secondary_metrics(self, test_type: str) -> List[str]:
         """Get secondary metrics to track for test type."""
         metrics_map = {
-            'icon': ['tap_through_rate', 'impression_count', 'brand_recall'],
-            'screenshot': ['tap_through_rate', 'time_on_page', 'scroll_depth'],
-            'title': ['impression_count', 'tap_through_rate', 'search_visibility'],
-            'description': ['time_on_page', 'scroll_depth', 'tap_through_rate']
+            "icon": ["tap_through_rate", "impression_count", "brand_recall"],
+            "screenshot": ["tap_through_rate", "time_on_page", "scroll_depth"],
+            "title": ["impression_count", "tap_through_rate", "search_visibility"],
+            "description": ["time_on_page", "scroll_depth", "tap_through_rate"],
         }
-        return metrics_map.get(test_type, ['tap_through_rate'])
+        return metrics_map.get(test_type, ["tap_through_rate"])
 
     def _get_test_best_practices(self, test_type: str) -> List[str]:
         """Get best practices for specific test type."""
         practices_map = {
-            'icon': [
-                'Test only one element at a time (color vs. style vs. symbolism)',
-                'Ensure icon is recognizable at small sizes (60x60px)',
-                'Consider cultural context for global audience',
-                'Test against top competitor icons'
+            "icon": [
+                "Test only one element at a time (color vs. style vs. symbolism)",
+                "Ensure icon is recognizable at small sizes (60x60px)",
+                "Consider cultural context for global audience",
+                "Test against top competitor icons",
             ],
-            'screenshot': [
-                'Test order of screenshots (users see first 2-3)',
-                'Use captions to tell story',
-                'Show key features and benefits',
-                'Test with and without device frames'
+            "screenshot": [
+                "Test order of screenshots (users see first 2-3)",
+                "Use captions to tell story",
+                "Show key features and benefits",
+                "Test with and without device frames",
             ],
-            'title': [
-                'Test keyword variations, not major rebrand',
-                'Keep brand name consistent',
-                'Ensure title fits within character limits',
-                'Test on both search and browse contexts'
+            "title": [
+                "Test keyword variations, not major rebrand",
+                "Keep brand name consistent",
+                "Ensure title fits within character limits",
+                "Test on both search and browse contexts",
             ],
-            'description': [
-                'Test structure (bullet points vs. paragraphs)',
-                'Test call-to-action placement',
-                'Test feature vs. benefit focus',
-                'Maintain keyword density'
-            ]
+            "description": [
+                "Test structure (bullet points vs. paragraphs)",
+                "Test call-to-action placement",
+                "Test feature vs. benefit focus",
+                "Maintain keyword density",
+            ],
         }
-        return practices_map.get(test_type, ['Test one variable at a time'])
+        return practices_map.get(test_type, ["Test one variable at a time"])
 
     def _estimate_test_duration(
-        self,
-        required_sample_size: int,
-        baseline_conversion: float
+        self, required_sample_size: int, baseline_conversion: float
     ) -> Dict[str, Any]:
         """Estimate test duration based on typical traffic levels."""
         # Assume different daily traffic scenarios
         traffic_scenarios = {
-            'low': 100,      # 100 page views/day
-            'medium': 1000,  # 1000 page views/day
-            'high': 10000    # 10000 page views/day
+            "low": 100,  # 100 page views/day
+            "medium": 1000,  # 1000 page views/day
+            "high": 10000,  # 10000 page views/day
         }
 
         estimates = {}
         for scenario, daily_views in traffic_scenarios.items():
             days = math.ceil(required_sample_size / daily_views)
             estimates[scenario] = {
-                'daily_page_views': daily_views,
-                'estimated_days': days,
-                'estimated_weeks': round(days / 7, 1)
+                "daily_page_views": daily_views,
+                "estimated_days": days,
+                "estimated_weeks": round(days / 7, 1),
             }
 
         return estimates
 
     def _generate_sample_size_recommendations(
-        self,
-        sample_size: int,
-        duration_estimates: Dict[str, Any]
+        self, sample_size: int, duration_estimates: Dict[str, Any]
     ) -> List[str]:
         """Generate recommendations based on sample size."""
         recommendations = []
@@ -409,12 +382,12 @@ class ABTestPlanner:
                 "Large sample size required - consider testing smaller effect size or increasing traffic"
             )
 
-        if duration_estimates['medium']['estimated_days'] > 30:
+        if duration_estimates["medium"]["estimated_days"] > 30:
             recommendations.append(
                 "Long test duration - consider higher minimum detectable effect or focus on high-impact changes"
             )
 
-        if duration_estimates['low']['estimated_days'] > 60:
+        if duration_estimates["low"]["estimated_days"] > 60:
             recommendations.append(
                 "Insufficient traffic for reliable testing - consider user acquisition or broader targeting"
             )
@@ -427,14 +400,7 @@ class ABTestPlanner:
     def _get_z_score(self, percentile: float) -> float:
         """Get z-score for given percentile (approximation)."""
         # Common z-scores
-        z_scores = {
-            0.80: 0.84,
-            0.85: 1.04,
-            0.90: 1.28,
-            0.95: 1.645,
-            0.975: 1.96,
-            0.99: 2.33
-        }
+        z_scores = {0.80: 0.84, 0.85: 1.04, 0.90: 1.28, 0.95: 1.645, 0.975: 1.96, 0.99: 2.33}
         return z_scores.get(percentile, 1.96)
 
     def _standard_normal_cdf(self, z: float) -> float:
@@ -454,67 +420,62 @@ class ABTestPlanner:
         improvement: float,
         is_significant_95: bool,
         is_significant_90: bool,
-        total_visitors: int
+        total_visitors: int,
     ) -> Dict[str, Any]:
         """Generate test decision and recommendation."""
         if total_visitors < 1000:
             return {
-                'decision': 'continue',
-                'rationale': 'Insufficient data - continue test to reach minimum sample size',
-                'action': 'Keep test running'
+                "decision": "continue",
+                "rationale": "Insufficient data - continue test to reach minimum sample size",
+                "action": "Keep test running",
             }
 
         if is_significant_95:
             if improvement > 0:
                 return {
-                    'decision': 'implement_b',
-                    'rationale': f'Variant B shows {improvement*100:.1f}% improvement with 95% confidence',
-                    'action': 'Implement Variant B'
+                    "decision": "implement_b",
+                    "rationale": f"Variant B shows {improvement*100:.1f}% improvement with 95% confidence",
+                    "action": "Implement Variant B",
                 }
             else:
                 return {
-                    'decision': 'keep_a',
-                    'rationale': 'Variant A performs better with 95% confidence',
-                    'action': 'Keep current version (A)'
+                    "decision": "keep_a",
+                    "rationale": "Variant A performs better with 95% confidence",
+                    "action": "Keep current version (A)",
                 }
 
         elif is_significant_90:
             if improvement > 0:
                 return {
-                    'decision': 'implement_b_cautiously',
-                    'rationale': f'Variant B shows {improvement*100:.1f}% improvement with 90% confidence',
-                    'action': 'Consider implementing B, monitor closely'
+                    "decision": "implement_b_cautiously",
+                    "rationale": f"Variant B shows {improvement*100:.1f}% improvement with 90% confidence",
+                    "action": "Consider implementing B, monitor closely",
                 }
             else:
                 return {
-                    'decision': 'keep_a',
-                    'rationale': 'Variant A performs better with 90% confidence',
-                    'action': 'Keep current version (A)'
+                    "decision": "keep_a",
+                    "rationale": "Variant A performs better with 90% confidence",
+                    "action": "Keep current version (A)",
                 }
 
         else:
             return {
-                'decision': 'inconclusive',
-                'rationale': 'No statistically significant difference detected',
-                'action': 'Either keep A or test different hypothesis'
+                "decision": "inconclusive",
+                "rationale": "No statistically significant difference detected",
+                "action": "Either keep A or test different hypothesis",
             }
 
     def _generate_tracking_recommendations(
-        self,
-        significance: Dict[str, Any],
-        progress: float,
-        test_type: str
+        self, significance: Dict[str, Any], progress: float, test_type: str
     ) -> List[str]:
         """Generate recommendations for ongoing test."""
         recommendations = []
 
         if progress < 50:
-            recommendations.append(
-                f"Test is {progress:.0f}% complete - continue collecting data"
-            )
+            recommendations.append(f"Test is {progress:.0f}% complete - continue collecting data")
 
         if progress >= 100:
-            if significance['statistical_analysis']['is_significant_95']:
+            if significance["statistical_analysis"]["is_significant_95"]:
                 recommendations.append(
                     "Sufficient data collected with significant results - ready to conclude test"
                 )
@@ -525,47 +486,38 @@ class ABTestPlanner:
 
         return recommendations
 
-    def _determine_next_steps(
-        self,
-        significance: Dict[str, Any],
-        progress: float
-    ) -> str:
+    def _determine_next_steps(self, significance: Dict[str, Any], progress: float) -> str:
         """Determine next steps for test."""
         if progress < 100:
             return f"Continue test until reaching 100% sample size (currently {progress:.0f}%)"
 
-        decision = significance.get('decision', {}).get('decision', 'inconclusive')
+        decision = significance.get("decision", {}).get("decision", "inconclusive")
 
-        if decision == 'implement_b':
+        if decision == "implement_b":
             return "Implement Variant B and monitor metrics for 2 weeks"
-        elif decision == 'keep_a':
+        elif decision == "keep_a":
             return "Keep Variant A and design new test with different hypothesis"
         else:
             return "Test inconclusive - either keep A or design new test"
 
     def _generate_test_insights(
-        self,
-        test: Dict[str, Any],
-        significance: Dict[str, Any],
-        results: Dict[str, Any]
+        self, test: Dict[str, Any], significance: Dict[str, Any], results: Dict[str, Any]
     ) -> List[str]:
         """Generate insights from test results."""
         insights = []
 
-        improvement = significance['improvement']['relative_percentage']
+        improvement = significance["improvement"]["relative_percentage"]
 
-        if significance['statistical_analysis']['is_significant_95']:
+        if significance["statistical_analysis"]["is_significant_95"]:
             insights.append(
                 f"Strong evidence: Variant B {'improved' if improvement > 0 else 'decreased'} "
                 f"conversion by {abs(improvement):.1f}% with 95% confidence"
             )
 
-        insights.append(
-            f"Tested {test['test_type']} changes: {test['hypothesis']}"
-        )
+        insights.append(f"Tested {test['test_type']} changes: {test['hypothesis']}")
 
         # Add context-specific insights
-        if test['test_type'] == 'icon' and improvement > 5:
+        if test["test_type"] == "icon" and improvement > 5:
             insights.append(
                 "Icon change had substantial impact - visual first impression is critical"
             )
@@ -573,51 +525,47 @@ class ABTestPlanner:
         return insights
 
     def _create_implementation_plan(
-        self,
-        test: Dict[str, Any],
-        significance: Dict[str, Any]
+        self, test: Dict[str, Any], significance: Dict[str, Any]
     ) -> List[Dict[str, str]]:
         """Create implementation plan for winning variant."""
         plan = []
 
-        if significance.get('decision', {}).get('decision') == 'implement_b':
-            plan.append({
-                'step': '1. Update store listing',
-                'details': f"Replace {test['test_type']} with Variant B across all platforms"
-            })
-            plan.append({
-                'step': '2. Monitor metrics',
-                'details': 'Track conversion rate for 2 weeks to confirm sustained improvement'
-            })
-            plan.append({
-                'step': '3. Document learnings',
-                'details': 'Record insights for future optimization'
-            })
+        if significance.get("decision", {}).get("decision") == "implement_b":
+            plan.append(
+                {
+                    "step": "1. Update store listing",
+                    "details": f"Replace {test['test_type']} with Variant B across all platforms",
+                }
+            )
+            plan.append(
+                {
+                    "step": "2. Monitor metrics",
+                    "details": "Track conversion rate for 2 weeks to confirm sustained improvement",
+                }
+            )
+            plan.append(
+                {
+                    "step": "3. Document learnings",
+                    "details": "Record insights for future optimization",
+                }
+            )
 
         return plan
 
-    def _extract_learnings(
-        self,
-        test: Dict[str, Any],
-        significance: Dict[str, Any]
-    ) -> List[str]:
+    def _extract_learnings(self, test: Dict[str, Any], significance: Dict[str, Any]) -> List[str]:
         """Extract key learnings from test."""
         learnings = []
 
-        improvement = significance['improvement']['relative_percentage']
+        improvement = significance["improvement"]["relative_percentage"]
 
         learnings.append(
             f"Testing {test['test_type']} can yield {abs(improvement):.1f}% conversion change"
         )
 
-        if test['test_type'] == 'title':
-            learnings.append(
-                "Title changes affect search visibility and user perception"
-            )
-        elif test['test_type'] == 'screenshot':
-            learnings.append(
-                "First 2-3 screenshots are critical for conversion"
-            )
+        if test["test_type"] == "title":
+            learnings.append("Title changes affect search visibility and user perception")
+        elif test["test_type"] == "screenshot":
+            learnings.append("First 2-3 screenshots are critical for conversion")
 
         return learnings
 
@@ -627,7 +575,7 @@ def plan_ab_test(
     variant_a: Dict[str, Any],
     variant_b: Dict[str, Any],
     hypothesis: str,
-    baseline_conversion: float
+    baseline_conversion: float,
 ) -> Dict[str, Any]:
     """
     Convenience function to plan an A/B test.
@@ -644,19 +592,10 @@ def plan_ab_test(
     """
     planner = ABTestPlanner()
 
-    test_design = planner.design_test(
-        test_type,
-        variant_a,
-        variant_b,
-        hypothesis
-    )
+    test_design = planner.design_test(test_type, variant_a, variant_b, hypothesis)
 
     sample_size = planner.calculate_sample_size(
-        baseline_conversion,
-        planner.MIN_EFFECT_SIZES.get(test_type, 0.05)
+        baseline_conversion, planner.MIN_EFFECT_SIZES.get(test_type, 0.05)
     )
 
-    return {
-        'test_design': test_design,
-        'sample_size_requirements': sample_size
-    }
+    return {"test_design": test_design, "sample_size_requirements": sample_size}

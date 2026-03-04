@@ -193,7 +193,7 @@ class AuditScheduleOptimizer:
                 risk_level=process.risk_level.value,
                 priority_score=priority,
                 days_overdue=overdue,
-                rationale=rationale
+                rationale=rationale,
             )
             schedule.append(slot)
 
@@ -206,7 +206,7 @@ class AuditScheduleOptimizer:
             total_audits=len(schedule),
             audits_by_quarter=audits_per_quarter,
             schedule=[asdict(s) for s in schedule],
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     def _generate_recommendations(self, prioritized: List) -> List[str]:
@@ -230,7 +230,9 @@ class AuditScheduleOptimizer:
             )
 
         # Check for processes with multiple findings
-        finding_processes = [(p.name, p.previous_findings) for p, _, _ in prioritized if p.previous_findings >= 3]
+        finding_processes = [
+            (p.name, p.previous_findings) for p, _, _ in prioritized if p.previous_findings >= 3
+        ]
         if finding_processes:
             names = ", ".join([name for name, _ in finding_processes[:3]])
             recommendations.append(
@@ -242,8 +244,7 @@ class AuditScheduleOptimizer:
         never_audited = [p.name for p, _, _ in prioritized if not p.last_audit_date]
         if never_audited:
             recommendations.append(
-                f"Never audited: {', '.join(never_audited[:3])}. "
-                "Include in next audit cycle."
+                f"Never audited: {', '.join(never_audited[:3])}. " "Include in next audit cycle."
             )
 
         if not recommendations:
@@ -269,14 +270,16 @@ def format_text_output(schedule: AuditSchedule) -> str:
         bar = "█" * count + "░" * (10 - count)
         lines.append(f"  {q}: {bar} {count}")
 
-    lines.extend([
-        "",
-        "-" * 70,
-        "AUDIT SCHEDULE",
-        "-" * 70,
-        f"{'Process':<25} {'Clause':<8} {'Date':<12} {'Risk':<8} {'Priority':<8}",
-        "-" * 70,
-    ])
+    lines.extend(
+        [
+            "",
+            "-" * 70,
+            "AUDIT SCHEDULE",
+            "-" * 70,
+            f"{'Process':<25} {'Clause':<8} {'Date':<12} {'Risk':<8} {'Priority':<8}",
+            "-" * 70,
+        ]
+    )
 
     for audit in schedule.schedule:
         lines.append(
@@ -287,12 +290,14 @@ def format_text_output(schedule: AuditSchedule) -> str:
             f"{audit['priority_score']:<8}"
         )
 
-    lines.extend([
-        "",
-        "-" * 70,
-        "RECOMMENDATIONS",
-        "-" * 70,
-    ])
+    lines.extend(
+        [
+            "",
+            "-" * 70,
+            "RECOMMENDATIONS",
+            "-" * 70,
+        ]
+    )
 
     for i, rec in enumerate(schedule.recommendations, 1):
         lines.append(f"{i}. {rec}")
@@ -317,11 +322,9 @@ def interactive_mode():
 
         clause = input("ISO 13485 clause (e.g., 7.3): ").strip()
         risk = input("Risk level (H/M/L): ").strip().upper()
-        risk_level = {
-            "H": RiskLevel.HIGH,
-            "M": RiskLevel.MEDIUM,
-            "L": RiskLevel.LOW
-        }.get(risk, RiskLevel.MEDIUM)
+        risk_level = {"H": RiskLevel.HIGH, "M": RiskLevel.MEDIUM, "L": RiskLevel.LOW}.get(
+            risk, RiskLevel.MEDIUM
+        )
 
         last_audit = input("Last audit date (YYYY-MM-DD, or Enter if never): ").strip()
         if not last_audit:
@@ -330,13 +333,15 @@ def interactive_mode():
         findings = input("Previous findings count (default 0): ").strip()
         findings = int(findings) if findings.isdigit() else 0
 
-        processes.append(Process(
-            name=name,
-            iso_clause=clause,
-            risk_level=risk_level,
-            last_audit_date=last_audit,
-            previous_findings=findings
-        ))
+        processes.append(
+            Process(
+                name=name,
+                iso_clause=clause,
+                risk_level=risk_level,
+                last_audit_date=last_audit,
+                previous_findings=findings,
+            )
+        )
 
         print(f"Added: {name}\n")
 
@@ -353,31 +358,11 @@ def interactive_mode():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Risk-Based Audit Schedule Optimizer"
-    )
-    parser.add_argument(
-        "--processes",
-        type=str,
-        help="JSON file with process definitions"
-    )
-    parser.add_argument(
-        "--output",
-        choices=["text", "json"],
-        default="text",
-        help="Output format"
-    )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode"
-    )
-    parser.add_argument(
-        "--months",
-        type=int,
-        default=12,
-        help="Planning horizon in months"
-    )
+    parser = argparse.ArgumentParser(description="Risk-Based Audit Schedule Optimizer")
+    parser.add_argument("--processes", type=str, help="JSON file with process definitions")
+    parser.add_argument("--output", choices=["text", "json"], default="text", help="Output format")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
+    parser.add_argument("--months", type=int, default=12, help="Planning horizon in months")
 
     args = parser.parse_args()
 
@@ -392,14 +377,16 @@ def main():
         processes = []
         for p in data.get("processes", []):
             risk = RiskLevel[p.get("risk_level", "MEDIUM").upper()]
-            processes.append(Process(
-                name=p["name"],
-                iso_clause=p.get("iso_clause", ""),
-                risk_level=risk,
-                last_audit_date=p.get("last_audit_date"),
-                previous_findings=p.get("previous_findings", 0),
-                criticality_score=p.get("criticality_score", 5)
-            ))
+            processes.append(
+                Process(
+                    name=p["name"],
+                    iso_clause=p.get("iso_clause", ""),
+                    risk_level=risk,
+                    last_audit_date=p.get("last_audit_date"),
+                    previous_findings=p.get("previous_findings", 0),
+                    criticality_score=p.get("criticality_score", 5),
+                )
+            )
     else:
         # Use default processes
         processes = [

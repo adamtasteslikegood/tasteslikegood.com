@@ -172,9 +172,7 @@ def attempt_recipe_generation(full_prompt, selected_model):
         try:
             creds = google.oauth2.credentials.Credentials(**session["credentials"])
             user_client = Client(credentials=creds)
-            recipe_data, recipe_json_str = _attempt_with_client(
-                user_client, "User Credentials"
-            )
+            recipe_data, recipe_json_str = _attempt_with_client(user_client, "User Credentials")
         except Exception as e:
             print(f"User credential generation failed: {e}")
             last_error_message = f"User Auth Error ({type(e).__name__}): {e}"
@@ -278,9 +276,7 @@ def generate_recipe():
         return error_message, 400
 
     # 2. Get selected model
-    default_model = CONFIG.get("app", {}).get(
-        "default_model", "models/gemini-2.5-flash"
-    )
+    default_model = CONFIG.get("app", {}).get("default_model", "models/gemini-2.5-flash")
     selected_model = request.form.get("model", default_model)
 
     # 3. Build full prompt
@@ -297,9 +293,7 @@ def generate_recipe():
             filename = save_generated_recipe(recipe_data, prompt, selected_model)
 
             end_time = time.time()
-            print(
-                f"Recipe generated successfully in {end_time - start_time:.2f} seconds."
-            )
+            print(f"Recipe generated successfully in {end_time - start_time:.2f} seconds.")
 
             # 6. Redirect to the new recipe's page
             return redirect(url_for("recipes.show_recipe", filename=filename))
@@ -312,9 +306,7 @@ def generate_recipe():
         with open("recipe_error.json", "a+") as f:
             f.write(f"{recipe_json_str}\n")
         with open("recipe_error.txt", "a") as f:
-            f.write(
-                f"Full prompt:\n{full_prompt}\n\nLast Error: {last_error_message}\n"
-            )
+            f.write(f"Full prompt:\n{full_prompt}\n\nLast Error: {last_error_message}\n")
     except Exception as logging_error:
         print(f"Error while logging: {logging_error}")
 

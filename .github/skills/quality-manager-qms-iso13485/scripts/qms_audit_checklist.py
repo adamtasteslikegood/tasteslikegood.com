@@ -18,7 +18,6 @@ import sys
 from datetime import datetime
 from typing import Optional
 
-
 # ISO 13485:2016 Clause Structure with Audit Questions
 ISO13485_CLAUSES = {
     "4.1": {
@@ -31,8 +30,8 @@ ISO13485_CLAUSES = {
             "Are processes monitored, measured, and analyzed?",
             "Are actions taken to achieve planned results?",
             "Is outsourced process control documented?",
-            "Are changes to processes managed?"
-        ]
+            "Are changes to processes managed?",
+        ],
     },
     "4.2.1": {
         "title": "Documentation Requirements - General",
@@ -43,8 +42,8 @@ ISO13485_CLAUSES = {
             "Are required documented procedures established?",
             "Are documents needed for process planning and operation maintained?",
             "Are required records maintained?",
-            "Is a medical device file established for each device type?"
-        ]
+            "Is a medical device file established for each device type?",
+        ],
     },
     "4.2.2": {
         "title": "Quality Manual",
@@ -53,8 +52,8 @@ ISO13485_CLAUSES = {
             "Are exclusions justified?",
             "Are documented procedures included or referenced?",
             "Is the interaction between processes described?",
-            "Is the quality manual controlled?"
-        ]
+            "Is the quality manual controlled?",
+        ],
     },
     "4.2.3": {
         "title": "Control of Documents",
@@ -66,8 +65,8 @@ ISO13485_CLAUSES = {
             "Are documents legible and identifiable?",
             "Are external documents identified and controlled?",
             "Is unintended use of obsolete documents prevented?",
-            "Is there a document change control process?"
-        ]
+            "Is there a document change control process?",
+        ],
     },
     "4.2.4": {
         "title": "Control of Records",
@@ -78,8 +77,8 @@ ISO13485_CLAUSES = {
             "Are retention times defined?",
             "Is protection from damage ensured?",
             "Are confidential records protected?",
-            "Is record disposal controlled?"
-        ]
+            "Is record disposal controlled?",
+        ],
     },
     "5.1": {
         "title": "Management Commitment",
@@ -89,8 +88,8 @@ ISO13485_CLAUSES = {
             "Is a quality policy established?",
             "Are quality objectives established?",
             "Are management reviews conducted?",
-            "Are resources provided for QMS?"
-        ]
+            "Are resources provided for QMS?",
+        ],
     },
     "5.2": {
         "title": "Customer Focus",
@@ -98,8 +97,8 @@ ISO13485_CLAUSES = {
             "Are customer requirements determined?",
             "Are applicable regulatory requirements determined?",
             "Are customer and regulatory requirements met?",
-            "Is customer satisfaction enhanced?"
-        ]
+            "Is customer satisfaction enhanced?",
+        ],
     },
     "5.3": {
         "title": "Quality Policy",
@@ -109,8 +108,8 @@ ISO13485_CLAUSES = {
             "Does it include commitment to effectiveness?",
             "Does it provide framework for quality objectives?",
             "Is it communicated and understood?",
-            "Is it reviewed for continuing suitability?"
-        ]
+            "Is it reviewed for continuing suitability?",
+        ],
     },
     "5.4.1": {
         "title": "Quality Objectives",
@@ -119,16 +118,16 @@ ISO13485_CLAUSES = {
             "Are they consistent with quality policy?",
             "Are they established at relevant functions?",
             "Do they include product requirements?",
-            "Do they include compliance requirements?"
-        ]
+            "Do they include compliance requirements?",
+        ],
     },
     "5.4.2": {
         "title": "QMS Planning",
         "questions": [
             "Is QMS planning carried out to meet requirements?",
             "Is QMS planning done to meet quality objectives?",
-            "Is QMS integrity maintained during changes?"
-        ]
+            "Is QMS integrity maintained during changes?",
+        ],
     },
     "5.5.1": {
         "title": "Responsibility and Authority",
@@ -136,8 +135,8 @@ ISO13485_CLAUSES = {
             "Are responsibilities and authorities defined?",
             "Are they documented?",
             "Are they communicated?",
-            "Are interrelationships defined?"
-        ]
+            "Are interrelationships defined?",
+        ],
     },
     "5.5.2": {
         "title": "Management Representative",
@@ -145,16 +144,16 @@ ISO13485_CLAUSES = {
             "Is a management representative appointed?",
             "Is authority to ensure QMS processes established?",
             "Is authority to report to top management defined?",
-            "Is authority to promote awareness of requirements defined?"
-        ]
+            "Is authority to promote awareness of requirements defined?",
+        ],
     },
     "5.5.3": {
         "title": "Internal Communication",
         "questions": [
             "Are communication processes established?",
             "Is QMS effectiveness communicated?",
-            "Is information communicated appropriately?"
-        ]
+            "Is information communicated appropriately?",
+        ],
     },
     "5.6": {
         "title": "Management Review",
@@ -163,8 +162,8 @@ ISO13485_CLAUSES = {
             "Are all required inputs reviewed?",
             "Are outputs documented?",
             "Are action items followed up?",
-            "Are records maintained?"
-        ]
+            "Are records maintained?",
+        ],
     },
     "6.1": {
         "title": "Provision of Resources",
@@ -172,8 +171,8 @@ ISO13485_CLAUSES = {
             "Are resources determined?",
             "Are resources provided for QMS?",
             "Are resources provided for customer satisfaction?",
-            "Are resources provided for regulatory compliance?"
-        ]
+            "Are resources provided for regulatory compliance?",
+        ],
     },
     "6.2": {
         "title": "Human Resources",
@@ -182,8 +181,8 @@ ISO13485_CLAUSES = {
             "Is training provided to achieve competence?",
             "Is training effectiveness evaluated?",
             "Is awareness of job relevance ensured?",
-            "Are training records maintained?"
-        ]
+            "Are training records maintained?",
+        ],
     },
     "6.3": {
         "title": "Infrastructure",
@@ -192,8 +191,8 @@ ISO13485_CLAUSES = {
             "Are buildings and workspace adequate?",
             "Is process equipment adequate?",
             "Are supporting services adequate?",
-            "Are maintenance requirements documented?"
-        ]
+            "Are maintenance requirements documented?",
+        ],
     },
     "6.4": {
         "title": "Work Environment",
@@ -202,8 +201,8 @@ ISO13485_CLAUSES = {
             "Are environmental requirements documented?",
             "Is contamination control adequate?",
             "Are personnel health and cleanliness controlled?",
-            "Are environmental conditions monitored?"
-        ]
+            "Are environmental conditions monitored?",
+        ],
     },
     "7.1": {
         "title": "Planning of Product Realization",
@@ -212,8 +211,8 @@ ISO13485_CLAUSES = {
             "Are processes needed determined?",
             "Is verification and validation defined?",
             "Are records requirements defined?",
-            "Is risk management applied?"
-        ]
+            "Is risk management applied?",
+        ],
     },
     "7.2": {
         "title": "Customer-Related Processes",
@@ -222,8 +221,8 @@ ISO13485_CLAUSES = {
             "Are regulatory requirements determined?",
             "Are requirements reviewed before commitment?",
             "Are differences resolved before acceptance?",
-            "Is communication with customers effective?"
-        ]
+            "Is communication with customers effective?",
+        ],
     },
     "7.3.1": {
         "title": "Design and Development Planning",
@@ -233,8 +232,8 @@ ISO13485_CLAUSES = {
             "Are verification activities defined?",
             "Are validation activities defined?",
             "Are responsibilities assigned?",
-            "Are interfaces managed?"
-        ]
+            "Are interfaces managed?",
+        ],
     },
     "7.3.2": {
         "title": "Design and Development Inputs",
@@ -244,8 +243,8 @@ ISO13485_CLAUSES = {
             "Are safety requirements defined?",
             "Are regulatory requirements identified?",
             "Are previous design inputs considered?",
-            "Are risk management outputs included?"
-        ]
+            "Are risk management outputs included?",
+        ],
     },
     "7.3.3": {
         "title": "Design and Development Outputs",
@@ -254,8 +253,8 @@ ISO13485_CLAUSES = {
             "Is purchasing information provided?",
             "Are acceptance criteria defined?",
             "Are essential characteristics specified?",
-            "Are outputs approved before release?"
-        ]
+            "Are outputs approved before release?",
+        ],
     },
     "7.3.4": {
         "title": "Design and Development Review",
@@ -264,8 +263,8 @@ ISO13485_CLAUSES = {
             "Is ability to meet requirements evaluated?",
             "Are problems identified?",
             "Are follow-up actions recorded?",
-            "Are appropriate functions represented?"
-        ]
+            "Are appropriate functions represented?",
+        ],
     },
     "7.3.5": {
         "title": "Design and Development Verification",
@@ -273,8 +272,8 @@ ISO13485_CLAUSES = {
             "Is verification performed per plan?",
             "Do outputs meet inputs?",
             "Are verification records maintained?",
-            "Are verification methods appropriate?"
-        ]
+            "Are verification methods appropriate?",
+        ],
     },
     "7.3.6": {
         "title": "Design and Development Validation",
@@ -283,16 +282,16 @@ ISO13485_CLAUSES = {
             "Is product evaluated for intended use?",
             "Is clinical evaluation included?",
             "Are validation records maintained?",
-            "Is validation completed before product delivery?"
-        ]
+            "Is validation completed before product delivery?",
+        ],
     },
     "7.3.7": {
         "title": "Design and Development Transfer",
         "questions": [
             "Are outputs verified before transfer?",
             "Is manufacturing capability verified?",
-            "Are transfer activities documented?"
-        ]
+            "Are transfer activities documented?",
+        ],
     },
     "7.3.8": {
         "title": "Control of Design and Development Changes",
@@ -302,8 +301,8 @@ ISO13485_CLAUSES = {
             "Are changes verified?",
             "Are changes validated as appropriate?",
             "Is impact on product assessed?",
-            "Are changes approved before implementation?"
-        ]
+            "Are changes approved before implementation?",
+        ],
     },
     "7.4.1": {
         "title": "Purchasing Process",
@@ -312,8 +311,8 @@ ISO13485_CLAUSES = {
             "Are evaluation criteria established?",
             "Is supplier performance monitored?",
             "Are re-evaluation criteria defined?",
-            "Is purchased product verified?"
-        ]
+            "Is purchased product verified?",
+        ],
     },
     "7.4.2": {
         "title": "Purchasing Information",
@@ -321,8 +320,8 @@ ISO13485_CLAUSES = {
             "Is purchasing information adequate?",
             "Are product requirements specified?",
             "Are QMS requirements specified?",
-            "Are personnel requirements specified?"
-        ]
+            "Are personnel requirements specified?",
+        ],
     },
     "7.4.3": {
         "title": "Verification of Purchased Product",
@@ -330,8 +329,8 @@ ISO13485_CLAUSES = {
             "Is incoming inspection adequate?",
             "Are verification activities defined?",
             "Are verification records maintained?",
-            "Is source verification defined if applicable?"
-        ]
+            "Is source verification defined if applicable?",
+        ],
     },
     "7.5.1": {
         "title": "Control of Production and Service Provision",
@@ -342,24 +341,24 @@ ISO13485_CLAUSES = {
             "Are monitoring devices available?",
             "Is monitoring implemented?",
             "Are release activities defined?",
-            "Are labeling requirements met?"
-        ]
+            "Are labeling requirements met?",
+        ],
     },
     "7.5.2": {
         "title": "Cleanliness of Product",
         "questions": [
             "Are cleanliness requirements documented?",
             "Is contamination controlled?",
-            "Are process agents controlled?"
-        ]
+            "Are process agents controlled?",
+        ],
     },
     "7.5.3": {
         "title": "Installation Activities",
         "questions": [
             "Are installation requirements documented?",
             "Are acceptance criteria defined?",
-            "Are installation records maintained?"
-        ]
+            "Are installation records maintained?",
+        ],
     },
     "7.5.4": {
         "title": "Servicing Activities",
@@ -367,8 +366,8 @@ ISO13485_CLAUSES = {
             "Are servicing procedures documented?",
             "Are reference materials controlled?",
             "Are service records maintained?",
-            "Is feedback analyzed?"
-        ]
+            "Is feedback analyzed?",
+        ],
     },
     "7.5.5": {
         "title": "Sterile Medical Devices",
@@ -376,8 +375,8 @@ ISO13485_CLAUSES = {
             "Is sterilization validated?",
             "Are process parameters controlled?",
             "Is sterile barrier validated?",
-            "Are sterilization records maintained?"
-        ]
+            "Are sterilization records maintained?",
+        ],
     },
     "7.5.6": {
         "title": "Validation of Processes",
@@ -387,8 +386,8 @@ ISO13485_CLAUSES = {
             "Is equipment qualified?",
             "Are personnel qualified?",
             "Are validation records maintained?",
-            "Are revalidation criteria defined?"
-        ]
+            "Are revalidation criteria defined?",
+        ],
     },
     "7.5.7": {
         "title": "Particular Requirements for Validation",
@@ -396,16 +395,16 @@ ISO13485_CLAUSES = {
             "Are validation methods defined?",
             "Are acceptance criteria established?",
             "Is software validation appropriate?",
-            "Are validation records maintained?"
-        ]
+            "Are validation records maintained?",
+        ],
     },
     "7.5.8": {
         "title": "Identification",
         "questions": [
             "Is product identified throughout realization?",
             "Is documentation identified?",
-            "Is UDI implemented as required?"
-        ]
+            "Is UDI implemented as required?",
+        ],
     },
     "7.5.9": {
         "title": "Traceability",
@@ -414,8 +413,8 @@ ISO13485_CLAUSES = {
             "Are components traceable?",
             "Is work environment recorded?",
             "Is distribution recorded?",
-            "Is traceability extent defined?"
-        ]
+            "Is traceability extent defined?",
+        ],
     },
     "7.5.10": {
         "title": "Customer Property",
@@ -423,8 +422,8 @@ ISO13485_CLAUSES = {
             "Is customer property identified?",
             "Is it verified on receipt?",
             "Is it protected and safeguarded?",
-            "Is loss or damage reported?"
-        ]
+            "Is loss or damage reported?",
+        ],
     },
     "7.5.11": {
         "title": "Preservation of Product",
@@ -433,8 +432,8 @@ ISO13485_CLAUSES = {
             "Is handling controlled?",
             "Is packaging controlled?",
             "Is storage controlled?",
-            "Is protection adequate?"
-        ]
+            "Is protection adequate?",
+        ],
     },
     "7.6": {
         "title": "Control of Monitoring and Measuring Equipment",
@@ -444,16 +443,16 @@ ISO13485_CLAUSES = {
             "Is calibration status identified?",
             "Is equipment protected from damage?",
             "Is software validated?",
-            "Are records maintained?"
-        ]
+            "Are records maintained?",
+        ],
     },
     "8.1": {
         "title": "Measurement, Analysis and Improvement - General",
         "questions": [
             "Are monitoring activities planned?",
             "Are analysis activities planned?",
-            "Are improvement activities planned?"
-        ]
+            "Are improvement activities planned?",
+        ],
     },
     "8.2.1": {
         "title": "Feedback",
@@ -461,8 +460,8 @@ ISO13485_CLAUSES = {
             "Is feedback collected?",
             "Is feedback analyzed?",
             "Is feedback used for improvement?",
-            "Is regulatory feedback included?"
-        ]
+            "Is regulatory feedback included?",
+        ],
     },
     "8.2.2": {
         "title": "Complaint Handling",
@@ -471,16 +470,16 @@ ISO13485_CLAUSES = {
             "Are complaints investigated?",
             "Are regulatory reports made if required?",
             "Is trend analysis performed?",
-            "Are CAPAs initiated when warranted?"
-        ]
+            "Are CAPAs initiated when warranted?",
+        ],
     },
     "8.2.3": {
         "title": "Reporting to Regulatory Authorities",
         "questions": [
             "Are reporting requirements identified?",
             "Are reports submitted timely?",
-            "Are records maintained?"
-        ]
+            "Are records maintained?",
+        ],
     },
     "8.2.4": {
         "title": "Internal Audit",
@@ -490,8 +489,8 @@ ISO13485_CLAUSES = {
             "Are auditors independent?",
             "Are auditors competent?",
             "Are audit records maintained?",
-            "Are findings followed up?"
-        ]
+            "Are findings followed up?",
+        ],
     },
     "8.2.5": {
         "title": "Monitoring and Measurement of Processes",
@@ -499,8 +498,8 @@ ISO13485_CLAUSES = {
             "Are processes monitored?",
             "Are suitable methods used?",
             "Is process capability demonstrated?",
-            "Are corrections made when needed?"
-        ]
+            "Are corrections made when needed?",
+        ],
     },
     "8.2.6": {
         "title": "Monitoring and Measurement of Product",
@@ -509,8 +508,8 @@ ISO13485_CLAUSES = {
             "Are acceptance criteria met?",
             "Is release authorized?",
             "Is traceability to inspection recorded?",
-            "Are records maintained?"
-        ]
+            "Are records maintained?",
+        ],
     },
     "8.3": {
         "title": "Control of Nonconforming Product",
@@ -522,8 +521,8 @@ ISO13485_CLAUSES = {
             "Is disposition determined?",
             "Is rework verified?",
             "Is concession controlled?",
-            "Is post-delivery NC investigated?"
-        ]
+            "Is post-delivery NC investigated?",
+        ],
     },
     "8.4": {
         "title": "Analysis of Data",
@@ -533,15 +532,15 @@ ISO13485_CLAUSES = {
             "Is conformity data analyzed?",
             "Is process data analyzed?",
             "Is supplier data analyzed?",
-            "Are audit results analyzed?"
-        ]
+            "Are audit results analyzed?",
+        ],
     },
     "8.5.1": {
         "title": "Improvement - General",
         "questions": [
             "Is continual improvement pursued?",
-            "Are policy, objectives, audits, data, actions, and reviews used?"
-        ]
+            "Are policy, objectives, audits, data, actions, and reviews used?",
+        ],
     },
     "8.5.2": {
         "title": "Corrective Action",
@@ -552,8 +551,8 @@ ISO13485_CLAUSES = {
             "Is action needed evaluated?",
             "Is action determined and implemented?",
             "Are results documented?",
-            "Is effectiveness verified?"
-        ]
+            "Is effectiveness verified?",
+        ],
     },
     "8.5.3": {
         "title": "Preventive Action",
@@ -563,9 +562,9 @@ ISO13485_CLAUSES = {
             "Is action needed evaluated?",
             "Is action determined and implemented?",
             "Are results documented?",
-            "Is effectiveness verified?"
-        ]
-    }
+            "Is effectiveness verified?",
+        ],
+    },
 }
 
 # Process-to-Clause Mapping
@@ -583,7 +582,7 @@ PROCESS_MAPPING = {
     "complaint-handling": ["8.2.1", "8.2.2", "8.2.3"],
     "risk-management": ["7.1"],
     "infrastructure": ["6.3", "6.4"],
-    "customer-requirements": ["5.2", "7.2"]
+    "customer-requirements": ["5.2", "7.2"],
 }
 
 
@@ -597,7 +596,7 @@ def get_clause_checklist(clause: str) -> dict:
         "clause": clause,
         "title": clause_data["title"],
         "questions": clause_data["questions"],
-        "question_count": len(clause_data["questions"])
+        "question_count": len(clause_data["questions"]),
     }
 
 
@@ -614,17 +613,15 @@ def get_process_checklist(process: str) -> dict:
         if clause in ISO13485_CLAUSES:
             clause_data = ISO13485_CLAUSES[clause]
             for q in clause_data["questions"]:
-                questions.append({
-                    "clause": clause,
-                    "clause_title": clause_data["title"],
-                    "question": q
-                })
+                questions.append(
+                    {"clause": clause, "clause_title": clause_data["title"], "question": q}
+                )
 
     return {
         "process": process,
         "clauses_covered": clauses,
         "questions": questions,
-        "question_count": len(questions)
+        "question_count": len(questions),
     }
 
 
@@ -634,17 +631,13 @@ def get_system_audit_checklist() -> dict:
 
     for clause, data in sorted(ISO13485_CLAUSES.items()):
         for q in data["questions"]:
-            all_questions.append({
-                "clause": clause,
-                "clause_title": data["title"],
-                "question": q
-            })
+            all_questions.append({"clause": clause, "clause_title": data["title"], "question": q})
 
     return {
         "audit_type": "system",
         "clauses_covered": list(ISO13485_CLAUSES.keys()),
         "questions": all_questions,
-        "question_count": len(all_questions)
+        "question_count": len(all_questions),
     }
 
 
@@ -794,43 +787,28 @@ Examples:
   python qms_audit_checklist.py --list-processes
   python qms_audit_checklist.py --list-clauses
   python qms_audit_checklist.py --interactive
-        """
+        """,
     )
 
     parser.add_argument(
-        "--clause",
-        help="Generate checklist for specific clause (e.g., 7.3.1, 8.5.2)"
+        "--clause", help="Generate checklist for specific clause (e.g., 7.3.1, 8.5.2)"
     )
     parser.add_argument(
-        "--process",
-        help="Generate checklist for process (e.g., design-control, capa)"
+        "--process", help="Generate checklist for process (e.g., design-control, capa)"
     )
     parser.add_argument(
         "--audit-type",
         choices=["clause", "process", "system"],
-        help="Audit type for checklist generation"
+        help="Audit type for checklist generation",
     )
     parser.add_argument(
-        "--output",
-        choices=["text", "json"],
-        default="text",
-        help="Output format (default: text)"
+        "--output", choices=["text", "json"], default="text", help="Output format (default: text)"
     )
     parser.add_argument(
-        "--list-processes",
-        action="store_true",
-        help="List available QMS processes"
+        "--list-processes", action="store_true", help="List available QMS processes"
     )
-    parser.add_argument(
-        "--list-clauses",
-        action="store_true",
-        help="List all ISO 13485 clauses"
-    )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode"
-    )
+    parser.add_argument("--list-clauses", action="store_true", help="List all ISO 13485 clauses")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
 
     args = parser.parse_args()
 
@@ -853,8 +831,10 @@ Examples:
 
     if args.list_clauses:
         if args.output == "json":
-            result = {c: {"title": d["title"], "question_count": len(d["questions"])}
-                     for c, d in sorted(ISO13485_CLAUSES.items())}
+            result = {
+                c: {"title": d["title"], "question_count": len(d["questions"])}
+                for c, d in sorted(ISO13485_CLAUSES.items())
+            }
             print(json.dumps(result, indent=2))
         else:
             print("\nISO 13485:2016 Clauses:")

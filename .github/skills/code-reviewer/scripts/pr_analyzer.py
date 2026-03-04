@@ -20,40 +20,47 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-
 # File categories for review prioritization
 FILE_CATEGORIES = {
     "critical": {
         "patterns": [
-            r"auth", r"security", r"password", r"token", r"secret",
-            r"payment", r"billing", r"crypto", r"encrypt"
+            r"auth",
+            r"security",
+            r"password",
+            r"token",
+            r"secret",
+            r"payment",
+            r"billing",
+            r"crypto",
+            r"encrypt",
         ],
         "weight": 5,
-        "description": "Security-sensitive files requiring careful review"
+        "description": "Security-sensitive files requiring careful review",
     },
     "high": {
         "patterns": [
-            r"api", r"database", r"migration", r"schema", r"model",
-            r"config", r"env", r"middleware"
+            r"api",
+            r"database",
+            r"migration",
+            r"schema",
+            r"model",
+            r"config",
+            r"env",
+            r"middleware",
         ],
         "weight": 4,
-        "description": "Core infrastructure files"
+        "description": "Core infrastructure files",
     },
     "medium": {
-        "patterns": [
-            r"service", r"controller", r"handler", r"util", r"helper"
-        ],
+        "patterns": [r"service", r"controller", r"handler", r"util", r"helper"],
         "weight": 3,
-        "description": "Business logic files"
+        "description": "Business logic files",
     },
     "low": {
-        "patterns": [
-            r"test", r"spec", r"mock", r"fixture", r"story",
-            r"readme", r"docs", r"\.md$"
-        ],
+        "patterns": [r"test", r"spec", r"mock", r"fixture", r"story", r"readme", r"docs", r"\.md$"],
         "weight": 1,
-        "description": "Tests and documentation"
-    }
+        "description": "Tests and documentation",
+    },
 }
 
 # Risky patterns to flag
@@ -62,57 +69,51 @@ RISK_PATTERNS = [
         "name": "hardcoded_secrets",
         "pattern": r"(password|secret|api_key|token)\s*[=:]\s*['\"][^'\"]+['\"]",
         "severity": "critical",
-        "message": "Potential hardcoded secret detected"
+        "message": "Potential hardcoded secret detected",
     },
     {
         "name": "todo_fixme",
         "pattern": r"(TODO|FIXME|HACK|XXX):",
         "severity": "low",
-        "message": "TODO/FIXME comment found"
+        "message": "TODO/FIXME comment found",
     },
     {
         "name": "console_log",
         "pattern": r"console\.(log|debug|info|warn|error)\(",
         "severity": "medium",
-        "message": "Console statement found (remove for production)"
+        "message": "Console statement found (remove for production)",
     },
     {
         "name": "debugger",
         "pattern": r"\bdebugger\b",
         "severity": "high",
-        "message": "Debugger statement found"
+        "message": "Debugger statement found",
     },
     {
         "name": "disable_eslint",
         "pattern": r"eslint-disable",
         "severity": "medium",
-        "message": "ESLint rule disabled"
+        "message": "ESLint rule disabled",
     },
     {
         "name": "any_type",
         "pattern": r":\s*any\b",
         "severity": "medium",
-        "message": "TypeScript 'any' type used"
+        "message": "TypeScript 'any' type used",
     },
     {
         "name": "sql_concatenation",
         "pattern": r"(SELECT|INSERT|UPDATE|DELETE).*\+.*['\"]",
         "severity": "critical",
-        "message": "Potential SQL injection (string concatenation in query)"
-    }
+        "message": "Potential SQL injection (string concatenation in query)",
+    },
 ]
 
 
 def run_git_command(cmd: List[str], cwd: Path) -> Tuple[bool, str]:
     """Run a git command and return success status and output."""
     try:
-        result = subprocess.run(
-            cmd,
-            cwd=cwd,
-            capture_output=True,
-            text=True,
-            timeout=30
-        )
+        result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, timeout=30)
         return result.returncode == 0, result.stdout.strip()
     except subprocess.TimeoutExpired:
         return False, "Command timed out"
@@ -123,23 +124,16 @@ def run_git_command(cmd: List[str], cwd: Path) -> Tuple[bool, str]:
 def get_changed_files(repo_path: Path, base: str, head: str) -> List[Dict]:
     """Get list of changed files between two refs."""
     success, output = run_git_command(
-        ["git", "diff", "--name-status", f"{base}...{head}"],
-        repo_path
+        ["git", "diff", "--name-status", f"{base}...{head}"], repo_path
     )
 
     if not success:
         # Try without the triple dot (for uncommitted changes)
-        success, output = run_git_command(
-            ["git", "diff", "--name-status", base, head],
-            repo_path
-        )
+        success, output = run_git_command(["git", "diff", "--name-status", base, head], repo_path)
 
     if not success or not output:
         # Fall back to staged changes
-        success, output = run_git_command(
-            ["git", "diff", "--name-status", "--cached"],
-            repo_path
-        )
+        success, output = run_git_command(["git", "diff", "--name-status", "--cached"], repo_path)
 
     files = []
     for line in output.split("\n"):
@@ -154,12 +148,9 @@ def get_changed_files(repo_path: Path, base: str, head: str) -> List[Dict]:
                 "M": "modified",
                 "D": "deleted",
                 "R": "renamed",
-                "C": "copied"
+                "C": "copied",
             }
-            files.append({
-                "path": filepath,
-                "status": status_map.get(status, "modified")
-            })
+            files.append({"path": filepath, "status": status_map.get(status, "modified")})
 
     return files
 
@@ -167,14 +158,10 @@ def get_changed_files(repo_path: Path, base: str, head: str) -> List[Dict]:
 def get_file_diff(repo_path: Path, filepath: str, base: str, head: str) -> str:
     """Get diff content for a specific file."""
     success, output = run_git_command(
-        ["git", "diff", f"{base}...{head}", "--", filepath],
-        repo_path
+        ["git", "diff", f"{base}...{head}", "--", filepath], repo_path
     )
     if not success:
-        success, output = run_git_command(
-            ["git", "diff", "--cached", "--", filepath],
-            repo_path
-        )
+        success, output = run_git_command(["git", "diff", "--cached", "--", filepath], repo_path)
     return output if success else ""
 
 
@@ -196,7 +183,8 @@ def analyze_diff_for_risks(diff_content: str, filepath: str) -> List[Dict]:
 
     # Only analyze added lines (starting with +)
     added_lines = [
-        line[1:] for line in diff_content.split("\n")
+        line[1:]
+        for line in diff_content.split("\n")
         if line.startswith("+") and not line.startswith("+++")
     ]
 
@@ -205,13 +193,15 @@ def analyze_diff_for_risks(diff_content: str, filepath: str) -> List[Dict]:
     for risk in RISK_PATTERNS:
         matches = re.findall(risk["pattern"], content, re.IGNORECASE)
         if matches:
-            risks.append({
-                "name": risk["name"],
-                "severity": risk["severity"],
-                "message": risk["message"],
-                "file": filepath,
-                "count": len(matches)
-            })
+            risks.append(
+                {
+                    "name": risk["name"],
+                    "severity": risk["severity"],
+                    "message": risk["message"],
+                    "file": filepath,
+                    "count": len(matches),
+                }
+            )
 
     return risks
 
@@ -264,10 +254,7 @@ def calculate_complexity_score(files: List[Dict], all_risks: List[Dict]) -> int:
 
 def analyze_commit_messages(repo_path: Path, base: str, head: str) -> Dict:
     """Analyze commit messages in the PR."""
-    success, output = run_git_command(
-        ["git", "log", "--oneline", f"{base}...{head}"],
-        repo_path
-    )
+    success, output = run_git_command(["git", "log", "--oneline", f"{base}...{head}"], repo_path)
 
     if not success or not output:
         return {"commits": 0, "issues": []}
@@ -282,38 +269,26 @@ def analyze_commit_messages(repo_path: Path, base: str, head: str) -> Dict:
         # Check for conventional commit format
         message = commit[8:] if len(commit) > 8 else commit  # Skip hash
 
-        if not re.match(r"^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:", message):
-            issues.append({
-                "commit": commit[:7],
-                "issue": "Does not follow conventional commit format"
-            })
+        if not re.match(
+            r"^(feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert)(\(.+\))?:", message
+        ):
+            issues.append(
+                {"commit": commit[:7], "issue": "Does not follow conventional commit format"}
+            )
 
         if len(message) > 72:
-            issues.append({
-                "commit": commit[:7],
-                "issue": "Commit message exceeds 72 characters"
-            })
+            issues.append({"commit": commit[:7], "issue": "Commit message exceeds 72 characters"})
 
-    return {
-        "commits": len(commits),
-        "issues": issues
-    }
+    return {"commits": len(commits), "issues": issues}
 
 
-def analyze_pr(
-    repo_path: Path,
-    base: str = "main",
-    head: str = "HEAD"
-) -> Dict:
+def analyze_pr(repo_path: Path, base: str = "main", head: str = "HEAD") -> Dict:
     """Perform complete PR analysis."""
     # Get changed files
     changed_files = get_changed_files(repo_path, base, head)
 
     if not changed_files:
-        return {
-            "status": "no_changes",
-            "message": "No changes detected between branches"
-        }
+        return {"status": "no_changes", "message": "No changes detected between branches"}
 
     # Analyze each file
     all_risks = []
@@ -330,15 +305,17 @@ def analyze_pr(
 
         all_risks.extend(risks)
 
-        file_analyses.append({
-            "path": filepath,
-            "status": file_info["status"],
-            "category": category,
-            "priority_weight": weight,
-            "additions": changes["additions"],
-            "deletions": changes["deletions"],
-            "risks": risks
-        })
+        file_analyses.append(
+            {
+                "path": filepath,
+                "status": file_info["status"],
+                "category": category,
+                "priority_weight": weight,
+                "additions": changes["additions"],
+                "deletions": changes["deletions"],
+                "risks": risks,
+            }
+        )
 
     # Sort by priority (highest first)
     file_analyses.sort(key=lambda x: (-x["priority_weight"], x["path"]))
@@ -360,17 +337,17 @@ def analyze_pr(
             "total_deletions": total_deletions,
             "complexity_score": complexity,
             "complexity_label": get_complexity_label(complexity),
-            "commits": commit_analysis["commits"]
+            "commits": commit_analysis["commits"],
         },
         "risks": {
             "critical": [r for r in all_risks if r["severity"] == "critical"],
             "high": [r for r in all_risks if r["severity"] == "high"],
             "medium": [r for r in all_risks if r["severity"] == "medium"],
-            "low": [r for r in all_risks if r["severity"] == "low"]
+            "low": [r for r in all_risks if r["severity"] == "low"],
         },
         "files": file_analyses,
         "commit_issues": commit_analysis["issues"],
-        "review_order": [f["path"] for f in file_analyses[:10]]  # Top 10 priority files
+        "review_order": [f["path"] for f in file_analyses[:10]],  # Top 10 priority files
     }
 
 
@@ -447,27 +424,16 @@ def main():
         "repo_path",
         nargs="?",
         default=".",
-        help="Path to git repository (default: current directory)"
+        help="Path to git repository (default: current directory)",
     )
     parser.add_argument(
-        "--base", "-b",
-        default="main",
-        help="Base branch for comparison (default: main)"
+        "--base", "-b", default="main", help="Base branch for comparison (default: main)"
     )
     parser.add_argument(
-        "--head", "-h",
-        default="HEAD",
-        help="Head branch/commit for comparison (default: HEAD)"
+        "--head", "-h", default="HEAD", help="Head branch/commit for comparison (default: HEAD)"
     )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        help="Write output to file"
-    )
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
+    parser.add_argument("--output", "-o", help="Write output to file")
 
     args = parser.parse_args()
 

@@ -6,6 +6,7 @@ Handles:
 - Dual authentication fallback strategy
 - Content generation with error handling
 """
+
 from typing import Optional, Dict, Any
 import logging
 from google.genai import Client
@@ -62,10 +63,7 @@ def attempt_generation(client: Client, model: str, prompt: str) -> str:
     """
     logger.info(f"Attempting generation with model {model}")
     try:
-        response = client.models.generate_content(
-            model=model,
-            contents=prompt
-        )
+        response = client.models.generate_content(model=model, contents=prompt)
         return response.text
     except Exception as e:
         logger.error(f"Generation failed: {e}")

@@ -29,16 +29,12 @@ def test_anonymous_user():
         # Get session ID
         session_id = get_or_create_session_id()
         print(f"✓ Session ID created: {session_id}")
-        assert session_id.startswith("session_"), (
-            "Session ID should start with 'session_'"
-        )
+        assert session_id.startswith("session_"), "Session ID should start with 'session_'"
 
         # Get user ID (should be same as session ID for anonymous users)
         user_id = get_user_id()
         print(f"✓ User ID: {user_id}")
-        assert user_id == session_id, (
-            "User ID should equal session ID for anonymous users"
-        )
+        assert user_id == session_id, "User ID should equal session ID for anonymous users"
 
         # Get display name
         display_name = get_user_display_name()
@@ -81,9 +77,7 @@ def test_authenticated_user():
         # Get user ID (should be email)
         user_id = get_user_id()
         print(f"✓ User ID: {user_id}")
-        assert user_id == "testuser@example.com", (
-            "User ID should be email for authenticated users"
-        )
+        assert user_id == "testuser@example.com", "User ID should be email for authenticated users"
 
         # Get display name
         display_name = get_user_display_name()

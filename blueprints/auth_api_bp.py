@@ -83,10 +83,7 @@ def api_login():
     }
 
     # Validate configuration
-    if (
-        not client_config["web"]["client_id"]
-        or not client_config["web"]["client_secret"]
-    ):
+    if not client_config["web"]["client_id"] or not client_config["web"]["client_secret"]:
         return (
             jsonify({"error": "OAuth credentials not configured"}),
             500,
@@ -139,9 +136,7 @@ def api_callback():
         session["credentials"] = credentials_to_dict(credentials)
 
         # Get user info from Google
-        userinfo_service = googleapiclient.discovery.build(
-            "oauth2", "v2", credentials=credentials
-        )
+        userinfo_service = googleapiclient.discovery.build("oauth2", "v2", credentials=credentials)
         user_info = userinfo_service.userinfo().get().execute()
         session["user_info"] = user_info
 
@@ -254,24 +249,30 @@ def api_me():
         user = User.query.get(user_id)
 
     if user:
-        return jsonify(
-            {
-                **user.to_dict(),
-                "picture": user_info.get("picture"),  # Picture not stored in DB
-                "authenticated": True,
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    **user.to_dict(),
+                    "picture": user_info.get("picture"),  # Picture not stored in DB
+                    "authenticated": True,
+                }
+            ),
+            200,
+        )
     else:
         # Fallback to session data if database lookup fails
-        return jsonify(
-            {
-                "user_id": user_id,
-                "email": user_info.get("email"),
-                "name": user_info.get("name"),
-                "picture": user_info.get("picture"),
-                "authenticated": True,
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "user_id": user_id,
+                    "email": user_info.get("email"),
+                    "name": user_info.get("name"),
+                    "picture": user_info.get("picture"),
+                    "authenticated": True,
+                }
+            ),
+            200,
+        )
 
 
 @auth_api_bp.route("/logout", methods=["POST"])
@@ -296,19 +297,25 @@ def api_check():
     """
     if "credentials" in session and "user_info" in session:
         user_info = session.get("user_info", {})
-        return jsonify(
-            {
-                "authenticated": True,
-                "user_id": session.get("user_id"),
-                "email": user_info.get("email"),
-                "name": user_info.get("name"),
-                "picture": user_info.get("picture"),
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "authenticated": True,
+                    "user_id": session.get("user_id"),
+                    "email": user_info.get("email"),
+                    "name": user_info.get("name"),
+                    "picture": user_info.get("picture"),
+                }
+            ),
+            200,
+        )
     else:
-        return jsonify(
-            {
-                "authenticated": False,
-                "user_id": None,
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "authenticated": False,
+                    "user_id": None,
+                }
+            ),
+            200,
+        )

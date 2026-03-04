@@ -18,7 +18,6 @@ import sys
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -32,7 +31,13 @@ RISK_SIGNAL_WEIGHTS: Dict[str, float] = {
 }
 
 RISK_TIERS: List[Dict[str, Any]] = [
-    {"name": "critical", "min": 80, "max": 100, "label": "CRITICAL", "action": "Immediate executive escalation"},
+    {
+        "name": "critical",
+        "min": 80,
+        "max": 100,
+        "label": "CRITICAL",
+        "action": "Immediate executive escalation",
+    },
     {"name": "high", "min": 60, "max": 79, "label": "HIGH", "action": "Urgent CSM intervention"},
     {"name": "medium", "min": 40, "max": 59, "label": "MEDIUM", "action": "Proactive outreach"},
     {"name": "low", "min": 0, "max": 39, "label": "LOW", "action": "Standard monitoring"},
@@ -164,19 +169,31 @@ def score_usage_decline(data: Dict[str, Any]) -> Tuple[float, List[Dict[str, str
     score = round(login_risk * 0.40 + feature_risk * 0.35 + dau_mau_risk * 0.25, 1)
 
     if login_trend <= -20:
-        warnings.append({"severity": "critical", "signal": f"Login frequency dropped {abs(login_trend)}%"})
+        warnings.append(
+            {"severity": "critical", "signal": f"Login frequency dropped {abs(login_trend)}%"}
+        )
     elif login_trend <= -10:
-        warnings.append({"severity": "high", "signal": f"Login frequency declined {abs(login_trend)}%"})
+        warnings.append(
+            {"severity": "high", "signal": f"Login frequency declined {abs(login_trend)}%"}
+        )
     elif login_trend < -5:
-        warnings.append({"severity": "medium", "signal": f"Login frequency dipping {abs(login_trend)}%"})
+        warnings.append(
+            {"severity": "medium", "signal": f"Login frequency dipping {abs(login_trend)}%"}
+        )
 
     if feature_change <= -15:
-        warnings.append({"severity": "high", "signal": f"Feature adoption dropped {abs(feature_change)}%"})
+        warnings.append(
+            {"severity": "high", "signal": f"Feature adoption dropped {abs(feature_change)}%"}
+        )
     elif feature_change < -5:
-        warnings.append({"severity": "medium", "signal": f"Feature adoption declining {abs(feature_change)}%"})
+        warnings.append(
+            {"severity": "medium", "signal": f"Feature adoption declining {abs(feature_change)}%"}
+        )
 
     if dau_mau_change <= -0.10:
-        warnings.append({"severity": "high", "signal": f"DAU/MAU ratio fell by {abs(dau_mau_change):.2f}"})
+        warnings.append(
+            {"severity": "high", "signal": f"DAU/MAU ratio fell by {abs(dau_mau_change):.2f}"}
+        )
 
     return score, warnings
 
@@ -196,17 +213,36 @@ def score_engagement_drop(data: Dict[str, Any]) -> Tuple[float, List[Dict[str, s
     score = round(cancel_risk * 0.30 + response_risk * 0.35 + nps_risk * 0.35, 1)
 
     if cancellations >= 3:
-        warnings.append({"severity": "critical", "signal": f"{cancellations} meeting cancellations -- customer disengaging"})
+        warnings.append(
+            {
+                "severity": "critical",
+                "signal": f"{cancellations} meeting cancellations -- customer disengaging",
+            }
+        )
     elif cancellations >= 2:
-        warnings.append({"severity": "high", "signal": f"{cancellations} meeting cancellations recently"})
+        warnings.append(
+            {"severity": "high", "signal": f"{cancellations} meeting cancellations recently"}
+        )
 
     if response_days >= 7:
-        warnings.append({"severity": "critical", "signal": f"Customer response time: {response_days} days -- going dark"})
+        warnings.append(
+            {
+                "severity": "critical",
+                "signal": f"Customer response time: {response_days} days -- going dark",
+            }
+        )
     elif response_days >= 4:
-        warnings.append({"severity": "high", "signal": f"Customer response time increasing: {response_days} days"})
+        warnings.append(
+            {
+                "severity": "high",
+                "signal": f"Customer response time increasing: {response_days} days",
+            }
+        )
 
     if nps_change <= -4:
-        warnings.append({"severity": "critical", "signal": f"NPS dropped by {abs(nps_change)} points"})
+        warnings.append(
+            {"severity": "critical", "signal": f"NPS dropped by {abs(nps_change)} points"}
+        )
     elif nps_change <= -2:
         warnings.append({"severity": "high", "signal": f"NPS declined by {abs(nps_change)} points"})
 
@@ -228,7 +264,12 @@ def score_support_issues(data: Dict[str, Any]) -> Tuple[float, List[Dict[str, st
     score = round(esc_risk * 0.35 + critical_risk * 0.35 + sat_risk * 0.30, 1)
 
     if critical_unresolved >= 2:
-        warnings.append({"severity": "critical", "signal": f"{critical_unresolved} unresolved critical support tickets"})
+        warnings.append(
+            {
+                "severity": "critical",
+                "signal": f"{critical_unresolved} unresolved critical support tickets",
+            }
+        )
     elif critical_unresolved >= 1:
         warnings.append({"severity": "high", "signal": "Unresolved critical support ticket"})
 
@@ -238,7 +279,9 @@ def score_support_issues(data: Dict[str, Any]) -> Tuple[float, List[Dict[str, st
         warnings.append({"severity": "medium", "signal": "Open support escalation"})
 
     if sat_trend == "critical":
-        warnings.append({"severity": "critical", "signal": "Support satisfaction at critical levels"})
+        warnings.append(
+            {"severity": "critical", "signal": "Support satisfaction at critical levels"}
+        )
     elif sat_trend == "declining":
         warnings.append({"severity": "high", "signal": "Support satisfaction trending down"})
 
@@ -256,7 +299,9 @@ def score_relationship_signals(data: Dict[str, Any]) -> Tuple[float, List[Dict[s
 
     if champion_left:
         risk_points += 45.0
-        warnings.append({"severity": "critical", "signal": "Internal champion has left the organisation"})
+        warnings.append(
+            {"severity": "critical", "signal": "Internal champion has left the organisation"}
+        )
 
     if sponsor_change:
         risk_points += 30.0
@@ -264,10 +309,20 @@ def score_relationship_signals(data: Dict[str, Any]) -> Tuple[float, List[Dict[s
 
     if competitor_mentions >= 3:
         risk_points += 35.0
-        warnings.append({"severity": "critical", "signal": f"Customer mentioned competitors {competitor_mentions} times"})
+        warnings.append(
+            {
+                "severity": "critical",
+                "signal": f"Customer mentioned competitors {competitor_mentions} times",
+            }
+        )
     elif competitor_mentions >= 1:
         risk_points += competitor_mentions * 12.0
-        warnings.append({"severity": "medium", "signal": f"Customer mentioned competitor {competitor_mentions} time(s)"})
+        warnings.append(
+            {
+                "severity": "medium",
+                "signal": f"Customer mentioned competitor {competitor_mentions} time(s)",
+            }
+        )
 
     score = clamp(risk_points)
     return round(score, 1), warnings
@@ -284,7 +339,9 @@ def score_commercial_factors(data: Dict[str, Any]) -> Tuple[float, List[Dict[str
 
     if contract_type == "month-to-month":
         risk_points += 30.0
-        warnings.append({"severity": "medium", "signal": "Month-to-month contract -- low switching cost"})
+        warnings.append(
+            {"severity": "medium", "signal": "Month-to-month contract -- low switching cost"}
+        )
     elif contract_type == "quarterly":
         risk_points += 15.0
 
@@ -294,7 +351,9 @@ def score_commercial_factors(data: Dict[str, Any]) -> Tuple[float, List[Dict[str
 
     if budget_cuts:
         risk_points += 40.0
-        warnings.append({"severity": "high", "signal": "Customer mentioned budget cuts or cost reduction"})
+        warnings.append(
+            {"severity": "high", "signal": "Customer mentioned budget cuts or cost reduction"}
+        )
 
     score = clamp(risk_points)
     return round(score, 1), warnings
@@ -308,10 +367,16 @@ def score_commercial_factors(data: Dict[str, Any]) -> Tuple[float, List[Dict[str
 def analyse_churn_risk(customer: Dict[str, Any]) -> Dict[str, Any]:
     """Analyse churn risk for a single customer."""
     usage_score, usage_warnings = score_usage_decline(customer.get("usage_decline", {}))
-    engagement_score, engagement_warnings = score_engagement_drop(customer.get("engagement_drop", {}))
+    engagement_score, engagement_warnings = score_engagement_drop(
+        customer.get("engagement_drop", {})
+    )
     support_score, support_warnings = score_support_issues(customer.get("support_issues", {}))
-    relationship_score, relationship_warnings = score_relationship_signals(customer.get("relationship_signals", {}))
-    commercial_score, commercial_warnings = score_commercial_factors(customer.get("commercial_factors", {}))
+    relationship_score, relationship_warnings = score_relationship_signals(
+        customer.get("relationship_signals", {})
+    )
+    commercial_score, commercial_warnings = score_commercial_factors(
+        customer.get("commercial_factors", {})
+    )
 
     # Weighted raw score
     raw_score = (
@@ -330,7 +395,13 @@ def analyse_churn_risk(customer: Dict[str, Any]) -> Dict[str, Any]:
     tier = get_risk_tier(adjusted_score)
 
     # Collect and sort warnings by severity
-    all_warnings = usage_warnings + engagement_warnings + support_warnings + relationship_warnings + commercial_warnings
+    all_warnings = (
+        usage_warnings
+        + engagement_warnings
+        + support_warnings
+        + relationship_warnings
+        + commercial_warnings
+    )
     all_warnings.sort(key=lambda w: WARNING_SEVERITY.get(w["severity"], 0), reverse=True)
 
     playbook = INTERVENTION_PLAYBOOKS.get(tier["name"], [])
@@ -394,15 +465,21 @@ def format_text(results: List[Dict[str, Any]]) -> str:
         lines.append(f"Customer: {r['name']} ({r['customer_id']})")
         lines.append(f"Segment:  {r['segment'].title()}  |  ARR: ${r['arr']:,.0f}")
         renewal_str = f"{r['days_to_renewal']} days" if r["days_to_renewal"] is not None else "N/A"
-        lines.append(f"Risk Score: {r['risk_score']}/100  [{r['risk_label']}]  |  Renewal: {renewal_str}")
+        lines.append(
+            f"Risk Score: {r['risk_score']}/100  [{r['risk_label']}]  |  Renewal: {renewal_str}"
+        )
         if r["urgency_multiplier"] > 1.0:
-            lines.append(f"  ** Urgency multiplier applied: {r['urgency_multiplier']}x (renewal approaching)")
+            lines.append(
+                f"  ** Urgency multiplier applied: {r['urgency_multiplier']}x (renewal approaching)"
+            )
         lines.append("")
 
         lines.append("  Signal Scores:")
         for signal_name, signal_data in r["signal_scores"].items():
             display_name = signal_name.replace("_", " ").title()
-            lines.append(f"    {display_name:25s} {signal_data['score']:6.1f}/100  ({signal_data['weight']})")
+            lines.append(
+                f"    {display_name:25s} {signal_data['score']:6.1f}/100  ({signal_data['weight']})"
+            )
 
         if r["warning_signals"]:
             lines.append("")
@@ -434,7 +511,9 @@ def format_json(results: List[Dict[str, Any]]) -> str:
             "high_count": sum(1 for r in results if r["risk_tier"] == "high"),
             "medium_count": sum(1 for r in results if r["risk_tier"] == "medium"),
             "low_count": sum(1 for r in results if r["risk_tier"] == "low"),
-            "total_arr_at_risk": sum(r["arr"] for r in results if r["risk_tier"] in ("critical", "high")),
+            "total_arr_at_risk": sum(
+                r["arr"] for r in results if r["risk_tier"] in ("critical", "high")
+            ),
         },
         "customers": sorted(results, key=lambda r: r["risk_score"], reverse=True),
     }

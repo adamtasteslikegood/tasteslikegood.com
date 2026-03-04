@@ -17,7 +17,6 @@ import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 
-
 # ISO 27001:2022 Annex A control domains
 CONTROL_DOMAINS = {
     "A.5": {"name": "Organizational Controls", "count": 37},
@@ -51,9 +50,9 @@ DEFAULT_RISK_RATINGS = {
 # Audit frequency based on risk level
 AUDIT_FREQUENCY = {
     "critical": 4,  # Quarterly
-    "high": 2,      # Semi-annual
-    "medium": 1,    # Annual
-    "low": 1,       # Annual
+    "high": 2,  # Semi-annual
+    "medium": 1,  # Annual
+    "low": 1,  # Annual
 }
 
 
@@ -76,10 +75,7 @@ def load_controls_from_csv(filepath: str) -> Dict[str, Dict]:
     return controls
 
 
-def calculate_audit_dates(
-    year: int,
-    frequency: int
-) -> List[str]:
+def calculate_audit_dates(year: int, frequency: int) -> List[str]:
     """Calculate audit dates based on frequency."""
     dates = []
     interval = 12 // frequency
@@ -92,10 +88,7 @@ def calculate_audit_dates(
     return dates
 
 
-def generate_audit_plan(
-    year: int,
-    controls: Optional[Dict[str, Dict]] = None
-) -> Dict[str, Any]:
+def generate_audit_plan(year: int, controls: Optional[Dict[str, Dict]] = None) -> Dict[str, Any]:
     """Generate risk-based annual audit plan."""
     if controls is None:
         controls = DEFAULT_RISK_RATINGS
@@ -141,19 +134,21 @@ def generate_audit_plan(
             else:
                 quarter = "Q4"
 
-            plan["schedule"][quarter]["audits"].append({
-                "control_id": control_id,
-                "control_name": control_data.get("name", "Unknown"),
-                "risk_level": risk,
-                "target_date": date,
-            })
+            plan["schedule"][quarter]["audits"].append(
+                {
+                    "control_id": control_id,
+                    "control_name": control_data.get("name", "Unknown"),
+                    "risk_level": risk,
+                    "target_date": date,
+                }
+            )
 
     # Sort audits within each quarter
     for quarter in plan["schedule"]:
         plan["schedule"][quarter]["audits"].sort(
             key=lambda x: (
                 {"critical": 0, "high": 1, "medium": 2, "low": 3}.get(x["risk_level"], 4),
-                x["target_date"]
+                x["target_date"],
             )
         )
 
@@ -168,10 +163,7 @@ def generate_audit_plan(
         "total_controls_in_scope": len(controls),
         "total_audits_planned": total_audits,
         "risk_distribution": risk_counts,
-        "audits_per_quarter": {
-            q: len(plan["schedule"][q]["audits"])
-            for q in plan["schedule"]
-        },
+        "audits_per_quarter": {q: len(plan["schedule"][q]["audits"]) for q in plan["schedule"]},
     }
 
     return plan
@@ -198,12 +190,14 @@ def format_markdown(plan: Dict[str, Any]) -> str:
     ]
 
     for quarter, data in plan["schedule"].items():
-        lines.extend([
-            f"## {quarter}: {data['month']}",
-            f"",
-            f"| Control | Name | Risk | Target Date |",
-            f"|---------|------|------|-------------|",
-        ])
+        lines.extend(
+            [
+                f"## {quarter}: {data['month']}",
+                f"",
+                f"| Control | Name | Risk | Target Date |",
+                f"|---------|------|------|-------------|",
+            ]
+        )
         for audit in data["audits"]:
             lines.append(
                 f"| {audit['control_id']} | {audit['control_name']} | "
@@ -211,43 +205,39 @@ def format_markdown(plan: Dict[str, Any]) -> str:
             )
         lines.append("")
 
-    lines.extend([
-        f"## Risk-Based Audit Frequency",
-        f"",
-        f"| Risk Level | Audit Frequency |",
-        f"|------------|-----------------|",
-        f"| Critical | Quarterly (4x/year) |",
-        f"| High | Semi-Annual (2x/year) |",
-        f"| Medium | Annual (1x/year) |",
-        f"| Low | Annual (1x/year) |",
-    ])
+    lines.extend(
+        [
+            f"## Risk-Based Audit Frequency",
+            f"",
+            f"| Risk Level | Audit Frequency |",
+            f"|------------|-----------------|",
+            f"| Critical | Quarterly (4x/year) |",
+            f"| High | Semi-Annual (2x/year) |",
+            f"| Medium | Annual (1x/year) |",
+            f"| Low | Annual (1x/year) |",
+        ]
+    )
 
     return "\n".join(lines)
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="ISMS Audit Scheduler - Risk-based audit planning"
-    )
+    parser = argparse.ArgumentParser(description="ISMS Audit Scheduler - Risk-based audit planning")
     parser.add_argument(
-        "--year", "-y",
+        "--year",
+        "-y",
         type=int,
         default=datetime.now().year,
-        help="Audit plan year (default: current year)"
+        help="Audit plan year (default: current year)",
     )
+    parser.add_argument("--controls", "-c", help="CSV file with control risk ratings")
+    parser.add_argument("--output", "-o", help="Output file path")
     parser.add_argument(
-        "--controls", "-c",
-        help="CSV file with control risk ratings"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        help="Output file path"
-    )
-    parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["json", "markdown"],
         default="json",
-        help="Output format (default: json)"
+        help="Output format (default: json)",
     )
 
     args = parser.parse_args()

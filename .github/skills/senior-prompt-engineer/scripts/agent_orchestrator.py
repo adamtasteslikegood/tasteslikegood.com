@@ -28,6 +28,7 @@ from enum import Enum
 
 class AgentPattern(Enum):
     """Supported agent patterns"""
+
     REACT = "react"
     PLAN_EXECUTE = "plan-execute"
     TOOL_USE = "tool-use"
@@ -38,6 +39,7 @@ class AgentPattern(Enum):
 @dataclass
 class ToolDefinition:
     """Definition of an agent tool"""
+
     name: str
     description: str
     parameters: Dict[str, Any] = field(default_factory=dict)
@@ -48,6 +50,7 @@ class ToolDefinition:
 @dataclass
 class AgentConfig:
     """Agent configuration"""
+
     name: str
     pattern: AgentPattern
     description: str
@@ -61,6 +64,7 @@ class AgentConfig:
 @dataclass
 class ValidationResult:
     """Result of agent validation"""
+
     is_valid: bool
     errors: List[str]
     warnings: List[str]
@@ -77,34 +81,34 @@ def parse_yaml_simple(content: str) -> Dict[str, Any]:
     current_list = None
     indent_stack = [(0, result)]
 
-    lines = content.split('\n')
+    lines = content.split("\n")
 
     for line in lines:
         # Skip empty lines and comments
         stripped = line.strip()
-        if not stripped or stripped.startswith('#'):
+        if not stripped or stripped.startswith("#"):
             continue
 
         # Calculate indent
         indent = len(line) - len(line.lstrip())
 
         # Check for list item
-        if stripped.startswith('- '):
+        if stripped.startswith("- "):
             item = stripped[2:].strip()
             if current_list is not None:
                 # Check if it's a key-value pair
-                if ':' in item and not item.startswith('{'):
-                    key, _, value = item.partition(':')
-                    current_list.append({key.strip(): value.strip().strip('"\'')})
+                if ":" in item and not item.startswith("{"):
+                    key, _, value = item.partition(":")
+                    current_list.append({key.strip(): value.strip().strip("\"'")})
                 else:
-                    current_list.append(item.strip('"\''))
+                    current_list.append(item.strip("\"'"))
             continue
 
         # Check for key-value pair
-        if ':' in stripped:
-            key, _, value = stripped.partition(':')
+        if ":" in stripped:
+            key, _, value = stripped.partition(":")
             key = key.strip()
-            value = value.strip().strip('"\'')
+            value = value.strip().strip("\"'")
 
             # Pop indent stack as needed
             while indent_stack and indent <= indent_stack[-1][0] and len(indent_stack) > 1:
@@ -122,7 +126,7 @@ def parse_yaml_simple(content: str) -> Dict[str, Any]:
                 next_line_idx = lines.index(line) + 1
                 if next_line_idx < len(lines):
                     next_stripped = lines[next_line_idx].strip()
-                    if next_stripped.startswith('- '):
+                    if next_stripped.startswith("- "):
                         current_dict[key] = []
                         current_list = current_dict[key]
                     else:
@@ -135,10 +139,10 @@ def parse_yaml_simple(content: str) -> Dict[str, Any]:
 
 def load_config(path: Path) -> AgentConfig:
     """Load agent configuration from file"""
-    content = path.read_text(encoding='utf-8')
+    content = path.read_text(encoding="utf-8")
 
     # Try JSON first
-    if path.suffix == '.json':
+    if path.suffix == ".json":
         data = json.loads(content)
     else:
         # Try YAML
@@ -149,7 +153,7 @@ def load_config(path: Path) -> AgentConfig:
             data = json.loads(content)
 
     # Parse pattern
-    pattern_str = data.get('pattern', 'react').lower()
+    pattern_str = data.get("pattern", "react").lower()
     try:
         pattern = AgentPattern(pattern_str)
     except ValueError:
@@ -157,27 +161,29 @@ def load_config(path: Path) -> AgentConfig:
 
     # Parse tools
     tools = []
-    for tool_data in data.get('tools', []):
+    for tool_data in data.get("tools", []):
         if isinstance(tool_data, dict):
-            tools.append(ToolDefinition(
-                name=tool_data.get('name', 'unknown'),
-                description=tool_data.get('description', ''),
-                parameters=tool_data.get('parameters', {}),
-                required_config=tool_data.get('required_config', []),
-                estimated_tokens=tool_data.get('estimated_tokens', 100)
-            ))
+            tools.append(
+                ToolDefinition(
+                    name=tool_data.get("name", "unknown"),
+                    description=tool_data.get("description", ""),
+                    parameters=tool_data.get("parameters", {}),
+                    required_config=tool_data.get("required_config", []),
+                    estimated_tokens=tool_data.get("estimated_tokens", 100),
+                )
+            )
         elif isinstance(tool_data, str):
-            tools.append(ToolDefinition(name=tool_data, description=''))
+            tools.append(ToolDefinition(name=tool_data, description=""))
 
     return AgentConfig(
-        name=data.get('name', 'agent'),
+        name=data.get("name", "agent"),
         pattern=pattern,
-        description=data.get('description', ''),
+        description=data.get("description", ""),
         tools=tools,
-        max_iterations=int(data.get('max_iterations', 10)),
-        system_prompt=data.get('system_prompt', ''),
-        temperature=float(data.get('temperature', 0.7)),
-        model=data.get('model', 'gpt-4')
+        max_iterations=int(data.get("max_iterations", 10)),
+        system_prompt=data.get("system_prompt", ""),
+        temperature=float(data.get("temperature", 0.7)),
+        model=data.get("model", "gpt-4"),
     )
 
 
@@ -204,7 +210,7 @@ def validate_agent(config: AgentConfig) -> ValidationResult:
 
         # Check required config
         if tool.required_config:
-            missing = [c for c in tool.required_config if not c.startswith('$')]
+            missing = [c for c in tool.required_config if not c.startswith("$")]
             if missing:
                 tool_status[tool.name] = f"WARN: Missing config: {missing}"
             else:
@@ -238,7 +244,7 @@ def validate_agent(config: AgentConfig) -> ValidationResult:
         tool_status=tool_status,
         estimated_tokens_per_run=(min_tokens, max_tokens),
         potential_infinite_loop=potential_loop,
-        max_depth=config.max_iterations
+        max_depth=config.max_iterations,
     )
 
 
@@ -324,7 +330,7 @@ def generate_ascii_diagram(config: AgentConfig) -> str:
     lines.append(" " * (width // 2 - 8) + "│ Final Answer  │")
     lines.append(" " * (width // 2 - 8) + "└───────────────┘")
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def generate_mermaid_diagram(config: AgentConfig) -> str:
@@ -366,7 +372,7 @@ def generate_mermaid_diagram(config: AgentConfig) -> str:
     lines.append("    end")
     lines.append("```")
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def estimate_cost(config: AgentConfig, runs: int = 100) -> Dict[str, Any]:
@@ -376,36 +382,39 @@ def estimate_cost(config: AgentConfig, runs: int = 100) -> Dict[str, Any]:
 
     # Cost per 1K tokens
     costs = {
-        'gpt-4': {'input': 0.03, 'output': 0.06},
-        'gpt-4-turbo': {'input': 0.01, 'output': 0.03},
-        'gpt-3.5-turbo': {'input': 0.0005, 'output': 0.0015},
-        'claude-3-opus': {'input': 0.015, 'output': 0.075},
-        'claude-3-sonnet': {'input': 0.003, 'output': 0.015},
+        "gpt-4": {"input": 0.03, "output": 0.06},
+        "gpt-4-turbo": {"input": 0.01, "output": 0.03},
+        "gpt-3.5-turbo": {"input": 0.0005, "output": 0.0015},
+        "claude-3-opus": {"input": 0.015, "output": 0.075},
+        "claude-3-sonnet": {"input": 0.003, "output": 0.015},
     }
 
-    model_cost = costs.get(config.model, costs['gpt-4'])
+    model_cost = costs.get(config.model, costs["gpt-4"])
 
     # Assume 60% input, 40% output
     input_tokens = min_tokens * 0.6
     output_tokens = min_tokens * 0.4
 
-    cost_per_run_min = (input_tokens / 1000 * model_cost['input'] +
-                        output_tokens / 1000 * model_cost['output'])
+    cost_per_run_min = (
+        input_tokens / 1000 * model_cost["input"] + output_tokens / 1000 * model_cost["output"]
+    )
 
     input_tokens_max = max_tokens * 0.6
     output_tokens_max = max_tokens * 0.4
-    cost_per_run_max = (input_tokens_max / 1000 * model_cost['input'] +
-                        output_tokens_max / 1000 * model_cost['output'])
+    cost_per_run_max = (
+        input_tokens_max / 1000 * model_cost["input"]
+        + output_tokens_max / 1000 * model_cost["output"]
+    )
 
     return {
-        'model': config.model,
-        'tokens_per_run': {'min': min_tokens, 'max': max_tokens},
-        'cost_per_run': {'min': round(cost_per_run_min, 4), 'max': round(cost_per_run_max, 4)},
-        'estimated_monthly': {
-            'runs': runs * 30,
-            'cost_min': round(cost_per_run_min * runs * 30, 2),
-            'cost_max': round(cost_per_run_max * runs * 30, 2)
-        }
+        "model": config.model,
+        "tokens_per_run": {"min": min_tokens, "max": max_tokens},
+        "cost_per_run": {"min": round(cost_per_run_min, 4), "max": round(cost_per_run_max, 4)},
+        "estimated_monthly": {
+            "runs": runs * 30,
+            "cost_min": round(cost_per_run_min * runs * 30, 2),
+            "cost_max": round(cost_per_run_max * runs * 30, 2),
+        },
     }
 
 
@@ -432,8 +441,12 @@ def format_validation_report(config: AgentConfig, result: ValidationResult) -> s
 
     lines.append("📊 FLOW ANALYSIS")
     lines.append(f"  Max iterations:      {result.max_depth}")
-    lines.append(f"  Estimated tokens:    {result.estimated_tokens_per_run[0]:,} - {result.estimated_tokens_per_run[1]:,}")
-    lines.append(f"  Potential loop:      {'⚠️ Yes' if result.potential_infinite_loop else '✅ No'}")
+    lines.append(
+        f"  Estimated tokens:    {result.estimated_tokens_per_run[0]:,} - {result.estimated_tokens_per_run[1]:,}"
+    )
+    lines.append(
+        f"  Potential loop:      {'⚠️ Yes' if result.potential_infinite_loop else '✅ No'}"
+    )
     lines.append("")
 
     if result.errors:
@@ -457,7 +470,7 @@ def format_validation_report(config: AgentConfig, result: ValidationResult) -> s
     lines.append("")
     lines.append("=" * 50)
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def main():
@@ -483,18 +496,27 @@ tools:
     required_config: [api_key]
   - name: calculator
     description: Evaluate math expressions
-        """
+        """,
     )
 
-    parser.add_argument('config', help='Agent configuration file (YAML or JSON)')
-    parser.add_argument('--validate', '-V', action='store_true', help='Validate agent configuration')
-    parser.add_argument('--visualize', '-v', action='store_true', help='Visualize agent workflow')
-    parser.add_argument('--format', '-f', choices=['ascii', 'mermaid'], default='ascii',
-                       help='Visualization format (default: ascii)')
-    parser.add_argument('--estimate-cost', '-e', action='store_true', help='Estimate token costs')
-    parser.add_argument('--runs', '-r', type=int, default=100, help='Daily runs for cost estimation')
-    parser.add_argument('--output', '-o', help='Output file path')
-    parser.add_argument('--json', '-j', action='store_true', help='Output as JSON')
+    parser.add_argument("config", help="Agent configuration file (YAML or JSON)")
+    parser.add_argument(
+        "--validate", "-V", action="store_true", help="Validate agent configuration"
+    )
+    parser.add_argument("--visualize", "-v", action="store_true", help="Visualize agent workflow")
+    parser.add_argument(
+        "--format",
+        "-f",
+        choices=["ascii", "mermaid"],
+        default="ascii",
+        help="Visualization format (default: ascii)",
+    )
+    parser.add_argument("--estimate-cost", "-e", action="store_true", help="Estimate token costs")
+    parser.add_argument(
+        "--runs", "-r", type=int, default=100, help="Daily runs for cost estimation"
+    )
+    parser.add_argument("--output", "-o", help="Output file path")
+    parser.add_argument("--json", "-j", action="store_true", help="Output as JSON")
 
     args = parser.parse_args()
 
@@ -526,7 +548,7 @@ tools:
 
     # Visualize
     if args.visualize:
-        if args.format == 'mermaid':
+        if args.format == "mermaid":
             diagram = generate_mermaid_diagram(config)
         else:
             diagram = generate_ascii_diagram(config)
@@ -541,14 +563,18 @@ tools:
             output_parts.append("")
             output_parts.append("💰 COST ESTIMATION")
             output_parts.append(f"  Model: {costs['model']}")
-            output_parts.append(f"  Tokens per run: {costs['tokens_per_run']['min']:,} - {costs['tokens_per_run']['max']:,}")
-            output_parts.append(f"  Cost per run: ${costs['cost_per_run']['min']:.4f} - ${costs['cost_per_run']['max']:.4f}")
+            output_parts.append(
+                f"  Tokens per run: {costs['tokens_per_run']['min']:,} - {costs['tokens_per_run']['max']:,}"
+            )
+            output_parts.append(
+                f"  Cost per run: ${costs['cost_per_run']['min']:.4f} - ${costs['cost_per_run']['max']:.4f}"
+            )
             output_parts.append(f"  Monthly ({costs['estimated_monthly']['runs']:,} runs):")
             output_parts.append(f"    Min: ${costs['estimated_monthly']['cost_min']:.2f}")
             output_parts.append(f"    Max: ${costs['estimated_monthly']['cost_max']:.2f}")
 
     # Output
-    output = '\n'.join(output_parts)
+    output = "\n".join(output_parts)
     print(output)
 
     if args.output:
@@ -556,5 +582,5 @@ tools:
         print(f"\nOutput saved to {args.output}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

@@ -26,6 +26,7 @@ from collections import defaultdict
 @dataclass
 class FileCoverage:
     """Coverage data for a single file"""
+
     path: str
     statements: Tuple[int, int]  # (covered, total)
     branches: Tuple[int, int]
@@ -54,6 +55,7 @@ class FileCoverage:
 @dataclass
 class CoverageGap:
     """An identified coverage gap"""
+
     file: str
     gap_type: str  # 'statements', 'branches', 'functions', 'lines'
     lines: List[int]
@@ -65,6 +67,7 @@ class CoverageGap:
 @dataclass
 class CoverageSummary:
     """Overall coverage summary"""
+
     statements: Tuple[int, int]
     branches: Tuple[int, int]
     functions: Tuple[int, int]
@@ -82,19 +85,19 @@ class CoverageParser:
     def parse(self, path: Path) -> Tuple[Dict[str, FileCoverage], CoverageSummary]:
         """Parse coverage data from file or directory"""
         if path.is_file():
-            if path.suffix == '.json':
+            if path.suffix == ".json":
                 return self._parse_istanbul_json(path)
-            elif path.suffix == '.info' or 'lcov' in path.name:
+            elif path.suffix == ".info" or "lcov" in path.name:
                 return self._parse_lcov(path)
         elif path.is_dir():
             # Look for common coverage files
-            for filename in ['coverage-final.json', 'coverage-summary.json', 'lcov.info']:
+            for filename in ["coverage-final.json", "coverage-summary.json", "lcov.info"]:
                 candidate = path / filename
                 if candidate.exists():
                     return self.parse(candidate)
 
             # Check for coverage-final.json in coverage directory
-            coverage_json = path / 'coverage-final.json'
+            coverage_json = path / "coverage-final.json"
             if coverage_json.exists():
                 return self._parse_istanbul_json(coverage_json)
 
@@ -102,7 +105,7 @@ class CoverageParser:
 
     def _parse_istanbul_json(self, path: Path) -> Tuple[Dict[str, FileCoverage], CoverageSummary]:
         """Parse Istanbul/Jest JSON coverage format"""
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             data = json.load(f)
 
         files = {}
@@ -113,30 +116,27 @@ class CoverageParser:
 
         for file_path, file_data in data.items():
             # Skip node_modules
-            if 'node_modules' in file_path:
+            if "node_modules" in file_path:
                 continue
 
             # Parse statement coverage
-            s_map = file_data.get('statementMap', {})
-            s_hits = file_data.get('s', {})
+            s_map = file_data.get("statementMap", {})
+            s_hits = file_data.get("s", {})
             covered_statements = sum(1 for h in s_hits.values() if h > 0)
             total_statements[0] += covered_statements
             total_statements[1] += len(s_map)
 
             # Parse branch coverage
-            b_map = file_data.get('branchMap', {})
-            b_hits = file_data.get('b', {})
-            covered_branches = sum(
-                sum(1 for h in hits if h > 0)
-                for hits in b_hits.values()
-            )
-            total_branch_count = sum(len(b['locations']) for b in b_map.values())
+            b_map = file_data.get("branchMap", {})
+            b_hits = file_data.get("b", {})
+            covered_branches = sum(sum(1 for h in hits if h > 0) for hits in b_hits.values())
+            total_branch_count = sum(len(b["locations"]) for b in b_map.values())
             total_branches[0] += covered_branches
             total_branches[1] += total_branch_count
 
             # Parse function coverage
-            fn_map = file_data.get('fnMap', {})
-            fn_hits = file_data.get('f', {})
+            fn_map = file_data.get("fnMap", {})
+            fn_hits = file_data.get("f", {})
             covered_functions = sum(1 for h in fn_hits.values() if h > 0)
             total_functions[0] += covered_functions
             total_functions[1] += len(fn_map)
@@ -146,7 +146,7 @@ class CoverageParser:
             for stmt_id, hits in s_hits.items():
                 if hits == 0 and stmt_id in s_map:
                     stmt = s_map[stmt_id]
-                    start_line = stmt.get('start', {}).get('line', 0)
+                    start_line = stmt.get("start", {}).get("line", 0)
                     if start_line not in uncovered_lines:
                         uncovered_lines.append(start_line)
 
@@ -169,7 +169,7 @@ class CoverageParser:
                 functions=(covered_functions, len(fn_map)),
                 lines=line_coverage,
                 uncovered_lines=sorted(uncovered_lines)[:50],  # Limit
-                uncovered_branches=uncovered_branches[:20]
+                uncovered_branches=uncovered_branches[:20],
             )
 
         summary = CoverageSummary(
@@ -177,7 +177,7 @@ class CoverageParser:
             branches=tuple(total_branches),
             functions=tuple(total_functions),
             lines=tuple(total_lines),
-            files_analyzed=len(files)
+            files_analyzed=len(files),
         )
 
         return files, summary
@@ -188,8 +188,8 @@ class CoverageParser:
         covered_lines = set()
 
         for stmt_id, stmt in s_map.items():
-            start_line = stmt.get('start', {}).get('line', 0)
-            end_line = stmt.get('end', {}).get('line', start_line)
+            start_line = stmt.get("start", {}).get("line", 0)
+            end_line = stmt.get("end", {}).get("line", start_line)
             for line in range(start_line, end_line + 1):
                 lines.add(line)
                 if s_hits.get(stmt_id, 0) > 0:
@@ -199,83 +199,81 @@ class CoverageParser:
 
     def _parse_lcov(self, path: Path) -> Tuple[Dict[str, FileCoverage], CoverageSummary]:
         """Parse LCOV format coverage data"""
-        with open(path, 'r') as f:
+        with open(path, "r") as f:
             content = f.read()
 
         files = {}
         current_file = None
         current_data = {}
 
-        total = {
-            'statements': [0, 0],
-            'branches': [0, 0],
-            'functions': [0, 0],
-            'lines': [0, 0]
-        }
+        total = {"statements": [0, 0], "branches": [0, 0], "functions": [0, 0], "lines": [0, 0]}
 
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             line = line.strip()
 
-            if line.startswith('SF:'):
+            if line.startswith("SF:"):
                 current_file = line[3:]
                 current_data = {
-                    'lines_hit': 0, 'lines_total': 0,
-                    'functions_hit': 0, 'functions_total': 0,
-                    'branches_hit': 0, 'branches_total': 0,
-                    'uncovered_lines': []
+                    "lines_hit": 0,
+                    "lines_total": 0,
+                    "functions_hit": 0,
+                    "functions_total": 0,
+                    "branches_hit": 0,
+                    "branches_total": 0,
+                    "uncovered_lines": [],
                 }
-            elif line.startswith('DA:'):
-                parts = line[3:].split(',')
+            elif line.startswith("DA:"):
+                parts = line[3:].split(",")
                 if len(parts) >= 2:
                     line_num = int(parts[0])
                     hits = int(parts[1])
-                    current_data['lines_total'] += 1
+                    current_data["lines_total"] += 1
                     if hits > 0:
-                        current_data['lines_hit'] += 1
+                        current_data["lines_hit"] += 1
                     else:
-                        current_data['uncovered_lines'].append(line_num)
-            elif line.startswith('FN:'):
-                current_data['functions_total'] += 1
-            elif line.startswith('FNDA:'):
-                parts = line[5:].split(',')
+                        current_data["uncovered_lines"].append(line_num)
+            elif line.startswith("FN:"):
+                current_data["functions_total"] += 1
+            elif line.startswith("FNDA:"):
+                parts = line[5:].split(",")
                 if len(parts) >= 1 and int(parts[0]) > 0:
-                    current_data['functions_hit'] += 1
-            elif line.startswith('BRDA:'):
-                parts = line[5:].split(',')
-                current_data['branches_total'] += 1
-                if len(parts) >= 4 and parts[3] != '-' and int(parts[3]) > 0:
-                    current_data['branches_hit'] += 1
-            elif line == 'end_of_record' and current_file:
+                    current_data["functions_hit"] += 1
+            elif line.startswith("BRDA:"):
+                parts = line[5:].split(",")
+                current_data["branches_total"] += 1
+                if len(parts) >= 4 and parts[3] != "-" and int(parts[3]) > 0:
+                    current_data["branches_hit"] += 1
+            elif line == "end_of_record" and current_file:
                 # Skip node_modules
-                if 'node_modules' not in current_file:
+                if "node_modules" not in current_file:
                     files[current_file] = FileCoverage(
                         path=current_file,
-                        statements=(current_data['lines_hit'], current_data['lines_total']),
-                        branches=(current_data['branches_hit'], current_data['branches_total']),
-                        functions=(current_data['functions_hit'], current_data['functions_total']),
-                        lines=(current_data['lines_hit'], current_data['lines_total']),
-                        uncovered_lines=current_data['uncovered_lines'][:50]
+                        statements=(current_data["lines_hit"], current_data["lines_total"]),
+                        branches=(current_data["branches_hit"], current_data["branches_total"]),
+                        functions=(current_data["functions_hit"], current_data["functions_total"]),
+                        lines=(current_data["lines_hit"], current_data["lines_total"]),
+                        uncovered_lines=current_data["uncovered_lines"][:50],
                     )
 
                     for key in total:
-                        if key == 'statements' or key == 'lines':
-                            total[key][0] += current_data['lines_hit']
-                            total[key][1] += current_data['lines_total']
-                        elif key == 'branches':
-                            total[key][0] += current_data['branches_hit']
-                            total[key][1] += current_data['branches_total']
-                        elif key == 'functions':
-                            total[key][0] += current_data['functions_hit']
-                            total[key][1] += current_data['functions_total']
+                        if key == "statements" or key == "lines":
+                            total[key][0] += current_data["lines_hit"]
+                            total[key][1] += current_data["lines_total"]
+                        elif key == "branches":
+                            total[key][0] += current_data["branches_hit"]
+                            total[key][1] += current_data["branches_total"]
+                        elif key == "functions":
+                            total[key][0] += current_data["functions_hit"]
+                            total[key][1] += current_data["functions_total"]
 
                 current_file = None
 
         summary = CoverageSummary(
-            statements=tuple(total['statements']),
-            branches=tuple(total['branches']),
-            functions=tuple(total['functions']),
-            lines=tuple(total['lines']),
-            files_analyzed=len(files)
+            statements=tuple(total["statements"]),
+            branches=tuple(total["branches"]),
+            functions=tuple(total["functions"]),
+            lines=tuple(total["lines"]),
+            files_analyzed=len(files),
         )
 
         return files, summary
@@ -285,37 +283,30 @@ class CoverageAnalyzer:
     """Analyzes coverage data and generates recommendations"""
 
     CRITICAL_PATTERNS = [
-        r'auth', r'payment', r'security', r'login', r'register',
-        r'checkout', r'order', r'transaction', r'billing'
+        r"auth",
+        r"payment",
+        r"security",
+        r"login",
+        r"register",
+        r"checkout",
+        r"order",
+        r"transaction",
+        r"billing",
     ]
 
-    SERVICE_PATTERNS = [
-        r'service', r'api', r'handler', r'controller', r'middleware'
-    ]
+    SERVICE_PATTERNS = [r"service", r"api", r"handler", r"controller", r"middleware"]
 
-    def __init__(
-        self,
-        threshold: int = 80,
-        critical_paths: bool = False,
-        verbose: bool = False
-    ):
+    def __init__(self, threshold: int = 80, critical_paths: bool = False, verbose: bool = False):
         self.threshold = threshold
         self.critical_paths = critical_paths
         self.verbose = verbose
 
     def analyze(
-        self,
-        files: Dict[str, FileCoverage],
-        summary: CoverageSummary
+        self, files: Dict[str, FileCoverage], summary: CoverageSummary
     ) -> Tuple[List[CoverageGap], Dict[str, Any]]:
         """Analyze coverage and return gaps and recommendations"""
         gaps = []
-        recommendations = {
-            'critical': [],
-            'high': [],
-            'medium': [],
-            'low': []
-        }
+        recommendations = {"critical": [], "high": [], "medium": [], "low": []}
 
         # Analyze each file
         for file_path, coverage in files.items():
@@ -323,40 +314,54 @@ class CoverageAnalyzer:
             gaps.extend(file_gaps)
 
         # Sort gaps by severity
-        severity_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
+        severity_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
         gaps.sort(key=lambda g: (severity_order[g.severity], -len(g.lines)))
 
         # Generate recommendations
         for gap in gaps:
-            recommendations[gap.severity].append({
-                'file': gap.file,
-                'type': gap.gap_type,
-                'lines': gap.lines[:10],  # Limit
-                'description': gap.description,
-                'recommendation': gap.recommendation
-            })
+            recommendations[gap.severity].append(
+                {
+                    "file": gap.file,
+                    "type": gap.gap_type,
+                    "lines": gap.lines[:10],  # Limit
+                    "description": gap.description,
+                    "recommendation": gap.recommendation,
+                }
+            )
 
         # Add summary stats
         stats = {
-            'overall_statement_pct': (summary.statements[0] / summary.statements[1] * 100) if summary.statements[1] > 0 else 100,
-            'overall_branch_pct': (summary.branches[0] / summary.branches[1] * 100) if summary.branches[1] > 0 else 100,
-            'overall_function_pct': (summary.functions[0] / summary.functions[1] * 100) if summary.functions[1] > 0 else 100,
-            'overall_line_pct': (summary.lines[0] / summary.lines[1] * 100) if summary.lines[1] > 0 else 100,
-            'files_analyzed': summary.files_analyzed,
-            'files_below_threshold': sum(
-                1 for f in files.values()
-                if f.line_pct < self.threshold
+            "overall_statement_pct": (
+                (summary.statements[0] / summary.statements[1] * 100)
+                if summary.statements[1] > 0
+                else 100
             ),
-            'total_gaps': len(gaps),
-            'critical_gaps': len(recommendations['critical']),
-            'threshold': self.threshold,
-            'meets_threshold': (summary.lines[0] / summary.lines[1] * 100) >= self.threshold if summary.lines[1] > 0 else True
+            "overall_branch_pct": (
+                (summary.branches[0] / summary.branches[1] * 100)
+                if summary.branches[1] > 0
+                else 100
+            ),
+            "overall_function_pct": (
+                (summary.functions[0] / summary.functions[1] * 100)
+                if summary.functions[1] > 0
+                else 100
+            ),
+            "overall_line_pct": (
+                (summary.lines[0] / summary.lines[1] * 100) if summary.lines[1] > 0 else 100
+            ),
+            "files_analyzed": summary.files_analyzed,
+            "files_below_threshold": sum(1 for f in files.values() if f.line_pct < self.threshold),
+            "total_gaps": len(gaps),
+            "critical_gaps": len(recommendations["critical"]),
+            "threshold": self.threshold,
+            "meets_threshold": (
+                (summary.lines[0] / summary.lines[1] * 100) >= self.threshold
+                if summary.lines[1] > 0
+                else True
+            ),
         }
 
-        return gaps, {
-            'recommendations': recommendations,
-            'stats': stats
-        }
+        return gaps, {"recommendations": recommendations, "stats": stats}
 
     def _analyze_file(self, file_path: str, coverage: FileCoverage) -> List[CoverageGap]:
         """Analyze a single file for coverage gaps"""
@@ -364,75 +369,76 @@ class CoverageAnalyzer:
 
         # Determine if file is critical
         is_critical = any(
-            re.search(pattern, file_path.lower())
-            for pattern in self.CRITICAL_PATTERNS
+            re.search(pattern, file_path.lower()) for pattern in self.CRITICAL_PATTERNS
         )
 
-        is_service = any(
-            re.search(pattern, file_path.lower())
-            for pattern in self.SERVICE_PATTERNS
-        )
+        is_service = any(re.search(pattern, file_path.lower()) for pattern in self.SERVICE_PATTERNS)
 
         # Determine severity based on file type and coverage level
         if is_critical:
-            base_severity = 'critical'
+            base_severity = "critical"
             target_threshold = 95
         elif is_service:
-            base_severity = 'high'
+            base_severity = "high"
             target_threshold = 85
         else:
-            base_severity = 'medium'
+            base_severity = "medium"
             target_threshold = self.threshold
 
         # Check line coverage
         if coverage.line_pct < target_threshold:
-            severity = base_severity if coverage.line_pct < 50 else self._lower_severity(base_severity)
+            severity = (
+                base_severity if coverage.line_pct < 50 else self._lower_severity(base_severity)
+            )
 
-            gaps.append(CoverageGap(
-                file=file_path,
-                gap_type='lines',
-                lines=coverage.uncovered_lines[:20],
-                severity=severity,
-                description=f"Line coverage at {coverage.line_pct:.1f}% (target: {target_threshold}%)",
-                recommendation=self._get_line_recommendation(coverage)
-            ))
+            gaps.append(
+                CoverageGap(
+                    file=file_path,
+                    gap_type="lines",
+                    lines=coverage.uncovered_lines[:20],
+                    severity=severity,
+                    description=f"Line coverage at {coverage.line_pct:.1f}% (target: {target_threshold}%)",
+                    recommendation=self._get_line_recommendation(coverage),
+                )
+            )
 
         # Check branch coverage
         if coverage.branch_pct < target_threshold - 5:  # Allow 5% less for branches
-            severity = base_severity if coverage.branch_pct < 40 else self._lower_severity(base_severity)
+            severity = (
+                base_severity if coverage.branch_pct < 40 else self._lower_severity(base_severity)
+            )
 
-            gaps.append(CoverageGap(
-                file=file_path,
-                gap_type='branches',
-                lines=[],
-                severity=severity,
-                description=f"Branch coverage at {coverage.branch_pct:.1f}%",
-                recommendation=f"Add tests for conditional logic. {len(coverage.uncovered_branches)} uncovered branches."
-            ))
+            gaps.append(
+                CoverageGap(
+                    file=file_path,
+                    gap_type="branches",
+                    lines=[],
+                    severity=severity,
+                    description=f"Branch coverage at {coverage.branch_pct:.1f}%",
+                    recommendation=f"Add tests for conditional logic. {len(coverage.uncovered_branches)} uncovered branches.",
+                )
+            )
 
         # Check function coverage
         if coverage.function_pct < target_threshold:
             severity = self._lower_severity(base_severity)
 
-            gaps.append(CoverageGap(
-                file=file_path,
-                gap_type='functions',
-                lines=[],
-                severity=severity,
-                description=f"Function coverage at {coverage.function_pct:.1f}%",
-                recommendation="Add tests for uncovered functions/methods."
-            ))
+            gaps.append(
+                CoverageGap(
+                    file=file_path,
+                    gap_type="functions",
+                    lines=[],
+                    severity=severity,
+                    description=f"Function coverage at {coverage.function_pct:.1f}%",
+                    recommendation="Add tests for uncovered functions/methods.",
+                )
+            )
 
         return gaps
 
     def _lower_severity(self, severity: str) -> str:
         """Lower severity by one level"""
-        mapping = {
-            'critical': 'high',
-            'high': 'medium',
-            'medium': 'low',
-            'low': 'low'
-        }
+        mapping = {"critical": "high", "high": "medium", "medium": "low", "low": "low"}
         return mapping[severity]
 
     def _get_line_recommendation(self, coverage: FileCoverage) -> str:
@@ -456,7 +462,7 @@ class ReportGenerator:
         files: Dict[str, FileCoverage],
         summary: CoverageSummary,
         analysis: Dict[str, Any],
-        threshold: int
+        threshold: int,
     ) -> str:
         """Generate a text report"""
         lines = []
@@ -469,7 +475,7 @@ class ReportGenerator:
         lines.append("")
 
         # Overall summary
-        stats = analysis['stats']
+        stats = analysis["stats"]
         lines.append("OVERALL COVERAGE:")
         lines.append(f"  Statements: {stats['overall_statement_pct']:.1f}%")
         lines.append(f"  Branches:   {stats['overall_branch_pct']:.1f}%")
@@ -478,45 +484,42 @@ class ReportGenerator:
         lines.append("")
 
         # Threshold check
-        threshold_status = "PASS" if stats['meets_threshold'] else "FAIL"
+        threshold_status = "PASS" if stats["meets_threshold"] else "FAIL"
         lines.append(f"Threshold ({threshold}%): {threshold_status}")
         lines.append(f"Files analyzed: {stats['files_analyzed']}")
         lines.append(f"Files below threshold: {stats['files_below_threshold']}")
         lines.append("")
 
         # Critical gaps
-        recs = analysis['recommendations']
-        if recs['critical']:
+        recs = analysis["recommendations"]
+        if recs["critical"]:
             lines.append("-" * 60)
             lines.append("CRITICAL GAPS (requires immediate attention):")
-            for rec in recs['critical'][:5]:
+            for rec in recs["critical"][:5]:
                 lines.append(f"  - {rec['file']}")
                 lines.append(f"    {rec['description']}")
-                if rec['lines']:
+                if rec["lines"]:
                     lines.append(f"    Uncovered lines: {', '.join(map(str, rec['lines'][:5]))}")
             lines.append("")
 
         # High priority gaps
-        if recs['high']:
+        if recs["high"]:
             lines.append("-" * 60)
             lines.append("HIGH PRIORITY GAPS:")
-            for rec in recs['high'][:5]:
+            for rec in recs["high"][:5]:
                 lines.append(f"  - {rec['file']}")
                 lines.append(f"    {rec['description']}")
             lines.append("")
 
         # Files below threshold
-        below_threshold = [
-            (path, cov) for path, cov in files.items()
-            if cov.line_pct < threshold
-        ]
+        below_threshold = [(path, cov) for path, cov in files.items() if cov.line_pct < threshold]
         below_threshold.sort(key=lambda x: x[1].line_pct)
 
         if below_threshold:
             lines.append("-" * 60)
             lines.append(f"FILES BELOW {threshold}% THRESHOLD:")
             for path, cov in below_threshold[:10]:
-                short_path = path.split('/')[-1] if '/' in path else path
+                short_path = path.split("/")[-1] if "/" in path else path
                 lines.append(f"  {cov.line_pct:5.1f}%  {short_path}")
             if len(below_threshold) > 10:
                 lines.append(f"  ... and {len(below_threshold) - 10} more files")
@@ -525,27 +528,25 @@ class ReportGenerator:
         # Recommendations
         lines.append("-" * 60)
         lines.append("RECOMMENDATIONS:")
-        all_recs = (
-            recs['critical'][:2] + recs['high'][:2] + recs['medium'][:2]
-        )
+        all_recs = recs["critical"][:2] + recs["high"][:2] + recs["medium"][:2]
         for i, rec in enumerate(all_recs[:5], 1):
             lines.append(f"  {i}. {rec['recommendation']}")
             lines.append(f"     File: {rec['file']}")
         lines.append("")
 
         lines.append("=" * 60)
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def generate_html_report(
         self,
         files: Dict[str, FileCoverage],
         summary: CoverageSummary,
         analysis: Dict[str, Any],
-        threshold: int
+        threshold: int,
     ) -> str:
         """Generate an HTML report"""
-        stats = analysis['stats']
-        recs = analysis['recommendations']
+        stats = analysis["stats"]
+        recs = analysis["recommendations"]
 
         html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -612,13 +613,13 @@ class ReportGenerator:
 
         # Add gaps to table
         all_gaps = (
-            [(g, 'critical') for g in recs['critical']] +
-            [(g, 'high') for g in recs['high']] +
-            [(g, 'medium') for g in recs['medium'][:5]]
+            [(g, "critical") for g in recs["critical"]]
+            + [(g, "high") for g in recs["high"]]
+            + [(g, "medium") for g in recs["medium"][:5]]
         )
 
         for gap, severity in all_gaps[:15]:
-            row_class = f"gap-{severity}" if severity in ['critical', 'high'] else ""
+            row_class = f"gap-{severity}" if severity in ["critical", "high"] else ""
             html += f"""            <tr class="{row_class}">
                 <td>{severity.upper()}</td>
                 <td>{gap['file'].split('/')[-1]}</td>
@@ -648,7 +649,7 @@ class ReportGenerator:
         sorted_files = sorted(files.items(), key=lambda x: x[1].line_pct)
 
         for path, cov in sorted_files[:20]:
-            short_path = path.split('/')[-1] if '/' in path else path
+            short_path = path.split("/")[-1] if "/" in path else path
             html += f"""            <tr>
                 <td>{short_path}</td>
                 <td>{cov.statement_pct:.1f}%</td>
@@ -675,9 +676,9 @@ class CoverageAnalyzerTool:
         threshold: int = 80,
         critical_paths: bool = False,
         strict: bool = False,
-        output_format: str = 'text',
+        output_format: str = "text",
         output_path: Optional[str] = None,
-        verbose: bool = False
+        verbose: bool = False,
     ):
         self.coverage_path = Path(coverage_path)
         self.threshold = threshold
@@ -699,23 +700,21 @@ class CoverageAnalyzerTool:
 
         # Analyze coverage
         analyzer = CoverageAnalyzer(
-            threshold=self.threshold,
-            critical_paths=self.critical_paths,
-            verbose=self.verbose
+            threshold=self.threshold, critical_paths=self.critical_paths, verbose=self.verbose
         )
         gaps, analysis = analyzer.analyze(files, summary)
 
         # Generate report
         reporter = ReportGenerator(self.verbose)
 
-        if self.output_format == 'html':
+        if self.output_format == "html":
             report = reporter.generate_html_report(files, summary, analysis, self.threshold)
         else:
             report = reporter.generate_text_report(files, summary, analysis, self.threshold)
 
         # Output report
         if self.output_path:
-            with open(self.output_path, 'w') as f:
+            with open(self.output_path, "w") as f:
                 f.write(report)
             print(f"Report written to: {self.output_path}")
         else:
@@ -723,23 +722,25 @@ class CoverageAnalyzerTool:
 
         # Return results
         results = {
-            'status': 'pass' if analysis['stats']['meets_threshold'] else 'fail',
-            'threshold': self.threshold,
-            'coverage': {
-                'statements': analysis['stats']['overall_statement_pct'],
-                'branches': analysis['stats']['overall_branch_pct'],
-                'functions': analysis['stats']['overall_function_pct'],
-                'lines': analysis['stats']['overall_line_pct']
+            "status": "pass" if analysis["stats"]["meets_threshold"] else "fail",
+            "threshold": self.threshold,
+            "coverage": {
+                "statements": analysis["stats"]["overall_statement_pct"],
+                "branches": analysis["stats"]["overall_branch_pct"],
+                "functions": analysis["stats"]["overall_function_pct"],
+                "lines": analysis["stats"]["overall_line_pct"],
             },
-            'files_analyzed': summary.files_analyzed,
-            'files_below_threshold': analysis['stats']['files_below_threshold'],
-            'total_gaps': analysis['stats']['total_gaps'],
-            'critical_gaps': analysis['stats']['critical_gaps']
+            "files_analyzed": summary.files_analyzed,
+            "files_below_threshold": analysis["stats"]["files_below_threshold"],
+            "total_gaps": analysis["stats"]["total_gaps"],
+            "critical_gaps": analysis["stats"]["critical_gaps"],
         }
 
         # Exit with error if strict mode and below threshold
-        if self.strict and not analysis['stats']['meets_threshold']:
-            print(f"\nFailed: Coverage {analysis['stats']['overall_line_pct']:.1f}% below threshold {self.threshold}%")
+        if self.strict and not analysis["stats"]["meets_threshold"]:
+            print(
+                f"\nFailed: Coverage {analysis['stats']['overall_line_pct']:.1f}% below threshold {self.threshold}%"
+            )
             sys.exit(1)
 
         return results
@@ -763,48 +764,32 @@ Examples:
 
   # Focus on critical paths
   python coverage_analyzer.py coverage/ --critical-paths
-        """
+        """,
     )
+    parser.add_argument("coverage", help="Path to coverage file or directory")
     parser.add_argument(
-        'coverage',
-        help='Path to coverage file or directory'
-    )
-    parser.add_argument(
-        '--threshold', '-t',
+        "--threshold",
+        "-t",
         type=int,
         default=80,
-        help='Coverage threshold percentage (default: 80)'
+        help="Coverage threshold percentage (default: 80)",
     )
     parser.add_argument(
-        '--strict',
-        action='store_true',
-        help='Exit with error if coverage is below threshold'
+        "--strict", action="store_true", help="Exit with error if coverage is below threshold"
     )
     parser.add_argument(
-        '--critical-paths',
-        action='store_true',
-        help='Focus analysis on critical business paths'
+        "--critical-paths", action="store_true", help="Focus analysis on critical business paths"
     )
     parser.add_argument(
-        '--format', '-f',
-        choices=['text', 'html', 'json'],
-        default='text',
-        help='Output format (default: text)'
+        "--format",
+        "-f",
+        choices=["text", "html", "json"],
+        default="text",
+        help="Output format (default: text)",
     )
-    parser.add_argument(
-        '--output', '-o',
-        help='Output file path'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Output results as JSON (summary only)'
-    )
+    parser.add_argument("--output", "-o", help="Output file path")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON (summary only)")
 
     args = parser.parse_args()
 
@@ -816,7 +801,7 @@ Examples:
             strict=args.strict,
             output_format=args.format,
             output_path=args.output,
-            verbose=args.verbose
+            verbose=args.verbose,
         )
 
         results = tool.run()
@@ -828,9 +813,10 @@ Examples:
         print(f"Error: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

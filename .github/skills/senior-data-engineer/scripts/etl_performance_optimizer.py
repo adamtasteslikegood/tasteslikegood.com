@@ -33,10 +33,7 @@ from datetime import datetime
 from collections import defaultdict
 from abc import ABC, abstractmethod
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
@@ -44,9 +41,11 @@ logger = logging.getLogger(__name__)
 # Data Classes
 # =============================================================================
 
+
 @dataclass
 class SQLQueryInfo:
     """Parsed information about a SQL query"""
+
     query_type: str  # SELECT, INSERT, UPDATE, DELETE, MERGE, CREATE
     tables: List[str]
     columns: List[str]
@@ -66,6 +65,7 @@ class SQLQueryInfo:
 @dataclass
 class OptimizationRecommendation:
     """A single optimization recommendation"""
+
     category: str  # index, partition, join, filter, aggregation, memory, shuffle
     severity: str  # critical, high, medium, low
     title: str
@@ -80,6 +80,7 @@ class OptimizationRecommendation:
 @dataclass
 class SparkJobMetrics:
     """Metrics from a Spark job"""
+
     job_id: str
     duration_ms: int
     stages: int
@@ -98,6 +99,7 @@ class SparkJobMetrics:
 @dataclass
 class PartitionStrategy:
     """Recommended partition strategy"""
+
     column: str
     partition_type: str  # range, hash, list
     num_partitions: Optional[int]
@@ -109,6 +111,7 @@ class PartitionStrategy:
 @dataclass
 class CostEstimate:
     """Cost estimate for a query"""
+
     warehouse: str
     compute_cost: float
     storage_cost: float
@@ -122,29 +125,30 @@ class CostEstimate:
 # SQL Parser
 # =============================================================================
 
+
 class SQLParser:
     """Parse and analyze SQL queries"""
 
     # Common SQL patterns
     PATTERNS = {
-        'select': re.compile(r'\bSELECT\b', re.IGNORECASE),
-        'from': re.compile(r'\bFROM\b', re.IGNORECASE),
-        'join': re.compile(r'\b(INNER|LEFT|RIGHT|FULL|CROSS)?\s*JOIN\b', re.IGNORECASE),
-        'where': re.compile(r'\bWHERE\b', re.IGNORECASE),
-        'group_by': re.compile(r'\bGROUP\s+BY\b', re.IGNORECASE),
-        'order_by': re.compile(r'\bORDER\s+BY\b', re.IGNORECASE),
-        'having': re.compile(r'\bHAVING\b', re.IGNORECASE),
-        'distinct': re.compile(r'\bDISTINCT\b', re.IGNORECASE),
-        'limit': re.compile(r'\bLIMIT\s+(\d+)', re.IGNORECASE),
-        'cte': re.compile(r'\bWITH\b', re.IGNORECASE),
-        'subquery': re.compile(r'\(\s*SELECT\b', re.IGNORECASE),
-        'window': re.compile(r'\bOVER\s*\(', re.IGNORECASE),
-        'aggregation': re.compile(r'\b(COUNT|SUM|AVG|MIN|MAX|STDDEV|VARIANCE)\s*\(', re.IGNORECASE),
-        'insert': re.compile(r'\bINSERT\s+INTO\b', re.IGNORECASE),
-        'update': re.compile(r'\bUPDATE\b', re.IGNORECASE),
-        'delete': re.compile(r'\bDELETE\s+FROM\b', re.IGNORECASE),
-        'merge': re.compile(r'\bMERGE\s+INTO\b', re.IGNORECASE),
-        'create': re.compile(r'\bCREATE\s+(TABLE|VIEW|INDEX)\b', re.IGNORECASE),
+        "select": re.compile(r"\bSELECT\b", re.IGNORECASE),
+        "from": re.compile(r"\bFROM\b", re.IGNORECASE),
+        "join": re.compile(r"\b(INNER|LEFT|RIGHT|FULL|CROSS)?\s*JOIN\b", re.IGNORECASE),
+        "where": re.compile(r"\bWHERE\b", re.IGNORECASE),
+        "group_by": re.compile(r"\bGROUP\s+BY\b", re.IGNORECASE),
+        "order_by": re.compile(r"\bORDER\s+BY\b", re.IGNORECASE),
+        "having": re.compile(r"\bHAVING\b", re.IGNORECASE),
+        "distinct": re.compile(r"\bDISTINCT\b", re.IGNORECASE),
+        "limit": re.compile(r"\bLIMIT\s+(\d+)", re.IGNORECASE),
+        "cte": re.compile(r"\bWITH\b", re.IGNORECASE),
+        "subquery": re.compile(r"\(\s*SELECT\b", re.IGNORECASE),
+        "window": re.compile(r"\bOVER\s*\(", re.IGNORECASE),
+        "aggregation": re.compile(r"\b(COUNT|SUM|AVG|MIN|MAX|STDDEV|VARIANCE)\s*\(", re.IGNORECASE),
+        "insert": re.compile(r"\bINSERT\s+INTO\b", re.IGNORECASE),
+        "update": re.compile(r"\bUPDATE\b", re.IGNORECASE),
+        "delete": re.compile(r"\bDELETE\s+FROM\b", re.IGNORECASE),
+        "merge": re.compile(r"\bMERGE\s+INTO\b", re.IGNORECASE),
+        "create": re.compile(r"\bCREATE\s+(TABLE|VIEW|INDEX)\b", re.IGNORECASE),
     }
 
     def parse(self, sql: str) -> SQLQueryInfo:
@@ -159,7 +163,7 @@ class SQLParser:
         tables = self._extract_tables(sql)
 
         # Extract columns (for SELECT queries)
-        columns = self._extract_columns(sql) if query_type == 'SELECT' else []
+        columns = self._extract_columns(sql) if query_type == "SELECT" else []
 
         # Extract joins
         joins = self._extract_joins(sql)
@@ -177,13 +181,13 @@ class SQLParser:
         aggregations = self._extract_aggregations(sql)
 
         # Count subqueries
-        subqueries = len(self.PATTERNS['subquery'].findall(sql))
+        subqueries = len(self.PATTERNS["subquery"].findall(sql))
 
         # Check for DISTINCT
-        distinct = bool(self.PATTERNS['distinct'].search(sql))
+        distinct = bool(self.PATTERNS["distinct"].search(sql))
 
         # Extract LIMIT
-        limit_match = self.PATTERNS['limit'].search(sql)
+        limit_match = self.PATTERNS["limit"].search(sql)
         limit = int(limit_match.group(1)) if limit_match else None
 
         # Extract CTEs
@@ -211,36 +215,36 @@ class SQLParser:
             limit=limit,
             ctes=ctes,
             window_functions=window_functions,
-            estimated_complexity=complexity
+            estimated_complexity=complexity,
         )
 
     def _clean_sql(self, sql: str) -> str:
         """Clean and normalize SQL"""
         # Remove comments
-        sql = re.sub(r'--.*$', '', sql, flags=re.MULTILINE)
-        sql = re.sub(r'/\*.*?\*/', '', sql, flags=re.DOTALL)
+        sql = re.sub(r"--.*$", "", sql, flags=re.MULTILINE)
+        sql = re.sub(r"/\*.*?\*/", "", sql, flags=re.DOTALL)
         # Normalize whitespace
-        sql = ' '.join(sql.split())
+        sql = " ".join(sql.split())
         return sql
 
     def _detect_query_type(self, sql: str) -> str:
         """Detect the type of SQL query"""
         sql_upper = sql.upper().strip()
 
-        if sql_upper.startswith('WITH') or sql_upper.startswith('SELECT'):
-            return 'SELECT'
-        elif self.PATTERNS['insert'].search(sql):
-            return 'INSERT'
-        elif self.PATTERNS['update'].search(sql):
-            return 'UPDATE'
-        elif self.PATTERNS['delete'].search(sql):
-            return 'DELETE'
-        elif self.PATTERNS['merge'].search(sql):
-            return 'MERGE'
-        elif self.PATTERNS['create'].search(sql):
-            return 'CREATE'
+        if sql_upper.startswith("WITH") or sql_upper.startswith("SELECT"):
+            return "SELECT"
+        elif self.PATTERNS["insert"].search(sql):
+            return "INSERT"
+        elif self.PATTERNS["update"].search(sql):
+            return "UPDATE"
+        elif self.PATTERNS["delete"].search(sql):
+            return "DELETE"
+        elif self.PATTERNS["merge"].search(sql):
+            return "MERGE"
+        elif self.PATTERNS["create"].search(sql):
+            return "CREATE"
         else:
-            return 'UNKNOWN'
+            return "UNKNOWN"
 
     def _extract_tables(self, sql: str) -> List[str]:
         """Extract table names from SQL"""
@@ -248,29 +252,26 @@ class SQLParser:
 
         # FROM clause tables
         from_pattern = re.compile(
-            r'\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)',
-            re.IGNORECASE
+            r"\bFROM\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)", re.IGNORECASE
         )
         tables.extend(from_pattern.findall(sql))
 
         # JOIN clause tables
         join_pattern = re.compile(
-            r'\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)',
-            re.IGNORECASE
+            r"\bJOIN\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)", re.IGNORECASE
         )
         tables.extend(join_pattern.findall(sql))
 
         # INSERT INTO table
         insert_pattern = re.compile(
-            r'\bINSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)',
-            re.IGNORECASE
+            r"\bINSERT\s+INTO\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)",
+            re.IGNORECASE,
         )
         tables.extend(insert_pattern.findall(sql))
 
         # UPDATE table
         update_pattern = re.compile(
-            r'\bUPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)',
-            re.IGNORECASE
+            r"\bUPDATE\s+([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)?)", re.IGNORECASE
         )
         tables.extend(update_pattern.findall(sql))
 
@@ -279,27 +280,29 @@ class SQLParser:
     def _extract_columns(self, sql: str) -> List[str]:
         """Extract column references from SELECT clause"""
         # Find SELECT ... FROM
-        match = re.search(r'\bSELECT\s+(.*?)\s+FROM\b', sql, re.IGNORECASE | re.DOTALL)
+        match = re.search(r"\bSELECT\s+(.*?)\s+FROM\b", sql, re.IGNORECASE | re.DOTALL)
         if not match:
             return []
 
         select_clause = match.group(1)
 
         # Handle SELECT *
-        if '*' in select_clause and 'COUNT(*)' not in select_clause.upper():
-            return ['*']
+        if "*" in select_clause and "COUNT(*)" not in select_clause.upper():
+            return ["*"]
 
         # Extract column names (simplified)
         columns = []
-        for part in select_clause.split(','):
+        for part in select_clause.split(","):
             part = part.strip()
             # Handle aliases
-            alias_match = re.search(r'\bAS\s+(\w+)\s*$', part, re.IGNORECASE)
+            alias_match = re.search(r"\bAS\s+(\w+)\s*$", part, re.IGNORECASE)
             if alias_match:
                 columns.append(alias_match.group(1))
             else:
                 # Get the last identifier
-                col_match = re.search(r'([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*$|\s+AS\b)', part, re.IGNORECASE)
+                col_match = re.search(
+                    r"([a-zA-Z_][a-zA-Z0-9_]*)(?:\s*$|\s+AS\b)", part, re.IGNORECASE
+                )
                 if col_match:
                     columns.append(col_match.group(1))
 
@@ -310,24 +313,26 @@ class SQLParser:
         joins = []
 
         join_pattern = re.compile(
-            r'\b(INNER|LEFT\s+OUTER?|RIGHT\s+OUTER?|FULL\s+OUTER?|CROSS)?\s*JOIN\s+'
-            r'([a-zA-Z_][a-zA-Z0-9_.]*)\s*(?:AS\s+)?(\w+)?\s*'
-            r'(?:ON\s+(.+?))?(?=\s+(?:INNER|LEFT|RIGHT|FULL|CROSS|WHERE|GROUP|ORDER|HAVING|LIMIT|$))',
-            re.IGNORECASE | re.DOTALL
+            r"\b(INNER|LEFT\s+OUTER?|RIGHT\s+OUTER?|FULL\s+OUTER?|CROSS)?\s*JOIN\s+"
+            r"([a-zA-Z_][a-zA-Z0-9_.]*)\s*(?:AS\s+)?(\w+)?\s*"
+            r"(?:ON\s+(.+?))?(?=\s+(?:INNER|LEFT|RIGHT|FULL|CROSS|WHERE|GROUP|ORDER|HAVING|LIMIT|$))",
+            re.IGNORECASE | re.DOTALL,
         )
 
         for match in join_pattern.finditer(sql):
-            join_type = match.group(1) or 'INNER'
+            join_type = match.group(1) or "INNER"
             table = match.group(2)
             alias = match.group(3)
             condition = match.group(4)
 
-            joins.append({
-                'type': join_type.strip().upper(),
-                'table': table,
-                'alias': alias,
-                'condition': condition.strip() if condition else None
-            })
+            joins.append(
+                {
+                    "type": join_type.strip().upper(),
+                    "table": table,
+                    "alias": alias,
+                    "condition": condition.strip() if condition else None,
+                }
+            )
 
         return joins
 
@@ -335,8 +340,9 @@ class SQLParser:
         """Extract WHERE clause conditions"""
         # Find WHERE ... (GROUP BY | ORDER BY | HAVING | LIMIT | end)
         match = re.search(
-            r'\bWHERE\s+(.*?)(?=\s+(?:GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT)|$)',
-            sql, re.IGNORECASE | re.DOTALL
+            r"\bWHERE\s+(.*?)(?=\s+(?:GROUP\s+BY|ORDER\s+BY|HAVING|LIMIT)|$)",
+            sql,
+            re.IGNORECASE | re.DOTALL,
         )
         if not match:
             return []
@@ -344,49 +350,44 @@ class SQLParser:
         where_clause = match.group(1).strip()
 
         # Split by AND/OR (simplified)
-        conditions = re.split(r'\s+AND\s+|\s+OR\s+', where_clause, flags=re.IGNORECASE)
+        conditions = re.split(r"\s+AND\s+|\s+OR\s+", where_clause, flags=re.IGNORECASE)
         return [c.strip() for c in conditions if c.strip()]
 
     def _extract_group_by(self, sql: str) -> List[str]:
         """Extract GROUP BY columns"""
         match = re.search(
-            r'\bGROUP\s+BY\s+(.*?)(?=\s+(?:HAVING|ORDER\s+BY|LIMIT)|$)',
-            sql, re.IGNORECASE | re.DOTALL
+            r"\bGROUP\s+BY\s+(.*?)(?=\s+(?:HAVING|ORDER\s+BY|LIMIT)|$)",
+            sql,
+            re.IGNORECASE | re.DOTALL,
         )
         if not match:
             return []
 
         group_clause = match.group(1).strip()
-        columns = [c.strip() for c in group_clause.split(',')]
+        columns = [c.strip() for c in group_clause.split(",")]
         return columns
 
     def _extract_order_by(self, sql: str) -> List[str]:
         """Extract ORDER BY columns"""
-        match = re.search(
-            r'\bORDER\s+BY\s+(.*?)(?=\s+LIMIT|$)',
-            sql, re.IGNORECASE | re.DOTALL
-        )
+        match = re.search(r"\bORDER\s+BY\s+(.*?)(?=\s+LIMIT|$)", sql, re.IGNORECASE | re.DOTALL)
         if not match:
             return []
 
         order_clause = match.group(1).strip()
-        columns = [c.strip() for c in order_clause.split(',')]
+        columns = [c.strip() for c in order_clause.split(",")]
         return columns
 
     def _extract_aggregations(self, sql: str) -> List[str]:
         """Extract aggregation functions used"""
         agg_pattern = re.compile(
-            r'\b(COUNT|SUM|AVG|MIN|MAX|STDDEV|VARIANCE|MEDIAN|PERCENTILE_CONT|PERCENTILE_DISC)\s*\(',
-            re.IGNORECASE
+            r"\b(COUNT|SUM|AVG|MIN|MAX|STDDEV|VARIANCE|MEDIAN|PERCENTILE_CONT|PERCENTILE_DISC)\s*\(",
+            re.IGNORECASE,
         )
         return list(set(m.upper() for m in agg_pattern.findall(sql)))
 
     def _extract_ctes(self, sql: str) -> List[str]:
         """Extract CTE names"""
-        cte_pattern = re.compile(
-            r'\bWITH\s+(\w+)\s+AS\s*\(|,\s*(\w+)\s+AS\s*\(',
-            re.IGNORECASE
-        )
+        cte_pattern = re.compile(r"\bWITH\s+(\w+)\s+AS\s*\(|,\s*(\w+)\s+AS\s*\(", re.IGNORECASE)
         ctes = []
         for match in cte_pattern.finditer(sql):
             cte_name = match.group(1) or match.group(2)
@@ -396,15 +397,17 @@ class SQLParser:
 
     def _extract_window_functions(self, sql: str) -> List[str]:
         """Extract window function patterns"""
-        window_pattern = re.compile(
-            r'\b(\w+)\s*\([^)]*\)\s+OVER\s*\(',
-            re.IGNORECASE
-        )
+        window_pattern = re.compile(r"\b(\w+)\s*\([^)]*\)\s+OVER\s*\(", re.IGNORECASE)
         return list(set(m.upper() for m in window_pattern.findall(sql)))
 
-    def _estimate_complexity(self, tables: List[str], joins: List[Dict],
-                            subqueries: int, aggregations: List[str],
-                            window_functions: List[str]) -> str:
+    def _estimate_complexity(
+        self,
+        tables: List[str],
+        joins: List[Dict],
+        subqueries: int,
+        aggregations: List[str],
+        window_functions: List[str],
+    ) -> str:
         """Estimate query complexity"""
         score = 0
 
@@ -413,9 +416,9 @@ class SQLParser:
 
         # Join count and types
         for join in joins:
-            if join['type'] in ('CROSS', 'FULL OUTER'):
+            if join["type"] in ("CROSS", "FULL OUTER"):
                 score += 30
-            elif join['type'] in ('LEFT OUTER', 'RIGHT OUTER'):
+            elif join["type"] in ("LEFT OUTER", "RIGHT OUTER"):
                 score += 20
             else:
                 score += 15
@@ -430,18 +433,19 @@ class SQLParser:
         score += len(window_functions) * 15
 
         if score < 30:
-            return 'low'
+            return "low"
         elif score < 60:
-            return 'medium'
+            return "medium"
         elif score < 100:
-            return 'high'
+            return "high"
         else:
-            return 'very_high'
+            return "very_high"
 
 
 # =============================================================================
 # SQL Optimizer
 # =============================================================================
+
 
 class SQLOptimizer:
     """Analyze SQL queries and provide optimization recommendations"""
@@ -451,7 +455,7 @@ class SQLOptimizer:
         recommendations = []
 
         # Check for SELECT *
-        if '*' in query_info.columns:
+        if "*" in query_info.columns:
             recommendations.append(self._recommend_explicit_columns())
 
         # Check for missing WHERE clause on large tables
@@ -502,7 +506,7 @@ class SQLOptimizer:
             recommendation="Specify only the columns you need",
             expected_improvement="10-50% reduction in data scanned depending on table width",
             implementation="Replace SELECT * with SELECT col1, col2, col3 ...",
-            priority=2
+            priority=2,
         )
 
     def _recommend_add_filters(self) -> OptimizationRecommendation:
@@ -515,7 +519,7 @@ class SQLOptimizer:
             recommendation="Add appropriate WHERE conditions to filter data early",
             expected_improvement="Up to 90%+ reduction in data processed if highly selective",
             implementation="Add WHERE column = value or WHERE date_column >= '2024-01-01'",
-            priority=1
+            priority=1,
         )
 
     def _analyze_joins(self, query_info: SQLQueryInfo) -> List[OptimizationRecommendation]:
@@ -524,46 +528,52 @@ class SQLOptimizer:
 
         for join in query_info.joins:
             # Check for CROSS JOIN
-            if join['type'] == 'CROSS':
-                recommendations.append(OptimizationRecommendation(
-                    category="join",
-                    severity="critical",
-                    title="Avoid CROSS JOIN",
-                    description="CROSS JOIN creates a Cartesian product, which can explode data volume.",
-                    current_issue=f"CROSS JOIN with table {join['table']} detected",
-                    recommendation="Replace with appropriate INNER/LEFT JOIN with ON condition",
-                    expected_improvement="Exponential reduction in intermediate data",
-                    implementation=f"Convert CROSS JOIN {join['table']} to INNER JOIN {join['table']} ON ...",
-                    priority=1
-                ))
+            if join["type"] == "CROSS":
+                recommendations.append(
+                    OptimizationRecommendation(
+                        category="join",
+                        severity="critical",
+                        title="Avoid CROSS JOIN",
+                        description="CROSS JOIN creates a Cartesian product, which can explode data volume.",
+                        current_issue=f"CROSS JOIN with table {join['table']} detected",
+                        recommendation="Replace with appropriate INNER/LEFT JOIN with ON condition",
+                        expected_improvement="Exponential reduction in intermediate data",
+                        implementation=f"Convert CROSS JOIN {join['table']} to INNER JOIN {join['table']} ON ...",
+                        priority=1,
+                    )
+                )
 
             # Check for missing join condition
-            if not join.get('condition'):
-                recommendations.append(OptimizationRecommendation(
-                    category="join",
-                    severity="high",
-                    title="Missing Join Condition",
-                    description="Join without explicit ON condition may cause Cartesian product.",
-                    current_issue=f"JOIN with {join['table']} has no explicit ON condition",
-                    recommendation="Add explicit ON condition to the join",
-                    expected_improvement="Prevents accidental Cartesian products",
-                    implementation=f"Add ON {join['table']}.id = other_table.foreign_key",
-                    priority=1
-                ))
+            if not join.get("condition"):
+                recommendations.append(
+                    OptimizationRecommendation(
+                        category="join",
+                        severity="high",
+                        title="Missing Join Condition",
+                        description="Join without explicit ON condition may cause Cartesian product.",
+                        current_issue=f"JOIN with {join['table']} has no explicit ON condition",
+                        recommendation="Add explicit ON condition to the join",
+                        expected_improvement="Prevents accidental Cartesian products",
+                        implementation=f"Add ON {join['table']}.id = other_table.foreign_key",
+                        priority=1,
+                    )
+                )
 
         # Check for many joins
         if len(query_info.joins) > 5:
-            recommendations.append(OptimizationRecommendation(
-                category="join",
-                severity="medium",
-                title="High Number of Joins",
-                description="Many joins can lead to complex execution plans and performance issues.",
-                current_issue=f"{len(query_info.joins)} joins detected in single query",
-                recommendation="Consider breaking into smaller queries or pre-aggregating",
-                expected_improvement="Better plan optimization and memory usage",
-                implementation="Use CTEs to materialize intermediate results, or denormalize frequently joined data",
-                priority=3
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="join",
+                    severity="medium",
+                    title="High Number of Joins",
+                    description="Many joins can lead to complex execution plans and performance issues.",
+                    current_issue=f"{len(query_info.joins)} joins detected in single query",
+                    recommendation="Consider breaking into smaller queries or pre-aggregating",
+                    expected_improvement="Better plan optimization and memory usage",
+                    implementation="Use CTEs to materialize intermediate results, or denormalize frequently joined data",
+                    priority=3,
+                )
+            )
 
         return recommendations
 
@@ -577,7 +587,7 @@ class SQLOptimizer:
             recommendation="Review if DISTINCT is necessary or if joins produce duplicates",
             expected_improvement="Eliminates expensive deduplication step if not needed",
             implementation="Review join conditions, or use GROUP BY if aggregating anyway",
-            priority=3
+            priority=3,
         )
 
     def _recommend_add_limit(self) -> OptimizationRecommendation:
@@ -590,7 +600,7 @@ class SQLOptimizer:
             recommendation="Add LIMIT if only top N rows are needed",
             expected_improvement="Significant reduction in sorting overhead for large results",
             implementation="Add LIMIT 100 (or appropriate number) after ORDER BY",
-            priority=4
+            priority=4,
         )
 
     def _recommend_cte_conversion(self) -> OptimizationRecommendation:
@@ -603,10 +613,12 @@ class SQLOptimizer:
             recommendation="Convert correlated subqueries to CTEs or JOINs",
             expected_improvement="Better query plan optimization and readability",
             implementation="WITH subquery_name AS (SELECT ...) SELECT ... FROM main_table JOIN subquery_name",
-            priority=3
+            priority=3,
         )
 
-    def _analyze_index_opportunities(self, query_info: SQLQueryInfo) -> List[OptimizationRecommendation]:
+    def _analyze_index_opportunities(
+        self, query_info: SQLQueryInfo
+    ) -> List[OptimizationRecommendation]:
         """Identify potential index opportunities"""
         recommendations = []
 
@@ -614,66 +626,76 @@ class SQLOptimizer:
         where_columns = set()
         for condition in query_info.where_conditions:
             # Extract column names from conditions
-            col_pattern = re.compile(r'\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|>|<|>=|<=|<>|!=|LIKE|IN|BETWEEN)', re.IGNORECASE)
+            col_pattern = re.compile(
+                r"\b([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:=|>|<|>=|<=|<>|!=|LIKE|IN|BETWEEN)", re.IGNORECASE
+            )
             where_columns.update(col_pattern.findall(condition))
 
         if where_columns:
-            recommendations.append(OptimizationRecommendation(
-                category="index",
-                severity="medium",
-                title="Consider Indexes on Filter Columns",
-                description="Columns used in WHERE clauses benefit from indexes.",
-                current_issue=f"Filter columns detected: {', '.join(where_columns)}",
-                recommendation="Create indexes on frequently filtered columns",
-                expected_improvement="Orders of magnitude faster for selective queries",
-                implementation=f"CREATE INDEX idx_name ON table ({', '.join(list(where_columns)[:3])})",
-                priority=2
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="index",
+                    severity="medium",
+                    title="Consider Indexes on Filter Columns",
+                    description="Columns used in WHERE clauses benefit from indexes.",
+                    current_issue=f"Filter columns detected: {', '.join(where_columns)}",
+                    recommendation="Create indexes on frequently filtered columns",
+                    expected_improvement="Orders of magnitude faster for selective queries",
+                    implementation=f"CREATE INDEX idx_name ON table ({', '.join(list(where_columns)[:3])})",
+                    priority=2,
+                )
+            )
 
         # JOIN columns are index candidates
         join_columns = set()
         for join in query_info.joins:
-            if join.get('condition'):
-                col_pattern = re.compile(r'\.([a-zA-Z_][a-zA-Z0-9_]*)\s*=', re.IGNORECASE)
-                join_columns.update(col_pattern.findall(join['condition']))
+            if join.get("condition"):
+                col_pattern = re.compile(r"\.([a-zA-Z_][a-zA-Z0-9_]*)\s*=", re.IGNORECASE)
+                join_columns.update(col_pattern.findall(join["condition"]))
 
         if join_columns:
-            recommendations.append(OptimizationRecommendation(
-                category="index",
-                severity="high",
-                title="Index Join Columns",
-                description="Join columns without indexes cause expensive full table scans.",
-                current_issue=f"Join columns detected: {', '.join(join_columns)}",
-                recommendation="Ensure indexes exist on join key columns",
-                expected_improvement="Dramatic improvement in join performance",
-                implementation=f"CREATE INDEX idx_join ON table ({list(join_columns)[0]})",
-                priority=1
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="index",
+                    severity="high",
+                    title="Index Join Columns",
+                    description="Join columns without indexes cause expensive full table scans.",
+                    current_issue=f"Join columns detected: {', '.join(join_columns)}",
+                    recommendation="Ensure indexes exist on join key columns",
+                    expected_improvement="Dramatic improvement in join performance",
+                    implementation=f"CREATE INDEX idx_join ON table ({list(join_columns)[0]})",
+                    priority=1,
+                )
+            )
 
         return recommendations
 
-    def _analyze_partition_pruning(self, query_info: SQLQueryInfo, sql: str) -> List[OptimizationRecommendation]:
+    def _analyze_partition_pruning(
+        self, query_info: SQLQueryInfo, sql: str
+    ) -> List[OptimizationRecommendation]:
         """Check for partition pruning opportunities"""
         recommendations = []
 
         # Look for date/time columns in WHERE clause
         date_pattern = re.compile(
-            r'\b(date|time|timestamp|created|updated|modified)_?\w*\s*(?:=|>|<|>=|<=|BETWEEN)',
-            re.IGNORECASE
+            r"\b(date|time|timestamp|created|updated|modified)_?\w*\s*(?:=|>|<|>=|<=|BETWEEN)",
+            re.IGNORECASE,
         )
 
         if date_pattern.search(sql):
-            recommendations.append(OptimizationRecommendation(
-                category="partition",
-                severity="medium",
-                title="Leverage Partition Pruning",
-                description="Date-based filters can leverage partitioned tables for massive speedups.",
-                current_issue="Date/time filter detected - ensure table is partitioned",
-                recommendation="Partition table by date column and ensure filter format matches",
-                expected_improvement="90%+ reduction in data scanned for time-bounded queries",
-                implementation="CREATE TABLE ... PARTITION BY RANGE (date_column) or use dynamic partitioning",
-                priority=2
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="partition",
+                    severity="medium",
+                    title="Leverage Partition Pruning",
+                    description="Date-based filters can leverage partitioned tables for massive speedups.",
+                    current_issue="Date/time filter detected - ensure table is partitioned",
+                    recommendation="Partition table by date column and ensure filter format matches",
+                    expected_improvement="90%+ reduction in data scanned for time-bounded queries",
+                    implementation="CREATE TABLE ... PARTITION BY RANGE (date_column) or use dynamic partitioning",
+                    priority=2,
+                )
+            )
 
         return recommendations
 
@@ -683,31 +705,35 @@ class SQLOptimizer:
 
         # High cardinality GROUP BY warning
         if len(query_info.group_by) > 3:
-            recommendations.append(OptimizationRecommendation(
-                category="aggregation",
-                severity="medium",
-                title="High Cardinality GROUP BY",
-                description="Grouping by many columns increases memory usage and reduces aggregation benefit.",
-                current_issue=f"GROUP BY with {len(query_info.group_by)} columns detected",
-                recommendation="Review if all group by columns are necessary",
-                expected_improvement="Reduced memory and faster aggregation",
-                implementation="Remove non-essential GROUP BY columns or pre-aggregate",
-                priority=3
-            ))
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="aggregation",
+                    severity="medium",
+                    title="High Cardinality GROUP BY",
+                    description="Grouping by many columns increases memory usage and reduces aggregation benefit.",
+                    current_issue=f"GROUP BY with {len(query_info.group_by)} columns detected",
+                    recommendation="Review if all group by columns are necessary",
+                    expected_improvement="Reduced memory and faster aggregation",
+                    implementation="Remove non-essential GROUP BY columns or pre-aggregate",
+                    priority=3,
+                )
+            )
 
         # COUNT DISTINCT optimization
-        if 'COUNT' in query_info.aggregations and query_info.distinct:
-            recommendations.append(OptimizationRecommendation(
-                category="aggregation",
-                severity="medium",
-                title="Optimize COUNT DISTINCT",
-                description="COUNT DISTINCT can be expensive for high cardinality columns.",
-                current_issue="COUNT DISTINCT pattern detected",
-                recommendation="Consider HyperLogLog approximation for very large datasets",
-                expected_improvement="Massive speedup with ~2% error tolerance",
-                implementation="Use APPROX_COUNT_DISTINCT() if available in your warehouse",
-                priority=3
-            ))
+        if "COUNT" in query_info.aggregations and query_info.distinct:
+            recommendations.append(
+                OptimizationRecommendation(
+                    category="aggregation",
+                    severity="medium",
+                    title="Optimize COUNT DISTINCT",
+                    description="COUNT DISTINCT can be expensive for high cardinality columns.",
+                    current_issue="COUNT DISTINCT pattern detected",
+                    recommendation="Consider HyperLogLog approximation for very large datasets",
+                    expected_improvement="Massive speedup with ~2% error tolerance",
+                    implementation="Use APPROX_COUNT_DISTINCT() if available in your warehouse",
+                    priority=3,
+                )
+            )
 
         return recommendations
 
@@ -715,6 +741,7 @@ class SQLOptimizer:
 # =============================================================================
 # Spark Job Analyzer
 # =============================================================================
+
 
 class SparkJobAnalyzer:
     """Analyze Spark job metrics and provide optimization recommendations"""
@@ -771,10 +798,12 @@ class SparkJobAnalyzer:
 3. Adaptive Query Execution (Spark 3.0+):
    spark.conf.set("spark.sql.adaptive.enabled", "true")
    spark.conf.set("spark.sql.adaptive.skewJoin.enabled", "true")""",
-            priority=1
+            priority=1,
         )
 
-    def _recommend_reduce_shuffle(self, metrics: SparkJobMetrics, ratio: float) -> OptimizationRecommendation:
+    def _recommend_reduce_shuffle(
+        self, metrics: SparkJobMetrics, ratio: float
+    ) -> OptimizationRecommendation:
         return OptimizationRecommendation(
             category="shuffle",
             severity="high",
@@ -792,10 +821,12 @@ class SparkJobAnalyzer:
    spark.conf.set("spark.sql.shuffle.partitions", optimal_count)
 4. Use bucketing for repeated joins:
    df.write.bucketBy(200, "key").saveAsTable("bucketed_table")""",
-            priority=1
+            priority=1,
         )
 
-    def _recommend_memory_tuning(self, metrics: SparkJobMetrics, gc_ratio: float) -> OptimizationRecommendation:
+    def _recommend_memory_tuning(
+        self, metrics: SparkJobMetrics, gc_ratio: float
+    ) -> OptimizationRecommendation:
         return OptimizationRecommendation(
             category="memory",
             severity="high",
@@ -817,10 +848,12 @@ class SparkJobAnalyzer:
    df.unpersist() when no longer needed
 5. Use Kryo serialization:
    spark.serializer=org.apache.spark.serializer.KryoSerializer""",
-            priority=2
+            priority=2,
         )
 
-    def _recommend_failure_handling(self, metrics: SparkJobMetrics, fail_ratio: float) -> OptimizationRecommendation:
+    def _recommend_failure_handling(
+        self, metrics: SparkJobMetrics, fail_ratio: float
+    ) -> OptimizationRecommendation:
         return OptimizationRecommendation(
             category="reliability",
             severity="high" if fail_ratio > 0.1 else "medium",
@@ -840,7 +873,7 @@ class SparkJobAnalyzer:
    df.checkpoint()
 5. Check for network timeouts:
    spark.network.timeout=300s""",
-            priority=1
+            priority=1,
         )
 
     def _recommend_reduce_speculation(self, metrics: SparkJobMetrics) -> OptimizationRecommendation:
@@ -859,7 +892,7 @@ class SparkJobAnalyzer:
    spark.speculation.multiplier=1.5
    spark.speculation.quantile=0.9
 3. Fix underlying skew/memory issues first""",
-            priority=3
+            priority=3,
         )
 
     def _recommend_reduce_tasks(self, metrics: SparkJobMetrics) -> OptimizationRecommendation:
@@ -878,11 +911,15 @@ class SparkJobAnalyzer:
    df.coalesce({max(200, metrics.tasks // 10)})
 3. Use adaptive partitioning (Spark 3.0+):
    spark.sql.adaptive.enabled=true""",
-            priority=3
+            priority=3,
         )
 
-    def _recommend_increase_parallelism(self, metrics: SparkJobMetrics) -> OptimizationRecommendation:
-        recommended_partitions = max(200, int(metrics.input_bytes / (128 * 1e6)))  # 128MB per partition
+    def _recommend_increase_parallelism(
+        self, metrics: SparkJobMetrics
+    ) -> OptimizationRecommendation:
+        recommended_partitions = max(
+            200, int(metrics.input_bytes / (128 * 1e6))
+        )  # 128MB per partition
         return OptimizationRecommendation(
             category="parallelism",
             severity="high",
@@ -898,13 +935,14 @@ class SparkJobAnalyzer:
    df.repartition({recommended_partitions})
 3. Adjust default parallelism:
    spark.default.parallelism={recommended_partitions}""",
-            priority=2
+            priority=2,
         )
 
 
 # =============================================================================
 # Partition Strategy Advisor
 # =============================================================================
+
 
 class PartitionAdvisor:
     """Recommend partitioning strategies based on data characteristics"""
@@ -913,9 +951,9 @@ class PartitionAdvisor:
         """Generate partition recommendations from data statistics"""
         recommendations = []
 
-        columns = data_stats.get('columns', {})
-        total_size_bytes = data_stats.get('total_size_bytes', 0)
-        row_count = data_stats.get('row_count', 0)
+        columns = data_stats.get("columns", {})
+        total_size_bytes = data_stats.get("total_size_bytes", 0)
+        row_count = data_stats.get("row_count", 0)
 
         for col_name, col_stats in columns.items():
             strategy = self._evaluate_column(col_name, col_stats, total_size_bytes, row_count)
@@ -927,24 +965,27 @@ class PartitionAdvisor:
 
         return recommendations[:3]  # Top 3 recommendations
 
-    def _evaluate_column(self, col_name: str, col_stats: Dict,
-                        total_size_bytes: int, row_count: int) -> Optional[PartitionStrategy]:
+    def _evaluate_column(
+        self, col_name: str, col_stats: Dict, total_size_bytes: int, row_count: int
+    ) -> Optional[PartitionStrategy]:
         """Evaluate a column for partitioning potential"""
-        cardinality = col_stats.get('cardinality', 0)
-        data_type = col_stats.get('data_type', 'string')
-        null_percentage = col_stats.get('null_percentage', 0)
+        cardinality = col_stats.get("cardinality", 0)
+        data_type = col_stats.get("data_type", "string")
+        null_percentage = col_stats.get("null_percentage", 0)
 
         # Skip high-null columns
         if null_percentage > 20:
             return None
 
         # Date/timestamp columns are ideal for range partitioning
-        if data_type in ('date', 'timestamp', 'datetime'):
+        if data_type in ("date", "timestamp", "datetime"):
             return self._recommend_date_partition(col_name, col_stats, total_size_bytes, row_count)
 
         # Low cardinality columns are good for list partitioning
         if cardinality and cardinality <= 100:
-            return self._recommend_list_partition(col_name, col_stats, total_size_bytes, cardinality)
+            return self._recommend_list_partition(
+                col_name, col_stats, total_size_bytes, cardinality
+            )
 
         # Medium cardinality columns can use hash partitioning
         if cardinality and 100 < cardinality <= 10000:
@@ -952,8 +993,9 @@ class PartitionAdvisor:
 
         return None
 
-    def _recommend_date_partition(self, col_name: str, col_stats: Dict,
-                                  total_size_bytes: int, row_count: int) -> PartitionStrategy:
+    def _recommend_date_partition(
+        self, col_name: str, col_stats: Dict, total_size_bytes: int, row_count: int
+    ) -> PartitionStrategy:
         # Estimate daily partition size (assume 365 days of data)
         estimated_days = 365
         partition_size_mb = (total_size_bytes / estimated_days) / (1024 * 1024)
@@ -964,7 +1006,7 @@ class PartitionAdvisor:
             num_partitions=None,  # Dynamic based on date range
             partition_size_mb=partition_size_mb,
             reasoning=f"Date column '{col_name}' is ideal for range partitioning. "
-                     f"Estimated daily partition size: {partition_size_mb:.1f} MB",
+            f"Estimated daily partition size: {partition_size_mb:.1f} MB",
             implementation=f"""
 -- BigQuery
 CREATE TABLE table_name
@@ -980,11 +1022,12 @@ df.write.partitionBy("{col_name}").parquet("path")
 
 -- PostgreSQL
 CREATE TABLE table_name (...)
-PARTITION BY RANGE ({col_name});"""
+PARTITION BY RANGE ({col_name});""",
         )
 
-    def _recommend_list_partition(self, col_name: str, col_stats: Dict,
-                                  total_size_bytes: int, cardinality: int) -> PartitionStrategy:
+    def _recommend_list_partition(
+        self, col_name: str, col_stats: Dict, total_size_bytes: int, cardinality: int
+    ) -> PartitionStrategy:
         partition_size_mb = (total_size_bytes / cardinality) / (1024 * 1024)
 
         return PartitionStrategy(
@@ -993,7 +1036,7 @@ PARTITION BY RANGE ({col_name});"""
             num_partitions=cardinality,
             partition_size_mb=partition_size_mb,
             reasoning=f"Column '{col_name}' has {cardinality} distinct values - ideal for list partitioning. "
-                     f"Estimated partition size: {partition_size_mb:.1f} MB",
+            f"Estimated partition size: {partition_size_mb:.1f} MB",
             implementation=f"""
 -- Spark/Hive
 df.write.partitionBy("{col_name}").parquet("path")
@@ -1002,11 +1045,12 @@ df.write.partitionBy("{col_name}").parquet("path")
 CREATE TABLE table_name (...)
 PARTITION BY LIST ({col_name});
 
--- Note: List partitioning works best with stable, low-cardinality values"""
+-- Note: List partitioning works best with stable, low-cardinality values""",
         )
 
-    def _recommend_hash_partition(self, col_name: str, col_stats: Dict,
-                                  total_size_bytes: int) -> PartitionStrategy:
+    def _recommend_hash_partition(
+        self, col_name: str, col_stats: Dict, total_size_bytes: int
+    ) -> PartitionStrategy:
         # Target ~128MB partitions
         target_partition_size = 128 * 1024 * 1024
         num_partitions = max(1, int(total_size_bytes / target_partition_size))
@@ -1021,7 +1065,7 @@ PARTITION BY LIST ({col_name});
             num_partitions=num_partitions,
             partition_size_mb=partition_size_mb,
             reasoning=f"Column '{col_name}' has medium cardinality - hash partitioning provides even distribution. "
-                     f"Recommended {num_partitions} partitions (~{partition_size_mb:.1f} MB each)",
+            f"Recommended {num_partitions} partitions (~{partition_size_mb:.1f} MB each)",
             implementation=f"""
 -- Spark
 df.repartition({num_partitions}, col("{col_name}"))
@@ -1031,7 +1075,7 @@ CREATE TABLE table_name (...)
 PARTITION BY HASH ({col_name});
 
 -- Snowflake (clustering)
-ALTER TABLE table_name CLUSTER BY ({col_name});"""
+ALTER TABLE table_name CLUSTER BY ({col_name});""",
         )
 
 
@@ -1039,64 +1083,67 @@ ALTER TABLE table_name CLUSTER BY ({col_name});"""
 # Cost Estimator
 # =============================================================================
 
+
 class CostEstimator:
     """Estimate query costs for cloud data warehouses"""
 
     # Pricing (approximate, varies by region and contract)
     PRICING = {
-        'snowflake': {
-            'compute_per_credit': 2.00,  # USD per credit
-            'credits_per_hour': {
-                'x-small': 1,
-                'small': 2,
-                'medium': 4,
-                'large': 8,
-                'x-large': 16,
+        "snowflake": {
+            "compute_per_credit": 2.00,  # USD per credit
+            "credits_per_hour": {
+                "x-small": 1,
+                "small": 2,
+                "medium": 4,
+                "large": 8,
+                "x-large": 16,
             },
-            'storage_per_tb_month': 23.00,
+            "storage_per_tb_month": 23.00,
         },
-        'bigquery': {
-            'on_demand_per_tb': 5.00,  # USD per TB scanned
-            'storage_per_tb_month': 20.00,
-            'streaming_insert_per_gb': 0.01,
+        "bigquery": {
+            "on_demand_per_tb": 5.00,  # USD per TB scanned
+            "storage_per_tb_month": 20.00,
+            "streaming_insert_per_gb": 0.01,
         },
-        'redshift': {
-            'dc2_large_per_hour': 0.25,
-            'ra3_xlarge_per_hour': 1.086,
-            'storage_per_gb_month': 0.024,
+        "redshift": {
+            "dc2_large_per_hour": 0.25,
+            "ra3_xlarge_per_hour": 1.086,
+            "storage_per_gb_month": 0.024,
         },
-        'databricks': {
-            'dbu_per_hour_sql': 0.22,
-            'dbu_per_hour_jobs': 0.15,
-        }
+        "databricks": {
+            "dbu_per_hour_sql": 0.22,
+            "dbu_per_hour_jobs": 0.15,
+        },
     }
 
-    def estimate(self, query_info: SQLQueryInfo, warehouse: str,
-                data_stats: Optional[Dict] = None) -> CostEstimate:
+    def estimate(
+        self, query_info: SQLQueryInfo, warehouse: str, data_stats: Optional[Dict] = None
+    ) -> CostEstimate:
         """Estimate query cost"""
         warehouse = warehouse.lower()
 
         if warehouse not in self.PRICING:
-            raise ValueError(f"Unknown warehouse: {warehouse}. Supported: {list(self.PRICING.keys())}")
+            raise ValueError(
+                f"Unknown warehouse: {warehouse}. Supported: {list(self.PRICING.keys())}"
+            )
 
         # Estimate data scanned
         data_scanned_bytes = self._estimate_data_scanned(query_info, data_stats)
-        data_scanned_tb = data_scanned_bytes / (1024 ** 4)
+        data_scanned_tb = data_scanned_bytes / (1024**4)
 
-        if warehouse == 'bigquery':
+        if warehouse == "bigquery":
             return self._estimate_bigquery(query_info, data_scanned_tb, data_stats)
-        elif warehouse == 'snowflake':
+        elif warehouse == "snowflake":
             return self._estimate_snowflake(query_info, data_scanned_tb, data_stats)
-        elif warehouse == 'redshift':
+        elif warehouse == "redshift":
             return self._estimate_redshift(query_info, data_scanned_tb, data_stats)
-        elif warehouse == 'databricks':
+        elif warehouse == "databricks":
             return self._estimate_databricks(query_info, data_scanned_tb, data_stats)
 
-    def _estimate_data_scanned(self, query_info: SQLQueryInfo,
-                               data_stats: Optional[Dict]) -> int:
+    def _estimate_data_scanned(self, query_info: SQLQueryInfo, data_stats: Optional[Dict]) -> int:
         """Estimate bytes of data that will be scanned"""
-        if data_stats and 'total_size_bytes' in data_stats:
-            base_size = data_stats['total_size_bytes']
+        if data_stats and "total_size_bytes" in data_stats:
+            base_size = data_stats["total_size_bytes"]
         else:
             # Default assumption: 1GB per table
             base_size = len(query_info.tables) * 1e9
@@ -1108,24 +1155,25 @@ class CostEstimator:
             filter_factor = 0.5 ** min(len(query_info.where_conditions), 3)
 
         # Adjust for column projection
-        if '*' not in query_info.columns and query_info.columns:
+        if "*" not in query_info.columns and query_info.columns:
             # Assume selecting specific columns reduces scan by 50%
             filter_factor *= 0.5
 
         return int(base_size * filter_factor)
 
-    def _estimate_bigquery(self, query_info: SQLQueryInfo,
-                          data_scanned_tb: float, data_stats: Optional[Dict]) -> CostEstimate:
-        pricing = self.PRICING['bigquery']
+    def _estimate_bigquery(
+        self, query_info: SQLQueryInfo, data_scanned_tb: float, data_stats: Optional[Dict]
+    ) -> CostEstimate:
+        pricing = self.PRICING["bigquery"]
 
-        compute_cost = data_scanned_tb * pricing['on_demand_per_tb']
+        compute_cost = data_scanned_tb * pricing["on_demand_per_tb"]
 
         # Minimum billing of 10MB
-        if data_scanned_tb < 10 / (1024 ** 2):
-            compute_cost = 10 / (1024 ** 2) * pricing['on_demand_per_tb']
+        if data_scanned_tb < 10 / (1024**2):
+            compute_cost = 10 / (1024**2) * pricing["on_demand_per_tb"]
 
         return CostEstimate(
-            warehouse='BigQuery',
+            warehouse="BigQuery",
             compute_cost=compute_cost,
             storage_cost=0,  # Storage cost separate
             data_transfer_cost=0,
@@ -1134,37 +1182,38 @@ class CostEstimator:
                 f"Estimated {data_scanned_tb * 1024:.2f} GB data scanned",
                 "Using on-demand pricing ($5/TB)",
                 "Assumes no slot reservations",
-                "Actual cost depends on partitioning and clustering"
-            ]
+                "Actual cost depends on partitioning and clustering",
+            ],
         )
 
-    def _estimate_snowflake(self, query_info: SQLQueryInfo,
-                           data_scanned_tb: float, data_stats: Optional[Dict]) -> CostEstimate:
-        pricing = self.PRICING['snowflake']
+    def _estimate_snowflake(
+        self, query_info: SQLQueryInfo, data_scanned_tb: float, data_stats: Optional[Dict]
+    ) -> CostEstimate:
+        pricing = self.PRICING["snowflake"]
 
         # Estimate warehouse size and time
         complexity_to_size = {
-            'low': 'x-small',
-            'medium': 'small',
-            'high': 'medium',
-            'very_high': 'large'
+            "low": "x-small",
+            "medium": "small",
+            "high": "medium",
+            "very_high": "large",
         }
-        warehouse_size = complexity_to_size.get(query_info.estimated_complexity, 'small')
-        credits_per_hour = pricing['credits_per_hour'][warehouse_size]
+        warehouse_size = complexity_to_size.get(query_info.estimated_complexity, "small")
+        credits_per_hour = pricing["credits_per_hour"][warehouse_size]
 
         # Estimate runtime (very rough)
         estimated_seconds = max(1, data_scanned_tb * 1024 * 10)  # 10 seconds per GB
         estimated_hours = estimated_seconds / 3600
 
         credits_used = credits_per_hour * estimated_hours
-        compute_cost = credits_used * pricing['compute_per_credit']
+        compute_cost = credits_used * pricing["compute_per_credit"]
 
         # Minimum 1 minute billing
-        min_cost = (credits_per_hour / 60) * pricing['compute_per_credit']
+        min_cost = (credits_per_hour / 60) * pricing["compute_per_credit"]
         compute_cost = max(compute_cost, min_cost)
 
         return CostEstimate(
-            warehouse='Snowflake',
+            warehouse="Snowflake",
             compute_cost=compute_cost,
             storage_cost=0,
             data_transfer_cost=0,
@@ -1174,16 +1223,17 @@ class CostEstimator:
                 f"Estimated runtime: {estimated_seconds:.1f} seconds",
                 f"Credits used: {credits_used:.4f}",
                 "Minimum 1-minute billing applies",
-                "Actual cost depends on warehouse auto-suspend settings"
-            ]
+                "Actual cost depends on warehouse auto-suspend settings",
+            ],
         )
 
-    def _estimate_redshift(self, query_info: SQLQueryInfo,
-                          data_scanned_tb: float, data_stats: Optional[Dict]) -> CostEstimate:
-        pricing = self.PRICING['redshift']
+    def _estimate_redshift(
+        self, query_info: SQLQueryInfo, data_scanned_tb: float, data_stats: Optional[Dict]
+    ) -> CostEstimate:
+        pricing = self.PRICING["redshift"]
 
         # Assume RA3 xl node type
-        hourly_rate = pricing['ra3_xlarge_per_hour']
+        hourly_rate = pricing["ra3_xlarge_per_hour"]
 
         # Estimate runtime
         estimated_seconds = max(1, data_scanned_tb * 1024 * 15)  # 15 seconds per GB
@@ -1192,7 +1242,7 @@ class CostEstimator:
         compute_cost = hourly_rate * estimated_hours
 
         return CostEstimate(
-            warehouse='Redshift',
+            warehouse="Redshift",
             compute_cost=compute_cost,
             storage_cost=0,
             data_transfer_cost=0,
@@ -1201,22 +1251,23 @@ class CostEstimator:
                 f"Using RA3.xlplus node type",
                 f"Estimated runtime: {estimated_seconds:.1f} seconds",
                 "Assumes dedicated cluster (not serverless)",
-                "Actual cost depends on cluster configuration"
-            ]
+                "Actual cost depends on cluster configuration",
+            ],
         )
 
-    def _estimate_databricks(self, query_info: SQLQueryInfo,
-                            data_scanned_tb: float, data_stats: Optional[Dict]) -> CostEstimate:
-        pricing = self.PRICING['databricks']
+    def _estimate_databricks(
+        self, query_info: SQLQueryInfo, data_scanned_tb: float, data_stats: Optional[Dict]
+    ) -> CostEstimate:
+        pricing = self.PRICING["databricks"]
 
         # Estimate DBUs
         estimated_seconds = max(1, data_scanned_tb * 1024 * 12)
         estimated_hours = estimated_seconds / 3600
 
-        dbu_cost = pricing['dbu_per_hour_sql'] * estimated_hours
+        dbu_cost = pricing["dbu_per_hour_sql"] * estimated_hours
 
         return CostEstimate(
-            warehouse='Databricks',
+            warehouse="Databricks",
             compute_cost=dbu_cost,
             storage_cost=0,
             data_transfer_cost=0,
@@ -1225,8 +1276,8 @@ class CostEstimator:
                 f"Using SQL warehouse",
                 f"Estimated runtime: {estimated_seconds:.1f} seconds",
                 "DBU rate may vary by workspace tier",
-                "Does not include underlying cloud costs"
-            ]
+                "Does not include underlying cloud costs",
+            ],
         )
 
 
@@ -1234,12 +1285,16 @@ class CostEstimator:
 # Report Generator
 # =============================================================================
 
+
 class ReportGenerator:
     """Generate optimization reports"""
 
-    def generate_text_report(self, query_info: SQLQueryInfo,
-                            recommendations: List[OptimizationRecommendation],
-                            cost_estimate: Optional[CostEstimate] = None) -> str:
+    def generate_text_report(
+        self,
+        query_info: SQLQueryInfo,
+        recommendations: List[OptimizationRecommendation],
+        cost_estimate: Optional[CostEstimate] = None,
+    ) -> str:
         """Generate a text report"""
         lines = []
         lines.append("=" * 80)
@@ -1265,7 +1320,9 @@ class ReportGenerator:
             lines.append("COST ESTIMATE")
             lines.append("-" * 40)
             lines.append(f"Warehouse: {cost_estimate.warehouse}")
-            lines.append(f"Estimated Cost: ${cost_estimate.total_cost:.4f} {cost_estimate.currency}")
+            lines.append(
+                f"Estimated Cost: ${cost_estimate.total_cost:.4f} {cost_estimate.currency}"
+            )
             lines.append("Assumptions:")
             for assumption in cost_estimate.assumptions:
                 lines.append(f"  - {assumption}")
@@ -1277,12 +1334,9 @@ class ReportGenerator:
             lines.append("-" * 40)
 
             for i, rec in enumerate(recommendations, 1):
-                severity_icon = {
-                    'critical': '🔴',
-                    'high': '🟠',
-                    'medium': '🟡',
-                    'low': '🟢'
-                }.get(rec.severity, '⚪')
+                severity_icon = {"critical": "🔴", "high": "🟠", "medium": "🟡", "low": "🟢"}.get(
+                    rec.severity, "⚪"
+                )
 
                 lines.append(f"\n{i}. {severity_icon} [{rec.severity.upper()}] {rec.title}")
                 lines.append(f"   Category: {rec.category}")
@@ -1290,7 +1344,7 @@ class ReportGenerator:
                 lines.append(f"   Recommendation: {rec.recommendation}")
                 lines.append(f"   Expected Improvement: {rec.expected_improvement}")
                 lines.append(f"\n   Implementation:")
-                for impl_line in rec.implementation.strip().split('\n'):
+                for impl_line in rec.implementation.strip().split("\n"):
                     lines.append(f"   {impl_line}")
         else:
             lines.append("\n✅ No optimization issues detected")
@@ -1299,9 +1353,12 @@ class ReportGenerator:
 
         return "\n".join(lines)
 
-    def generate_json_report(self, query_info: SQLQueryInfo,
-                            recommendations: List[OptimizationRecommendation],
-                            cost_estimate: Optional[CostEstimate] = None) -> Dict:
+    def generate_json_report(
+        self,
+        query_info: SQLQueryInfo,
+        recommendations: List[OptimizationRecommendation],
+        cost_estimate: Optional[CostEstimate] = None,
+    ) -> Dict:
         """Generate a JSON report"""
         return {
             "report_type": "etl_performance_optimization",
@@ -1313,7 +1370,7 @@ class ReportGenerator:
                 "subqueries": query_info.subqueries,
                 "aggregations": query_info.aggregations,
                 "window_functions": query_info.window_functions,
-                "complexity": query_info.estimated_complexity
+                "complexity": query_info.estimated_complexity,
             },
             "cost_estimate": asdict(cost_estimate) if cost_estimate else None,
             "recommendations": [asdict(r) for r in recommendations],
@@ -1322,8 +1379,8 @@ class ReportGenerator:
                 "critical": sum(1 for r in recommendations if r.severity == "critical"),
                 "high": sum(1 for r in recommendations if r.severity == "high"),
                 "medium": sum(1 for r in recommendations if r.severity == "medium"),
-                "low": sum(1 for r in recommendations if r.severity == "low")
-            }
+                "low": sum(1 for r in recommendations if r.severity == "low"),
+            },
         }
 
 
@@ -1331,12 +1388,13 @@ class ReportGenerator:
 # CLI Commands
 # =============================================================================
 
+
 def cmd_analyze_sql(args):
     """Analyze SQL query for optimization opportunities"""
     # Load SQL
     sql_path = Path(args.input)
     if sql_path.exists():
-        with open(sql_path, 'r') as f:
+        with open(sql_path, "r") as f:
             sql = f.read()
     else:
         sql = args.input  # Treat as inline SQL
@@ -1354,7 +1412,7 @@ def cmd_analyze_sql(args):
         estimator = CostEstimator()
         data_stats = None
         if args.stats:
-            with open(args.stats, 'r') as f:
+            with open(args.stats, "r") as f:
                 data_stats = json.load(f)
         cost_estimate = estimator.estimate(query_info, args.warehouse, data_stats)
 
@@ -1368,7 +1426,7 @@ def cmd_analyze_sql(args):
         output = reporter.generate_text_report(query_info, recommendations, cost_estimate)
 
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(output)
         logger.info(f"Report saved to {args.output}")
     else:
@@ -1377,7 +1435,7 @@ def cmd_analyze_sql(args):
 
 def cmd_analyze_spark(args):
     """Analyze Spark job metrics"""
-    with open(args.input, 'r') as f:
+    with open(args.input, "r") as f:
         metrics_data = json.load(f)
 
     # Handle both single job and array of jobs
@@ -1391,19 +1449,19 @@ def cmd_analyze_spark(args):
 
     for job_data in jobs:
         metrics = SparkJobMetrics(
-            job_id=job_data.get('jobId', 'unknown'),
-            duration_ms=job_data.get('duration', 0),
-            stages=job_data.get('numStages', 0),
-            tasks=job_data.get('numTasks', 0),
-            shuffle_read_bytes=job_data.get('shuffleReadBytes', 0),
-            shuffle_write_bytes=job_data.get('shuffleWriteBytes', 0),
-            input_bytes=job_data.get('inputBytes', 0),
-            output_bytes=job_data.get('outputBytes', 0),
-            peak_memory_bytes=job_data.get('peakMemoryBytes', 0),
-            gc_time_ms=job_data.get('gcTime', 0),
-            failed_tasks=job_data.get('failedTasks', 0),
-            speculative_tasks=job_data.get('speculativeTasks', 0),
-            skew_ratio=job_data.get('skewRatio', 1.0)
+            job_id=job_data.get("jobId", "unknown"),
+            duration_ms=job_data.get("duration", 0),
+            stages=job_data.get("numStages", 0),
+            tasks=job_data.get("numTasks", 0),
+            shuffle_read_bytes=job_data.get("shuffleReadBytes", 0),
+            shuffle_write_bytes=job_data.get("shuffleWriteBytes", 0),
+            input_bytes=job_data.get("inputBytes", 0),
+            output_bytes=job_data.get("outputBytes", 0),
+            peak_memory_bytes=job_data.get("peakMemoryBytes", 0),
+            gc_time_ms=job_data.get("gcTime", 0),
+            failed_tasks=job_data.get("failedTasks", 0),
+            speculative_tasks=job_data.get("speculativeTasks", 0),
+            skew_ratio=job_data.get("skewRatio", 1.0),
         )
 
         recommendations = analyzer.analyze(metrics)
@@ -1436,7 +1494,7 @@ def cmd_analyze_spark(args):
         output = "\n".join(lines)
 
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(output)
     else:
         print(output)
@@ -1444,7 +1502,7 @@ def cmd_analyze_spark(args):
 
 def cmd_optimize_partition(args):
     """Recommend partition strategies"""
-    with open(args.input, 'r') as f:
+    with open(args.input, "r") as f:
         data_stats = json.load(f)
 
     advisor = PartitionAdvisor()
@@ -1466,16 +1524,18 @@ def cmd_optimize_partition(args):
                 lines.append(f"   Type: {strategy.partition_type}")
                 if strategy.num_partitions:
                     lines.append(f"   Partitions: {strategy.num_partitions}")
-                lines.append(f"   Estimated size: {strategy.partition_size_mb:.1f} MB per partition")
+                lines.append(
+                    f"   Estimated size: {strategy.partition_size_mb:.1f} MB per partition"
+                )
                 lines.append(f"   Reasoning: {strategy.reasoning}")
                 lines.append(f"\n   Implementation:")
-                for impl_line in strategy.implementation.strip().split('\n'):
+                for impl_line in strategy.implementation.strip().split("\n"):
                     lines.append(f"   {impl_line}")
 
         output = "\n".join(lines)
 
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(output)
     else:
         print(output)
@@ -1486,7 +1546,7 @@ def cmd_estimate_cost(args):
     # Load SQL
     sql_path = Path(args.input)
     if sql_path.exists():
-        with open(sql_path, 'r') as f:
+        with open(sql_path, "r") as f:
             sql = f.read()
     else:
         sql = args.input
@@ -1498,7 +1558,7 @@ def cmd_estimate_cost(args):
     # Load data stats if provided
     data_stats = None
     if args.stats:
-        with open(args.stats, 'r') as f:
+        with open(args.stats, "r") as f:
             data_stats = json.load(f)
 
     # Estimate cost
@@ -1523,7 +1583,7 @@ def cmd_estimate_cost(args):
         output = "\n".join(lines)
 
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(output)
     else:
         print(output)
@@ -1532,33 +1592,21 @@ def cmd_estimate_cost(args):
 def cmd_generate_template(args):
     """Generate template files"""
     templates = {
-        'data_stats': {
+        "data_stats": {
             "total_size_bytes": 10737418240,
             "row_count": 10000000,
             "columns": {
-                "id": {
-                    "data_type": "integer",
-                    "cardinality": 10000000,
-                    "null_percentage": 0
-                },
+                "id": {"data_type": "integer", "cardinality": 10000000, "null_percentage": 0},
                 "created_at": {
                     "data_type": "timestamp",
                     "cardinality": 1000000,
-                    "null_percentage": 0
+                    "null_percentage": 0,
                 },
-                "category": {
-                    "data_type": "string",
-                    "cardinality": 50,
-                    "null_percentage": 2
-                },
-                "amount": {
-                    "data_type": "float",
-                    "cardinality": 100000,
-                    "null_percentage": 5
-                }
-            }
+                "category": {"data_type": "string", "cardinality": 50, "null_percentage": 2},
+                "amount": {"data_type": "float", "cardinality": 100000, "null_percentage": 5},
+            },
         },
-        'spark_metrics': {
+        "spark_metrics": {
             "jobId": "job_12345",
             "duration": 300000,
             "numStages": 5,
@@ -1571,8 +1619,8 @@ def cmd_generate_template(args):
             "gcTime": 15000,
             "failedTasks": 2,
             "speculativeTasks": 5,
-            "skewRatio": 3.5
-        }
+            "skewRatio": 3.5,
+        },
     }
 
     if args.template not in templates:
@@ -1582,7 +1630,7 @@ def cmd_generate_template(args):
     output = json.dumps(templates[args.template], indent=2)
 
     if args.output:
-        with open(args.output, 'w') as f:
+        with open(args.output, "w") as f:
             f.write(output)
         logger.info(f"Template saved to {args.output}")
     else:
@@ -1613,53 +1661,64 @@ Examples:
 
   # Generate template files
   python etl_performance_optimizer.py template data_stats --output stats.json
-        """
+        """,
     )
 
-    parser.add_argument('--verbose', '-v', action='store_true', help='Verbose output')
+    parser.add_argument("--verbose", "-v", action="store_true", help="Verbose output")
 
-    subparsers = parser.add_subparsers(dest='command', help='Command to run')
+    subparsers = parser.add_subparsers(dest="command", help="Command to run")
 
     # Analyze SQL command
-    sql_parser = subparsers.add_parser('analyze-sql', help='Analyze SQL query')
-    sql_parser.add_argument('input', help='SQL file or inline query')
-    sql_parser.add_argument('--warehouse', '-w', choices=['bigquery', 'snowflake', 'redshift', 'databricks'],
-                          help='Warehouse for cost estimation')
-    sql_parser.add_argument('--stats', '-s', help='Data statistics JSON file')
-    sql_parser.add_argument('--output', '-o', help='Output file')
-    sql_parser.add_argument('--json', action='store_true', help='Output as JSON')
+    sql_parser = subparsers.add_parser("analyze-sql", help="Analyze SQL query")
+    sql_parser.add_argument("input", help="SQL file or inline query")
+    sql_parser.add_argument(
+        "--warehouse",
+        "-w",
+        choices=["bigquery", "snowflake", "redshift", "databricks"],
+        help="Warehouse for cost estimation",
+    )
+    sql_parser.add_argument("--stats", "-s", help="Data statistics JSON file")
+    sql_parser.add_argument("--output", "-o", help="Output file")
+    sql_parser.add_argument("--json", action="store_true", help="Output as JSON")
     sql_parser.set_defaults(func=cmd_analyze_sql)
 
     # Analyze Spark command
-    spark_parser = subparsers.add_parser('analyze-spark', help='Analyze Spark job metrics')
-    spark_parser.add_argument('input', help='Spark metrics JSON file')
-    spark_parser.add_argument('--output', '-o', help='Output file')
-    spark_parser.add_argument('--json', action='store_true', help='Output as JSON')
+    spark_parser = subparsers.add_parser("analyze-spark", help="Analyze Spark job metrics")
+    spark_parser.add_argument("input", help="Spark metrics JSON file")
+    spark_parser.add_argument("--output", "-o", help="Output file")
+    spark_parser.add_argument("--json", action="store_true", help="Output as JSON")
     spark_parser.set_defaults(func=cmd_analyze_spark)
 
     # Optimize partition command
-    partition_parser = subparsers.add_parser('optimize-partition', help='Recommend partition strategies')
-    partition_parser.add_argument('input', help='Data statistics JSON file')
-    partition_parser.add_argument('--output', '-o', help='Output file')
-    partition_parser.add_argument('--json', action='store_true', help='Output as JSON')
+    partition_parser = subparsers.add_parser(
+        "optimize-partition", help="Recommend partition strategies"
+    )
+    partition_parser.add_argument("input", help="Data statistics JSON file")
+    partition_parser.add_argument("--output", "-o", help="Output file")
+    partition_parser.add_argument("--json", action="store_true", help="Output as JSON")
     partition_parser.set_defaults(func=cmd_optimize_partition)
 
     # Estimate cost command
-    cost_parser = subparsers.add_parser('estimate-cost', help='Estimate query cost')
-    cost_parser.add_argument('input', help='SQL file or inline query')
-    cost_parser.add_argument('--warehouse', '-w', required=True,
-                           choices=['bigquery', 'snowflake', 'redshift', 'databricks'],
-                           help='Target warehouse')
-    cost_parser.add_argument('--stats', '-s', help='Data statistics JSON file')
-    cost_parser.add_argument('--output', '-o', help='Output file')
-    cost_parser.add_argument('--json', action='store_true', help='Output as JSON')
+    cost_parser = subparsers.add_parser("estimate-cost", help="Estimate query cost")
+    cost_parser.add_argument("input", help="SQL file or inline query")
+    cost_parser.add_argument(
+        "--warehouse",
+        "-w",
+        required=True,
+        choices=["bigquery", "snowflake", "redshift", "databricks"],
+        help="Target warehouse",
+    )
+    cost_parser.add_argument("--stats", "-s", help="Data statistics JSON file")
+    cost_parser.add_argument("--output", "-o", help="Output file")
+    cost_parser.add_argument("--json", action="store_true", help="Output as JSON")
     cost_parser.set_defaults(func=cmd_estimate_cost)
 
     # Template command
-    template_parser = subparsers.add_parser('template', help='Generate template files')
-    template_parser.add_argument('template', choices=['data_stats', 'spark_metrics'],
-                                help='Template type')
-    template_parser.add_argument('--output', '-o', help='Output file')
+    template_parser = subparsers.add_parser("template", help="Generate template files")
+    template_parser.add_argument(
+        "template", choices=["data_stats", "spark_metrics"], help="Template type"
+    )
+    template_parser.add_argument("--output", "-o", help="Output file")
     template_parser.set_defaults(func=cmd_generate_template)
 
     args = parser.parse_args()
@@ -1677,9 +1736,10 @@ Examples:
         logger.error(f"Error: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

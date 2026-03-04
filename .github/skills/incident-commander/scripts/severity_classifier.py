@@ -41,8 +41,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-
 # ---------- Severity Level Definitions ----------------------------------------
+
 
 class SeverityLevel:
     """Enum-like container for SEV1 through SEV4 definitions."""
@@ -92,8 +92,7 @@ class SeverityLevel:
         "SEV4": {
             "label": "Minor",
             "description": (
-                "Cosmetic issue, low impact, minimal user effect, "
-                "informational or non-urgent."
+                "Cosmetic issue, low impact, minimal user effect, " "informational or non-urgent."
             ),
             "score_threshold": 0.0,
             "response_time_minutes": 120,
@@ -223,6 +222,7 @@ ESCALATION_TEMPLATES: Dict[str, Dict[str, Any]] = {
 
 # ---------- Data Model Classes ------------------------------------------------
 
+
 @dataclass
 class ImpactAssessment:
     """Parsed and normalised impact data from incident input."""
@@ -290,6 +290,7 @@ class SLAImpact:
 
 # ---------- Input Parsing -----------------------------------------------------
 
+
 def parse_incident_data(raw: Dict[str, Any]) -> Tuple[Dict, ImpactAssessment, Dict, Dict]:
     """
     Validate and normalise raw JSON input into typed structures.
@@ -320,6 +321,7 @@ def parse_incident_data(raw: Dict[str, Any]) -> Tuple[Dict, ImpactAssessment, Di
 
 
 # ---------- Core Scoring Engine -----------------------------------------------
+
 
 def _score_revenue_impact(impact: ImpactAssessment) -> Tuple[float, List[str]]:
     """Score the revenue impact dimension (0.0 - 1.0)."""
@@ -426,9 +428,7 @@ def _score_service_criticality(signals: Dict, context: Dict) -> Tuple[float, Lis
     return score, factors
 
 
-def _score_blast_radius(
-    impact: ImpactAssessment, signals: Dict
-) -> Tuple[float, List[str]]:
+def _score_blast_radius(impact: ImpactAssessment, signals: Dict) -> Tuple[float, List[str]]:
     """Score blast radius from region spread, alert volume, and error rate."""
     factors: List[str] = []
     score = 0.0
@@ -535,6 +535,7 @@ def compute_dimension_scores(
 
 # ---------- Classification Wrapper --------------------------------------------
 
+
 def classify_severity(
     incident: Dict, impact: ImpactAssessment, signals: Dict, context: Dict
 ) -> SeverityScore:
@@ -546,6 +547,7 @@ def classify_severity(
 
 
 # ---------- Escalation Path Builder -------------------------------------------
+
 
 def build_escalation_path(
     severity_score: SeverityScore,
@@ -571,19 +573,23 @@ def build_escalation_path(
 
     chain: List[Dict[str, Any]] = []
     if template["escalate_to"]:
-        chain.append({
-            "trigger_after_minutes": template["escalate_after_minutes"],
-            "notify": template["escalate_to"],
-            "reason": f"No resolution within {template['escalate_after_minutes']} minutes",
-        })
+        chain.append(
+            {
+                "trigger_after_minutes": template["escalate_after_minutes"],
+                "notify": template["escalate_to"],
+                "reason": f"No resolution within {template['escalate_after_minutes']} minutes",
+            }
+        )
 
     sev_def = SeverityLevel.get_definition(level)
     if sev_def.get("executive_notify"):
-        chain.append({
-            "trigger_after_minutes": 15,
-            "notify": ["vp-engineering", "cto"],
-            "reason": "SEV1 executive notification policy",
-        })
+        chain.append(
+            {
+                "trigger_after_minutes": 15,
+                "notify": ["vp-engineering", "cto"],
+                "reason": "SEV1 executive notification policy",
+            }
+        )
 
     cross_team: List[str] = []
     dependent_services = signals.get("dependent_services", [])
@@ -619,6 +625,7 @@ def build_escalation_path(
 
 
 # ---------- Action Plan Builder -----------------------------------------------
+
 
 def build_action_plan(
     severity_score: SeverityScore,
@@ -674,9 +681,7 @@ def build_action_plan(
 
     dependent_services = signals.get("dependent_services", [])
     if dependent_services:
-        diagnostics.append(
-            f"Check health of dependent services: {', '.join(dependent_services)}"
-        )
+        diagnostics.append(f"Check health of dependent services: {', '.join(dependent_services)}")
 
     # -- Communication actions --
     comms: List[str] = []
@@ -737,6 +742,7 @@ def build_action_plan(
 
 # ---------- SLA Impact Assessment ---------------------------------------------
 
+
 def assess_sla_impact(
     severity_score: SeverityScore,
     impact: ImpactAssessment,
@@ -777,30 +783,20 @@ def assess_sla_impact(
     budget_impact_per_hour = burn_rate * 60
     error_budget_impact = round(budget_impact_per_hour, 2)
 
-    remaining_pct = round(
-        max(0.0, (remaining_budget / monthly_budget) * 100.0), 1
-    )
+    remaining_pct = round(max(0.0, (remaining_budget / monthly_budget) * 100.0), 1)
 
     recommendations: List[str] = []
     if breach_risk == "critical":
-        recommendations.append(
-            "SLA breach imminent. Prioritize resolution above all other work."
-        )
-        recommendations.append(
-            "Prepare customer communication about potential SLA credit."
-        )
+        recommendations.append("SLA breach imminent. Prioritize resolution above all other work.")
+        recommendations.append("Prepare customer communication about potential SLA credit.")
     elif breach_risk == "high":
         recommendations.append(
             "SLA breach likely within hours. Escalate to ensure rapid resolution."
         )
     elif breach_risk == "medium":
-        recommendations.append(
-            "Monitor error budget consumption. Resolve before end of business."
-        )
+        recommendations.append("Monitor error budget consumption. Resolve before end of business.")
     else:
-        recommendations.append(
-            "SLA impact is contained. Continue standard incident response."
-        )
+        recommendations.append("SLA impact is contained. Continue standard incident response.")
 
     recommendations.append(
         f"Current burn rate: {round(burn_rate * 100, 1)}% of error budget per minute"
@@ -822,6 +818,7 @@ def assess_sla_impact(
 
 
 # ---------- Output Formatters -------------------------------------------------
+
 
 def _header_line(char: str, width: int = 72) -> str:
     return char * width
@@ -889,8 +886,12 @@ def format_text(
         lines.append(f"War Room:         Required ({escalation.bridge_link})")
     else:
         lines.append("War Room:         Not required")
-    lines.append(f"Status Page:      {'Update required' if escalation.status_page_update else 'No update needed'}")
-    lines.append(f"Customer Comms:   {'Required' if escalation.customer_comms_required else 'Not required'}")
+    lines.append(
+        f"Status Page:      {'Update required' if escalation.status_page_update else 'No update needed'}"
+    )
+    lines.append(
+        f"Customer Comms:   {'Required' if escalation.customer_comms_required else 'Not required'}"
+    )
     lines.append("")
 
     if escalation.escalation_chain:
@@ -1101,9 +1102,7 @@ def format_markdown(
     lines.append("### Rollback Assessment")
     lines.append("")
     if rb.get("recent_deployment_detected"):
-        lines.append(
-            f"| Deploy | {rb.get('service', '?')} v{rb.get('version', '?')} |"
-        )
+        lines.append(f"| Deploy | {rb.get('service', '?')} v{rb.get('version', '?')} |")
         lines.append(f"|--------|------|")
         lines.append(f"| Deployed At | {rb.get('deployed_at', '?')} |")
         if "minutes_since_deploy" in rb:
@@ -1139,6 +1138,7 @@ def format_markdown(
 
 
 # ---------- CLI Entry Point ---------------------------------------------------
+
 
 def main() -> None:
     """Parse arguments, read input, classify, and emit output."""
@@ -1178,7 +1178,9 @@ examples:
                 raw_data = json.load(fh)
         else:
             if sys.stdin.isatty():
-                parser.error("No input file provided and stdin is a terminal. Pipe JSON or pass a file.")
+                parser.error(
+                    "No input file provided and stdin is a terminal. Pipe JSON or pass a file."
+                )
             raw_data = json.load(sys.stdin)
     except json.JSONDecodeError as exc:
         print(f"Error: invalid JSON input -- {exc}", file=sys.stderr)

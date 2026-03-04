@@ -55,12 +55,12 @@ $users = @(
 
         for user in users:
             upn = f"{user.get('username', '')}@{self.domain}"
-            display_name = user.get('display_name', '')
-            first_name = user.get('first_name', '')
-            last_name = user.get('last_name', '')
-            job_title = user.get('job_title', '')
-            department = user.get('department', '')
-            license_sku = user.get('license_sku', 'Microsoft_365_Business_Standard')
+            display_name = user.get("display_name", "")
+            first_name = user.get("first_name", "")
+            last_name = user.get("last_name", "")
+            job_title = user.get("job_title", "")
+            department = user.get("department", "")
+            license_sku = user.get("license_sku", "Microsoft_365_Business_Standard")
 
             script += f"""    @{{
         UserPrincipalName = "{upn}"
@@ -265,7 +265,9 @@ Disconnect-ExchangeOnline -Confirm:$false
 """
         return script
 
-    def generate_license_assignment_recommendations(self, user_role: str, department: str) -> Dict[str, Any]:
+    def generate_license_assignment_recommendations(
+        self, user_role: str, department: str
+    ) -> Dict[str, Any]:
         """
         Recommend appropriate license based on user role and department.
 
@@ -277,83 +279,91 @@ Disconnect-ExchangeOnline -Confirm:$false
             License recommendations with justification
         """
         # License decision matrix
-        if any(keyword in user_role.lower() for keyword in ['ceo', 'cto', 'cfo', 'executive', 'director', 'vp']):
+        if any(
+            keyword in user_role.lower()
+            for keyword in ["ceo", "cto", "cfo", "executive", "director", "vp"]
+        ):
             return {
-                'recommended_license': 'Microsoft 365 E5',
-                'justification': 'Executive level - requires advanced security, compliance, and full feature set',
-                'features_needed': [
-                    'Advanced Threat Protection',
-                    'Azure AD P2 with PIM',
-                    'Advanced compliance and eDiscovery',
-                    'Phone System and Audio Conferencing'
+                "recommended_license": "Microsoft 365 E5",
+                "justification": "Executive level - requires advanced security, compliance, and full feature set",
+                "features_needed": [
+                    "Advanced Threat Protection",
+                    "Azure AD P2 with PIM",
+                    "Advanced compliance and eDiscovery",
+                    "Phone System and Audio Conferencing",
                 ],
-                'monthly_cost': 57.00
+                "monthly_cost": 57.00,
             }
 
-        elif any(keyword in user_role.lower() for keyword in ['admin', 'it', 'security', 'compliance']):
+        elif any(
+            keyword in user_role.lower() for keyword in ["admin", "it", "security", "compliance"]
+        ):
             return {
-                'recommended_license': 'Microsoft 365 E5',
-                'justification': 'IT/Security role - requires full admin and security capabilities',
-                'features_needed': [
-                    'Advanced security and compliance tools',
-                    'Azure AD P2',
-                    'Privileged Identity Management',
-                    'Advanced analytics'
+                "recommended_license": "Microsoft 365 E5",
+                "justification": "IT/Security role - requires full admin and security capabilities",
+                "features_needed": [
+                    "Advanced security and compliance tools",
+                    "Azure AD P2",
+                    "Privileged Identity Management",
+                    "Advanced analytics",
                 ],
-                'monthly_cost': 57.00
+                "monthly_cost": 57.00,
             }
 
-        elif department.lower() in ['legal', 'finance', 'hr', 'accounting']:
+        elif department.lower() in ["legal", "finance", "hr", "accounting"]:
             return {
-                'recommended_license': 'Microsoft 365 E3',
-                'justification': 'Handles sensitive data - requires enhanced security and compliance',
-                'features_needed': [
-                    'Data Loss Prevention',
-                    'Information Protection',
-                    'Azure AD P1',
-                    'Advanced compliance tools'
+                "recommended_license": "Microsoft 365 E3",
+                "justification": "Handles sensitive data - requires enhanced security and compliance",
+                "features_needed": [
+                    "Data Loss Prevention",
+                    "Information Protection",
+                    "Azure AD P1",
+                    "Advanced compliance tools",
                 ],
-                'monthly_cost': 36.00
+                "monthly_cost": 36.00,
             }
 
-        elif any(keyword in user_role.lower() for keyword in ['manager', 'lead', 'supervisor']):
+        elif any(keyword in user_role.lower() for keyword in ["manager", "lead", "supervisor"]):
             return {
-                'recommended_license': 'Microsoft 365 Business Premium',
-                'justification': 'Management role - needs full productivity suite with security',
-                'features_needed': [
-                    'Desktop Office apps',
-                    'Advanced security',
-                    'Device management',
-                    'Teams advanced features'
+                "recommended_license": "Microsoft 365 Business Premium",
+                "justification": "Management role - needs full productivity suite with security",
+                "features_needed": [
+                    "Desktop Office apps",
+                    "Advanced security",
+                    "Device management",
+                    "Teams advanced features",
                 ],
-                'monthly_cost': 22.00
+                "monthly_cost": 22.00,
             }
 
-        elif any(keyword in user_role.lower() for keyword in ['part-time', 'contractor', 'temporary', 'intern']):
+        elif any(
+            keyword in user_role.lower()
+            for keyword in ["part-time", "contractor", "temporary", "intern"]
+        ):
             return {
-                'recommended_license': 'Microsoft 365 Business Basic',
-                'justification': 'Temporary/part-time role - web apps and basic features sufficient',
-                'features_needed': [
-                    'Web versions of Office apps',
-                    'Teams',
-                    'OneDrive (1TB)',
-                    'Exchange (50GB)'
+                "recommended_license": "Microsoft 365 Business Basic",
+                "justification": "Temporary/part-time role - web apps and basic features sufficient",
+                "features_needed": [
+                    "Web versions of Office apps",
+                    "Teams",
+                    "OneDrive (1TB)",
+                    "Exchange (50GB)",
                 ],
-                'monthly_cost': 6.00
+                "monthly_cost": 6.00,
             }
 
         else:
             return {
-                'recommended_license': 'Microsoft 365 Business Standard',
-                'justification': 'Standard office worker - full productivity suite',
-                'features_needed': [
-                    'Desktop Office apps',
-                    'Teams',
-                    'OneDrive (1TB)',
-                    'Exchange (50GB)',
-                    'SharePoint'
+                "recommended_license": "Microsoft 365 Business Standard",
+                "justification": "Standard office worker - full productivity suite",
+                "features_needed": [
+                    "Desktop Office apps",
+                    "Teams",
+                    "OneDrive (1TB)",
+                    "Exchange (50GB)",
+                    "SharePoint",
                 ],
-                'monthly_cost': 12.50
+                "monthly_cost": 12.50,
             }
 
     def generate_group_membership_recommendations(self, user: Dict[str, Any]) -> List[str]:
@@ -369,29 +379,29 @@ Disconnect-ExchangeOnline -Confirm:$false
         recommended_groups = []
 
         # Department-based groups
-        department = user.get('department', '').lower()
+        department = user.get("department", "").lower()
         if department:
             recommended_groups.append(f"DL-{department.capitalize()}")  # Distribution list
             recommended_groups.append(f"SG-{department.capitalize()}")  # Security group
 
         # Location-based groups
-        location = user.get('location', '').lower()
+        location = user.get("location", "").lower()
         if location:
             recommended_groups.append(f"SG-Location-{location.capitalize()}")
 
         # Role-based groups
-        job_title = user.get('job_title', '').lower()
-        if any(keyword in job_title for keyword in ['manager', 'director', 'vp', 'executive']):
+        job_title = user.get("job_title", "").lower()
+        if any(keyword in job_title for keyword in ["manager", "director", "vp", "executive"]):
             recommended_groups.append("SG-Management")
 
-        if any(keyword in job_title for keyword in ['admin', 'administrator']):
+        if any(keyword in job_title for keyword in ["admin", "administrator"]):
             recommended_groups.append("SG-ITAdmins")
 
         # Functional groups
-        if user.get('needs_sharepoint_access'):
+        if user.get("needs_sharepoint_access"):
             recommended_groups.append(f"SG-SharePoint-{department.capitalize()}")
 
-        if user.get('needs_project_access'):
+        if user.get("needs_project_access"):
             recommended_groups.append("SG-ProjectUsers")
 
         return recommended_groups
@@ -410,15 +420,15 @@ Disconnect-ExchangeOnline -Confirm:$false
         warnings = []
 
         # Required fields
-        required_fields = ['first_name', 'last_name', 'username']
+        required_fields = ["first_name", "last_name", "username"]
         for field in required_fields:
             if not user_data.get(field):
                 errors.append(f"Missing required field: {field}")
 
         # Username validation
-        username = user_data.get('username', '')
+        username = user_data.get("username", "")
         if username:
-            if ' ' in username:
+            if " " in username:
                 errors.append("Username cannot contain spaces")
             if not username.islower():
                 warnings.append("Username should be lowercase")
@@ -426,22 +436,18 @@ Disconnect-ExchangeOnline -Confirm:$false
                 errors.append("Username must be at least 3 characters")
 
         # Email validation
-        email = user_data.get('email')
-        if email and '@' not in email:
+        email = user_data.get("email")
+        if email and "@" not in email:
             errors.append("Invalid email format")
 
         # Display name
-        if not user_data.get('display_name'):
-            first = user_data.get('first_name', '')
-            last = user_data.get('last_name', '')
+        if not user_data.get("display_name"):
+            first = user_data.get("first_name", "")
+            last = user_data.get("last_name", "")
             warnings.append(f"Display name not provided, will use: {first} {last}")
 
         # License validation
-        if not user_data.get('license_sku'):
+        if not user_data.get("license_sku"):
             warnings.append("No license specified, will need manual assignment")
 
-        return {
-            'is_valid': len(errors) == 0,
-            'errors': errors,
-            'warnings': warnings
-        }
+        return {"is_valid": len(errors) == 0, "errors": errors, "warnings": warnings}

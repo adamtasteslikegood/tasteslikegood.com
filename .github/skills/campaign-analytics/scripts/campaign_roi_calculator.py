@@ -23,7 +23,6 @@ import json
 import sys
 from typing import Any, Dict, List, Optional
 
-
 # Industry benchmark ranges by channel
 # Format: {metric: {channel: (low, target, high)}}
 BENCHMARKS: Dict[str, Dict[str, tuple]] = {
@@ -171,7 +170,9 @@ def calculate_campaign_metrics(campaign: Dict[str, Any]) -> Dict[str, Any]:
             "assessment": assessment,
         }
         if assessment == "underperforming":
-            flags.append(f"ROAS ({roas:.2f}x) is below industry low ({benchmark[0]}x) for {channel}")
+            flags.append(
+                f"ROAS ({roas:.2f}x) is below industry low ({benchmark[0]}x) for {channel}"
+            )
 
     if cpa is not None:
         benchmark = get_benchmark("cpa", channel)
@@ -182,23 +183,32 @@ def calculate_campaign_metrics(campaign: Dict[str, Any]) -> Dict[str, Any]:
             "assessment": assessment,
         }
         if assessment == "underperforming":
-            flags.append(f"CPA (${cpa:.2f}) exceeds industry high (${benchmark[2]:.2f}) for {channel}")
+            flags.append(
+                f"CPA (${cpa:.2f}) exceeds industry high (${benchmark[2]:.2f}) for {channel}"
+            )
 
     if profit < 0:
         flags.append(f"Campaign is unprofitable: ${profit:,.2f} net loss")
 
     # Recommendations
     recommendations: List[str] = []
-    if ctr is not None and assessments.get("ctr", {}).get("assessment") in ("below_target", "underperforming"):
+    if ctr is not None and assessments.get("ctr", {}).get("assessment") in (
+        "below_target",
+        "underperforming",
+    ):
         recommendations.append("Improve ad creative and targeting to increase CTR")
     if assessments.get("roas", {}).get("assessment") in ("below_target", "underperforming"):
         recommendations.append("Review targeting and bid strategy to improve ROAS")
     if assessments.get("cpa", {}).get("assessment") in ("below_target", "underperforming"):
         recommendations.append("Optimize landing pages and conversion flow to reduce CPA")
     if cvr is not None and cvr < 10:
-        recommendations.append("Lead-to-customer conversion is low; review sales process and lead quality")
+        recommendations.append(
+            "Lead-to-customer conversion is low; review sales process and lead quality"
+        )
     if lead_conversion_rate is not None and lead_conversion_rate < 2:
-        recommendations.append("Click-to-lead rate is low; improve landing page relevance and form experience")
+        recommendations.append(
+            "Click-to-lead rate is low; improve landing page relevance and form experience"
+        )
     if profit > 0 and assessments.get("roas", {}).get("assessment") in ("good", "excellent"):
         recommendations.append("Campaign performing well; consider scaling budget")
 
@@ -218,7 +228,9 @@ def calculate_campaign_metrics(campaign: Dict[str, Any]) -> Dict[str, Any]:
             "cvr_pct": round(cvr, 2) if cvr is not None else None,
             "cpc": round(cpc, 2) if cpc is not None else None,
             "cpm": round(cpm, 2) if cpm is not None else None,
-            "lead_conversion_rate_pct": round(lead_conversion_rate, 2) if lead_conversion_rate is not None else None,
+            "lead_conversion_rate_pct": (
+                round(lead_conversion_rate, 2) if lead_conversion_rate is not None else None
+            ),
             "impressions": impressions,
             "clicks": clicks,
             "leads": leads,
@@ -270,7 +282,9 @@ def calculate_portfolio_summary(campaign_results: List[Dict[str, Any]]) -> Dict[
         channel_summary[ch] = {
             "spend": round(totals["spend"], 2),
             "revenue": round(totals["revenue"], 2),
-            "roi_pct": round(safe_divide(totals["revenue"] - totals["spend"], totals["spend"]) * 100, 2),
+            "roi_pct": round(
+                safe_divide(totals["revenue"] - totals["spend"], totals["spend"]) * 100, 2
+            ),
             "roas": round(safe_divide(totals["revenue"], totals["spend"]), 2),
             "leads": int(totals["leads"]),
             "customers": int(totals["customers"]),
@@ -289,7 +303,9 @@ def calculate_portfolio_summary(campaign_results: List[Dict[str, Any]]) -> Dict[
         "total_customers": total_customers,
         "blended_ctr_pct": round(safe_divide(total_clicks, total_impressions) * 100, 2),
         "blended_cpl": round(safe_divide(total_spend, total_leads), 2) if total_leads > 0 else None,
-        "blended_cpa": round(safe_divide(total_spend, total_customers), 2) if total_customers > 0 else None,
+        "blended_cpa": (
+            round(safe_divide(total_spend, total_customers), 2) if total_customers > 0 else None
+        ),
         "underperforming_campaigns": underperforming,
         "top_performer": top_performers[0]["name"] if top_performers else None,
         "channel_summary": channel_summary,

@@ -145,5 +145,5 @@ def migrate_session_to_user(old_session_id, new_user_id):
         "migrated_count": 0,
         "errors": [],
         "message": "Migration not yet implemented - recipes remain under session ID",
-        'message': 'Migration not yet implemented - recipes remain under session ID'
+        "message": "Migration not yet implemented - recipes remain under session ID",
     }

@@ -69,9 +69,7 @@ def show_recipe(filename):
 
         if was_refreshed and new_url:
             recipe_data["stock_image_url"] = new_url
-            print(
-                f"DEBUG: Stock image updated for {recipe_data.get('name')}: {new_url}"
-            )
+            print(f"DEBUG: Stock image updated for {recipe_data.get('name')}: {new_url}")
 
             # Update ai_metadata with stock image generation info
             if "ai_metadata" not in recipe_data:
@@ -88,9 +86,7 @@ def show_recipe(filename):
             # Complete fallback - use curated static image
             recipe_name = recipe_data.get("name", "food")
             recipe_data["stock_image_url"] = _get_fallback_image(recipe_name)
-            print(
-                f"DEBUG: Ultimate fallback to curated image: {recipe_data['stock_image_url']}"
-            )
+            print(f"DEBUG: Ultimate fallback to curated image: {recipe_data['stock_image_url']}")
             updated = True
 
         # 2. AI Image - REMOVED synchronous generation
@@ -127,9 +123,7 @@ def show_json(filename):
             return Response(pretty_json, mimetype="application/json")
 
         recipe_data["filename"] = filename
-        return render_template(
-            "json_viewer.html", recipe=recipe_data, recipe_json_str=pretty_json
-        )
+        return render_template("json_viewer.html", recipe=recipe_data, recipe_json_str=pretty_json)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
         abort(500)

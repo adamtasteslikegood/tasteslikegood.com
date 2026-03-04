@@ -17,19 +17,11 @@ depends_on = None
 
 
 def upgrade():
-    op.add_column(
-        "recipe", sa.Column("guest_session_id", sa.String(length=64), nullable=True)
-    )
-    op.create_index(
-        "ix_recipe_guest_session_id", "recipe", ["guest_session_id"], unique=False
-    )
+    op.add_column("recipe", sa.Column("guest_session_id", sa.String(length=64), nullable=True))
+    op.create_index("ix_recipe_guest_session_id", "recipe", ["guest_session_id"], unique=False)
 
-    op.add_column(
-        "cookbook", sa.Column("guest_session_id", sa.String(length=64), nullable=True)
-    )
-    op.create_index(
-        "ix_cookbook_guest_session_id", "cookbook", ["guest_session_id"], unique=False
-    )
+    op.add_column("cookbook", sa.Column("guest_session_id", sa.String(length=64), nullable=True))
+    op.create_index("ix_cookbook_guest_session_id", "cookbook", ["guest_session_id"], unique=False)
 
 
 def downgrade():

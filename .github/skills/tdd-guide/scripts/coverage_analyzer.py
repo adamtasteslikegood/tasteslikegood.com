@@ -12,6 +12,7 @@ import xml.etree.ElementTree as ET
 
 class CoverageFormat:
     """Supported coverage report formats."""
+
     LCOV = "lcov"
     JSON = "json"
     XML = "xml"
@@ -27,11 +28,7 @@ class CoverageAnalyzer:
         self.gaps = []
         self.summary = {}
 
-    def parse_coverage_report(
-        self,
-        report_content: str,
-        format_type: str
-    ) -> Dict[str, Any]:
+    def parse_coverage_report(self, report_content: str, format_type: str) -> Dict[str, Any]:
         """
         Parse coverage report in various formats.
 
@@ -57,40 +54,36 @@ class CoverageAnalyzer:
         current_file = None
         file_data = {}
 
-        for line in content.split('\n'):
+        for line in content.split("\n"):
             line = line.strip()
 
-            if line.startswith('SF:'):
+            if line.startswith("SF:"):
                 # Source file
                 current_file = line[3:]
-                file_data = {
-                    'lines': {},
-                    'functions': {},
-                    'branches': {}
-                }
+                file_data = {"lines": {}, "functions": {}, "branches": {}}
 
-            elif line.startswith('DA:'):
+            elif line.startswith("DA:"):
                 # Line coverage data (line_number,hit_count)
-                parts = line[3:].split(',')
+                parts = line[3:].split(",")
                 line_num = int(parts[0])
                 hit_count = int(parts[1])
-                file_data['lines'][line_num] = hit_count
+                file_data["lines"][line_num] = hit_count
 
-            elif line.startswith('FNDA:'):
+            elif line.startswith("FNDA:"):
                 # Function coverage (hit_count,function_name)
-                parts = line[5:].split(',', 1)
+                parts = line[5:].split(",", 1)
                 hit_count = int(parts[0])
-                func_name = parts[1] if len(parts) > 1 else 'unknown'
-                file_data['functions'][func_name] = hit_count
+                func_name = parts[1] if len(parts) > 1 else "unknown"
+                file_data["functions"][func_name] = hit_count
 
-            elif line.startswith('BRDA:'):
+            elif line.startswith("BRDA:"):
                 # Branch coverage (line,block,branch,hit_count)
-                parts = line[5:].split(',')
+                parts = line[5:].split(",")
                 branch_id = f"{parts[0]}:{parts[1]}:{parts[2]}"
-                hit_count = 0 if parts[3] == '-' else int(parts[3])
-                file_data['branches'][branch_id] = hit_count
+                hit_count = 0 if parts[3] == "-" else int(parts[3])
+                file_data["branches"][branch_id] = hit_count
 
-            elif line == 'end_of_record':
+            elif line == "end_of_record":
                 if current_file:
                     files[current_file] = file_data
                 current_file = None
@@ -111,38 +104,34 @@ class CoverageAnalyzer:
                 branches = {}
 
                 # Line coverage
-                if 's' in file_data:  # Statement map
-                    statement_map = file_data['s']
+                if "s" in file_data:  # Statement map
+                    statement_map = file_data["s"]
                     for stmt_id, hit_count in statement_map.items():
                         # Map statement to line number
-                        if 'statementMap' in file_data:
-                            stmt_info = file_data['statementMap'].get(stmt_id, {})
-                            line_num = stmt_info.get('start', {}).get('line')
+                        if "statementMap" in file_data:
+                            stmt_info = file_data["statementMap"].get(stmt_id, {})
+                            line_num = stmt_info.get("start", {}).get("line")
                             if line_num:
                                 lines[line_num] = hit_count
 
                 # Function coverage
-                if 'f' in file_data:
-                    func_map = file_data['f']
-                    func_names = file_data.get('fnMap', {})
+                if "f" in file_data:
+                    func_map = file_data["f"]
+                    func_names = file_data.get("fnMap", {})
                     for func_id, hit_count in func_map.items():
                         func_info = func_names.get(func_id, {})
-                        func_name = func_info.get('name', f'func_{func_id}')
+                        func_name = func_info.get("name", f"func_{func_id}")
                         functions[func_name] = hit_count
 
                 # Branch coverage
-                if 'b' in file_data:
-                    branch_map = file_data['b']
+                if "b" in file_data:
+                    branch_map = file_data["b"]
                     for branch_id, locations in branch_map.items():
                         for idx, hit_count in enumerate(locations):
                             branch_key = f"{branch_id}:{idx}"
                             branches[branch_key] = hit_count
 
-                files[file_path] = {
-                    'lines': lines,
-                    'functions': functions,
-                    'branches': branches
-                }
+                files[file_path] = {"lines": lines, "functions": functions, "branches": branches}
 
             self.coverage_data = files
             return files
@@ -157,33 +146,29 @@ class CoverageAnalyzer:
             files = {}
 
             # Handle Cobertura format
-            for package in root.findall('.//package'):
-                for cls in package.findall('classes/class'):
-                    filename = cls.get('filename', cls.get('name', 'unknown'))
+            for package in root.findall(".//package"):
+                for cls in package.findall("classes/class"):
+                    filename = cls.get("filename", cls.get("name", "unknown"))
 
                     lines = {}
                     branches = {}
 
-                    for line in cls.findall('lines/line'):
-                        line_num = int(line.get('number', 0))
-                        hit_count = int(line.get('hits', 0))
+                    for line in cls.findall("lines/line"):
+                        line_num = int(line.get("number", 0))
+                        hit_count = int(line.get("hits", 0))
                         lines[line_num] = hit_count
 
                         # Branch info
-                        branch = line.get('branch', 'false')
-                        if branch == 'true':
-                            condition_coverage = line.get('condition-coverage', '0% (0/0)')
+                        branch = line.get("branch", "false")
+                        if branch == "true":
+                            condition_coverage = line.get("condition-coverage", "0% (0/0)")
                             # Parse "(covered/total)"
-                            if '(' in condition_coverage:
-                                branch_info = condition_coverage.split('(')[1].split(')')[0]
-                                covered, total = map(int, branch_info.split('/'))
+                            if "(" in condition_coverage:
+                                branch_info = condition_coverage.split("(")[1].split(")")[0]
+                                covered, total = map(int, branch_info.split("/"))
                                 branches[f"{line_num}:branch"] = covered
 
-                    files[filename] = {
-                        'lines': lines,
-                        'functions': {},
-                        'branches': branches
-                    }
+                    files[filename] = {"lines": lines, "functions": {}, "branches": branches}
 
             self.coverage_data = files
             return files
@@ -207,33 +192,33 @@ class CoverageAnalyzer:
 
         for file_path, file_data in self.coverage_data.items():
             # Lines
-            for line_num, hit_count in file_data.get('lines', {}).items():
+            for line_num, hit_count in file_data.get("lines", {}).items():
                 total_lines += 1
                 if hit_count > 0:
                     covered_lines += 1
 
             # Branches
-            for branch_id, hit_count in file_data.get('branches', {}).items():
+            for branch_id, hit_count in file_data.get("branches", {}).items():
                 total_branches += 1
                 if hit_count > 0:
                     covered_branches += 1
 
             # Functions
-            for func_name, hit_count in file_data.get('functions', {}).items():
+            for func_name, hit_count in file_data.get("functions", {}).items():
                 total_functions += 1
                 if hit_count > 0:
                     covered_functions += 1
 
         summary = {
-            'line_coverage': self._safe_percentage(covered_lines, total_lines),
-            'branch_coverage': self._safe_percentage(covered_branches, total_branches),
-            'function_coverage': self._safe_percentage(covered_functions, total_functions),
-            'total_lines': total_lines,
-            'covered_lines': covered_lines,
-            'total_branches': total_branches,
-            'covered_branches': covered_branches,
-            'total_functions': total_functions,
-            'covered_functions': covered_functions
+            "line_coverage": self._safe_percentage(covered_lines, total_lines),
+            "branch_coverage": self._safe_percentage(covered_branches, total_branches),
+            "function_coverage": self._safe_percentage(covered_functions, total_functions),
+            "total_lines": total_lines,
+            "covered_lines": covered_lines,
+            "total_branches": total_branches,
+            "covered_branches": covered_branches,
+            "total_functions": total_functions,
+            "covered_functions": covered_functions,
         }
 
         self.summary = summary
@@ -266,15 +251,12 @@ class CoverageAnalyzer:
         return gaps
 
     def _analyze_file_gaps(
-        self,
-        file_path: str,
-        file_data: Dict[str, Any],
-        threshold: float
+        self, file_path: str, file_data: Dict[str, Any], threshold: float
     ) -> Optional[Dict[str, Any]]:
         """Analyze coverage gaps for a single file."""
-        lines = file_data.get('lines', {})
-        branches = file_data.get('branches', {})
-        functions = file_data.get('functions', {})
+        lines = file_data.get("lines", {})
+        branches = file_data.get("branches", {})
+        functions = file_data.get("functions", {})
 
         # Calculate file coverage
         total_lines = len(lines)
@@ -292,31 +274,28 @@ class CoverageAnalyzer:
         # Only report if below threshold
         if line_coverage < threshold or branch_coverage < threshold:
             return {
-                'file': file_path,
-                'line_coverage': line_coverage,
-                'branch_coverage': branch_coverage,
-                'uncovered_lines': sorted(uncovered_lines),
-                'uncovered_branches': uncovered_branches,
-                'priority': self._calculate_priority(line_coverage, branch_coverage, threshold)
+                "file": file_path,
+                "line_coverage": line_coverage,
+                "branch_coverage": branch_coverage,
+                "uncovered_lines": sorted(uncovered_lines),
+                "uncovered_branches": uncovered_branches,
+                "priority": self._calculate_priority(line_coverage, branch_coverage, threshold),
             }
 
         return None
 
     def _calculate_priority(
-        self,
-        line_coverage: float,
-        branch_coverage: float,
-        threshold: float
+        self, line_coverage: float, branch_coverage: float, threshold: float
     ) -> str:
         """Calculate priority based on coverage gap severity."""
         gap = threshold - min(line_coverage, branch_coverage)
 
         if gap >= 40:
-            return 'P0'  # Critical - less than 40% coverage
+            return "P0"  # Critical - less than 40% coverage
         elif gap >= 20:
-            return 'P1'  # Important - 60-80% coverage
+            return "P1"  # Important - 60-80% coverage
         else:
-            return 'P2'  # Nice to have - 80%+ coverage
+            return "P2"  # Nice to have - 80%+ coverage
 
     def get_file_coverage(self, file_path: str) -> Dict[str, Any]:
         """
@@ -332,9 +311,9 @@ class CoverageAnalyzer:
             return {}
 
         file_data = self.coverage_data[file_path]
-        lines = file_data.get('lines', {})
-        branches = file_data.get('branches', {})
-        functions = file_data.get('functions', {})
+        lines = file_data.get("lines", {})
+        branches = file_data.get("branches", {})
+        functions = file_data.get("functions", {})
 
         total_lines = len(lines)
         covered_lines = sum(1 for hit in lines.values() if hit > 0)
@@ -346,13 +325,13 @@ class CoverageAnalyzer:
         covered_functions = sum(1 for hit in functions.values() if hit > 0)
 
         return {
-            'file': file_path,
-            'line_coverage': self._safe_percentage(covered_lines, total_lines),
-            'branch_coverage': self._safe_percentage(covered_branches, total_branches),
-            'function_coverage': self._safe_percentage(covered_functions, total_functions),
-            'lines': lines,
-            'branches': branches,
-            'functions': functions
+            "file": file_path,
+            "line_coverage": self._safe_percentage(covered_lines, total_lines),
+            "branch_coverage": self._safe_percentage(covered_branches, total_branches),
+            "function_coverage": self._safe_percentage(covered_functions, total_functions),
+            "lines": lines,
+            "branches": branches,
+            "functions": functions,
         }
 
     def generate_recommendations(self) -> List[Dict[str, Any]]:
@@ -367,39 +346,45 @@ class CoverageAnalyzer:
         # Check overall coverage
         summary = self.summary or self.calculate_summary()
 
-        if summary['line_coverage'] < 80:
-            recommendations.append({
-                'priority': 'P0',
-                'type': 'overall_coverage',
-                'message': f"Overall line coverage ({summary['line_coverage']}%) is below 80% threshold",
-                'action': 'Focus on adding tests for critical paths and business logic',
-                'impact': 'high'
-            })
+        if summary["line_coverage"] < 80:
+            recommendations.append(
+                {
+                    "priority": "P0",
+                    "type": "overall_coverage",
+                    "message": f"Overall line coverage ({summary['line_coverage']}%) is below 80% threshold",
+                    "action": "Focus on adding tests for critical paths and business logic",
+                    "impact": "high",
+                }
+            )
 
-        if summary['branch_coverage'] < 70:
-            recommendations.append({
-                'priority': 'P0',
-                'type': 'branch_coverage',
-                'message': f"Branch coverage ({summary['branch_coverage']}%) is below 70% threshold",
-                'action': 'Add tests for conditional logic and error handling paths',
-                'impact': 'high'
-            })
+        if summary["branch_coverage"] < 70:
+            recommendations.append(
+                {
+                    "priority": "P0",
+                    "type": "branch_coverage",
+                    "message": f"Branch coverage ({summary['branch_coverage']}%) is below 70% threshold",
+                    "action": "Add tests for conditional logic and error handling paths",
+                    "impact": "high",
+                }
+            )
 
         # File-specific recommendations
         for gap in self.gaps:
-            if gap['priority'] == 'P0':
-                recommendations.append({
-                    'priority': 'P0',
-                    'type': 'file_coverage',
-                    'file': gap['file'],
-                    'message': f"Critical coverage gap in {gap['file']}",
-                    'action': f"Add tests for lines: {gap['uncovered_lines'][:10]}",
-                    'impact': 'high'
-                })
+            if gap["priority"] == "P0":
+                recommendations.append(
+                    {
+                        "priority": "P0",
+                        "type": "file_coverage",
+                        "file": gap["file"],
+                        "message": f"Critical coverage gap in {gap['file']}",
+                        "action": f"Add tests for lines: {gap['uncovered_lines'][:10]}",
+                        "impact": "high",
+                    }
+                )
 
         # Sort by priority
-        priority_order = {'P0': 0, 'P1': 1, 'P2': 2}
-        recommendations.sort(key=lambda x: priority_order.get(x['priority'], 3))
+        priority_order = {"P0": 0, "P1": 1, "P2": 2}
+        recommendations.sort(key=lambda x: priority_order.get(x["priority"], 3))
 
         return recommendations
 
@@ -416,11 +401,11 @@ class CoverageAnalyzer:
         content_stripped = content.strip()
 
         # Check for LCOV format
-        if content_stripped.startswith('TN:') or 'SF:' in content_stripped[:100]:
+        if content_stripped.startswith("TN:") or "SF:" in content_stripped[:100]:
             return CoverageFormat.LCOV
 
         # Check for JSON format
-        if content_stripped.startswith('{') or content_stripped.startswith('['):
+        if content_stripped.startswith("{") or content_stripped.startswith("["):
             try:
                 json.loads(content_stripped)
                 return CoverageFormat.JSON
@@ -428,7 +413,7 @@ class CoverageAnalyzer:
                 pass
 
         # Check for XML format
-        if content_stripped.startswith('<?xml') or content_stripped.startswith('<coverage'):
+        if content_stripped.startswith("<?xml") or content_stripped.startswith("<coverage"):
             return CoverageFormat.XML
 
         raise ValueError("Unable to detect coverage report format")

@@ -14,10 +14,33 @@ class SecurityAssessor:
 
     # Compliance standards mapping
     COMPLIANCE_STANDARDS = {
-        'GDPR': ['data_privacy', 'consent_management', 'data_portability', 'right_to_deletion', 'audit_logging'],
-        'SOC2': ['access_controls', 'encryption_at_rest', 'encryption_in_transit', 'audit_logging', 'backup_recovery'],
-        'HIPAA': ['phi_protection', 'encryption_at_rest', 'encryption_in_transit', 'access_controls', 'audit_logging'],
-        'PCI_DSS': ['payment_data_encryption', 'access_controls', 'network_security', 'vulnerability_management']
+        "GDPR": [
+            "data_privacy",
+            "consent_management",
+            "data_portability",
+            "right_to_deletion",
+            "audit_logging",
+        ],
+        "SOC2": [
+            "access_controls",
+            "encryption_at_rest",
+            "encryption_in_transit",
+            "audit_logging",
+            "backup_recovery",
+        ],
+        "HIPAA": [
+            "phi_protection",
+            "encryption_at_rest",
+            "encryption_in_transit",
+            "access_controls",
+            "audit_logging",
+        ],
+        "PCI_DSS": [
+            "payment_data_encryption",
+            "access_controls",
+            "network_security",
+            "vulnerability_management",
+        ],
     }
 
     def __init__(self, security_data: Dict[str, Any]):
@@ -27,10 +50,10 @@ class SecurityAssessor:
         Args:
             security_data: Dictionary containing vulnerability and compliance data
         """
-        self.technology = security_data.get('technology', 'Unknown')
-        self.vulnerabilities = security_data.get('vulnerabilities', {})
-        self.security_features = security_data.get('security_features', {})
-        self.compliance_requirements = security_data.get('compliance_requirements', [])
+        self.technology = security_data.get("technology", "Unknown")
+        self.vulnerabilities = security_data.get("vulnerabilities", {})
+        self.security_features = security_data.get("security_features", {})
+        self.compliance_requirements = security_data.get("compliance_requirements", [])
 
     def calculate_security_score(self) -> Dict[str, Any]:
         """
@@ -47,26 +70,26 @@ class SecurityAssessor:
 
         # Weighted average
         weights = {
-            'vulnerability_score': 0.30,
-            'patch_responsiveness': 0.25,
-            'security_features': 0.30,
-            'track_record': 0.15
+            "vulnerability_score": 0.30,
+            "patch_responsiveness": 0.25,
+            "security_features": 0.30,
+            "track_record": 0.15,
         }
 
         overall = (
-            vuln_score * weights['vulnerability_score'] +
-            patch_score * weights['patch_responsiveness'] +
-            features_score * weights['security_features'] +
-            track_record_score * weights['track_record']
+            vuln_score * weights["vulnerability_score"]
+            + patch_score * weights["patch_responsiveness"]
+            + features_score * weights["security_features"]
+            + track_record_score * weights["track_record"]
         )
 
         return {
-            'overall_security_score': overall,
-            'vulnerability_score': vuln_score,
-            'patch_responsiveness': patch_score,
-            'security_features_score': features_score,
-            'track_record_score': track_record_score,
-            'security_grade': self._calculate_grade(overall)
+            "overall_security_score": overall,
+            "vulnerability_score": vuln_score,
+            "patch_responsiveness": patch_score,
+            "security_features_score": features_score,
+            "track_record_score": track_record_score,
+            "security_grade": self._calculate_grade(overall),
         }
 
     def _score_vulnerabilities(self) -> float:
@@ -77,10 +100,10 @@ class SecurityAssessor:
             Vulnerability score (0-100, higher is better)
         """
         # Get vulnerability counts by severity (last 12 months)
-        critical = self.vulnerabilities.get('critical_last_12m', 0)
-        high = self.vulnerabilities.get('high_last_12m', 0)
-        medium = self.vulnerabilities.get('medium_last_12m', 0)
-        low = self.vulnerabilities.get('low_last_12m', 0)
+        critical = self.vulnerabilities.get("critical_last_12m", 0)
+        high = self.vulnerabilities.get("high_last_12m", 0)
+        medium = self.vulnerabilities.get("medium_last_12m", 0)
+        low = self.vulnerabilities.get("low_last_12m", 0)
 
         # Calculate weighted vulnerability count
         weighted_vulns = (critical * 4) + (high * 2) + (medium * 1) + (low * 0.5)
@@ -115,8 +138,8 @@ class SecurityAssessor:
             Patch responsiveness score (0-100)
         """
         # Average days to patch critical vulnerabilities
-        critical_patch_days = self.vulnerabilities.get('avg_critical_patch_days', 30)
-        high_patch_days = self.vulnerabilities.get('avg_high_patch_days', 60)
+        critical_patch_days = self.vulnerabilities.get("avg_critical_patch_days", 30)
+        high_patch_days = self.vulnerabilities.get("avg_high_patch_days", 60)
 
         # Score critical patch time (most important)
         if critical_patch_days <= 7:
@@ -143,7 +166,7 @@ class SecurityAssessor:
             high_score = 10
 
         # Has active security team
-        has_security_team = self.vulnerabilities.get('has_security_team', False)
+        has_security_team = self.vulnerabilities.get("has_security_team", False)
         team_score = 20 if has_security_team else 0
 
         total_score = critical_score + high_score + team_score
@@ -161,11 +184,11 @@ class SecurityAssessor:
 
         # Essential features (10 points each)
         essential_features = [
-            'encryption_at_rest',
-            'encryption_in_transit',
-            'authentication',
-            'authorization',
-            'input_validation'
+            "encryption_at_rest",
+            "encryption_in_transit",
+            "authentication",
+            "authorization",
+            "input_validation",
         ]
 
         for feature in essential_features:
@@ -174,16 +197,16 @@ class SecurityAssessor:
 
         # Advanced features (5 points each)
         advanced_features = [
-            'rate_limiting',
-            'csrf_protection',
-            'xss_protection',
-            'sql_injection_protection',
-            'audit_logging',
-            'mfa_support',
-            'rbac',
-            'secrets_management',
-            'security_headers',
-            'cors_configuration'
+            "rate_limiting",
+            "csrf_protection",
+            "xss_protection",
+            "sql_injection_protection",
+            "audit_logging",
+            "mfa_support",
+            "rbac",
+            "secrets_management",
+            "security_headers",
+            "cors_configuration",
         ]
 
         for feature in advanced_features:
@@ -202,7 +225,7 @@ class SecurityAssessor:
         score = 50.0  # Start at neutral
 
         # Years since major security incident
-        years_since_major = self.vulnerabilities.get('years_since_major_incident', 5)
+        years_since_major = self.vulnerabilities.get("years_since_major_incident", 5)
         if years_since_major >= 3:
             score += 30
         elif years_since_major >= 1:
@@ -211,17 +234,17 @@ class SecurityAssessor:
             score -= 10
 
         # Security certifications
-        has_certifications = self.vulnerabilities.get('has_security_certifications', False)
+        has_certifications = self.vulnerabilities.get("has_security_certifications", False)
         if has_certifications:
             score += 20
 
         # Bug bounty program
-        has_bug_bounty = self.vulnerabilities.get('has_bug_bounty_program', False)
+        has_bug_bounty = self.vulnerabilities.get("has_bug_bounty_program", False)
         if has_bug_bounty:
             score += 10
 
         # Security audits
-        security_audits = self.vulnerabilities.get('security_audits_per_year', 0)
+        security_audits = self.vulnerabilities.get("security_audits_per_year", 0)
         score += min(20, security_audits * 10)
 
         return min(100.0, max(0.0, score))
@@ -265,9 +288,9 @@ class SecurityAssessor:
         for standard in standards:
             if standard not in self.COMPLIANCE_STANDARDS:
                 results[standard] = {
-                    'readiness': 'Unknown',
-                    'score': 0,
-                    'status': 'Unknown standard'
+                    "readiness": "Unknown",
+                    "score": 0,
+                    "status": "Unknown standard",
                 }
                 continue
 
@@ -315,16 +338,20 @@ class SecurityAssessor:
             status = "Major gaps - extensive implementation needed"
 
         return {
-            'readiness_level': readiness_level,
-            'readiness_percentage': readiness_pct,
-            'status': status,
-            'features_met': met_count,
-            'features_required': total_count,
-            'missing_features': missing_features,
-            'recommendation': self._generate_compliance_recommendation(readiness_level, missing_features)
+            "readiness_level": readiness_level,
+            "readiness_percentage": readiness_pct,
+            "status": status,
+            "features_met": met_count,
+            "features_required": total_count,
+            "missing_features": missing_features,
+            "recommendation": self._generate_compliance_recommendation(
+                readiness_level, missing_features
+            ),
         }
 
-    def _generate_compliance_recommendation(self, readiness_level: str, missing_features: List[str]) -> str:
+    def _generate_compliance_recommendation(
+        self, readiness_level: str, missing_features: List[str]
+    ) -> str:
         """
         Generate compliance recommendation.
 
@@ -340,7 +367,9 @@ class SecurityAssessor:
         elif readiness_level == "Mostly Ready":
             return f"Implement missing features: {', '.join(missing_features[:3])}"
         elif readiness_level == "Partial":
-            return f"Significant implementation needed. Start with: {', '.join(missing_features[:3])}"
+            return (
+                f"Significant implementation needed. Start with: {', '.join(missing_features[:3])}"
+            )
         else:
             return "Not recommended without major security enhancements"
 
@@ -353,36 +382,33 @@ class SecurityAssessor:
         """
         # Current vulnerabilities
         current = {
-            'critical': self.vulnerabilities.get('critical_last_12m', 0),
-            'high': self.vulnerabilities.get('high_last_12m', 0),
-            'medium': self.vulnerabilities.get('medium_last_12m', 0),
-            'low': self.vulnerabilities.get('low_last_12m', 0)
+            "critical": self.vulnerabilities.get("critical_last_12m", 0),
+            "high": self.vulnerabilities.get("high_last_12m", 0),
+            "medium": self.vulnerabilities.get("medium_last_12m", 0),
+            "low": self.vulnerabilities.get("low_last_12m", 0),
         }
 
         # Historical vulnerabilities (last 3 years)
         historical = {
-            'critical': self.vulnerabilities.get('critical_last_3y', 0),
-            'high': self.vulnerabilities.get('high_last_3y', 0),
-            'medium': self.vulnerabilities.get('medium_last_3y', 0),
-            'low': self.vulnerabilities.get('low_last_3y', 0)
+            "critical": self.vulnerabilities.get("critical_last_3y", 0),
+            "high": self.vulnerabilities.get("high_last_3y", 0),
+            "medium": self.vulnerabilities.get("medium_last_3y", 0),
+            "low": self.vulnerabilities.get("low_last_3y", 0),
         }
 
         # Common vulnerability types
-        common_types = self.vulnerabilities.get('common_vulnerability_types', [
-            'SQL Injection',
-            'XSS',
-            'CSRF',
-            'Authentication Issues'
-        ])
+        common_types = self.vulnerabilities.get(
+            "common_vulnerability_types", ["SQL Injection", "XSS", "CSRF", "Authentication Issues"]
+        )
 
         return {
-            'current_vulnerabilities': current,
-            'total_current': sum(current.values()),
-            'historical_vulnerabilities': historical,
-            'total_historical': sum(historical.values()),
-            'common_types': common_types,
-            'severity_distribution': self._calculate_severity_distribution(current),
-            'trend': self._analyze_vulnerability_trend(current, historical)
+            "current_vulnerabilities": current,
+            "total_current": sum(current.values()),
+            "historical_vulnerabilities": historical,
+            "total_historical": sum(historical.values()),
+            "common_types": common_types,
+            "severity_distribution": self._calculate_severity_distribution(current),
+            "trend": self._analyze_vulnerability_trend(current, historical),
         }
 
     def _calculate_severity_distribution(self, vulnerabilities: Dict[str, int]) -> Dict[str, str]:
@@ -400,11 +426,12 @@ class SecurityAssessor:
             return {k: "0%" for k in vulnerabilities.keys()}
 
         return {
-            severity: f"{(count / total * 100):.1f}%"
-            for severity, count in vulnerabilities.items()
+            severity: f"{(count / total * 100):.1f}%" for severity, count in vulnerabilities.items()
         }
 
-    def _analyze_vulnerability_trend(self, current: Dict[str, int], historical: Dict[str, int]) -> str:
+    def _analyze_vulnerability_trend(
+        self, current: Dict[str, int], historical: Dict[str, int]
+    ) -> str:
         """
         Analyze vulnerability trend.
 
@@ -438,25 +465,25 @@ class SecurityAssessor:
 
         # Generate recommendations
         recommendations = self._generate_security_recommendations(
-            security_score,
-            compliance,
-            vulnerabilities
+            security_score, compliance, vulnerabilities
         )
 
         return {
-            'technology': self.technology,
-            'security_score': security_score,
-            'compliance_assessment': compliance,
-            'vulnerability_analysis': vulnerabilities,
-            'recommendations': recommendations,
-            'overall_risk_level': self._determine_risk_level(security_score['overall_security_score'])
+            "technology": self.technology,
+            "security_score": security_score,
+            "compliance_assessment": compliance,
+            "vulnerability_analysis": vulnerabilities,
+            "recommendations": recommendations,
+            "overall_risk_level": self._determine_risk_level(
+                security_score["overall_security_score"]
+            ),
         }
 
     def _generate_security_recommendations(
         self,
         security_score: Dict[str, Any],
         compliance: Dict[str, Dict[str, Any]],
-        vulnerabilities: Dict[str, Any]
+        vulnerabilities: Dict[str, Any],
     ) -> List[str]:
         """
         Generate security recommendations.
@@ -472,29 +499,37 @@ class SecurityAssessor:
         recommendations = []
 
         # Security score recommendations
-        if security_score['overall_security_score'] < 70:
-            recommendations.append("Improve overall security posture - score below acceptable threshold")
+        if security_score["overall_security_score"] < 70:
+            recommendations.append(
+                "Improve overall security posture - score below acceptable threshold"
+            )
 
         # Vulnerability recommendations
-        current_critical = vulnerabilities['current_vulnerabilities']['critical']
+        current_critical = vulnerabilities["current_vulnerabilities"]["critical"]
         if current_critical > 0:
-            recommendations.append(f"Address {current_critical} critical vulnerabilities immediately")
+            recommendations.append(
+                f"Address {current_critical} critical vulnerabilities immediately"
+            )
 
         # Patch responsiveness
-        if security_score['patch_responsiveness'] < 60:
+        if security_score["patch_responsiveness"] < 60:
             recommendations.append("Improve vulnerability patch response time")
 
         # Security features
-        if security_score['security_features_score'] < 70:
-            recommendations.append("Implement additional security features (MFA, audit logging, RBAC)")
+        if security_score["security_features_score"] < 70:
+            recommendations.append(
+                "Implement additional security features (MFA, audit logging, RBAC)"
+            )
 
         # Compliance recommendations
         for standard, assessment in compliance.items():
-            if assessment['readiness_level'] == "Not Ready":
+            if assessment["readiness_level"] == "Not Ready":
                 recommendations.append(f"{standard}: {assessment['recommendation']}")
 
         if not recommendations:
-            recommendations.append("Security posture is strong - continue monitoring and maintenance")
+            recommendations.append(
+                "Security posture is strong - continue monitoring and maintenance"
+            )
 
         return recommendations
 

@@ -55,18 +55,18 @@ class DependencyAnalyzer:
 
     def _detect_package_manager(self):
         """Detect which package manager is used."""
-        if (self.project_path / 'package.json').exists():
-            self.package_manager = 'npm'
-        elif (self.project_path / 'requirements.txt').exists():
-            self.package_manager = 'pip'
-        elif (self.project_path / 'pyproject.toml').exists():
-            self.package_manager = 'poetry'
-        elif (self.project_path / 'go.mod').exists():
-            self.package_manager = 'go'
-        elif (self.project_path / 'Cargo.toml').exists():
-            self.package_manager = 'cargo'
+        if (self.project_path / "package.json").exists():
+            self.package_manager = "npm"
+        elif (self.project_path / "requirements.txt").exists():
+            self.package_manager = "pip"
+        elif (self.project_path / "pyproject.toml").exists():
+            self.package_manager = "poetry"
+        elif (self.project_path / "go.mod").exists():
+            self.package_manager = "go"
+        elif (self.project_path / "Cargo.toml").exists():
+            self.package_manager = "cargo"
         else:
-            self.package_manager = 'unknown'
+            self.package_manager = "unknown"
 
         if self.verbose:
             print(f"Detected package manager: {self.package_manager}")
@@ -74,11 +74,11 @@ class DependencyAnalyzer:
     def _parse_dependencies(self):
         """Parse dependencies based on detected package manager."""
         parsers = {
-            'npm': self._parse_npm,
-            'pip': self._parse_pip,
-            'poetry': self._parse_poetry,
-            'go': self._parse_go,
-            'cargo': self._parse_cargo,
+            "npm": self._parse_npm,
+            "pip": self._parse_pip,
+            "poetry": self._parse_poetry,
+            "go": self._parse_go,
+            "cargo": self._parse_cargo,
         }
 
         parser = parsers.get(self.package_manager)
@@ -87,59 +87,64 @@ class DependencyAnalyzer:
 
     def _parse_npm(self):
         """Parse package.json for npm dependencies."""
-        pkg_path = self.project_path / 'package.json'
+        pkg_path = self.project_path / "package.json"
         try:
             data = json.loads(pkg_path.read_text())
 
             # Direct dependencies
-            for name, version in data.get('dependencies', {}).items():
+            for name, version in data.get("dependencies", {}).items():
                 self.direct_deps[name] = self._clean_version(version)
 
             # Dev dependencies
-            for name, version in data.get('devDependencies', {}).items():
+            for name, version in data.get("devDependencies", {}).items():
                 self.dev_deps[name] = self._clean_version(version)
 
             if self.verbose:
-                print(f"Found {len(self.direct_deps)} direct deps, "
-                      f"{len(self.dev_deps)} dev deps")
+                print(
+                    f"Found {len(self.direct_deps)} direct deps, " f"{len(self.dev_deps)} dev deps"
+                )
 
         except Exception as e:
-            self.issues.append({
-                'type': 'parse_error',
-                'severity': 'error',
-                'message': f"Failed to parse package.json: {e}"
-            })
+            self.issues.append(
+                {
+                    "type": "parse_error",
+                    "severity": "error",
+                    "message": f"Failed to parse package.json: {e}",
+                }
+            )
 
     def _parse_pip(self):
         """Parse requirements.txt for Python dependencies."""
-        req_path = self.project_path / 'requirements.txt'
+        req_path = self.project_path / "requirements.txt"
         try:
             content = req_path.read_text()
-            for line in content.strip().split('\n'):
+            for line in content.strip().split("\n"):
                 line = line.strip()
-                if not line or line.startswith('#') or line.startswith('-'):
+                if not line or line.startswith("#") or line.startswith("-"):
                     continue
 
                 # Parse name and version
-                match = re.match(r'^([a-zA-Z0-9_-]+)(?:[=<>!~]+(.+))?', line)
+                match = re.match(r"^([a-zA-Z0-9_-]+)(?:[=<>!~]+(.+))?", line)
                 if match:
                     name = match.group(1)
-                    version = match.group(2) or 'any'
+                    version = match.group(2) or "any"
                     self.direct_deps[name] = version
 
             if self.verbose:
                 print(f"Found {len(self.direct_deps)} dependencies")
 
         except Exception as e:
-            self.issues.append({
-                'type': 'parse_error',
-                'severity': 'error',
-                'message': f"Failed to parse requirements.txt: {e}"
-            })
+            self.issues.append(
+                {
+                    "type": "parse_error",
+                    "severity": "error",
+                    "message": f"Failed to parse requirements.txt: {e}",
+                }
+            )
 
     def _parse_poetry(self):
         """Parse pyproject.toml for Poetry dependencies."""
-        toml_path = self.project_path / 'pyproject.toml'
+        toml_path = self.project_path / "pyproject.toml"
         try:
             content = toml_path.read_text()
 
@@ -147,71 +152,76 @@ class DependencyAnalyzer:
             in_deps = False
             in_dev_deps = False
 
-            for line in content.split('\n'):
+            for line in content.split("\n"):
                 line = line.strip()
 
-                if line == '[tool.poetry.dependencies]':
+                if line == "[tool.poetry.dependencies]":
                     in_deps = True
                     in_dev_deps = False
                     continue
-                elif line == '[tool.poetry.dev-dependencies]' or \
-                     line == '[tool.poetry.group.dev.dependencies]':
+                elif (
+                    line == "[tool.poetry.dev-dependencies]"
+                    or line == "[tool.poetry.group.dev.dependencies]"
+                ):
                     in_deps = False
                     in_dev_deps = True
                     continue
-                elif line.startswith('['):
+                elif line.startswith("["):
                     in_deps = False
                     in_dev_deps = False
                     continue
 
-                if (in_deps or in_dev_deps) and '=' in line:
+                if (in_deps or in_dev_deps) and "=" in line:
                     match = re.match(r'^([a-zA-Z0-9_-]+)\s*=\s*["\']?([^"\']+)', line)
                     if match:
                         name = match.group(1)
                         version = match.group(2)
-                        if name != 'python':
+                        if name != "python":
                             if in_deps:
                                 self.direct_deps[name] = version
                             else:
                                 self.dev_deps[name] = version
 
             if self.verbose:
-                print(f"Found {len(self.direct_deps)} direct deps, "
-                      f"{len(self.dev_deps)} dev deps")
+                print(
+                    f"Found {len(self.direct_deps)} direct deps, " f"{len(self.dev_deps)} dev deps"
+                )
 
         except Exception as e:
-            self.issues.append({
-                'type': 'parse_error',
-                'severity': 'error',
-                'message': f"Failed to parse pyproject.toml: {e}"
-            })
+            self.issues.append(
+                {
+                    "type": "parse_error",
+                    "severity": "error",
+                    "message": f"Failed to parse pyproject.toml: {e}",
+                }
+            )
 
     def _parse_go(self):
         """Parse go.mod for Go dependencies."""
-        mod_path = self.project_path / 'go.mod'
+        mod_path = self.project_path / "go.mod"
         try:
             content = mod_path.read_text()
 
             # Find require block
             in_require = False
-            for line in content.split('\n'):
+            for line in content.split("\n"):
                 line = line.strip()
 
-                if line.startswith('require ('):
+                if line.startswith("require ("):
                     in_require = True
                     continue
-                elif line == ')' and in_require:
+                elif line == ")" and in_require:
                     in_require = False
                     continue
-                elif line.startswith('require ') and '(' not in line:
+                elif line.startswith("require ") and "(" not in line:
                     # Single-line require
-                    match = re.match(r'require\s+([^\s]+)\s+([^\s]+)', line)
+                    match = re.match(r"require\s+([^\s]+)\s+([^\s]+)", line)
                     if match:
                         self.direct_deps[match.group(1)] = match.group(2)
                     continue
 
                 if in_require:
-                    match = re.match(r'([^\s]+)\s+([^\s]+)', line)
+                    match = re.match(r"([^\s]+)\s+([^\s]+)", line)
                     if match:
                         self.direct_deps[match.group(1)] = match.group(2)
 
@@ -219,38 +229,40 @@ class DependencyAnalyzer:
                 print(f"Found {len(self.direct_deps)} dependencies")
 
         except Exception as e:
-            self.issues.append({
-                'type': 'parse_error',
-                'severity': 'error',
-                'message': f"Failed to parse go.mod: {e}"
-            })
+            self.issues.append(
+                {
+                    "type": "parse_error",
+                    "severity": "error",
+                    "message": f"Failed to parse go.mod: {e}",
+                }
+            )
 
     def _parse_cargo(self):
         """Parse Cargo.toml for Rust dependencies."""
-        cargo_path = self.project_path / 'Cargo.toml'
+        cargo_path = self.project_path / "Cargo.toml"
         try:
             content = cargo_path.read_text()
 
             in_deps = False
             in_dev_deps = False
 
-            for line in content.split('\n'):
+            for line in content.split("\n"):
                 line = line.strip()
 
-                if line == '[dependencies]':
+                if line == "[dependencies]":
                     in_deps = True
                     in_dev_deps = False
                     continue
-                elif line == '[dev-dependencies]':
+                elif line == "[dev-dependencies]":
                     in_deps = False
                     in_dev_deps = True
                     continue
-                elif line.startswith('['):
+                elif line.startswith("["):
                     in_deps = False
                     in_dev_deps = False
                     continue
 
-                if (in_deps or in_dev_deps) and '=' in line:
+                if (in_deps or in_dev_deps) and "=" in line:
                     match = re.match(r'^([a-zA-Z0-9_-]+)\s*=\s*["\']?([^"\']+)', line)
                     if match:
                         name = match.group(1)
@@ -261,30 +273,42 @@ class DependencyAnalyzer:
                             self.dev_deps[name] = version
 
             if self.verbose:
-                print(f"Found {len(self.direct_deps)} direct deps, "
-                      f"{len(self.dev_deps)} dev deps")
+                print(
+                    f"Found {len(self.direct_deps)} direct deps, " f"{len(self.dev_deps)} dev deps"
+                )
 
         except Exception as e:
-            self.issues.append({
-                'type': 'parse_error',
-                'severity': 'error',
-                'message': f"Failed to parse Cargo.toml: {e}"
-            })
+            self.issues.append(
+                {
+                    "type": "parse_error",
+                    "severity": "error",
+                    "message": f"Failed to parse Cargo.toml: {e}",
+                }
+            )
 
     def _clean_version(self, version: str) -> str:
         """Clean version string."""
-        return version.lstrip('^~>=<!')
+        return version.lstrip("^~>=<!")
 
     def _scan_internal_modules(self):
         """Scan internal module imports for coupling analysis."""
-        ignore_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv',
-                       'dist', 'build', '.next', 'coverage'}
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+        }
 
         # Find all code files
-        extensions = ['.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.rs']
+        extensions = [".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs"]
 
         for ext in extensions:
-            for file_path in self.project_path.rglob(f'*{ext}'):
+            for file_path in self.project_path.rglob(f"*{ext}"):
                 # Skip ignored directories
                 if any(ignored in file_path.parts for ignored in ignore_dirs):
                     continue
@@ -292,7 +316,7 @@ class DependencyAnalyzer:
                 # Get module name (directory relative to project root)
                 try:
                     rel_path = file_path.relative_to(self.project_path)
-                    module = rel_path.parts[0] if len(rel_path.parts) > 1 else 'root'
+                    module = rel_path.parts[0] if len(rel_path.parts) > 1 else "root"
 
                     # Extract imports
                     imports = self._extract_imports(file_path)
@@ -308,18 +332,18 @@ class DependencyAnalyzer:
         """Extract import statements from a file."""
         imports = set()
         try:
-            content = file_path.read_text(encoding='utf-8', errors='ignore')
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
 
             # Python imports
-            for match in re.finditer(r'^(?:from|import)\s+([\w.]+)', content, re.MULTILINE):
-                imports.add(match.group(1).split('.')[0])
+            for match in re.finditer(r"^(?:from|import)\s+([\w.]+)", content, re.MULTILINE):
+                imports.add(match.group(1).split(".")[0])
 
             # JS/TS imports
             for match in re.finditer(r'(?:import|require)\s*\(?[\'"]([^\'"\s]+)[\'"]', content):
                 imp = match.group(1)
-                if imp.startswith('.') or imp.startswith('@/') or imp.startswith('~/'):
+                if imp.startswith(".") or imp.startswith("@/") or imp.startswith("~/"):
                     # Relative import - extract first path component
-                    parts = imp.lstrip('./~@').split('/')
+                    parts = imp.lstrip("./~@").split("/")
                     if parts:
                         imports.add(parts[0])
 
@@ -372,11 +396,13 @@ class DependencyAnalyzer:
 
         if cycles:
             for cycle in cycles:
-                self.issues.append({
-                    'type': 'circular_dependency',
-                    'severity': 'warning',
-                    'message': f"Circular dependency: {' -> '.join(cycle)}"
-                })
+                self.issues.append(
+                    {
+                        "type": "circular_dependency",
+                        "severity": "warning",
+                        "message": f"Circular dependency: {' -> '.join(cycle)}",
+                    }
+                )
 
         if self.verbose:
             print(f"Found {len(self.circular_deps)} circular dependencies")
@@ -434,9 +460,9 @@ class DependencyAnalyzer:
 
         # Check for known problematic packages (simplified check)
         problematic = {
-            'lodash': 'Consider lodash-es or native methods for smaller bundle',
-            'moment': 'Consider day.js or date-fns for smaller bundle',
-            'request': 'Deprecated. Use axios, node-fetch, or native fetch',
+            "lodash": "Consider lodash-es or native methods for smaller bundle",
+            "moment": "Consider day.js or date-fns for smaller bundle",
+            "request": "Deprecated. Use axios, node-fetch, or native fetch",
         }
 
         for pkg, suggestion in problematic.items():
@@ -446,24 +472,24 @@ class DependencyAnalyzer:
     def _build_report(self) -> Dict:
         """Build the analysis report."""
         return {
-            'project_path': str(self.project_path),
-            'package_manager': self.package_manager,
-            'summary': {
-                'direct_dependencies': len(self.direct_deps),
-                'dev_dependencies': len(self.dev_deps),
-                'internal_modules': len(self.internal_modules),
-                'coupling_score': self.coupling_score,
-                'circular_dependencies': len(self.circular_deps),
-                'issues': len(self.issues),
+            "project_path": str(self.project_path),
+            "package_manager": self.package_manager,
+            "summary": {
+                "direct_dependencies": len(self.direct_deps),
+                "dev_dependencies": len(self.dev_deps),
+                "internal_modules": len(self.internal_modules),
+                "coupling_score": self.coupling_score,
+                "circular_dependencies": len(self.circular_deps),
+                "issues": len(self.issues),
             },
-            'dependencies': {
-                'direct': self.direct_deps,
-                'dev': self.dev_deps,
+            "dependencies": {
+                "direct": self.direct_deps,
+                "dev": self.dev_deps,
             },
-            'internal_modules': {k: list(v) for k, v in self.internal_modules.items()},
-            'circular_dependencies': self.circular_deps,
-            'issues': self.issues,
-            'recommendations': self.recommendations,
+            "internal_modules": {k: list(v) for k, v in self.internal_modules.items()},
+            "circular_dependencies": self.circular_deps,
+            "issues": self.issues,
+            "recommendations": self.recommendations,
         }
 
 
@@ -475,38 +501,38 @@ def print_human_report(report: Dict):
     print(f"\nProject: {report['project_path']}")
     print(f"Package Manager: {report['package_manager']}")
 
-    summary = report['summary']
+    summary = report["summary"]
     print("\n--- Summary ---")
     print(f"Direct dependencies: {summary['direct_dependencies']}")
     print(f"Dev dependencies: {summary['dev_dependencies']}")
     print(f"Internal modules: {summary['internal_modules']}")
-    print(f"Coupling score: {summary['coupling_score']}/100 ", end='')
+    print(f"Coupling score: {summary['coupling_score']}/100 ", end="")
 
-    if summary['coupling_score'] < 30:
+    if summary["coupling_score"] < 30:
         print("(low - good)")
-    elif summary['coupling_score'] < 70:
+    elif summary["coupling_score"] < 70:
         print("(moderate)")
     else:
         print("(high - consider refactoring)")
 
-    if report['circular_dependencies']:
+    if report["circular_dependencies"]:
         print(f"\n--- Circular Dependencies ({len(report['circular_dependencies'])}) ---")
-        for cycle in report['circular_dependencies']:
+        for cycle in report["circular_dependencies"]:
             print(f"  {' -> '.join(cycle)}")
 
-    if report['issues']:
+    if report["issues"]:
         print(f"\n--- Issues ({len(report['issues'])}) ---")
-        for issue in report['issues']:
-            severity = issue['severity'].upper()
+        for issue in report["issues"]:
+            severity = issue["severity"].upper()
             print(f"  [{severity}] {issue['message']}")
 
-    if report['recommendations']:
+    if report["recommendations"]:
         print(f"\n--- Recommendations ---")
-        for i, rec in enumerate(report['recommendations'], 1):
+        for i, rec in enumerate(report["recommendations"], 1):
             print(f"  {i}. {rec}")
 
     # Show top dependencies
-    deps = report['dependencies']['direct']
+    deps = report["dependencies"]["direct"]
     if deps:
         print(f"\n--- Top Dependencies (of {len(deps)}) ---")
         for name, version in list(deps.items())[:10]:
@@ -519,9 +545,9 @@ def print_human_report(report: Dict):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Analyze project dependencies and module coupling',
+        description="Analyze project dependencies and module coupling",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
+        epilog="""
 Examples:
   %(prog)s ./my-project
   %(prog)s ./my-project --output json
@@ -534,34 +560,25 @@ Supported package managers:
   - poetry (pyproject.toml)
   - go (go.mod)
   - cargo (Cargo.toml)
-        '''
+        """,
     )
 
+    parser.add_argument("project_path", help="Path to the project directory")
     parser.add_argument(
-        'project_path',
-        help='Path to the project directory'
+        "--output",
+        "-o",
+        choices=["human", "json"],
+        default="human",
+        help="Output format (default: human)",
     )
     parser.add_argument(
-        '--output', '-o',
-        choices=['human', 'json'],
-        default='human',
-        help='Output format (default: human)'
+        "--check",
+        choices=["all", "circular", "coupling"],
+        default="all",
+        help="What to check (default: all)",
     )
-    parser.add_argument(
-        '--check',
-        choices=['all', 'circular', 'coupling'],
-        default='all',
-        help='What to check (default: all)'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    parser.add_argument(
-        '--save', '-s',
-        help='Save report to file'
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    parser.add_argument("--save", "-s", help="Save report to file")
 
     args = parser.parse_args()
 
@@ -579,17 +596,17 @@ Supported package managers:
     report = analyzer.analyze()
 
     # Filter report based on --check option
-    if args.check == 'circular':
-        if report['circular_dependencies']:
+    if args.check == "circular":
+        if report["circular_dependencies"]:
             print("Circular dependencies found:")
-            for cycle in report['circular_dependencies']:
+            for cycle in report["circular_dependencies"]:
                 print(f"  {' -> '.join(cycle)}")
             sys.exit(1)
         else:
             print("No circular dependencies found.")
             sys.exit(0)
-    elif args.check == 'coupling':
-        score = report['summary']['coupling_score']
+    elif args.check == "coupling":
+        score = report["summary"]["coupling_score"]
         print(f"Coupling score: {score}/100")
         if score > 70:
             print("WARNING: High coupling detected")
@@ -597,7 +614,7 @@ Supported package managers:
         sys.exit(0)
 
     # Output report
-    if args.output == 'json':
+    if args.output == "json":
         output = json.dumps(report, indent=2)
         if args.save:
             Path(args.save).write_text(output)
@@ -611,5 +628,5 @@ Supported package managers:
             print(f"\nJSON report saved to {args.save}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

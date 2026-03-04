@@ -50,7 +50,7 @@ def simple_linear_regression(
     intercept = y_mean - slope * x_mean
 
     # R-squared
-    r_squared = safe_divide(ss_xy ** 2, ss_xx * ss_yy) if ss_yy > 0 else 0.0
+    r_squared = safe_divide(ss_xy**2, ss_xx * ss_yy) if ss_yy > 0 else 0.0
 
     return (slope, intercept, r_squared)
 
@@ -110,9 +110,7 @@ class ForecastBuilder:
             "historical_revenues": revenues,
         }
 
-    def build_driver_based_forecast(
-        self, scenario: str = "base"
-    ) -> Dict[str, Any]:
+    def build_driver_based_forecast(self, scenario: str = "base") -> Dict[str, Any]:
         """
         Build a driver-based revenue forecast.
 
@@ -166,17 +164,19 @@ class ForecastBuilder:
                 opex = period_revenue * opex_pct
                 operating_income = gross_profit - opex
 
-                forecast_periods.append({
-                    "period": period,
-                    "revenue": round(period_revenue, 2),
-                    "units": round(current_units, 0),
-                    "price": round(current_price, 2),
-                    "cogs": round(cogs, 2),
-                    "gross_profit": round(gross_profit, 2),
-                    "gross_margin": round(adjusted_margin, 4),
-                    "opex": round(opex, 2),
-                    "operating_income": round(operating_income, 2),
-                })
+                forecast_periods.append(
+                    {
+                        "period": period,
+                        "revenue": round(period_revenue, 2),
+                        "units": round(current_units, 0),
+                        "price": round(current_price, 2),
+                        "cogs": round(cogs, 2),
+                        "gross_profit": round(gross_profit, 2),
+                        "gross_margin": round(adjusted_margin, 4),
+                        "opex": round(opex, 2),
+                        "operating_income": round(operating_income, 2),
+                    }
+                )
         else:
             # Simple growth-based forecast
             monthly_growth = (1 + adjusted_growth) ** (1 / 12) - 1
@@ -188,15 +188,17 @@ class ForecastBuilder:
                 opex = current_revenue * opex_pct
                 operating_income = gross_profit - opex
 
-                forecast_periods.append({
-                    "period": period,
-                    "revenue": round(current_revenue, 2),
-                    "cogs": round(cogs, 2),
-                    "gross_profit": round(gross_profit, 2),
-                    "gross_margin": round(adjusted_margin, 4),
-                    "opex": round(opex, 2),
-                    "operating_income": round(operating_income, 2),
-                })
+                forecast_periods.append(
+                    {
+                        "period": period,
+                        "revenue": round(current_revenue, 2),
+                        "cogs": round(cogs, 2),
+                        "gross_profit": round(gross_profit, 2),
+                        "gross_margin": round(adjusted_margin, 4),
+                        "opex": round(opex, 2),
+                        "operating_income": round(operating_income, 2),
+                    }
+                )
 
         total_revenue = sum(p["revenue"] for p in forecast_periods)
         total_operating_income = sum(p["operating_income"] for p in forecast_periods)
@@ -208,9 +210,7 @@ class ForecastBuilder:
             "forecast_periods": forecast_periods,
             "total_revenue": round(total_revenue, 2),
             "total_operating_income": round(total_operating_income, 2),
-            "average_monthly_revenue": round(
-                safe_divide(total_revenue, len(forecast_periods)), 2
-            ),
+            "average_monthly_revenue": round(safe_divide(total_revenue, len(forecast_periods)), 2),
         }
 
     def build_rolling_cash_flow(self, weeks: int = 13) -> Dict[str, Any]:
@@ -261,30 +261,30 @@ class ForecastBuilder:
             net_cash_flow = total_inflows - total_outflows
             running_balance += net_cash_flow
 
-            weekly_projections.append({
-                "week": week,
-                "collections": round(collections, 2),
-                "one_time_inflows": round(one_time_inflows, 2),
-                "total_inflows": round(total_inflows, 2),
-                "payroll": round(weekly_payroll, 2),
-                "rent": round(weekly_rent, 2),
-                "operating": round(weekly_operating, 2),
-                "other_expenses": round(weekly_other, 2),
-                "one_time_outflows": round(one_time_outflows, 2),
-                "total_outflows": round(total_outflows, 2),
-                "net_cash_flow": round(net_cash_flow, 2),
-                "closing_balance": round(running_balance, 2),
-                "notes": ", ".join(one_time_labels) if one_time_labels else "",
-            })
+            weekly_projections.append(
+                {
+                    "week": week,
+                    "collections": round(collections, 2),
+                    "one_time_inflows": round(one_time_inflows, 2),
+                    "total_inflows": round(total_inflows, 2),
+                    "payroll": round(weekly_payroll, 2),
+                    "rent": round(weekly_rent, 2),
+                    "operating": round(weekly_operating, 2),
+                    "other_expenses": round(weekly_other, 2),
+                    "one_time_outflows": round(one_time_outflows, 2),
+                    "total_outflows": round(total_outflows, 2),
+                    "net_cash_flow": round(net_cash_flow, 2),
+                    "closing_balance": round(running_balance, 2),
+                    "notes": ", ".join(one_time_labels) if one_time_labels else "",
+                }
+            )
 
         # Summary
         total_inflows = sum(w["total_inflows"] for w in weekly_projections)
         total_outflows = sum(w["total_outflows"] for w in weekly_projections)
         min_balance = min(w["closing_balance"] for w in weekly_projections)
         min_balance_week = next(
-            w["week"]
-            for w in weekly_projections
-            if w["closing_balance"] == min_balance
+            w["week"] for w in weekly_projections if w["closing_balance"] == min_balance
         )
 
         return {
@@ -304,9 +304,7 @@ class ForecastBuilder:
             "weekly_projections": weekly_projections,
         }
 
-    def build_scenario_comparison(
-        self, scenarios: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    def build_scenario_comparison(self, scenarios: Optional[List[str]] = None) -> Dict[str, Any]:
         """Build and compare multiple scenarios."""
         if scenarios is None:
             scenarios = ["base", "bull", "bear"]
@@ -320,23 +318,23 @@ class ForecastBuilder:
         comparison: List[Dict[str, Any]] = []
         for scenario in scenarios:
             result = scenario_results[scenario]
-            comparison.append({
-                "scenario": scenario,
-                "total_revenue": result["total_revenue"],
-                "total_operating_income": result["total_operating_income"],
-                "growth_rate": result["growth_rate"],
-                "gross_margin": result["gross_margin"],
-                "avg_monthly_revenue": result["average_monthly_revenue"],
-            })
+            comparison.append(
+                {
+                    "scenario": scenario,
+                    "total_revenue": result["total_revenue"],
+                    "total_operating_income": result["total_operating_income"],
+                    "growth_rate": result["growth_rate"],
+                    "gross_margin": result["gross_margin"],
+                    "avg_monthly_revenue": result["average_monthly_revenue"],
+                }
+            )
 
         return {
             "scenarios": scenario_results,
             "comparison": comparison,
         }
 
-    def run_full_forecast(
-        self, scenarios: Optional[List[str]] = None
-    ) -> Dict[str, Any]:
+    def run_full_forecast(self, scenarios: Optional[List[str]] = None) -> Dict[str, Any]:
         """Run the complete forecast analysis."""
         trends = self.analyze_trends()
         scenario_comparison = self.build_scenario_comparison(scenarios)
@@ -372,8 +370,7 @@ class ForecastBuilder:
             lines.append(f"  Direction: {t['direction']}")
             lines.append(f"  R-squared: {t['r_squared']:.4f}")
             lines.append(
-                f"  Average Historical Growth: "
-                f"{trend['average_growth_rate'] * 100:.1f}%"
+                f"  Average Historical Growth: " f"{trend['average_growth_rate'] * 100:.1f}%"
             )
             if trend["seasonality_index"]:
                 lines.append(
@@ -428,8 +425,7 @@ class ForecastBuilder:
 
         lines.append(f"\n  Weekly Detail:")
         lines.append(
-            f"  {'Wk':>3s}  {'Inflows':>10s}  {'Outflows':>10s}  "
-            f"{'Net':>10s}  {'Balance':>12s}"
+            f"  {'Wk':>3s}  {'Inflows':>10s}  {'Outflows':>10s}  " f"{'Net':>10s}  {'Balance':>12s}"
         )
         lines.append("  " + "-" * 50)
         for w in cf["weekly_projections"]:

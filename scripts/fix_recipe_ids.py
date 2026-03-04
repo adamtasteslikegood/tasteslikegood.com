@@ -60,8 +60,7 @@ def fix_recipe_ids():
 
                 if data_id != recipe.id:
                     logger.info(
-                        f"Fixing recipe '{recipe.name}': "
-                        f"DB id={recipe.id}, data.id={data_id}"
+                        f"Fixing recipe '{recipe.name}': " f"DB id={recipe.id}, data.id={data_id}"
                     )
 
                     # Update data to include the correct id

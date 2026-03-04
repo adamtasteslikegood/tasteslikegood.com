@@ -52,10 +52,10 @@ class FormatDetector:
     def _is_typescript(self, code: str) -> bool:
         """Check if code is TypeScript."""
         ts_patterns = [
-            r'\binterface\s+\w+',  # interface definitions
-            r':\s*\w+\s*[=;]',  # type annotations
-            r'\btype\s+\w+\s*=',  # type aliases
-            r'<\w+>',  # generic types
+            r"\binterface\s+\w+",  # interface definitions
+            r":\s*\w+\s*[=;]",  # type annotations
+            r"\btype\s+\w+\s*=",  # type aliases
+            r"<\w+>",  # generic types
             r'import.*from.*[\'"]',  # ES6 imports with types
         ]
 
@@ -66,10 +66,10 @@ class FormatDetector:
     def _is_javascript(self, code: str) -> bool:
         """Check if code is JavaScript."""
         js_patterns = [
-            r'\bconst\s+\w+',  # const declarations
-            r'\blet\s+\w+',  # let declarations
-            r'=>',  # arrow functions
-            r'function\s+\w+',  # function declarations
+            r"\bconst\s+\w+",  # const declarations
+            r"\blet\s+\w+",  # let declarations
+            r"=>",  # arrow functions
+            r"function\s+\w+",  # function declarations
             r'require\([\'"]',  # CommonJS require
         ]
 
@@ -79,12 +79,12 @@ class FormatDetector:
     def _is_python(self, code: str) -> bool:
         """Check if code is Python."""
         py_patterns = [
-            r'\bdef\s+\w+',  # function definitions
-            r'\bclass\s+\w+',  # class definitions
-            r'import\s+\w+',  # import statements
-            r'from\s+\w+\s+import',  # from imports
-            r'^\s*#.*$',  # Python comments
-            r':\s*$',  # Python colons
+            r"\bdef\s+\w+",  # function definitions
+            r"\bclass\s+\w+",  # class definitions
+            r"import\s+\w+",  # import statements
+            r"from\s+\w+\s+import",  # from imports
+            r"^\s*#.*$",  # Python comments
+            r":\s*$",  # Python colons
         ]
 
         matches = sum(1 for pattern in py_patterns if re.search(pattern, code, re.MULTILINE))
@@ -93,11 +93,11 @@ class FormatDetector:
     def _is_java(self, code: str) -> bool:
         """Check if code is Java."""
         java_patterns = [
-            r'\bpublic\s+class',  # public class
-            r'\bprivate\s+\w+',  # private members
-            r'\bpublic\s+\w+\s+\w+\s*\(',  # public methods
-            r'import\s+java\.',  # Java imports
-            r'\bvoid\s+\w+\s*\(',  # void methods
+            r"\bpublic\s+class",  # public class
+            r"\bprivate\s+\w+",  # private members
+            r"\bpublic\s+\w+\s+\w+\s*\(",  # public methods
+            r"import\s+java\.",  # Java imports
+            r"\bvoid\s+\w+\s*\(",  # void methods
         ]
 
         matches = sum(1 for pattern in java_patterns if re.search(pattern, code))
@@ -114,32 +114,32 @@ class FormatDetector:
             Detected framework (jest, vitest, pytest, junit, mocha, unknown)
         """
         # Jest patterns
-        if 'from \'@jest/globals\'' in code or '@jest/' in code:
+        if "from '@jest/globals'" in code or "@jest/" in code:
             self.detected_framework = "jest"
             return "jest"
 
         # Vitest patterns
-        if 'from \'vitest\'' in code or 'import { vi }' in code:
+        if "from 'vitest'" in code or "import { vi }" in code:
             self.detected_framework = "vitest"
             return "vitest"
 
         # Pytest patterns
-        if 'import pytest' in code or 'def test_' in code:
+        if "import pytest" in code or "def test_" in code:
             self.detected_framework = "pytest"
             return "pytest"
 
         # Unittest patterns
-        if 'import unittest' in code and 'unittest.TestCase' in code:
+        if "import unittest" in code and "unittest.TestCase" in code:
             self.detected_framework = "unittest"
             return "unittest"
 
         # JUnit patterns
-        if '@Test' in code and 'import org.junit' in code:
+        if "@Test" in code and "import org.junit" in code:
             self.detected_framework = "junit"
             return "junit"
 
         # Mocha patterns
-        if 'describe(' in code and 'it(' in code:
+        if "describe(" in code and "it(" in code:
             self.detected_framework = "mocha"
             return "mocha"
 
@@ -159,20 +159,21 @@ class FormatDetector:
         content_stripped = content.strip()
 
         # LCOV format
-        if content_stripped.startswith('TN:') or 'SF:' in content_stripped[:200]:
+        if content_stripped.startswith("TN:") or "SF:" in content_stripped[:200]:
             return "lcov"
 
         # JSON format
-        if content_stripped.startswith('{'):
+        if content_stripped.startswith("{"):
             try:
                 import json
+
                 json.loads(content_stripped)
                 return "json"
             except:
                 pass
 
         # XML format
-        if content_stripped.startswith('<?xml') or content_stripped.startswith('<coverage'):
+        if content_stripped.startswith("<?xml") or content_stripped.startswith("<coverage"):
             return "xml"
 
         return "unknown"
@@ -188,30 +189,30 @@ class FormatDetector:
             Detection results with format, language, framework
         """
         result = {
-            'format': 'unknown',
-            'language': 'unknown',
-            'framework': 'unknown',
-            'content_type': 'unknown'
+            "format": "unknown",
+            "language": "unknown",
+            "framework": "unknown",
+            "content_type": "unknown",
         }
 
         # Detect if it's a coverage report
         coverage_format = self.detect_coverage_format(input_data)
         if coverage_format != "unknown":
-            result['format'] = coverage_format
-            result['content_type'] = 'coverage_report'
+            result["format"] = coverage_format
+            result["content_type"] = "coverage_report"
             return result
 
         # Detect if it's source code
         language = self.detect_language(input_data)
         if language != "unknown":
-            result['language'] = language
-            result['content_type'] = 'source_code'
+            result["language"] = language
+            result["content_type"] = "source_code"
 
         # Detect if it's test code
         framework = self.detect_test_framework(input_data)
         if framework != "unknown":
-            result['framework'] = framework
-            result['content_type'] = 'test_code'
+            result["framework"] = framework
+            result["content_type"] = "test_code"
 
         return result
 
@@ -232,27 +233,28 @@ class FormatDetector:
 
         # Extension to language mapping
         ext_to_lang = {
-            '.ts': 'typescript',
-            '.tsx': 'typescript',
-            '.js': 'javascript',
-            '.jsx': 'javascript',
-            '.py': 'python',
-            '.java': 'java',
-            '.kt': 'kotlin',
-            '.go': 'go',
-            '.rs': 'rust',
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".js": "javascript",
+            ".jsx": "javascript",
+            ".py": "python",
+            ".java": "java",
+            ".kt": "kotlin",
+            ".go": "go",
+            ".rs": "rust",
         }
 
         # Test file patterns
-        is_test = any(pattern in file_name.lower()
-                     for pattern in ['test', 'spec', '_test.', '.test.'])
+        is_test = any(
+            pattern in file_name.lower() for pattern in ["test", "spec", "_test.", ".test."]
+        )
 
         return {
-            'file_name': file_name,
-            'extension': file_ext,
-            'language': ext_to_lang.get(file_ext, 'unknown'),
-            'is_test': is_test,
-            'purpose': 'test' if is_test else 'source'
+            "file_name": file_name,
+            "extension": file_ext,
+            "language": ext_to_lang.get(file_ext, "unknown"),
+            "is_test": is_test,
+            "purpose": "test" if is_test else "source",
         }
 
     def suggest_test_file_name(self, source_file: str, framework: str) -> str:
@@ -271,11 +273,11 @@ class FormatDetector:
         base_name = os.path.splitext(os.path.basename(source_file))[0]
         ext = os.path.splitext(source_file)[1]
 
-        if framework in ['jest', 'vitest', 'mocha']:
+        if framework in ["jest", "vitest", "mocha"]:
             return f"{base_name}.test{ext}"
-        elif framework in ['pytest', 'unittest']:
+        elif framework in ["pytest", "unittest"]:
             return f"test_{base_name}.py"
-        elif framework in ['junit', 'testng']:
+        elif framework in ["junit", "testng"]:
             return f"{base_name.capitalize()}Test.java"
         else:
             return f"{base_name}_test{ext}"
@@ -293,26 +295,31 @@ class FormatDetector:
         patterns = []
 
         # Arrange-Act-Assert pattern
-        if any(comment in code.lower() for comment in ['// arrange', '# arrange', '// act', '# act']):
-            patterns.append('AAA (Arrange-Act-Assert)')
+        if any(
+            comment in code.lower() for comment in ["// arrange", "# arrange", "// act", "# act"]
+        ):
+            patterns.append("AAA (Arrange-Act-Assert)")
 
         # Given-When-Then pattern
-        if any(comment in code.lower() for comment in ['given', 'when', 'then']):
-            patterns.append('Given-When-Then')
+        if any(comment in code.lower() for comment in ["given", "when", "then"]):
+            patterns.append("Given-When-Then")
 
         # Setup/Teardown pattern
-        if any(keyword in code for keyword in ['beforeEach', 'afterEach', 'setUp', 'tearDown']):
-            patterns.append('Setup-Teardown')
+        if any(keyword in code for keyword in ["beforeEach", "afterEach", "setUp", "tearDown"]):
+            patterns.append("Setup-Teardown")
 
         # Mocking pattern
-        if any(keyword in code.lower() for keyword in ['mock', 'stub', 'spy']):
-            patterns.append('Mocking/Stubbing')
+        if any(keyword in code.lower() for keyword in ["mock", "stub", "spy"]):
+            patterns.append("Mocking/Stubbing")
 
         # Parameterized tests
-        if any(keyword in code for keyword in ['@pytest.mark.parametrize', 'test.each', '@ParameterizedTest']):
-            patterns.append('Parameterized Tests')
+        if any(
+            keyword in code
+            for keyword in ["@pytest.mark.parametrize", "test.each", "@ParameterizedTest"]
+        ):
+            patterns.append("Parameterized Tests")
 
-        return patterns if patterns else ['No specific pattern detected']
+        return patterns if patterns else ["No specific pattern detected"]
 
     def analyze_project_structure(self, file_paths: List[str]) -> Dict[str, Any]:
         """
@@ -333,41 +340,41 @@ class FormatDetector:
             file_info = self.extract_file_info(file_path)
 
             # Count languages
-            lang = file_info['language']
-            if lang != 'unknown':
+            lang = file_info["language"]
+            if lang != "unknown":
                 languages[lang] = languages.get(lang, 0) + 1
 
             # Categorize files
-            if file_info['is_test']:
+            if file_info["is_test"]:
                 test_files.append(file_path)
             else:
                 source_files.append(file_path)
 
         # Determine primary language
-        primary_language = max(languages.items(), key=lambda x: x[1])[0] if languages else 'unknown'
+        primary_language = max(languages.items(), key=lambda x: x[1])[0] if languages else "unknown"
 
         return {
-            'primary_language': primary_language,
-            'languages': languages,
-            'source_file_count': len(source_files),
-            'test_file_count': len(test_files),
-            'test_ratio': len(test_files) / len(source_files) if source_files else 0,
-            'suggested_framework': self._suggest_framework(primary_language)
+            "primary_language": primary_language,
+            "languages": languages,
+            "source_file_count": len(source_files),
+            "test_file_count": len(test_files),
+            "test_ratio": len(test_files) / len(source_files) if source_files else 0,
+            "suggested_framework": self._suggest_framework(primary_language),
         }
 
     def _suggest_framework(self, language: str) -> str:
         """Suggest testing framework based on language."""
         framework_map = {
-            'typescript': 'jest or vitest',
-            'javascript': 'jest or mocha',
-            'python': 'pytest',
-            'java': 'junit',
-            'kotlin': 'junit',
-            'go': 'testing package',
-            'rust': 'cargo test',
+            "typescript": "jest or vitest",
+            "javascript": "jest or mocha",
+            "python": "pytest",
+            "java": "junit",
+            "kotlin": "junit",
+            "go": "testing package",
+            "rust": "cargo test",
         }
 
-        return framework_map.get(language, 'unknown')
+        return framework_map.get(language, "unknown")
 
     def detect_environment(self) -> Dict[str, str]:
         """
@@ -379,6 +386,6 @@ class FormatDetector:
         # This is a placeholder - actual detection would use environment variables
         # or other runtime checks
         return {
-            'environment': 'cli',  # Could be 'desktop', 'api'
-            'output_preference': 'terminal-friendly'  # Could be 'rich-markdown', 'json'
+            "environment": "cli",  # Could be 'desktop', 'api'
+            "output_preference": "terminal-friendly",  # Could be 'rich-markdown', 'json'
         }

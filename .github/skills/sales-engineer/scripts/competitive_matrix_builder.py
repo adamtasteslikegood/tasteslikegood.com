@@ -15,7 +15,6 @@ import json
 import sys
 from typing import Any
 
-
 # Feature scoring levels
 FEATURE_SCORES: dict[str, int] = {
     "full": 3,
@@ -128,16 +127,18 @@ def build_comparison_matrix(data: dict[str, Any]) -> dict[str, Any]:
             max_score = max(scores.values())
             leaders = [p for p, s in scores.items() if s == max_score]
 
-            matrix.append({
-                "category": cat_name,
-                "feature": feature_name,
-                "scores": scores,
-                "leaders": leaders,
-                "our_score": scores[our_product],
-                "max_score": max_score,
-                "we_lead": our_product in leaders and len(leaders) == 1,
-                "we_trail": scores[our_product] < max_score,
-            })
+            matrix.append(
+                {
+                    "category": cat_name,
+                    "feature": feature_name,
+                    "scores": scores,
+                    "leaders": leaders,
+                    "our_score": scores[our_product],
+                    "max_score": max_score,
+                    "we_lead": our_product in leaders and len(leaders) == 1,
+                    "we_trail": scores[our_product] < max_score,
+                }
+            )
 
         # Category summary
         cat_product_scores = {}
@@ -223,20 +224,20 @@ def identify_differentiators(comparison: dict[str, Any]) -> list[dict[str, Any]]
     for entry in comparison["matrix"]:
         if entry["we_lead"] and entry["our_score"] >= 2:
             # Calculate gap from nearest competitor
-            competitor_scores = [
-                entry["scores"][c] for c in comparison["competitors"]
-            ]
+            competitor_scores = [entry["scores"][c] for c in comparison["competitors"]]
             max_competitor = max(competitor_scores) if competitor_scores else 0
             gap = entry["our_score"] - max_competitor
 
-            differentiators.append({
-                "feature": entry["feature"],
-                "category": entry["category"],
-                "our_score": entry["our_score"],
-                "our_label": FEATURE_LABELS.get(entry["our_score"], "Unknown"),
-                "best_competitor_score": max_competitor,
-                "gap": gap,
-            })
+            differentiators.append(
+                {
+                    "feature": entry["feature"],
+                    "category": entry["category"],
+                    "our_score": entry["our_score"],
+                    "our_label": FEATURE_LABELS.get(entry["our_score"], "Unknown"),
+                    "best_competitor_score": max_competitor,
+                    "gap": gap,
+                }
+            )
 
     # Sort by gap size descending
     differentiators.sort(key=lambda d: d["gap"], reverse=True)
@@ -263,14 +264,16 @@ def identify_vulnerabilities(comparison: dict[str, Any]) -> list[dict[str, Any]]
             }
             gap = entry["max_score"] - entry["our_score"]
 
-            vulnerabilities.append({
-                "feature": entry["feature"],
-                "category": entry["category"],
-                "our_score": entry["our_score"],
-                "our_label": FEATURE_LABELS.get(entry["our_score"], "Unknown"),
-                "leading_competitors": leader_scores,
-                "gap": gap,
-            })
+            vulnerabilities.append(
+                {
+                    "feature": entry["feature"],
+                    "category": entry["category"],
+                    "our_score": entry["our_score"],
+                    "our_label": FEATURE_LABELS.get(entry["our_score"], "Unknown"),
+                    "leading_competitors": leader_scores,
+                    "gap": gap,
+                }
+            )
 
     # Sort by gap size descending
     vulnerabilities.sort(key=lambda v: v["gap"], reverse=True)
@@ -300,21 +303,15 @@ def generate_win_themes(
         for cat in top_diff_categories[:3]:
             cat_diffs = [d for d in differentiators if d["category"] == cat]
             feature_names = [d["feature"] for d in cat_diffs[:3]]
-            themes.append(
-                f"Superior {cat} capabilities: {', '.join(feature_names)}"
-            )
+            themes.append(f"Superior {cat} capabilities: {', '.join(feature_names)}")
 
     # Theme from overall competitive position
     our_score = competitive_scores.get(our_product, {}).get("weighted_score", 0)
     competitor_scores = [
-        (p, s["weighted_score"])
-        for p, s in competitive_scores.items()
-        if p != our_product
+        (p, s["weighted_score"]) for p, s in competitive_scores.items() if p != our_product
     ]
     if competitor_scores:
-        best_competitor_name, best_competitor_score = max(
-            competitor_scores, key=lambda x: x[1]
-        )
+        best_competitor_name, best_competitor_score = max(competitor_scores, key=lambda x: x[1])
         if our_score > best_competitor_score:
             themes.append(
                 f"Overall strongest solution ({our_score:.1f}% vs {best_competitor_name} at {best_competitor_score:.1f}%)"
@@ -328,7 +325,9 @@ def generate_win_themes(
         )
 
     if not themes:
-        themes.append("Competitive parity - emphasize implementation quality, support, and total cost of ownership")
+        themes.append(
+            "Competitive parity - emphasize implementation quality, support, and total cost of ownership"
+        )
 
     return themes
 
@@ -346,9 +345,7 @@ def analyze_competitive(data: dict[str, Any]) -> dict[str, Any]:
     competitive_scores = compute_competitive_scores(comparison)
     differentiators = identify_differentiators(comparison)
     vulnerabilities = identify_vulnerabilities(comparison)
-    win_themes = generate_win_themes(
-        differentiators, competitive_scores, comparison["our_product"]
-    )
+    win_themes = generate_win_themes(differentiators, competitive_scores, comparison["our_product"])
 
     return {
         "analysis_info": {
@@ -427,8 +424,7 @@ def format_text(result: dict[str, Any]) -> str:
             lines.append(f"\n  [{current_category}] (weight: {weight}x)")
 
         score_cols = "  ".join(
-            f"{FEATURE_LABELS.get(entry['scores'].get(p, 0), 'N/A'):>10}"
-            for p in all_products
+            f"{FEATURE_LABELS.get(entry['scores'].get(p, 0), 'N/A'):>10}" for p in all_products
         )
         lead_marker = " *" if entry["we_lead"] else (" !" if entry["we_trail"] else "")
         feature_display = entry["feature"][:28]
@@ -459,8 +455,7 @@ def format_text(result: dict[str, Any]) -> str:
         lines.append("-" * 80)
         for v in vulns:
             leaders = ", ".join(
-                f"{p}: {FEATURE_LABELS.get(s, 'N/A')}"
-                for p, s in v["leading_competitors"].items()
+                f"{p}: {FEATURE_LABELS.get(s, 'N/A')}" for p, s in v["leading_competitors"].items()
             )
             lines.append(
                 f"  - {v['feature']} [{v['category']}] "

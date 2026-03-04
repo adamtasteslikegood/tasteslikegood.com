@@ -29,6 +29,7 @@ import math
 @dataclass
 class RetrievalMetrics:
     """Retrieval quality metrics"""
+
     precision_at_k: float
     recall_at_k: float
     mrr: float  # Mean Reciprocal Rank
@@ -39,6 +40,7 @@ class RetrievalMetrics:
 @dataclass
 class ContextEvaluation:
     """Evaluation of a single context"""
+
     context_id: str
     relevance_score: float
     token_overlap: float
@@ -49,6 +51,7 @@ class ContextEvaluation:
 @dataclass
 class AnswerEvaluation:
     """Evaluation of an answer against context"""
+
     question_id: str
     faithfulness_score: float
     groundedness_score: float
@@ -60,6 +63,7 @@ class AnswerEvaluation:
 @dataclass
 class RAGEvaluationReport:
     """Complete RAG evaluation report"""
+
     total_questions: int
     avg_context_relevance: float
     avg_faithfulness: float
@@ -75,20 +79,105 @@ def tokenize(text: str) -> List[str]:
     """Simple tokenization for text comparison"""
     # Lowercase and split on non-alphanumeric
     text = text.lower()
-    tokens = re.findall(r'\b\w+\b', text)
+    tokens = re.findall(r"\b\w+\b", text)
     # Remove common stopwords
-    stopwords = {'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
-                 'being', 'have', 'has', 'had', 'do', 'does', 'did', 'will',
-                 'would', 'could', 'should', 'may', 'might', 'must', 'shall',
-                 'can', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by',
-                 'from', 'as', 'into', 'through', 'during', 'before', 'after',
-                 'above', 'below', 'up', 'down', 'out', 'off', 'over', 'under',
-                 'again', 'further', 'then', 'once', 'here', 'there', 'when',
-                 'where', 'why', 'how', 'all', 'each', 'few', 'more', 'most',
-                 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own',
-                 'same', 'so', 'than', 'too', 'very', 'just', 'and', 'but',
-                 'if', 'or', 'because', 'until', 'while', 'it', 'this', 'that',
-                 'these', 'those', 'i', 'you', 'he', 'she', 'we', 'they'}
+    stopwords = {
+        "the",
+        "a",
+        "an",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "have",
+        "has",
+        "had",
+        "do",
+        "does",
+        "did",
+        "will",
+        "would",
+        "could",
+        "should",
+        "may",
+        "might",
+        "must",
+        "shall",
+        "can",
+        "to",
+        "of",
+        "in",
+        "for",
+        "on",
+        "with",
+        "at",
+        "by",
+        "from",
+        "as",
+        "into",
+        "through",
+        "during",
+        "before",
+        "after",
+        "above",
+        "below",
+        "up",
+        "down",
+        "out",
+        "off",
+        "over",
+        "under",
+        "again",
+        "further",
+        "then",
+        "once",
+        "here",
+        "there",
+        "when",
+        "where",
+        "why",
+        "how",
+        "all",
+        "each",
+        "few",
+        "more",
+        "most",
+        "other",
+        "some",
+        "such",
+        "no",
+        "nor",
+        "not",
+        "only",
+        "own",
+        "same",
+        "so",
+        "than",
+        "too",
+        "very",
+        "just",
+        "and",
+        "but",
+        "if",
+        "or",
+        "because",
+        "until",
+        "while",
+        "it",
+        "this",
+        "that",
+        "these",
+        "those",
+        "i",
+        "you",
+        "he",
+        "she",
+        "we",
+        "they",
+    }
     return [t for t in tokens if t not in stopwords and len(t) > 2]
 
 
@@ -127,10 +216,10 @@ def calculate_rouge_l(reference: str, candidate: str) -> float:
 
     for i in range(1, m + 1):
         for j in range(1, n + 1):
-            if ref_tokens[i-1] == cand_tokens[j-1]:
-                dp[i][j] = dp[i-1][j-1] + 1
+            if ref_tokens[i - 1] == cand_tokens[j - 1]:
+                dp[i][j] = dp[i - 1][j - 1] + 1
             else:
-                dp[i][j] = max(dp[i-1][j], dp[i][j-1])
+                dp[i][j] = max(dp[i - 1][j], dp[i][j - 1])
 
     lcs_length = dp[m][n]
 
@@ -144,7 +233,9 @@ def calculate_rouge_l(reference: str, candidate: str) -> float:
     return 2 * precision * recall / (precision + recall)
 
 
-def evaluate_context_relevance(question: str, context: str, context_id: str = "") -> ContextEvaluation:
+def evaluate_context_relevance(
+    question: str, context: str, context_id: str = ""
+) -> ContextEvaluation:
     """Evaluate how relevant a context is to a question"""
     question_terms = set(extract_key_terms(question, 15))
     context_terms = set(extract_key_terms(context, 30))
@@ -164,14 +255,14 @@ def evaluate_context_relevance(question: str, context: str, context_id: str = ""
         relevance_score=round(relevance, 3),
         token_overlap=round(token_overlap, 3),
         key_terms_covered=list(covered),
-        missing_terms=list(missing)
+        missing_terms=list(missing),
     )
 
 
 def extract_claims(answer: str) -> List[str]:
     """Extract individual claims from an answer"""
     # Split on sentence boundaries
-    sentences = re.split(r'[.!?]+', answer)
+    sentences = re.split(r"[.!?]+", answer)
     claims = []
 
     for sentence in sentences:
@@ -204,14 +295,11 @@ def check_claim_support(claim: str, context: str) -> Tuple[bool, float]:
 
 
 def evaluate_answer_faithfulness(
-    question: str,
-    answer: str,
-    contexts: List[str],
-    question_id: str = ""
+    question: str, answer: str, contexts: List[str], question_id: str = ""
 ) -> AnswerEvaluation:
     """Evaluate if answer is faithful to the provided contexts"""
     claims = extract_claims(answer)
-    combined_context = ' '.join(contexts)
+    combined_context = " ".join(contexts)
 
     claim_evaluations = []
     supported_claims = 0
@@ -222,18 +310,18 @@ def evaluate_answer_faithfulness(
         is_supported, score = check_claim_support(claim, combined_context)
 
         claim_eval = {
-            'claim': claim[:100] + '...' if len(claim) > 100 else claim,
-            'supported': is_supported,
-            'score': round(score, 3)
+            "claim": claim[:100] + "..." if len(claim) > 100 else claim,
+            "supported": is_supported,
+            "score": round(score, 3),
         }
 
         # Track which contexts support this claim
         for i, ctx in enumerate(contexts):
             _, ctx_score = check_claim_support(claim, ctx)
             if ctx_score > 0.3:
-                claim_eval[f'context_{i}'] = round(ctx_score, 3)
-                if f'context_{i}' not in context_used:
-                    context_used.append(f'context_{i}')
+                claim_eval[f"context_{i}"] = round(ctx_score, 3)
+                if f"context_{i}" not in context_used:
+                    context_used.append(f"context_{i}")
 
         claim_evaluations.append(claim_eval)
 
@@ -246,7 +334,11 @@ def evaluate_answer_faithfulness(
     faithfulness = supported_claims / len(claims) if claims else 1.0
 
     # Groundedness = average support score
-    avg_score = sum(c['score'] for c in claim_evaluations) / len(claim_evaluations) if claim_evaluations else 1.0
+    avg_score = (
+        sum(c["score"] for c in claim_evaluations) / len(claim_evaluations)
+        if claim_evaluations
+        else 1.0
+    )
 
     return AnswerEvaluation(
         question_id=question_id,
@@ -254,14 +346,12 @@ def evaluate_answer_faithfulness(
         groundedness_score=round(avg_score, 3),
         claims=claim_evaluations,
         unsupported_claims=unsupported,
-        context_used=context_used
+        context_used=context_used,
     )
 
 
 def calculate_retrieval_metrics(
-    retrieved: List[str],
-    relevant: Set[str],
-    k: int = 5
+    retrieved: List[str], relevant: Set[str], k: int = 5
 ) -> RetrievalMetrics:
     """Calculate standard retrieval metrics"""
     retrieved_k = retrieved[:k]
@@ -295,7 +385,7 @@ def calculate_retrieval_metrics(
         recall_at_k=round(recall, 3),
         mrr=round(mrr, 3),
         ndcg_at_k=round(ndcg, 3),
-        k=k
+        k=k,
     )
 
 
@@ -328,7 +418,7 @@ def generate_recommendations(report: RAGEvaluationReport) -> List[str]:
         )
 
     retrieval = report.retrieval_metrics
-    if retrieval.get('precision_at_k', 0) < 0.7:
+    if retrieval.get("precision_at_k", 0) < 0.7:
         recommendations.append(
             "Retrieval precision is low. Consider: re-ranking retrieved documents, "
             "using cross-encoder for reranking, or adjusting similarity threshold."
@@ -341,10 +431,7 @@ def generate_recommendations(report: RAGEvaluationReport) -> List[str]:
 
 
 def evaluate_rag_system(
-    questions: List[Dict],
-    contexts: List[Dict],
-    k: int = 5,
-    verbose: bool = False
+    questions: List[Dict], contexts: List[Dict], k: int = 5, verbose: bool = False
 ) -> RAGEvaluationReport:
     """Comprehensive RAG system evaluation"""
 
@@ -357,21 +444,20 @@ def evaluate_rag_system(
     questions_with_context = 0
 
     for q_data in questions:
-        question = q_data.get('question', q_data.get('query', ''))
-        question_id = q_data.get('id', str(questions.index(q_data)))
-        answer = q_data.get('answer', q_data.get('response', ''))
-        expected = q_data.get('expected', q_data.get('ground_truth', ''))
+        question = q_data.get("question", q_data.get("query", ""))
+        question_id = q_data.get("id", str(questions.index(q_data)))
+        answer = q_data.get("answer", q_data.get("response", ""))
+        expected = q_data.get("expected", q_data.get("ground_truth", ""))
 
         # Find contexts for this question
         q_contexts = []
         for ctx in contexts:
-            if ctx.get('question_id') == question_id or ctx.get('query_id') == question_id:
-                q_contexts.append(ctx.get('content', ctx.get('text', '')))
+            if ctx.get("question_id") == question_id or ctx.get("query_id") == question_id:
+                q_contexts.append(ctx.get("content", ctx.get("text", "")))
 
         # If no specific contexts, use all contexts (for simple datasets)
         if not q_contexts:
-            q_contexts = [ctx.get('content', ctx.get('text', ''))
-                        for ctx in contexts[:k]]
+            q_contexts = [ctx.get("content", ctx.get("text", "")) for ctx in contexts[:k]]
 
         if q_contexts:
             questions_with_context += 1
@@ -391,41 +477,61 @@ def evaluate_rag_system(
 
             # Track issues
             if answer_eval.unsupported_claims:
-                issues.append({
-                    'type': 'unsupported_claim',
-                    'question_id': question_id,
-                    'claims': answer_eval.unsupported_claims[:3]
-                })
+                issues.append(
+                    {
+                        "type": "unsupported_claim",
+                        "question_id": question_id,
+                        "claims": answer_eval.unsupported_claims[:3],
+                    }
+                )
 
         # Check for low relevance contexts
         low_relevance = [e for e in context_evals if e.relevance_score < 0.5]
         if low_relevance:
-            issues.append({
-                'type': 'low_relevance',
-                'question_id': question_id,
-                'contexts': [e.context_id for e in low_relevance]
-            })
+            issues.append(
+                {
+                    "type": "low_relevance",
+                    "question_id": question_id,
+                    "contexts": [e.context_id for e in low_relevance],
+                }
+            )
 
         if verbose:
-            question_details.append({
-                'question_id': question_id,
-                'question': question[:100],
-                'context_scores': [asdict(e) for e in context_evals],
-                'answer_faithfulness': all_faithfulness_scores[-1] if all_faithfulness_scores else None
-            })
+            question_details.append(
+                {
+                    "question_id": question_id,
+                    "question": question[:100],
+                    "context_scores": [asdict(e) for e in context_evals],
+                    "answer_faithfulness": (
+                        all_faithfulness_scores[-1] if all_faithfulness_scores else None
+                    ),
+                }
+            )
 
     # Calculate aggregates
-    avg_context_relevance = sum(all_context_scores) / len(all_context_scores) if all_context_scores else 0
-    avg_faithfulness = sum(all_faithfulness_scores) / len(all_faithfulness_scores) if all_faithfulness_scores else 0
-    avg_groundedness = sum(all_groundedness_scores) / len(all_groundedness_scores) if all_groundedness_scores else 0
+    avg_context_relevance = (
+        sum(all_context_scores) / len(all_context_scores) if all_context_scores else 0
+    )
+    avg_faithfulness = (
+        sum(all_faithfulness_scores) / len(all_faithfulness_scores)
+        if all_faithfulness_scores
+        else 0
+    )
+    avg_groundedness = (
+        sum(all_groundedness_scores) / len(all_groundedness_scores)
+        if all_groundedness_scores
+        else 0
+    )
     coverage = questions_with_context / len(questions) if questions else 0
 
     # Simulated retrieval metrics (based on relevance scores)
     high_relevance = sum(1 for s in all_context_scores if s > 0.5)
     retrieval_metrics = {
-        'precision_at_k': round(high_relevance / len(all_context_scores) if all_context_scores else 0, 3),
-        'estimated_recall': round(coverage, 3),
-        'k': k
+        "precision_at_k": round(
+            high_relevance / len(all_context_scores) if all_context_scores else 0, 3
+        ),
+        "estimated_recall": round(coverage, 3),
+        "k": k,
     }
 
     report = RAGEvaluationReport(
@@ -437,7 +543,7 @@ def evaluate_rag_system(
         coverage=round(coverage, 3),
         issues=issues[:20],  # Limit to 20 issues
         recommendations=[],
-        question_details=question_details if verbose else []
+        question_details=question_details if verbose else [],
     )
 
     report.recommendations = generate_recommendations(report)
@@ -459,22 +565,34 @@ def format_report(report: RAGEvaluationReport) -> str:
     lines.append("")
 
     lines.append("📈 RETRIEVAL METRICS")
-    lines.append(f"  Context Relevance:    {report.avg_context_relevance:.2f} {'✅' if report.avg_context_relevance >= 0.8 else '⚠️'} (target: >0.80)")
-    lines.append(f"  Precision@{report.retrieval_metrics.get('k', 5)}:         {report.retrieval_metrics.get('precision_at_k', 0):.2f}")
+    lines.append(
+        f"  Context Relevance:    {report.avg_context_relevance:.2f} {'✅' if report.avg_context_relevance >= 0.8 else '⚠️'} (target: >0.80)"
+    )
+    lines.append(
+        f"  Precision@{report.retrieval_metrics.get('k', 5)}:         {report.retrieval_metrics.get('precision_at_k', 0):.2f}"
+    )
     lines.append("")
 
     lines.append("📝 GENERATION METRICS")
-    lines.append(f"  Answer Faithfulness:  {report.avg_faithfulness:.2f} {'✅' if report.avg_faithfulness >= 0.95 else '⚠️'} (target: >0.95)")
-    lines.append(f"  Groundedness:         {report.avg_groundedness:.2f} {'✅' if report.avg_groundedness >= 0.85 else '⚠️'} (target: >0.85)")
+    lines.append(
+        f"  Answer Faithfulness:  {report.avg_faithfulness:.2f} {'✅' if report.avg_faithfulness >= 0.95 else '⚠️'} (target: >0.95)"
+    )
+    lines.append(
+        f"  Groundedness:         {report.avg_groundedness:.2f} {'✅' if report.avg_groundedness >= 0.85 else '⚠️'} (target: >0.85)"
+    )
     lines.append("")
 
     if report.issues:
         lines.append(f"⚠️ ISSUES FOUND ({len(report.issues)})")
         for issue in report.issues[:10]:
-            if issue['type'] == 'unsupported_claim':
-                lines.append(f"  Q{issue['question_id']}: {len(issue.get('claims', []))} unsupported claim(s)")
-            elif issue['type'] == 'low_relevance':
-                lines.append(f"  Q{issue['question_id']}: Low relevance contexts: {issue.get('contexts', [])}")
+            if issue["type"] == "unsupported_claim":
+                lines.append(
+                    f"  Q{issue['question_id']}: {len(issue.get('claims', []))} unsupported claim(s)"
+                )
+            elif issue["type"] == "low_relevance":
+                lines.append(
+                    f"  Q{issue['question_id']}: Low relevance contexts: {issue.get('contexts', [])}"
+                )
         if len(report.issues) > 10:
             lines.append(f"  ... and {len(report.issues) - 10} more issues")
         lines.append("")
@@ -486,7 +604,7 @@ def format_report(report: RAGEvaluationReport) -> str:
 
     lines.append("=" * 60)
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def main():
@@ -512,16 +630,20 @@ contexts.json:
   {"question_id": "q1", "content": "Retrieved context text..."},
   {"question_id": "q2", "content": "Another context..."}
 ]
-        """
+        """,
     )
 
-    parser.add_argument('--contexts', '-c', required=True, help='JSON file with retrieved contexts')
-    parser.add_argument('--questions', '-q', required=True, help='JSON file with questions and answers')
-    parser.add_argument('--k', type=int, default=5, help='Number of top contexts to evaluate (default: 5)')
-    parser.add_argument('--output', '-o', help='Output file for detailed report (JSON)')
-    parser.add_argument('--json', '-j', action='store_true', help='Output as JSON instead of text')
-    parser.add_argument('--verbose', '-v', action='store_true', help='Include per-question details')
-    parser.add_argument('--compare', help='Compare with baseline report JSON')
+    parser.add_argument("--contexts", "-c", required=True, help="JSON file with retrieved contexts")
+    parser.add_argument(
+        "--questions", "-q", required=True, help="JSON file with questions and answers"
+    )
+    parser.add_argument(
+        "--k", type=int, default=5, help="Number of top contexts to evaluate (default: 5)"
+    )
+    parser.add_argument("--output", "-o", help="Output file for detailed report (JSON)")
+    parser.add_argument("--json", "-j", action="store_true", help="Output as JSON instead of text")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Include per-question details")
+    parser.add_argument("--compare", help="Compare with baseline report JSON")
 
     args = parser.parse_args()
 
@@ -538,8 +660,8 @@ contexts.json:
         sys.exit(1)
 
     try:
-        contexts = json.loads(contexts_path.read_text(encoding='utf-8'))
-        questions = json.loads(questions_path.read_text(encoding='utf-8'))
+        contexts = json.loads(contexts_path.read_text(encoding="utf-8"))
+        questions = json.loads(questions_path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         print(f"Error: Invalid JSON format: {e}", file=sys.stderr)
         sys.exit(1)
@@ -553,9 +675,15 @@ contexts.json:
         if baseline_path.exists():
             baseline = json.loads(baseline_path.read_text())
             print("\n📊 COMPARISON WITH BASELINE")
-            print(f"  Relevance:    {baseline.get('avg_context_relevance', 0):.2f} -> {report.avg_context_relevance:.2f}")
-            print(f"  Faithfulness: {baseline.get('avg_faithfulness', 0):.2f} -> {report.avg_faithfulness:.2f}")
-            print(f"  Groundedness: {baseline.get('avg_groundedness', 0):.2f} -> {report.avg_groundedness:.2f}")
+            print(
+                f"  Relevance:    {baseline.get('avg_context_relevance', 0):.2f} -> {report.avg_context_relevance:.2f}"
+            )
+            print(
+                f"  Faithfulness: {baseline.get('avg_faithfulness', 0):.2f} -> {report.avg_faithfulness:.2f}"
+            )
+            print(
+                f"  Groundedness: {baseline.get('avg_groundedness', 0):.2f} -> {report.avg_groundedness:.2f}"
+            )
             print()
 
     # Output
@@ -570,5 +698,5 @@ contexts.json:
         print(f"\nDetailed report saved to {args.output}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

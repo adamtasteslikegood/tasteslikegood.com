@@ -71,28 +71,40 @@ class MDRGapAnalyzer:
                 category="Technical Documentation",
                 description="Complete device description including variants, accessories, intended purpose",
                 priority="High",
-                evidence_needed=["Device specification", "Intended purpose statement", "Variant listing"]
+                evidence_needed=[
+                    "Device specification",
+                    "Intended purpose statement",
+                    "Variant listing",
+                ],
             ),
             GapItem(
                 requirement="Annex II - Information Supplied",
                 category="Technical Documentation",
                 description="Label and IFU meeting Article 13 requirements",
                 priority="High",
-                evidence_needed=["Label artwork", "Instructions for use", "Symbol glossary"]
+                evidence_needed=["Label artwork", "Instructions for use", "Symbol glossary"],
             ),
             GapItem(
                 requirement="Annex II - Design and Manufacturing",
                 category="Technical Documentation",
                 description="Design history file and manufacturing documentation",
                 priority="High",
-                evidence_needed=["Design history file", "Process flow diagram", "Validation reports"]
+                evidence_needed=[
+                    "Design history file",
+                    "Process flow diagram",
+                    "Validation reports",
+                ],
             ),
             GapItem(
                 requirement="Annex II - GSPR Compliance",
                 category="Technical Documentation",
                 description="General Safety and Performance Requirements checklist",
                 priority="Critical",
-                evidence_needed=["GSPR matrix", "Standard compliance evidence", "Risk management file"]
+                evidence_needed=[
+                    "GSPR matrix",
+                    "Standard compliance evidence",
+                    "Risk management file",
+                ],
             ),
         ],
         "clinical_evaluation": [
@@ -101,21 +113,25 @@ class MDRGapAnalyzer:
                 category="Clinical Evaluation",
                 description="Clinical evaluation report with systematic literature review",
                 priority="Critical",
-                evidence_needed=["Clinical evaluation report", "Literature search protocol", "Data appraisal"]
+                evidence_needed=[
+                    "Clinical evaluation report",
+                    "Literature search protocol",
+                    "Data appraisal",
+                ],
             ),
             GapItem(
                 requirement="Annex XIV Part B - PMCF",
                 category="Clinical Evaluation",
                 description="Post-market clinical follow-up plan and evaluation report",
                 priority="High",
-                evidence_needed=["PMCF plan", "PMCF evaluation report", "Residual risk assessment"]
+                evidence_needed=["PMCF plan", "PMCF evaluation report", "Residual risk assessment"],
             ),
             GapItem(
                 requirement="Qualified Person for CER",
                 category="Clinical Evaluation",
                 description="Clinical evaluation by qualified evaluator per Annex XIV",
                 priority="High",
-                evidence_needed=["Evaluator CV", "Qualification evidence", "Signed CER"]
+                evidence_needed=["Evaluator CV", "Qualification evidence", "Signed CER"],
             ),
         ],
         "risk_management": [
@@ -124,14 +140,19 @@ class MDRGapAnalyzer:
                 category="Risk Management",
                 description="Complete risk management file per ISO 14971:2019",
                 priority="Critical",
-                evidence_needed=["Risk management plan", "Risk analysis", "Risk evaluation", "Risk control"]
+                evidence_needed=[
+                    "Risk management plan",
+                    "Risk analysis",
+                    "Risk evaluation",
+                    "Risk control",
+                ],
             ),
             GapItem(
                 requirement="Benefit-Risk Analysis",
                 category="Risk Management",
                 description="Documented benefit-risk determination",
                 priority="High",
-                evidence_needed=["Benefit-risk analysis document", "Residual risk acceptability"]
+                evidence_needed=["Benefit-risk analysis document", "Residual risk acceptability"],
             ),
         ],
         "quality_management": [
@@ -140,14 +161,14 @@ class MDRGapAnalyzer:
                 category="Quality Management",
                 description="Quality management system conforming to ISO 13485:2016",
                 priority="Critical",
-                evidence_needed=["QMS manual", "Process documentation", "Internal audit records"]
+                evidence_needed=["QMS manual", "Process documentation", "Internal audit records"],
             ),
             GapItem(
                 requirement="Post-Market Surveillance",
                 category="Quality Management",
                 description="PMS system per Article 83-86",
                 priority="High",
-                evidence_needed=["PMS plan", "PSUR (if required)", "Vigilance procedures"]
+                evidence_needed=["PMS plan", "PSUR (if required)", "Vigilance procedures"],
             ),
         ],
         "udi_eudamed": [
@@ -156,14 +177,18 @@ class MDRGapAnalyzer:
                 category="UDI/EUDAMED",
                 description="Unique Device Identification per Article 27",
                 priority="High",
-                evidence_needed=["UDI-DI assignment", "Label with UDI carrier", "GUDID/EUDAMED registration"]
+                evidence_needed=[
+                    "UDI-DI assignment",
+                    "Label with UDI carrier",
+                    "GUDID/EUDAMED registration",
+                ],
             ),
             GapItem(
                 requirement="EUDAMED Registration",
                 category="UDI/EUDAMED",
                 description="Actor, device, and certificate registration in EUDAMED",
                 priority="Medium",
-                evidence_needed=["Actor registration", "Device registration", "Certificate upload"]
+                evidence_needed=["Actor registration", "Device registration", "Certificate upload"],
             ),
         ],
         "notified_body": [
@@ -172,14 +197,18 @@ class MDRGapAnalyzer:
                 category="Notified Body",
                 description="Selection and engagement of MDR-designated Notified Body",
                 priority="Critical",
-                evidence_needed=["NB selection criteria", "NB engagement letter", "Audit schedule"]
+                evidence_needed=["NB selection criteria", "NB engagement letter", "Audit schedule"],
             ),
             GapItem(
                 requirement="Conformity Assessment",
                 category="Notified Body",
                 description="Completion of appropriate conformity assessment procedure",
                 priority="Critical",
-                evidence_needed=["Application dossier", "Technical documentation submission", "Certificate"]
+                evidence_needed=[
+                    "Application dossier",
+                    "Technical documentation submission",
+                    "Certificate",
+                ],
             ),
         ],
     }
@@ -192,14 +221,18 @@ class MDRGapAnalyzer:
                 category="Technical Documentation",
                 description="Additional documentation for Class III devices",
                 priority="Critical",
-                evidence_needed=["Implant card", "Patient information", "Device tracking"]
+                evidence_needed=["Implant card", "Patient information", "Device tracking"],
             ),
             GapItem(
                 requirement="Clinical Investigation",
                 category="Clinical Evaluation",
                 description="Clinical investigation per Article 61 (unless equivalent device)",
                 priority="Critical",
-                evidence_needed=["Clinical investigation plan", "Ethics approval", "Clinical study report"]
+                evidence_needed=[
+                    "Clinical investigation plan",
+                    "Ethics approval",
+                    "Clinical study report",
+                ],
             ),
         ],
         DeviceClass.IIB: [
@@ -208,7 +241,7 @@ class MDRGapAnalyzer:
                 category="Technical Documentation",
                 description="Additional requirements for implantable Class IIb devices",
                 priority="High",
-                evidence_needed=["Implant card (if implantable)", "Long-term safety data"]
+                evidence_needed=["Implant card (if implantable)", "Long-term safety data"],
             ),
         ],
     }
@@ -224,24 +257,28 @@ class MDRGapAnalyzer:
         # Add all base requirements
         for category_gaps in self.REQUIREMENTS.values():
             for gap in category_gaps:
-                self.gaps.append(GapItem(
-                    requirement=gap.requirement,
-                    category=gap.category,
-                    description=gap.description,
-                    priority=gap.priority,
-                    evidence_needed=gap.evidence_needed.copy()
-                ))
+                self.gaps.append(
+                    GapItem(
+                        requirement=gap.requirement,
+                        category=gap.category,
+                        description=gap.description,
+                        priority=gap.priority,
+                        evidence_needed=gap.evidence_needed.copy(),
+                    )
+                )
 
         # Add class-specific requirements
         if self.device_class in self.CLASS_REQUIREMENTS:
             for gap in self.CLASS_REQUIREMENTS[self.device_class]:
-                self.gaps.append(GapItem(
-                    requirement=gap.requirement,
-                    category=gap.category,
-                    description=gap.description,
-                    priority=gap.priority,
-                    evidence_needed=gap.evidence_needed.copy()
-                ))
+                self.gaps.append(
+                    GapItem(
+                        requirement=gap.requirement,
+                        category=gap.category,
+                        description=gap.description,
+                        priority=gap.priority,
+                        evidence_needed=gap.evidence_needed.copy(),
+                    )
+                )
 
         # Class I self-certification: NB not required
         if self.device_class == DeviceClass.I:
@@ -266,7 +303,8 @@ class MDRGapAnalyzer:
 
         # Identify critical gaps
         critical_gaps = [
-            g.requirement for g in applicable_gaps
+            g.requirement
+            for g in applicable_gaps
             if g.priority == "Critical" and g.status != GapStatus.COMPLETE
         ]
 
@@ -280,15 +318,18 @@ class MDRGapAnalyzer:
             total_requirements=len(applicable_gaps),
             gaps_identified=len(applicable_gaps) - len(complete_gaps),
             completion_percentage=round(completion, 1),
-            gaps=[{
-                "requirement": g.requirement,
-                "category": g.category,
-                "status": g.status.value,
-                "priority": g.priority,
-                "evidence_needed": g.evidence_needed
-            } for g in applicable_gaps],
+            gaps=[
+                {
+                    "requirement": g.requirement,
+                    "category": g.category,
+                    "status": g.status.value,
+                    "priority": g.priority,
+                    "evidence_needed": g.evidence_needed,
+                }
+                for g in applicable_gaps
+            ],
             recommendations=recommendations,
-            critical_gaps=critical_gaps
+            critical_gaps=critical_gaps,
         )
 
     def _generate_recommendations(self) -> List[str]:
@@ -297,8 +338,10 @@ class MDRGapAnalyzer:
 
         # Check for critical gaps
         critical_incomplete = [
-            g for g in self.gaps
-            if g.priority == "Critical" and g.status not in [GapStatus.COMPLETE, GapStatus.NOT_APPLICABLE]
+            g
+            for g in self.gaps
+            if g.priority == "Critical"
+            and g.status not in [GapStatus.COMPLETE, GapStatus.NOT_APPLICABLE]
         ]
 
         if critical_incomplete:
@@ -355,20 +398,24 @@ def format_text_output(result: GapAnalysisResult) -> str:
     ]
 
     if result.critical_gaps:
-        lines.extend([
-            "-" * 60,
-            "CRITICAL GAPS (Address Immediately)",
-            "-" * 60,
-        ])
+        lines.extend(
+            [
+                "-" * 60,
+                "CRITICAL GAPS (Address Immediately)",
+                "-" * 60,
+            ]
+        )
         for gap in result.critical_gaps:
             lines.append(f"  * {gap}")
         lines.append("")
 
-    lines.extend([
-        "-" * 60,
-        "GAP DETAILS BY CATEGORY",
-        "-" * 60,
-    ])
+    lines.extend(
+        [
+            "-" * 60,
+            "GAP DETAILS BY CATEGORY",
+            "-" * 60,
+        ]
+    )
 
     # Group by category
     categories = {}
@@ -384,12 +431,14 @@ def format_text_output(result: GapAnalysisResult) -> str:
             status_mark = "✓" if gap["status"] == "Complete" else "○"
             lines.append(f"  [{status_mark}] {gap['requirement']} ({gap['priority']})")
 
-    lines.extend([
-        "",
-        "-" * 60,
-        "RECOMMENDATIONS",
-        "-" * 60,
-    ])
+    lines.extend(
+        [
+            "",
+            "-" * 60,
+            "RECOMMENDATIONS",
+            "-" * 60,
+        ]
+    )
     for i, rec in enumerate(result.recommendations, 1):
         lines.append(f"{i}. {rec}")
 
@@ -456,27 +505,16 @@ def interactive_mode():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="EU MDR 2017/745 Gap Analysis Tool"
-    )
+    parser = argparse.ArgumentParser(description="EU MDR 2017/745 Gap Analysis Tool")
     parser.add_argument("--device", type=str, help="Device name")
     parser.add_argument(
         "--class",
         dest="device_class",
         choices=["I", "Is", "Im", "IIa", "IIb", "III"],
-        help="Device classification"
+        help="Device classification",
     )
-    parser.add_argument(
-        "--output",
-        choices=["text", "json"],
-        default="text",
-        help="Output format"
-    )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode"
-    )
+    parser.add_argument("--output", choices=["text", "json"], default="text", help="Output format")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
 
     args = parser.parse_args()
 

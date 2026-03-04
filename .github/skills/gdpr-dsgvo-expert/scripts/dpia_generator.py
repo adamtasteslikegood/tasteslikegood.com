@@ -19,59 +19,58 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 # DPIA threshold criteria (Art. 35(3) and WP29 Guidelines)
 DPIA_TRIGGERS = {
     "systematic_monitoring": {
         "description": "Systematic monitoring of publicly accessible area",
         "article": "Art. 35(3)(c)",
-        "weight": 10
+        "weight": 10,
     },
     "large_scale_special_category": {
         "description": "Large-scale processing of special category data (Art. 9)",
         "article": "Art. 35(3)(b)",
-        "weight": 10
+        "weight": 10,
     },
     "automated_decision_making": {
         "description": "Automated decision-making with legal/significant effects",
         "article": "Art. 35(3)(a)",
-        "weight": 10
+        "weight": 10,
     },
     "evaluation_scoring": {
         "description": "Evaluation or scoring of individuals",
         "article": "WP29 Guidelines",
-        "weight": 7
+        "weight": 7,
     },
     "sensitive_data": {
         "description": "Processing of sensitive data or highly personal data",
         "article": "WP29 Guidelines",
-        "weight": 7
+        "weight": 7,
     },
     "large_scale": {
         "description": "Data processed on a large scale",
         "article": "WP29 Guidelines",
-        "weight": 6
+        "weight": 6,
     },
     "data_matching": {
         "description": "Matching or combining datasets",
         "article": "WP29 Guidelines",
-        "weight": 5
+        "weight": 5,
     },
     "vulnerable_subjects": {
         "description": "Data concerning vulnerable data subjects",
         "article": "WP29 Guidelines",
-        "weight": 7
+        "weight": 7,
     },
     "innovative_technology": {
         "description": "Innovative use or applying new technological solutions",
         "article": "WP29 Guidelines",
-        "weight": 5
+        "weight": 5,
     },
     "cross_border_transfer": {
         "description": "Transfer of data outside the EU/EEA",
         "article": "GDPR Chapter V",
-        "weight": 5
-    }
+        "weight": 5,
+    },
 }
 
 # Risk categories and mitigation measures
@@ -83,8 +82,8 @@ RISK_CATEGORIES = {
             "Implement access controls and authentication",
             "Use encryption for data at rest and in transit",
             "Maintain audit logs of access",
-            "Implement least privilege principle"
-        ]
+            "Implement least privilege principle",
+        ],
     },
     "data_breach": {
         "description": "Risk of data breach or unauthorized disclosure",
@@ -93,8 +92,8 @@ RISK_CATEGORIES = {
             "Implement intrusion detection systems",
             "Establish incident response procedures",
             "Regular security assessments",
-            "Employee security training"
-        ]
+            "Employee security training",
+        ],
     },
     "excessive_collection": {
         "description": "Risk of collecting more data than necessary",
@@ -103,8 +102,8 @@ RISK_CATEGORIES = {
             "Implement data minimization principles",
             "Regular review of data collected",
             "Privacy by design approach",
-            "Document purpose for each data element"
-        ]
+            "Document purpose for each data element",
+        ],
     },
     "purpose_creep": {
         "description": "Risk of using data for purposes beyond original scope",
@@ -113,8 +112,8 @@ RISK_CATEGORIES = {
             "Clear purpose limitation policies",
             "Consent management for new purposes",
             "Technical controls on data access",
-            "Regular purpose review"
-        ]
+            "Regular purpose review",
+        ],
     },
     "retention_violation": {
         "description": "Risk of retaining data longer than necessary",
@@ -123,8 +122,8 @@ RISK_CATEGORIES = {
             "Implement retention schedules",
             "Automated deletion processes",
             "Regular data inventory audits",
-            "Document retention justification"
-        ]
+            "Document retention justification",
+        ],
     },
     "rights_violation": {
         "description": "Risk of failing to fulfill data subject rights",
@@ -133,8 +132,8 @@ RISK_CATEGORIES = {
             "Implement subject access request process",
             "Technical capability for data portability",
             "Deletion/erasure procedures",
-            "Staff training on rights requests"
-        ]
+            "Staff training on rights requests",
+        ],
     },
     "inaccurate_data": {
         "description": "Risk of processing inaccurate or outdated data",
@@ -143,8 +142,8 @@ RISK_CATEGORIES = {
             "Data quality checks at collection",
             "Regular data verification",
             "Easy update mechanisms for subjects",
-            "Automated accuracy validation"
-        ]
+            "Automated accuracy validation",
+        ],
     },
     "third_party_risk": {
         "description": "Risk from third-party processors",
@@ -153,9 +152,9 @@ RISK_CATEGORIES = {
             "Due diligence on processors",
             "Data Processing Agreements",
             "Regular processor audits",
-            "Clear processor instructions"
-        ]
-    }
+            "Clear processor instructions",
+        ],
+    },
 }
 
 # Legal bases under Article 6
@@ -168,8 +167,8 @@ LEGAL_BASES = {
             "Specific to the purpose",
             "Informed consent with clear information",
             "Unambiguous indication of wishes",
-            "Easy to withdraw"
-        ]
+            "Easy to withdraw",
+        ],
     },
     "contract": {
         "article": "Art. 6(1)(b)",
@@ -177,8 +176,8 @@ LEGAL_BASES = {
         "requirements": [
             "Contract must exist or be in negotiation",
             "Processing must be necessary for the contract",
-            "Cannot process more than contractually needed"
-        ]
+            "Cannot process more than contractually needed",
+        ],
     },
     "legal_obligation": {
         "article": "Art. 6(1)(c)",
@@ -186,8 +185,8 @@ LEGAL_BASES = {
         "requirements": [
             "Legal obligation must be binding",
             "Must be EU or Member State law",
-            "Processing must be necessary to comply"
-        ]
+            "Processing must be necessary to comply",
+        ],
     },
     "vital_interests": {
         "article": "Art. 6(1)(d)",
@@ -195,8 +194,8 @@ LEGAL_BASES = {
         "requirements": [
             "Life-threatening situation",
             "No other legal basis available",
-            "Typically emergency situations"
-        ]
+            "Typically emergency situations",
+        ],
     },
     "public_interest": {
         "article": "Art. 6(1)(e)",
@@ -204,8 +203,8 @@ LEGAL_BASES = {
         "requirements": [
             "Task in public interest or official authority",
             "Legal basis in EU or Member State law",
-            "Processing must be necessary"
-        ]
+            "Processing must be necessary",
+        ],
     },
     "legitimate_interests": {
         "article": "Art. 6(1)(f)",
@@ -214,9 +213,9 @@ LEGAL_BASES = {
             "Identify the legitimate interest",
             "Show processing is necessary",
             "Balance against data subject rights",
-            "Not available for public authorities"
-        ]
-    }
+            "Not available for public authorities",
+        ],
+    },
 }
 
 
@@ -226,44 +225,36 @@ def get_template() -> Dict:
         "project_name": "",
         "version": "1.0",
         "date": datetime.now().strftime("%Y-%m-%d"),
-        "controller": {
-            "name": "",
-            "contact": "",
-            "dpo_contact": ""
-        },
+        "controller": {"name": "", "contact": "", "dpo_contact": ""},
         "processing_activity": {
             "description": "",
             "purposes": [],
             "legal_basis": "",
-            "legal_basis_justification": ""
+            "legal_basis_justification": "",
         },
         "data_subjects": {
             "categories": [],
             "estimated_number": "",
             "vulnerable_groups": False,
-            "vulnerable_groups_details": ""
+            "vulnerable_groups_details": "",
         },
         "personal_data": {
             "categories": [],
             "special_categories": [],
             "source": "",
-            "retention_period": ""
+            "retention_period": "",
         },
         "processing_operations": {
             "collection_method": "",
             "storage_location": "",
             "access_controls": "",
             "automated_decisions": False,
-            "profiling": False
+            "profiling": False,
         },
-        "data_recipients": {
-            "internal": [],
-            "external_processors": [],
-            "third_countries": []
-        },
+        "data_recipients": {"internal": [], "external_processors": [], "third_countries": []},
         "dpia_triggers": [],
         "identified_risks": [],
-        "mitigations_planned": []
+        "mitigations_planned": [],
     }
 
 
@@ -277,39 +268,47 @@ def assess_dpia_requirement(input_data: Dict) -> Dict:
         if trigger in DPIA_TRIGGERS:
             trigger_info = DPIA_TRIGGERS[trigger]
             total_weight += trigger_info["weight"]
-            triggered_criteria.append({
-                "trigger": trigger,
-                "description": trigger_info["description"],
-                "article": trigger_info["article"]
-            })
+            triggered_criteria.append(
+                {
+                    "trigger": trigger,
+                    "description": trigger_info["description"],
+                    "article": trigger_info["article"],
+                }
+            )
 
     # Also check data characteristics
     if input_data.get("data_subjects", {}).get("vulnerable_groups"):
         if "vulnerable_subjects" not in triggers_present:
             total_weight += DPIA_TRIGGERS["vulnerable_subjects"]["weight"]
-            triggered_criteria.append({
-                "trigger": "vulnerable_subjects",
-                "description": DPIA_TRIGGERS["vulnerable_subjects"]["description"],
-                "article": DPIA_TRIGGERS["vulnerable_subjects"]["article"]
-            })
+            triggered_criteria.append(
+                {
+                    "trigger": "vulnerable_subjects",
+                    "description": DPIA_TRIGGERS["vulnerable_subjects"]["description"],
+                    "article": DPIA_TRIGGERS["vulnerable_subjects"]["article"],
+                }
+            )
 
     if input_data.get("personal_data", {}).get("special_categories"):
         if "sensitive_data" not in triggers_present:
             total_weight += DPIA_TRIGGERS["sensitive_data"]["weight"]
-            triggered_criteria.append({
-                "trigger": "sensitive_data",
-                "description": DPIA_TRIGGERS["sensitive_data"]["description"],
-                "article": DPIA_TRIGGERS["sensitive_data"]["article"]
-            })
+            triggered_criteria.append(
+                {
+                    "trigger": "sensitive_data",
+                    "description": DPIA_TRIGGERS["sensitive_data"]["description"],
+                    "article": DPIA_TRIGGERS["sensitive_data"]["article"],
+                }
+            )
 
     if input_data.get("data_recipients", {}).get("third_countries"):
         if "cross_border_transfer" not in triggers_present:
             total_weight += DPIA_TRIGGERS["cross_border_transfer"]["weight"]
-            triggered_criteria.append({
-                "trigger": "cross_border_transfer",
-                "description": DPIA_TRIGGERS["cross_border_transfer"]["description"],
-                "article": DPIA_TRIGGERS["cross_border_transfer"]["article"]
-            })
+            triggered_criteria.append(
+                {
+                    "trigger": "cross_border_transfer",
+                    "description": DPIA_TRIGGERS["cross_border_transfer"]["description"],
+                    "article": DPIA_TRIGGERS["cross_border_transfer"]["article"],
+                }
+            )
 
     # DPIA required if 2+ triggers or weight >= 10
     dpia_required = len(triggered_criteria) >= 2 or total_weight >= 10
@@ -318,7 +317,9 @@ def assess_dpia_requirement(input_data: Dict) -> Dict:
         "dpia_required": dpia_required,
         "risk_score": total_weight,
         "triggered_criteria": triggered_criteria,
-        "recommendation": "DPIA is mandatory" if dpia_required else "DPIA recommended as best practice"
+        "recommendation": (
+            "DPIA is mandatory" if dpia_required else "DPIA recommended as best practice"
+        ),
     }
 
 
@@ -333,56 +334,60 @@ def assess_risks(input_data: Dict) -> List[Dict]:
 
     # Unauthorized access risk
     if processing.get("storage_location") or processing.get("collection_method"):
-        risks.append({
-            **RISK_CATEGORIES["unauthorized_access"],
-            "likelihood": "medium",
-            "residual_risk": "low" if processing.get("access_controls") else "medium"
-        })
+        risks.append(
+            {
+                **RISK_CATEGORIES["unauthorized_access"],
+                "likelihood": "medium",
+                "residual_risk": "low" if processing.get("access_controls") else "medium",
+            }
+        )
 
     # Data breach risk (always present)
-    risks.append({
-        **RISK_CATEGORIES["data_breach"],
-        "likelihood": "medium",
-        "residual_risk": "medium"
-    })
+    risks.append(
+        {**RISK_CATEGORIES["data_breach"], "likelihood": "medium", "residual_risk": "medium"}
+    )
 
     # Third party risk
     if recipients.get("external_processors") or recipients.get("third_countries"):
-        risks.append({
-            **RISK_CATEGORIES["third_party_risk"],
-            "likelihood": "medium",
-            "residual_risk": "medium"
-        })
+        risks.append(
+            {
+                **RISK_CATEGORIES["third_party_risk"],
+                "likelihood": "medium",
+                "residual_risk": "medium",
+            }
+        )
 
     # Rights violation risk
-    risks.append({
-        **RISK_CATEGORIES["rights_violation"],
-        "likelihood": "low",
-        "residual_risk": "low"
-    })
+    risks.append(
+        {**RISK_CATEGORIES["rights_violation"], "likelihood": "low", "residual_risk": "low"}
+    )
 
     # Retention violation risk
     if not personal_data.get("retention_period"):
-        risks.append({
-            **RISK_CATEGORIES["retention_violation"],
-            "likelihood": "high",
-            "residual_risk": "high"
-        })
+        risks.append(
+            {
+                **RISK_CATEGORIES["retention_violation"],
+                "likelihood": "high",
+                "residual_risk": "high",
+            }
+        )
 
     # Automated decision risk
     if processing.get("automated_decisions") or processing.get("profiling"):
-        risks.append({
-            "description": "Risk of unfair automated decisions affecting individuals",
-            "impact": "high",
-            "likelihood": "medium",
-            "residual_risk": "medium",
-            "mitigations": [
-                "Human review of automated decisions",
-                "Transparency about logic involved",
-                "Right to contest decisions",
-                "Regular algorithm audits"
-            ]
-        })
+        risks.append(
+            {
+                "description": "Risk of unfair automated decisions affecting individuals",
+                "impact": "high",
+                "likelihood": "medium",
+                "residual_risk": "medium",
+                "mitigations": [
+                    "Human review of automated decisions",
+                    "Transparency about logic involved",
+                    "Right to contest decisions",
+                    "Regular algorithm audits",
+                ],
+            }
+        )
 
     return risks
 
@@ -425,8 +430,8 @@ Risk Score: {requirement['risk_score']}/100
 ### Triggered Criteria
 
 """
-    if requirement['triggered_criteria']:
-        for criteria in requirement['triggered_criteria']:
+    if requirement["triggered_criteria"]:
+        for criteria in requirement["triggered_criteria"]:
             report += f"- **{criteria['description']}** ({criteria['article']})\n"
     else:
         report += "- No mandatory triggers identified\n"
@@ -443,7 +448,7 @@ Risk Score: {requirement['risk_score']}/100
 ### Purposes
 
 """
-    for purpose in processing.get('purposes', ['Not specified']):
+    for purpose in processing.get("purposes", ["Not specified"]):
         report += f"- {purpose}\n"
 
     report += f"""
@@ -454,9 +459,9 @@ Risk Score: {requirement['risk_score']}/100
 **Justification**: {processing.get('legal_basis_justification', 'Not provided')}
 
 """
-    if legal_info.get('requirements'):
+    if legal_info.get("requirements"):
         report += "**Requirements to satisfy:**\n"
-        for req in legal_info['requirements']:
+        for req in legal_info["requirements"]:
             report += f"- {req}\n"
 
     report += f"""
@@ -477,12 +482,12 @@ Risk Score: {requirement['risk_score']}/100
 ### Data Categories
 
 """
-    for category in personal_data.get('categories', ['Not specified']):
+    for category in personal_data.get("categories", ["Not specified"]):
         report += f"- {category}\n"
 
-    if personal_data.get('special_categories'):
+    if personal_data.get("special_categories"):
         report += "\n### Special Category Data (Art. 9)\n\n"
-        for category in personal_data['special_categories']:
+        for category in personal_data["special_categories"]:
             report += f"- **{category}** - Requires Art. 9(2) exception\n"
 
     report += f"""
@@ -513,17 +518,17 @@ Risk Score: {requirement['risk_score']}/100
 ### Internal Recipients
 
 """
-    for recipient in recipients.get('internal', ['Not specified']):
+    for recipient in recipients.get("internal", ["Not specified"]):
         report += f"- {recipient}\n"
 
     report += "\n### External Processors\n\n"
-    for processor in recipients.get('external_processors', ['None']):
+    for processor in recipients.get("external_processors", ["None"]):
         report += f"- {processor}\n"
 
-    if recipients.get('third_countries'):
+    if recipients.get("third_countries"):
         report += "\n### Third Country Transfers\n\n"
         report += "**Warning**: Transfers require Chapter V safeguards\n\n"
-        for country in recipients['third_countries']:
+        for country in recipients["third_countries"]:
             report += f"- {country}\n"
 
     report += """
@@ -544,7 +549,7 @@ Risk Score: {requirement['risk_score']}/100
 **Recommended Mitigations:**
 
 """
-        for mitigation in risk.get('mitigations', []):
+        for mitigation in risk.get("mitigations", []):
             report += f"- {mitigation}\n"
         report += "\n"
 
@@ -607,27 +612,13 @@ Next Review Date: _______________
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate DPIA documentation"
-    )
+    parser = argparse.ArgumentParser(description="Generate DPIA documentation")
     parser.add_argument(
-        "--input", "-i",
-        help="Path to JSON input file with processing activity details"
+        "--input", "-i", help="Path to JSON input file with processing activity details"
     )
-    parser.add_argument(
-        "--output", "-o",
-        help="Path to output file (default: stdout)"
-    )
-    parser.add_argument(
-        "--template",
-        action="store_true",
-        help="Output a blank JSON template"
-    )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode"
-    )
+    parser.add_argument("--output", "-o", help="Path to output file (default: stdout)")
+    parser.add_argument("--template", action="store_true", help="Output a blank JSON template")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
 
     args = parser.parse_args()
 

@@ -20,22 +20,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-
 # Severity weights for prioritization
-SEVERITY_WEIGHTS = {
-    "critical": 100,
-    "high": 75,
-    "medium": 50,
-    "low": 25,
-    "info": 10
-}
+SEVERITY_WEIGHTS = {"critical": 100, "high": 75, "medium": 50, "low": 25, "info": 10}
 
 # Review verdict thresholds
 VERDICT_THRESHOLDS = {
     "approve": {"max_critical": 0, "max_high": 0, "max_score": 100},
     "approve_with_suggestions": {"max_critical": 0, "max_high": 2, "max_score": 85},
     "request_changes": {"max_critical": 0, "max_high": 5, "max_score": 70},
-    "block": {"max_critical": float("inf"), "max_high": float("inf"), "max_score": 0}
+    "block": {"max_critical": float("inf"), "max_high": float("inf"), "max_score": 0},
 }
 
 
@@ -59,7 +52,7 @@ def run_pr_analyzer(repo_path: Path) -> Dict:
             [sys.executable, str(script_path), str(repo_path), "--json"],
             capture_output=True,
             text=True,
-            timeout=120
+            timeout=120,
         )
         if result.returncode == 0:
             return json.loads(result.stdout)
@@ -79,7 +72,7 @@ def run_quality_checker(repo_path: Path) -> Dict:
             [sys.executable, str(script_path), str(repo_path), "--json"],
             capture_output=True,
             text=True,
-            timeout=300
+            timeout=300,
         )
         if result.returncode == 0:
             return json.loads(result.stdout)
@@ -144,31 +137,33 @@ def generate_findings_list(pr_analysis: Dict, quality_analysis: Dict) -> List[Di
     if "risks" in pr_analysis:
         for severity, items in pr_analysis["risks"].items():
             for item in items:
-                findings.append({
-                    "source": "pr_analysis",
-                    "severity": severity,
-                    "category": item.get("name", "unknown"),
-                    "message": item.get("message", ""),
-                    "file": item.get("file", ""),
-                    "count": item.get("count", 1)
-                })
+                findings.append(
+                    {
+                        "source": "pr_analysis",
+                        "severity": severity,
+                        "category": item.get("name", "unknown"),
+                        "message": item.get("message", ""),
+                        "file": item.get("file", ""),
+                        "count": item.get("count", 1),
+                    }
+                )
 
     # Add code quality findings
     if "issues" in quality_analysis:
         for issue in quality_analysis["issues"]:
-            findings.append({
-                "source": "quality_analysis",
-                "severity": issue.get("severity", "medium"),
-                "category": issue.get("type", "unknown"),
-                "message": issue.get("message", ""),
-                "file": issue.get("file", ""),
-                "line": issue.get("line", 0)
-            })
+            findings.append(
+                {
+                    "source": "quality_analysis",
+                    "severity": issue.get("severity", "medium"),
+                    "category": issue.get("type", "unknown"),
+                    "message": issue.get("message", ""),
+                    "file": issue.get("file", ""),
+                    "line": issue.get("line", 0),
+                }
+            )
 
     # Sort by severity weight
-    findings.sort(
-        key=lambda x: -SEVERITY_WEIGHTS.get(x["severity"], 0)
-    )
+    findings.sort(key=lambda x: -SEVERITY_WEIGHTS.get(x["severity"], 0))
 
     return findings
 
@@ -190,7 +185,7 @@ def generate_action_items(findings: List[Dict]) -> List[Dict]:
             "priority": "P0" if severity == "critical" else "P1" if severity == "high" else "P2",
             "action": get_action_for_category(category, finding),
             "severity": severity,
-            "files_affected": [finding["file"]] if finding.get("file") else []
+            "files_affected": [finding["file"]] if finding.get("file") else [],
         }
         action_items.append(action)
         seen_categories.add(category)
@@ -216,7 +211,7 @@ def get_action_for_category(category: str, finding: Dict) -> str:
         "missing_error_handling": "Add proper error handling and recovery logic",
         "duplicate_code": "Extract duplicate code into shared functions",
         "magic_numbers": "Replace magic numbers with named constants",
-        "large_file": "Consider splitting into multiple smaller modules"
+        "large_file": "Consider splitting into multiple smaller modules",
     }
     return actions.get(category, f"Review and address: {finding.get('message', category)}")
 
@@ -241,7 +236,7 @@ def format_markdown_report(report: Dict) -> str:
         "approve": "✅",
         "approve_with_suggestions": "✅",
         "request_changes": "⚠️",
-        "block": "❌"
+        "block": "❌",
     }.get(verdict, "❓")
 
     lines.append(f"**Verdict:** {verdict_emoji} {verdict.upper().replace('_', ' ')}")
@@ -361,9 +356,7 @@ def format_text_report(report: Dict) -> str:
 
 
 def generate_report(
-    repo_path: Path,
-    pr_analysis: Optional[Dict] = None,
-    quality_analysis: Optional[Dict] = None
+    repo_path: Path, pr_analysis: Optional[Dict] = None, quality_analysis: Optional[Dict] = None
 ) -> Dict:
     """Generate comprehensive review report."""
     # Run analyses if not provided
@@ -381,16 +374,12 @@ def generate_report(
         "critical": len([f for f in findings if f["severity"] == "critical"]),
         "high": len([f for f in findings if f["severity"] == "high"]),
         "medium": len([f for f in findings if f["severity"] == "medium"]),
-        "low": len([f for f in findings if f["severity"] == "low"])
+        "low": len([f for f in findings if f["severity"] == "low"]),
     }
 
     # Calculate score and verdict
     score = calculate_review_score(pr_analysis, quality_analysis)
-    verdict, rationale = determine_verdict(
-        score,
-        issue_counts["critical"],
-        issue_counts["high"]
-    )
+    verdict, rationale = determine_verdict(score, issue_counts["critical"], issue_counts["high"])
 
     # Generate action items
     action_items = generate_action_items(findings)
@@ -400,16 +389,16 @@ def generate_report(
         "metadata": {
             "generated_at": datetime.now().isoformat(),
             "repository": str(repo_path),
-            "version": "1.0.0"
+            "version": "1.0.0",
         },
         "summary": {
             "score": score,
             "verdict": verdict,
             "rationale": rationale,
-            "issue_counts": issue_counts
+            "issue_counts": issue_counts,
         },
         "findings": findings,
-        "action_items": action_items
+        "action_items": action_items,
     }
 
     # Add PR summary if available
@@ -425,37 +414,22 @@ def generate_report(
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Generate comprehensive code review reports"
-    )
+    parser = argparse.ArgumentParser(description="Generate comprehensive code review reports")
     parser.add_argument(
-        "repo_path",
-        nargs="?",
-        default=".",
-        help="Path to repository (default: current directory)"
+        "repo_path", nargs="?", default=".", help="Path to repository (default: current directory)"
     )
+    parser.add_argument("--pr-analysis", help="Path to pre-computed PR analysis JSON")
+    parser.add_argument("--quality-analysis", help="Path to pre-computed quality analysis JSON")
     parser.add_argument(
-        "--pr-analysis",
-        help="Path to pre-computed PR analysis JSON"
-    )
-    parser.add_argument(
-        "--quality-analysis",
-        help="Path to pre-computed quality analysis JSON"
-    )
-    parser.add_argument(
-        "--format", "-f",
+        "--format",
+        "-f",
         choices=["text", "markdown", "json"],
         default="text",
-        help="Output format (default: text)"
+        help="Output format (default: text)",
     )
+    parser.add_argument("--output", "-o", help="Write output to file")
     parser.add_argument(
-        "--output", "-o",
-        help="Write output to file"
-    )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output as JSON (shortcut for --format json)"
+        "--json", action="store_true", help="Output as JSON (shortcut for --format json)"
     )
 
     args = parser.parse_args()

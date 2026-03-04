@@ -193,6 +193,25 @@ pytest tests/test_normalization.py
 pytest tests/test_normalization.py::TestNormalization::test_normalize_unit
 ```
 
+## CI/CD
+
+This project includes comprehensive CI/CD with GitHub Actions:
+
+- ✅ **Lint** - Black formatting + Flake8 linting
+- ✅ **Type Check** - mypy static analysis
+- ✅ **Test** - pytest with coverage reporting
+- ✅ **Security** - Safety vulnerability scanning
+
+**Pre-commit checks:**
+```bash
+uv run black .
+uv run flake8 .
+uv run mypy . --ignore-missing-imports
+uv run pytest --cov=.
+```
+
+**See:** [`CI_QUICK_REFERENCE.md`](CI_QUICK_REFERENCE.md) for all commands and [`CI_IMPLEMENTATION_COMPLETE.md`](CI_IMPLEMENTATION_COMPLETE.md) for detailed setup.
+
 ## Documentation
 
 - **[API.md](API.md)** - Detailed API endpoint documentation

@@ -65,9 +65,7 @@ def get_recipe_by_id(
         Recipe object if found and owned by user (or anonymous), None otherwise
     """
     try:
-        query = _apply_recipe_scope(
-            Recipe.query.filter_by(id=recipe_id), user_id, guest_session_id
-        )
+        query = _apply_recipe_scope(Recipe.query.filter_by(id=recipe_id), user_id, guest_session_id)
 
         return query.first()
     except Exception as e:
@@ -234,9 +232,7 @@ def get_all_recipes(limit: int = 100) -> List[Recipe]:
         return []
 
 
-def count_user_recipes(
-    user_id: Optional[int], guest_session_id: Optional[str] = None
-) -> int:
+def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] = None) -> int:
     """
     Count the number of recipes for a user.
 
@@ -280,9 +276,7 @@ def migrate_file_to_db(
             logger.warning(f"Recipe {recipe_id} already exists in database, skipping")
             return existing
 
-        recipe = Recipe(
-            id=recipe_id, user_id=user_id, name=recipe_name, data=recipe_data
-        )
+        recipe = Recipe(id=recipe_id, user_id=user_id, name=recipe_name, data=recipe_data)
 
         db.session.add(recipe)
         db.session.commit()

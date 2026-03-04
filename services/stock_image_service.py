@@ -92,14 +92,10 @@ def search_unsplash(keywords, per_page=1):
                     user = photo.get("user", {})
                     photographer_name = user.get("name", "Unknown")
                     photographer_username = user.get("username", "")
-                    photographer_url = (
-                        f"https://unsplash.com/@{photographer_username}{utm_params}"
-                    )
+                    photographer_url = f"https://unsplash.com/@{photographer_username}{utm_params}"
                     unsplash_url = f"https://unsplash.com{utm_params}"
 
-                    print(
-                        f"DEBUG: Unsplash found image for '{query}' by {photographer_name}"
-                    )
+                    print(f"DEBUG: Unsplash found image for '{query}' by {photographer_name}")
 
                     return {
                         "url": image_url,
@@ -111,9 +107,7 @@ def search_unsplash(keywords, per_page=1):
                         },
                     }
         else:
-            print(
-                f"DEBUG: Unsplash API returned {response.status_code}: {response.text[:100]}"
-            )
+            print(f"DEBUG: Unsplash API returned {response.status_code}: {response.text[:100]}")
 
     except Exception as e:
         print(f"DEBUG: Unsplash search failed: {e}")
@@ -121,9 +115,7 @@ def search_unsplash(keywords, per_page=1):
     return None
 
 
-def get_smart_stock_image(
-    recipe_name, user_metadata=None, description="", image_keywords=None
-):
+def get_smart_stock_image(recipe_name, user_metadata=None, description="", image_keywords=None):
     """
     Searches Unsplash for a stock image matching the recipe.
 
@@ -162,11 +154,7 @@ def get_smart_stock_image(
 
     try:
         # Strategy 1: Use image_keywords if provided (best option)
-        if (
-            image_keywords
-            and isinstance(image_keywords, list)
-            and len(image_keywords) > 0
-        ):
+        if image_keywords and isinstance(image_keywords, list) and len(image_keywords) > 0:
             metadata["search_query"] = " ".join(image_keywords[:3])
             result = search_unsplash(image_keywords)
             if result:
@@ -239,9 +227,7 @@ def validate_image_url(url):
         bool: True if the URL is valid and returns an image, False otherwise
     """
     # Common headers to mimic a browser request
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
     try:
         # Try HEAD request first (faster, less bandwidth)
@@ -255,9 +241,7 @@ def validate_image_url(url):
 
         # HEAD failed or no content-type - fall back to GET with stream
         # Many servers (Pexels, Unsplash) don't properly support HEAD requests
-        response = requests.get(
-            url, timeout=5, allow_redirects=True, headers=headers, stream=True
-        )
+        response = requests.get(url, timeout=5, allow_redirects=True, headers=headers, stream=True)
 
         if response.status_code != 200:
             print(f"URL validation failed for {url}: status {response.status_code}")
@@ -283,9 +267,7 @@ def validate_image_url(url):
         ):  # SVG
             return True
 
-        print(
-            f"URL validation failed for {url}: not an image (content-type: {content_type})"
-        )
+        print(f"URL validation failed for {url}: not an image (content-type: {content_type})")
         return False
 
     except Exception as e:

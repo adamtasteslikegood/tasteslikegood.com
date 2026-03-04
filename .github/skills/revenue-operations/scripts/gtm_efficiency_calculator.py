@@ -282,9 +282,7 @@ def calculate_burn_multiple(net_burn: float, net_new_arr: float) -> dict[str, An
     }
 
 
-def calculate_rule_of_40(
-    revenue_growth_pct: float, fcf_margin_pct: float
-) -> dict[str, Any]:
+def calculate_rule_of_40(revenue_growth_pct: float, fcf_margin_pct: float) -> dict[str, Any]:
     """Calculate Rule of 40.
 
     Formula: Revenue Growth % + FCF Margin %
@@ -426,8 +424,7 @@ def generate_recommendations(metrics: dict) -> list[str]:
 
     # Positive summary if everything is green
     green_count = sum(
-        1 for m in metrics.values()
-        if isinstance(m, dict) and m.get("rating") == "Green"
+        1 for m in metrics.values() if isinstance(m, dict) and m.get("rating") == "Green"
     )
     total_metrics = 6
     if green_count == total_metrics:
@@ -528,9 +525,7 @@ def format_text_report(results: dict) -> str:
 
     for key, name, fmt_fn in metrics_order:
         m = results[key]
-        lines.append(
-            f"  {name:25s} {fmt_fn(m):>12s} {m['rating']:>8s} {m['target']:>15s}"
-        )
+        lines.append(f"  {name:25s} {fmt_fn(m):>12s} {m['rating']:>8s} {m['target']:>15s}")
 
     # Detailed breakdown
     lines.append("")

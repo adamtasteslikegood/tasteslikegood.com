@@ -159,14 +159,16 @@ class CAPATracker:
         for capa in sorted(overdue_capas, key=lambda c: c.days_open, reverse=True):
             target = datetime.strptime(capa.target_date, "%Y-%m-%d")
             days_overdue = (self.today - target).days
-            overdue_list.append({
-                "capa_number": capa.capa_number,
-                "title": capa.title,
-                "severity": capa.severity.value,
-                "status": capa.status.value,
-                "days_overdue": days_overdue,
-                "owner": capa.owner
-            })
+            overdue_list.append(
+                {
+                    "capa_number": capa.capa_number,
+                    "title": capa.title,
+                    "severity": capa.severity.value,
+                    "status": capa.status.value,
+                    "days_overdue": days_overdue,
+                    "owner": capa.owner,
+                }
+            )
 
         # Generate recommendations
         recommendations = self._generate_recommendations(
@@ -184,7 +186,7 @@ class CAPATracker:
             by_severity=by_severity,
             by_source=by_source,
             overdue_list=overdue_list,
-            recommendations=recommendations
+            recommendations=recommendations,
         )
 
     def _generate_recommendations(
@@ -192,7 +194,7 @@ class CAPATracker:
         open_capas: List[CAPA],
         overdue_capas: List[CAPA],
         effectiveness: float,
-        avg_cycle: float
+        avg_cycle: float,
     ) -> List[str]:
         """Generate actionable recommendations."""
         recommendations = []
@@ -252,8 +254,7 @@ class CAPATracker:
 
         if not recommendations:
             recommendations.append(
-                "CAPA program operating within targets. "
-                "Continue monitoring key metrics."
+                "CAPA program operating within targets. " "Continue monitoring key metrics."
             )
 
         return recommendations
@@ -261,9 +262,11 @@ class CAPATracker:
     def get_aging_report(self) -> Dict:
         """Generate aging analysis of open CAPAs."""
         open_statuses = [
-            CAPAStatus.OPEN, CAPAStatus.INVESTIGATION,
-            CAPAStatus.ACTION_PLANNING, CAPAStatus.IMPLEMENTATION,
-            CAPAStatus.VERIFICATION
+            CAPAStatus.OPEN,
+            CAPAStatus.INVESTIGATION,
+            CAPAStatus.ACTION_PLANNING,
+            CAPAStatus.IMPLEMENTATION,
+            CAPAStatus.VERIFICATION,
         ]
         open_capas = [c for c in self.capas if c.status in open_statuses]
 
@@ -272,7 +275,7 @@ class CAPATracker:
             "31-60 days": [],
             "61-90 days": [],
             "91-120 days": [],
-            ">120 days": []
+            ">120 days": [],
         }
 
         for capa in open_capas:
@@ -288,13 +291,15 @@ class CAPATracker:
             else:
                 bucket = ">120 days"
 
-            aging_buckets[bucket].append({
-                "capa_number": capa.capa_number,
-                "title": capa.title,
-                "days_open": days,
-                "status": capa.status.value,
-                "severity": capa.severity.value
-            })
+            aging_buckets[bucket].append(
+                {
+                    "capa_number": capa.capa_number,
+                    "title": capa.title,
+                    "days_open": days,
+                    "status": capa.status.value,
+                    "severity": capa.severity.value,
+                }
+            )
 
         return aging_buckets
 
@@ -324,43 +329,51 @@ def format_text_output(metrics: CAPAMetrics, aging: Dict) -> str:
         bar = "█" * min(count, 20)
         lines.append(f"  {status:<25} {bar} {count}")
 
-    lines.extend([
-        "",
-        "SEVERITY DISTRIBUTION",
-        "-" * 40,
-    ])
+    lines.extend(
+        [
+            "",
+            "SEVERITY DISTRIBUTION",
+            "-" * 40,
+        ]
+    )
 
     for severity, count in metrics.by_severity.items():
         bar = "█" * min(count, 20)
         lines.append(f"  {severity:<25} {bar} {count}")
 
-    lines.extend([
-        "",
-        "SOURCE DISTRIBUTION",
-        "-" * 40,
-    ])
+    lines.extend(
+        [
+            "",
+            "SOURCE DISTRIBUTION",
+            "-" * 40,
+        ]
+    )
 
     for source, count in metrics.by_source.items():
         bar = "█" * min(count, 20)
         lines.append(f"  {source:<25} {bar} {count}")
 
-    lines.extend([
-        "",
-        "AGING ANALYSIS",
-        "-" * 40,
-    ])
+    lines.extend(
+        [
+            "",
+            "AGING ANALYSIS",
+            "-" * 40,
+        ]
+    )
 
     for bucket, capas in aging.items():
         lines.append(f"  {bucket}: {len(capas)} CAPA(s)")
 
     if metrics.overdue_list:
-        lines.extend([
-            "",
-            "OVERDUE CAPAs",
-            "-" * 40,
-            f"{'CAPA #':<12} {'Title':<25} {'Days':<6} {'Owner':<15}",
-            "-" * 60,
-        ])
+        lines.extend(
+            [
+                "",
+                "OVERDUE CAPAs",
+                "-" * 40,
+                f"{'CAPA #':<12} {'Title':<25} {'Days':<6} {'Owner':<15}",
+                "-" * 60,
+            ]
+        )
 
         for item in metrics.overdue_list[:10]:
             title = item["title"][:24] if len(item["title"]) > 24 else item["title"]
@@ -372,11 +385,13 @@ def format_text_output(metrics: CAPAMetrics, aging: Dict) -> str:
         if len(metrics.overdue_list) > 10:
             lines.append(f"... and {len(metrics.overdue_list) - 10} more")
 
-    lines.extend([
-        "",
-        "RECOMMENDATIONS",
-        "-" * 40,
-    ])
+    lines.extend(
+        [
+            "",
+            "RECOMMENDATIONS",
+            "-" * 40,
+        ]
+    )
 
     for i, rec in enumerate(metrics.recommendations, 1):
         lines.append(f"{i}. {rec}")
@@ -402,7 +417,9 @@ def interactive_mode():
         title = input("Title: ").strip()
         description = input("Description: ").strip()
 
-        print("Source options: C=Complaint, A=Audit, N=Nonconformance, M=Management Review, T=Trend, O=Other")
+        print(
+            "Source options: C=Complaint, A=Audit, N=Nonconformance, M=Management Review, T=Trend, O=Other"
+        )
         source_input = input("Source [C/A/N/M/T/O]: ").strip().upper()
         source_map = {
             "C": CAPASource.COMPLAINT,
@@ -410,7 +427,7 @@ def interactive_mode():
             "N": CAPASource.NONCONFORMANCE,
             "M": CAPASource.MANAGEMENT_REVIEW,
             "T": CAPASource.TREND_ANALYSIS,
-            "O": CAPASource.OTHER
+            "O": CAPASource.OTHER,
         }
         source = source_map.get(source_input, CAPASource.OTHER)
 
@@ -419,11 +436,13 @@ def interactive_mode():
         severity_map = {
             "C": CAPASeverity.CRITICAL,
             "M": CAPASeverity.MAJOR,
-            "I": CAPASeverity.MINOR
+            "I": CAPASeverity.MINOR,
         }
         severity = severity_map.get(severity_input, CAPASeverity.MINOR)
 
-        print("Status: O=Open, I=Investigation, P=Action Planning, M=Implementation, V=Verification, E=Closed Effective, N=Closed Ineffective")
+        print(
+            "Status: O=Open, I=Investigation, P=Action Planning, M=Implementation, V=Verification, E=Closed Effective, N=Closed Ineffective"
+        )
         status_input = input("Status [O/I/P/M/V/E/N]: ").strip().upper()
         status_map = {
             "O": CAPAStatus.OPEN,
@@ -432,7 +451,7 @@ def interactive_mode():
             "M": CAPAStatus.IMPLEMENTATION,
             "V": CAPAStatus.VERIFICATION,
             "E": CAPAStatus.CLOSED_EFFECTIVE,
-            "N": CAPAStatus.CLOSED_INEFFECTIVE
+            "N": CAPAStatus.CLOSED_INEFFECTIVE,
         }
         status = status_map.get(status_input, CAPAStatus.OPEN)
 
@@ -444,18 +463,20 @@ def interactive_mode():
         if status in [CAPAStatus.CLOSED_EFFECTIVE, CAPAStatus.CLOSED_INEFFECTIVE]:
             close_date = input("Close Date (YYYY-MM-DD): ").strip()
 
-        capas.append(CAPA(
-            capa_number=capa_num,
-            title=title,
-            description=description,
-            source=source,
-            severity=severity,
-            status=status,
-            open_date=open_date,
-            target_date=target_date,
-            owner=owner,
-            close_date=close_date if close_date else None
-        ))
+        capas.append(
+            CAPA(
+                capa_number=capa_num,
+                title=title,
+                description=description,
+                source=source,
+                severity=severity,
+                status=status,
+                open_date=open_date,
+                target_date=target_date,
+                owner=owner,
+                close_date=close_date if close_date else None,
+            )
+        )
 
         print(f"\nAdded: {capa_num}\n")
 
@@ -470,30 +491,11 @@ def interactive_mode():
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="CAPA Tracking and Metrics Tool"
-    )
-    parser.add_argument(
-        "--capas",
-        type=str,
-        help="JSON file with CAPA data"
-    )
-    parser.add_argument(
-        "--output",
-        choices=["text", "json"],
-        default="text",
-        help="Output format"
-    )
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Run in interactive mode"
-    )
-    parser.add_argument(
-        "--sample",
-        action="store_true",
-        help="Generate sample CAPA data file"
-    )
+    parser = argparse.ArgumentParser(description="CAPA Tracking and Metrics Tool")
+    parser.add_argument("--capas", type=str, help="JSON file with CAPA data")
+    parser.add_argument("--output", choices=["text", "json"], default="text", help="Output format")
+    parser.add_argument("--interactive", action="store_true", help="Run in interactive mode")
+    parser.add_argument("--sample", action="store_true", help="Generate sample CAPA data file")
 
     args = parser.parse_args()
 
@@ -515,7 +517,7 @@ def main():
                     "target_date": "2024-08-15",
                     "owner": "J. Smith",
                     "root_cause": "No trigger for schedule update at equipment purchase",
-                    "corrective_action": "Updated SOP-EQ-001 to require schedule update"
+                    "corrective_action": "Updated SOP-EQ-001 to require schedule update",
                 },
                 {
                     "capa_number": "CAPA-2024-002",
@@ -526,7 +528,7 @@ def main():
                     "status": "INVESTIGATION",
                     "open_date": "2024-09-01",
                     "target_date": "2024-10-01",
-                    "owner": "M. Jones"
+                    "owner": "M. Jones",
                 },
                 {
                     "capa_number": "CAPA-2024-003",
@@ -538,8 +540,8 @@ def main():
                     "open_date": "2024-03-10",
                     "target_date": "2024-06-10",
                     "owner": "A. Brown",
-                    "close_date": "2024-05-20"
-                }
+                    "close_date": "2024-05-20",
+                },
             ]
         }
         print(json.dumps(sample_data, indent=2))
@@ -566,21 +568,23 @@ def main():
             except KeyError:
                 status = CAPAStatus.OPEN
 
-            capas.append(CAPA(
-                capa_number=c["capa_number"],
-                title=c.get("title", ""),
-                description=c.get("description", ""),
-                source=source,
-                severity=severity,
-                status=status,
-                open_date=c["open_date"],
-                target_date=c["target_date"],
-                owner=c.get("owner", ""),
-                root_cause=c.get("root_cause", ""),
-                corrective_action=c.get("corrective_action", ""),
-                verification_date=c.get("verification_date"),
-                close_date=c.get("close_date")
-            ))
+            capas.append(
+                CAPA(
+                    capa_number=c["capa_number"],
+                    title=c.get("title", ""),
+                    description=c.get("description", ""),
+                    source=source,
+                    severity=severity,
+                    status=status,
+                    open_date=c["open_date"],
+                    target_date=c["target_date"],
+                    owner=c.get("owner", ""),
+                    root_cause=c.get("root_cause", ""),
+                    corrective_action=c.get("corrective_action", ""),
+                    verification_date=c.get("verification_date"),
+                    close_date=c.get("close_date"),
+                )
+            )
     else:
         # Demo data if no file provided
         capas = [
@@ -593,7 +597,7 @@ def main():
                 status=CAPAStatus.VERIFICATION,
                 open_date="2024-06-15",
                 target_date="2024-08-15",
-                owner="J. Smith"
+                owner="J. Smith",
             ),
             CAPA(
                 capa_number="CAPA-2024-002",
@@ -604,7 +608,7 @@ def main():
                 status=CAPAStatus.INVESTIGATION,
                 open_date="2024-09-01",
                 target_date="2024-10-01",
-                owner="M. Jones"
+                owner="M. Jones",
             ),
             CAPA(
                 capa_number="CAPA-2024-003",
@@ -616,8 +620,8 @@ def main():
                 open_date="2024-03-10",
                 target_date="2024-06-10",
                 owner="A. Brown",
-                close_date="2024-05-20"
-            )
+                close_date="2024-05-20",
+            ),
         ]
 
     tracker = CAPATracker(capas)
@@ -625,10 +629,7 @@ def main():
     aging = tracker.get_aging_report()
 
     if args.output == "json":
-        output = {
-            "metrics": asdict(metrics),
-            "aging": aging
-        }
+        output = {"metrics": asdict(metrics), "aging": aging}
         print(json.dumps(output, indent=2))
     else:
         print(format_text_output(metrics, aging))

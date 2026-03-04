@@ -16,7 +16,6 @@ import json
 import sys
 from typing import Any
 
-
 # Coverage status to score mapping
 COVERAGE_SCORES: dict[str, float] = {
     "full": 1.0,
@@ -123,8 +122,10 @@ def generate_gap_analysis(analyzed_reqs: list[dict[str, Any]]) -> list[dict[str,
     gaps = []
     for req in analyzed_reqs:
         if req["coverage_status"] in ("gap", "partial", "planned"):
-            severity = "critical" if req["priority"] == "must-have" else (
-                "high" if req["priority"] == "should-have" else "low"
+            severity = (
+                "critical"
+                if req["priority"] == "must-have"
+                else ("high" if req["priority"] == "should-have" else "low")
             )
 
             mitigation = req["mitigation"]
@@ -136,16 +137,18 @@ def generate_gap_analysis(analyzed_reqs: list[dict[str, Any]]) -> list[dict[str,
                 else:
                     mitigation = "Evaluate build vs. partner vs. no-bid for this requirement"
 
-            gaps.append({
-                "id": req["id"],
-                "requirement": req["requirement"],
-                "category": req["category"],
-                "priority": req["priority"],
-                "coverage_status": req["coverage_status"],
-                "severity": severity,
-                "effort_hours": req["effort_hours"],
-                "mitigation": mitigation,
-            })
+            gaps.append(
+                {
+                    "id": req["id"],
+                    "requirement": req["requirement"],
+                    "category": req["category"],
+                    "priority": req["priority"],
+                    "coverage_status": req["coverage_status"],
+                    "severity": severity,
+                    "effort_hours": req["effort_hours"],
+                    "mitigation": mitigation,
+                }
+            )
 
     # Sort by severity: critical > high > low
     severity_order = {"critical": 0, "high": 1, "low": 2}
@@ -225,22 +228,32 @@ def determine_bid_recommendation(
     # Primary decision logic
     if coverage_ratio >= BID_THRESHOLD and must_have_gaps <= MAX_MUST_HAVE_GAPS_FOR_BID:
         decision = "BID"
-        reasons.append(f"Coverage score {overall_coverage:.1f}% exceeds {BID_THRESHOLD*100:.0f}% threshold")
+        reasons.append(
+            f"Coverage score {overall_coverage:.1f}% exceeds {BID_THRESHOLD*100:.0f}% threshold"
+        )
         if must_have_gaps > 0:
-            reasons.append(f"{must_have_gaps} must-have gap(s) within acceptable range (max {MAX_MUST_HAVE_GAPS_FOR_BID})")
+            reasons.append(
+                f"{must_have_gaps} must-have gap(s) within acceptable range (max {MAX_MUST_HAVE_GAPS_FOR_BID})"
+            )
     elif coverage_ratio >= CONDITIONAL_THRESHOLD or (
         must_have_gaps <= MAX_MUST_HAVE_GAPS_FOR_BID and coverage_ratio >= 0.4
     ):
         decision = "CONDITIONAL BID"
-        reasons.append(f"Coverage score {overall_coverage:.1f}% in conditional range ({CONDITIONAL_THRESHOLD*100:.0f}%-{BID_THRESHOLD*100:.0f}%)")
+        reasons.append(
+            f"Coverage score {overall_coverage:.1f}% in conditional range ({CONDITIONAL_THRESHOLD*100:.0f}%-{BID_THRESHOLD*100:.0f}%)"
+        )
         if must_have_gaps > 0:
             reasons.append(f"{must_have_gaps} must-have gap(s) require mitigation plan")
     else:
         decision = "NO-BID"
         if coverage_ratio < CONDITIONAL_THRESHOLD:
-            reasons.append(f"Coverage score {overall_coverage:.1f}% below {CONDITIONAL_THRESHOLD*100:.0f}% minimum")
+            reasons.append(
+                f"Coverage score {overall_coverage:.1f}% below {CONDITIONAL_THRESHOLD*100:.0f}% minimum"
+            )
         if must_have_gaps > MAX_MUST_HAVE_GAPS_FOR_BID:
-            reasons.append(f"{must_have_gaps} must-have gaps exceed maximum of {MAX_MUST_HAVE_GAPS_FOR_BID}")
+            reasons.append(
+                f"{must_have_gaps} must-have gaps exceed maximum of {MAX_MUST_HAVE_GAPS_FOR_BID}"
+            )
 
     # Strategic value adjustment
     if strategic_value.lower() == "high" and decision == "CONDITIONAL BID":
@@ -249,8 +262,8 @@ def determine_bid_recommendation(
         decision = "NO-BID"
         reasons.append("Low strategic value does not justify investment for conditional coverage")
 
-    confidence = "high" if coverage_ratio >= 0.80 else (
-        "medium" if coverage_ratio >= 0.60 else "low"
+    confidence = (
+        "high" if coverage_ratio >= 0.80 else ("medium" if coverage_ratio >= 0.60 else "low")
     )
 
     return {
@@ -280,54 +293,66 @@ def generate_risk_assessment(
 
     critical_gaps = [g for g in gaps if g["severity"] == "critical"]
     if critical_gaps:
-        risks.append({
-            "risk": "Critical requirement gaps",
-            "impact": "high",
-            "description": f"{len(critical_gaps)} must-have requirements not fully met",
-            "mitigation": "Prioritize engineering effort or partner integration for gap closure",
-        })
+        risks.append(
+            {
+                "risk": "Critical requirement gaps",
+                "impact": "high",
+                "description": f"{len(critical_gaps)} must-have requirements not fully met",
+                "mitigation": "Prioritize engineering effort or partner integration for gap closure",
+            }
+        )
 
     total_effort = sum(r["effort_hours"] for r in analyzed_reqs if r["coverage_status"] != "full")
     if total_effort > 200:
-        risks.append({
-            "risk": "High customization effort",
-            "impact": "high",
-            "description": f"{total_effort} hours estimated for non-full requirements",
-            "mitigation": "Evaluate resource availability and timeline feasibility before committing",
-        })
+        risks.append(
+            {
+                "risk": "High customization effort",
+                "impact": "high",
+                "description": f"{total_effort} hours estimated for non-full requirements",
+                "mitigation": "Evaluate resource availability and timeline feasibility before committing",
+            }
+        )
     elif total_effort > 80:
-        risks.append({
-            "risk": "Moderate customization effort",
-            "impact": "medium",
-            "description": f"{total_effort} hours estimated for non-full requirements",
-            "mitigation": "Phase implementation and set clear expectations on delivery timeline",
-        })
+        risks.append(
+            {
+                "risk": "Moderate customization effort",
+                "impact": "medium",
+                "description": f"{total_effort} hours estimated for non-full requirements",
+                "mitigation": "Phase implementation and set clear expectations on delivery timeline",
+            }
+        )
 
     planned_count = sum(1 for r in analyzed_reqs if r["coverage_status"] == "planned")
     if planned_count > 3:
-        risks.append({
-            "risk": "Roadmap dependency",
-            "impact": "medium",
-            "description": f"{planned_count} requirements depend on planned product features",
-            "mitigation": "Confirm roadmap timelines with product team; include contractual commitments if needed",
-        })
+        risks.append(
+            {
+                "risk": "Roadmap dependency",
+                "impact": "medium",
+                "description": f"{planned_count} requirements depend on planned product features",
+                "mitigation": "Confirm roadmap timelines with product team; include contractual commitments if needed",
+            }
+        )
 
     partial_count = sum(1 for r in analyzed_reqs if r["coverage_status"] == "partial")
     if partial_count > 5:
-        risks.append({
-            "risk": "Workaround complexity",
-            "impact": "medium",
-            "description": f"{partial_count} requirements need workarounds or configuration",
-            "mitigation": "Document workarounds clearly; plan for native support in future releases",
-        })
+        risks.append(
+            {
+                "risk": "Workaround complexity",
+                "impact": "medium",
+                "description": f"{partial_count} requirements need workarounds or configuration",
+                "mitigation": "Document workarounds clearly; plan for native support in future releases",
+            }
+        )
 
     if not risks:
-        risks.append({
-            "risk": "No significant risks identified",
-            "impact": "low",
-            "description": "Strong coverage across all requirement categories",
-            "mitigation": "Maintain standard engagement process",
-        })
+        risks.append(
+            {
+                "risk": "No significant risks identified",
+                "impact": "low",
+                "description": "Strong coverage across all requirement categories",
+                "mitigation": "Maintain standard engagement process",
+            }
+        )
 
     return risks
 
@@ -366,8 +391,7 @@ def analyze_rfp(data: dict[str, Any]) -> dict[str, Any]:
 
     # Must-have gap count
     must_have_gaps = sum(
-        1 for r in analyzed_reqs
-        if r["priority"] == "must-have" and r["coverage_status"] == "gap"
+        1 for r in analyzed_reqs if r["priority"] == "must-have" and r["coverage_status"] == "gap"
     )
 
     # Category breakdown
@@ -442,7 +466,9 @@ def format_text(result: dict[str, Any]) -> str:
     lines.append("-" * 70)
     lines.append(f"Overall Coverage:  {cs['overall_coverage_percentage']}%")
     lines.append(f"Total Requirements: {cs['total_requirements']}")
-    lines.append(f"  Full:    {cs['full']}  |  Partial: {cs['partial']}  |  Planned: {cs['planned']}  |  Gap: {cs['gap']}")
+    lines.append(
+        f"  Full:    {cs['full']}  |  Partial: {cs['partial']}  |  Planned: {cs['planned']}  |  Gap: {cs['gap']}"
+    )
     lines.append(f"Must-Have Gaps:    {cs['must_have_gaps']}")
     lines.append("")
 
@@ -460,7 +486,9 @@ def format_text(result: dict[str, Any]) -> str:
     lines.append("-" * 70)
     lines.append("CATEGORY BREAKDOWN")
     lines.append("-" * 70)
-    lines.append(f"{'Category':<25} {'Coverage':>8} {'Full':>5} {'Part':>5} {'Plan':>5} {'Gap':>5} {'Effort':>7}")
+    lines.append(
+        f"{'Category':<25} {'Coverage':>8} {'Full':>5} {'Part':>5} {'Plan':>5} {'Gap':>5} {'Effort':>7}"
+    )
     lines.append("-" * 70)
     for cat, scores in result["category_scores"].items():
         lines.append(
@@ -478,11 +506,15 @@ def format_text(result: dict[str, Any]) -> str:
         lines.append("GAP ANALYSIS")
         lines.append("-" * 70)
         for gap in gaps:
-            severity_marker = "!!!" if gap["severity"] == "critical" else (
-                "!!" if gap["severity"] == "high" else "!"
+            severity_marker = (
+                "!!!"
+                if gap["severity"] == "critical"
+                else ("!!" if gap["severity"] == "high" else "!")
             )
             lines.append(f"  [{severity_marker}] {gap['id']}: {gap['requirement']}")
-            lines.append(f"       Category: {gap['category']} | Priority: {gap['priority']} | Status: {gap['coverage_status']}")
+            lines.append(
+                f"       Category: {gap['category']} | Priority: {gap['priority']} | Status: {gap['coverage_status']}"
+            )
             lines.append(f"       Effort: {gap['effort_hours']}h | Mitigation: {gap['mitigation']}")
             lines.append("")
 

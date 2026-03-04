@@ -65,9 +65,9 @@ def refresh_models():
     models, auth_method, error = refresh_models_from_api(session_credentials)
 
     if error:
-        return jsonify(
-            {"error": error, "auth_method": auth_method}
-        ), 401 if auth_method is None else 500
+        return jsonify({"error": error, "auth_method": auth_method}), (
+            401 if auth_method is None else 500
+        )
 
     # Calculate total fetched (need to reload cache for full count)
     cached_models = load_models_from_cache()
@@ -130,9 +130,7 @@ def regenerate_recipe_image(filename):
         recipe_data = get_recipe(filename)
 
         # Generate image (force_regenerate=True overwrites existing)
-        image_url, error = generate_ai_image(
-            filepath, recipe_data, filename, force_regenerate=True
-        )
+        image_url, error = generate_ai_image(filepath, recipe_data, filename, force_regenerate=True)
 
         if error:
             return jsonify(error), error["status"]

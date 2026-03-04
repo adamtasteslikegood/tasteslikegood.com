@@ -26,52 +26,52 @@ class PatternDetector:
 
     # Pattern signatures
     PATTERNS = {
-        'layered': {
-            'indicators': ['controller', 'service', 'repository', 'dao', 'model', 'entity'],
-            'structure': ['controllers', 'services', 'repositories', 'models'],
-            'weight': 0,
+        "layered": {
+            "indicators": ["controller", "service", "repository", "dao", "model", "entity"],
+            "structure": ["controllers", "services", "repositories", "models"],
+            "weight": 0,
         },
-        'mvc': {
-            'indicators': ['model', 'view', 'controller'],
-            'structure': ['models', 'views', 'controllers'],
-            'weight': 0,
+        "mvc": {
+            "indicators": ["model", "view", "controller"],
+            "structure": ["models", "views", "controllers"],
+            "weight": 0,
         },
-        'hexagonal': {
-            'indicators': ['port', 'adapter', 'domain', 'infrastructure', 'application'],
-            'structure': ['ports', 'adapters', 'domain', 'infrastructure'],
-            'weight': 0,
+        "hexagonal": {
+            "indicators": ["port", "adapter", "domain", "infrastructure", "application"],
+            "structure": ["ports", "adapters", "domain", "infrastructure"],
+            "weight": 0,
         },
-        'clean': {
-            'indicators': ['entity', 'usecase', 'interface', 'framework', 'adapter'],
-            'structure': ['entities', 'usecases', 'interfaces', 'frameworks'],
-            'weight': 0,
+        "clean": {
+            "indicators": ["entity", "usecase", "interface", "framework", "adapter"],
+            "structure": ["entities", "usecases", "interfaces", "frameworks"],
+            "weight": 0,
         },
-        'microservices': {
-            'indicators': ['service', 'api', 'gateway', 'docker', 'kubernetes'],
-            'structure': ['services', 'api-gateway', 'docker-compose'],
-            'weight': 0,
+        "microservices": {
+            "indicators": ["service", "api", "gateway", "docker", "kubernetes"],
+            "structure": ["services", "api-gateway", "docker-compose"],
+            "weight": 0,
         },
-        'modular_monolith': {
-            'indicators': ['module', 'feature', 'bounded'],
-            'structure': ['modules', 'features'],
-            'weight': 0,
+        "modular_monolith": {
+            "indicators": ["module", "feature", "bounded"],
+            "structure": ["modules", "features"],
+            "weight": 0,
         },
-        'feature_based': {
-            'indicators': ['feature', 'component', 'page'],
-            'structure': ['features', 'components', 'pages'],
-            'weight': 0,
+        "feature_based": {
+            "indicators": ["feature", "component", "page"],
+            "structure": ["features", "components", "pages"],
+            "weight": 0,
         },
     }
 
     # Layer definitions for violation detection
     LAYER_HIERARCHY = {
-        'presentation': ['controller', 'handler', 'view', 'page', 'component', 'ui', 'route'],
-        'application': ['service', 'usecase', 'application', 'facade'],
-        'domain': ['domain', 'entity', 'model', 'aggregate', 'valueobject'],
-        'infrastructure': ['repository', 'dao', 'adapter', 'gateway', 'client', 'config'],
+        "presentation": ["controller", "handler", "view", "page", "component", "ui", "route"],
+        "application": ["service", "usecase", "application", "facade"],
+        "domain": ["domain", "entity", "model", "aggregate", "valueobject"],
+        "infrastructure": ["repository", "dao", "adapter", "gateway", "client", "config"],
     }
 
-    LAYER_ORDER = ['presentation', 'application', 'domain', 'infrastructure']
+    LAYER_ORDER = ["presentation", "application", "domain", "infrastructure"]
 
     def __init__(self, project_path: Path):
         self.project_path = project_path
@@ -88,25 +88,35 @@ class PatternDetector:
         self._assign_layers()
 
         return {
-            'detected_pattern': self.detected_pattern,
-            'confidence': self.confidence,
-            'directories': list(self.directories),
-            'layer_assignments': self.layer_assignments,
-            'pattern_scores': {p: d['weight'] for p, d in self.PATTERNS.items()},
+            "detected_pattern": self.detected_pattern,
+            "confidence": self.confidence,
+            "directories": list(self.directories),
+            "layer_assignments": self.layer_assignments,
+            "pattern_scores": {p: d["weight"] for p, d in self.PATTERNS.items()},
         }
 
     def _scan_structure(self):
         """Scan directory structure."""
-        ignore_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv',
-                       'dist', 'build', '.next', 'coverage', '.pytest_cache'}
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+            ".pytest_cache",
+        }
 
         for item in self.project_path.iterdir():
-            if item.is_dir() and item.name not in ignore_dirs and not item.name.startswith('.'):
+            if item.is_dir() and item.name not in ignore_dirs and not item.name.startswith("."):
                 self.directories.add(item.name.lower())
 
                 # Scan files in directory
                 try:
-                    for f in item.rglob('*'):
+                    for f in item.rglob("*"):
                         if f.is_file():
                             self.files[item.name.lower()].append(f.name.lower())
                 except PermissionError:
@@ -118,32 +128,36 @@ class PatternDetector:
             score = 0
 
             # Check directory structure
-            for struct in config['structure']:
+            for struct in config["structure"]:
                 if struct.lower() in self.directories:
                     score += 2
 
             # Check indicator presence in directory names
-            for indicator in config['indicators']:
+            for indicator in config["indicators"]:
                 for dir_name in self.directories:
                     if indicator in dir_name:
                         score += 1
 
             # Check file patterns
             all_files = [f for files in self.files.values() for f in files]
-            for indicator in config['indicators']:
+            for indicator in config["indicators"]:
                 matching_files = sum(1 for f in all_files if indicator in f)
                 score += min(matching_files // 5, 3)  # Cap contribution
 
-            config['weight'] = score
+            config["weight"] = score
 
         # Find best match
-        best_pattern = max(self.PATTERNS.items(), key=lambda x: x[1]['weight'])
-        if best_pattern[1]['weight'] > 3:
+        best_pattern = max(self.PATTERNS.items(), key=lambda x: x[1]["weight"])
+        if best_pattern[1]["weight"] > 3:
             self.detected_pattern = best_pattern[0]
-            max_possible = len(best_pattern[1]['structure']) * 2 + len(best_pattern[1]['indicators']) * 2
-            self.confidence = min(100, int((best_pattern[1]['weight'] / max(max_possible, 1)) * 100))
+            max_possible = (
+                len(best_pattern[1]["structure"]) * 2 + len(best_pattern[1]["indicators"]) * 2
+            )
+            self.confidence = min(
+                100, int((best_pattern[1]["weight"] / max(max_possible, 1)) * 100)
+            )
         else:
-            self.detected_pattern = 'unstructured'
+            self.detected_pattern = "unstructured"
             self.confidence = 0
 
     def _assign_layers(self):
@@ -158,7 +172,7 @@ class PatternDetector:
                     break
 
             if dir_name not in self.layer_assignments:
-                self.layer_assignments[dir_name] = 'unknown'
+                self.layer_assignments[dir_name] = "unknown"
 
 
 class CodeAnalyzer:
@@ -184,108 +198,143 @@ class CodeAnalyzer:
         self._check_naming_conventions()
 
         return {
-            'issues': self.issues,
-            'metrics': self.metrics,
+            "issues": self.issues,
+            "metrics": self.metrics,
         }
 
     def _analyze_file_sizes(self):
         """Check for oversized files."""
-        extensions = ['.py', '.js', '.ts', '.jsx', '.tsx', '.go', '.rs', '.java']
+        extensions = [".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs", ".java"]
         large_files = []
         total_lines = 0
         file_count = 0
 
-        ignore_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv',
-                       'dist', 'build', '.next', 'coverage'}
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+        }
 
         for ext in extensions:
-            for file_path in self.project_path.rglob(f'*{ext}'):
+            for file_path in self.project_path.rglob(f"*{ext}"):
                 if any(ignored in file_path.parts for ignored in ignore_dirs):
                     continue
 
                 try:
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
-                    lines = len(content.split('\n'))
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
+                    lines = len(content.split("\n"))
                     total_lines += lines
                     file_count += 1
 
                     if lines > self.MAX_FILE_LINES:
-                        large_files.append({
-                            'path': str(file_path.relative_to(self.project_path)),
-                            'lines': lines,
-                        })
-                        self.issues.append({
-                            'type': 'large_file',
-                            'severity': 'warning',
-                            'file': str(file_path.relative_to(self.project_path)),
-                            'message': f"File has {lines} lines (threshold: {self.MAX_FILE_LINES})",
-                            'suggestion': "Consider splitting into smaller, focused modules",
-                        })
+                        large_files.append(
+                            {
+                                "path": str(file_path.relative_to(self.project_path)),
+                                "lines": lines,
+                            }
+                        )
+                        self.issues.append(
+                            {
+                                "type": "large_file",
+                                "severity": "warning",
+                                "file": str(file_path.relative_to(self.project_path)),
+                                "message": f"File has {lines} lines (threshold: {self.MAX_FILE_LINES})",
+                                "suggestion": "Consider splitting into smaller, focused modules",
+                            }
+                        )
                 except Exception:
                     pass
 
-        self.metrics['total_lines'] = total_lines
-        self.metrics['file_count'] = file_count
-        self.metrics['avg_file_lines'] = total_lines // file_count if file_count > 0 else 0
-        self.metrics['large_files'] = large_files
+        self.metrics["total_lines"] = total_lines
+        self.metrics["file_count"] = file_count
+        self.metrics["avg_file_lines"] = total_lines // file_count if file_count > 0 else 0
+        self.metrics["large_files"] = large_files
 
     def _analyze_imports(self):
         """Analyze import patterns."""
-        extensions = ['.py', '.js', '.ts', '.jsx', '.tsx']
+        extensions = [".py", ".js", ".ts", ".jsx", ".tsx"]
         high_import_files = []
 
-        ignore_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv',
-                       'dist', 'build', '.next', 'coverage'}
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+        }
 
         for ext in extensions:
-            for file_path in self.project_path.rglob(f'*{ext}'):
+            for file_path in self.project_path.rglob(f"*{ext}"):
                 if any(ignored in file_path.parts for ignored in ignore_dirs):
                     continue
 
                 try:
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
 
                     # Count imports
-                    py_imports = len(re.findall(r'^(?:from|import)\s+', content, re.MULTILINE))
-                    js_imports = len(re.findall(r'^import\s+', content, re.MULTILINE))
+                    py_imports = len(re.findall(r"^(?:from|import)\s+", content, re.MULTILINE))
+                    js_imports = len(re.findall(r"^import\s+", content, re.MULTILINE))
                     imports = py_imports + js_imports
 
                     if imports > self.MAX_IMPORTS_PER_FILE:
-                        high_import_files.append({
-                            'path': str(file_path.relative_to(self.project_path)),
-                            'imports': imports,
-                        })
-                        self.issues.append({
-                            'type': 'high_imports',
-                            'severity': 'info',
-                            'file': str(file_path.relative_to(self.project_path)),
-                            'message': f"File has {imports} imports (threshold: {self.MAX_IMPORTS_PER_FILE})",
-                            'suggestion': "Consider if all imports are necessary or if the file has too many responsibilities",
-                        })
+                        high_import_files.append(
+                            {
+                                "path": str(file_path.relative_to(self.project_path)),
+                                "imports": imports,
+                            }
+                        )
+                        self.issues.append(
+                            {
+                                "type": "high_imports",
+                                "severity": "info",
+                                "file": str(file_path.relative_to(self.project_path)),
+                                "message": f"File has {imports} imports (threshold: {self.MAX_IMPORTS_PER_FILE})",
+                                "suggestion": "Consider if all imports are necessary or if the file has too many responsibilities",
+                            }
+                        )
                 except Exception:
                     pass
 
-        self.metrics['high_import_files'] = high_import_files
+        self.metrics["high_import_files"] = high_import_files
 
     def _detect_god_classes(self):
         """Detect potential god classes (oversized classes)."""
-        extensions = ['.py', '.js', '.ts', '.java']
+        extensions = [".py", ".js", ".ts", ".java"]
         god_classes = []
 
-        ignore_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv',
-                       'dist', 'build', '.next', 'coverage'}
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+        }
 
         for ext in extensions:
-            for file_path in self.project_path.rglob(f'*{ext}'):
+            for file_path in self.project_path.rglob(f"*{ext}"):
                 if any(ignored in file_path.parts for ignored in ignore_dirs):
                     continue
 
                 try:
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
-                    lines = content.split('\n')
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
+                    lines = content.split("\n")
 
                     # Simple class detection
-                    class_pattern = r'^\s*(?:export\s+)?(?:abstract\s+)?class\s+(\w+)'
+                    class_pattern = r"^\s*(?:export\s+)?(?:abstract\s+)?class\s+(\w+)"
                     in_class = False
                     class_name = None
                     class_start = 0
@@ -298,11 +347,13 @@ class CodeAnalyzer:
                                 # End previous class
                                 class_lines = i - class_start
                                 if class_lines > self.MAX_CLASS_LINES:
-                                    god_classes.append({
-                                        'file': str(file_path.relative_to(self.project_path)),
-                                        'class': class_name,
-                                        'lines': class_lines,
-                                    })
+                                    god_classes.append(
+                                        {
+                                            "file": str(file_path.relative_to(self.project_path)),
+                                            "class": class_name,
+                                            "lines": class_lines,
+                                        }
+                                    )
                             class_name = match.group(1)
                             class_start = i
                             in_class = True
@@ -311,33 +362,46 @@ class CodeAnalyzer:
                     if in_class and class_name:
                         class_lines = len(lines) - class_start
                         if class_lines > self.MAX_CLASS_LINES:
-                            god_classes.append({
-                                'file': str(file_path.relative_to(self.project_path)),
-                                'class': class_name,
-                                'lines': class_lines,
-                            })
-                            self.issues.append({
-                                'type': 'god_class',
-                                'severity': 'warning',
-                                'file': str(file_path.relative_to(self.project_path)),
-                                'message': f"Class '{class_name}' has ~{class_lines} lines (threshold: {self.MAX_CLASS_LINES})",
-                                'suggestion': "Consider applying Single Responsibility Principle and splitting into smaller classes",
-                            })
+                            god_classes.append(
+                                {
+                                    "file": str(file_path.relative_to(self.project_path)),
+                                    "class": class_name,
+                                    "lines": class_lines,
+                                }
+                            )
+                            self.issues.append(
+                                {
+                                    "type": "god_class",
+                                    "severity": "warning",
+                                    "file": str(file_path.relative_to(self.project_path)),
+                                    "message": f"Class '{class_name}' has ~{class_lines} lines (threshold: {self.MAX_CLASS_LINES})",
+                                    "suggestion": "Consider applying Single Responsibility Principle and splitting into smaller classes",
+                                }
+                            )
 
                 except Exception:
                     pass
 
-        self.metrics['god_classes'] = god_classes
+        self.metrics["god_classes"] = god_classes
 
     def _check_naming_conventions(self):
         """Check for naming convention issues."""
-        ignore_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv',
-                       'dist', 'build', '.next', 'coverage'}
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+        }
 
         naming_issues = []
 
         # Check directory naming
-        for dir_path in self.project_path.rglob('*'):
+        for dir_path in self.project_path.rglob("*"):
             if not dir_path.is_dir():
                 continue
             if any(ignored in dir_path.parts for ignored in ignore_dirs):
@@ -345,37 +409,41 @@ class CodeAnalyzer:
 
             dir_name = dir_path.name
             # Check for mixed case in directories (should be kebab-case or snake_case)
-            if re.search(r'[A-Z]', dir_name) and '-' not in dir_name and '_' not in dir_name:
+            if re.search(r"[A-Z]", dir_name) and "-" not in dir_name and "_" not in dir_name:
                 rel_path = str(dir_path.relative_to(self.project_path))
-                if len(rel_path.split('/')) <= 3:  # Only check top-level dirs
-                    naming_issues.append({
-                        'type': 'directory',
-                        'path': rel_path,
-                        'issue': 'PascalCase directory name',
-                    })
+                if len(rel_path.split("/")) <= 3:  # Only check top-level dirs
+                    naming_issues.append(
+                        {
+                            "type": "directory",
+                            "path": rel_path,
+                            "issue": "PascalCase directory name",
+                        }
+                    )
 
         if naming_issues:
-            self.issues.append({
-                'type': 'naming_convention',
-                'severity': 'info',
-                'message': f"Found {len(naming_issues)} naming convention inconsistencies",
-                'details': naming_issues[:5],  # Show first 5
-            })
+            self.issues.append(
+                {
+                    "type": "naming_convention",
+                    "severity": "info",
+                    "message": f"Found {len(naming_issues)} naming convention inconsistencies",
+                    "details": naming_issues[:5],  # Show first 5
+                }
+            )
 
-        self.metrics['naming_issues'] = naming_issues
+        self.metrics["naming_issues"] = naming_issues
 
 
 class LayerViolationDetector:
     """Detects architectural layer violations."""
 
-    LAYER_ORDER = ['presentation', 'application', 'domain', 'infrastructure']
+    LAYER_ORDER = ["presentation", "application", "domain", "infrastructure"]
 
     # Valid dependency directions (key can depend on values)
     VALID_DEPENDENCIES = {
-        'presentation': ['application', 'domain'],
-        'application': ['domain', 'infrastructure'],
-        'domain': [],  # Domain should not depend on other layers
-        'infrastructure': ['domain'],
+        "presentation": ["application", "domain"],
+        "application": ["domain", "infrastructure"],
+        "domain": [],  # Domain should not depend on other layers
+        "infrastructure": ["domain"],
     }
 
     def __init__(self, project_path: Path, layer_assignments: Dict[str, str]):
@@ -390,12 +458,21 @@ class LayerViolationDetector:
 
     def _analyze_imports(self):
         """Analyze imports for layer violations."""
-        extensions = ['.py', '.js', '.ts', '.jsx', '.tsx']
-        ignore_dirs = {'.git', 'node_modules', '__pycache__', '.venv', 'venv',
-                       'dist', 'build', '.next', 'coverage'}
+        extensions = [".py", ".js", ".ts", ".jsx", ".tsx"]
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            "__pycache__",
+            ".venv",
+            "venv",
+            "dist",
+            "build",
+            ".next",
+            "coverage",
+        }
 
         for ext in extensions:
-            for file_path in self.project_path.rglob(f'*{ext}'):
+            for file_path in self.project_path.rglob(f"*{ext}"):
                 if any(ignored in file_path.parts for ignored in ignore_dirs):
                     continue
 
@@ -407,11 +484,11 @@ class LayerViolationDetector:
                     source_dir = rel_path.parts[0].lower()
                     source_layer = self.layer_assignments.get(source_dir)
 
-                    if not source_layer or source_layer == 'unknown':
+                    if not source_layer or source_layer == "unknown":
                         continue
 
                     # Extract imports
-                    content = file_path.read_text(encoding='utf-8', errors='ignore')
+                    content = file_path.read_text(encoding="utf-8", errors="ignore")
                     imports = self._extract_imports(content)
 
                     # Check each import for layer violations
@@ -421,19 +498,21 @@ class LayerViolationDetector:
                             continue
 
                         target_layer = self.layer_assignments.get(target_dir.lower())
-                        if not target_layer or target_layer == 'unknown':
+                        if not target_layer or target_layer == "unknown":
                             continue
 
                         if self._is_violation(source_layer, target_layer):
-                            self.violations.append({
-                                'type': 'layer_violation',
-                                'severity': 'warning',
-                                'file': str(rel_path),
-                                'source_layer': source_layer,
-                                'target_layer': target_layer,
-                                'import': imp,
-                                'message': f"{source_layer} layer should not depend on {target_layer} layer",
-                            })
+                            self.violations.append(
+                                {
+                                    "type": "layer_violation",
+                                    "severity": "warning",
+                                    "file": str(rel_path),
+                                    "source_layer": source_layer,
+                                    "target_layer": target_layer,
+                                    "import": imp,
+                                    "message": f"{source_layer} layer should not depend on {target_layer} layer",
+                                }
+                            )
 
                 except Exception:
                     pass
@@ -443,7 +522,7 @@ class LayerViolationDetector:
         imports = []
 
         # Python imports
-        imports.extend(re.findall(r'^(?:from|import)\s+([\w.]+)', content, re.MULTILINE))
+        imports.extend(re.findall(r"^(?:from|import)\s+([\w.]+)", content, re.MULTILINE))
 
         # JS/TS imports
         imports.extend(re.findall(r'(?:import|require)\s*\(?[\'"]([^\'"\s]+)[\'"]', content))
@@ -453,12 +532,12 @@ class LayerViolationDetector:
     def _get_import_directory(self, imp: str) -> Optional[str]:
         """Get the directory from an import path."""
         # Handle relative imports
-        if imp.startswith('.'):
+        if imp.startswith("."):
             return None  # Skip relative imports
 
-        parts = imp.replace('@/', '').replace('~/', '').split('/')
+        parts = imp.replace("@/", "").replace("~/", "").split("/")
         if parts:
-            return parts[0].split('.')[0]
+            return parts[0].split(".")[0]
         return None
 
     def _is_violation(self, source_layer: str, target_layer: str) -> bool:
@@ -487,8 +566,10 @@ class ProjectArchitect:
         pattern_result = pattern_detector.scan()
 
         if self.verbose:
-            print(f"Detected pattern: {pattern_result['detected_pattern']} "
-                  f"(confidence: {pattern_result['confidence']}%)")
+            print(
+                f"Detected pattern: {pattern_result['detected_pattern']} "
+                f"(confidence: {pattern_result['confidence']}%)"
+            )
 
         # Code analysis
         code_analyzer = CodeAnalyzer(self.project_path, self.verbose)
@@ -499,8 +580,7 @@ class ProjectArchitect:
 
         # Layer violation detection
         violation_detector = LayerViolationDetector(
-            self.project_path,
-            pattern_result['layer_assignments']
+            self.project_path, pattern_result["layer_assignments"]
         )
         violations = violation_detector.detect()
 
@@ -508,46 +588,45 @@ class ProjectArchitect:
             print(f"Found {len(violations)} layer violations")
 
         # Generate recommendations
-        recommendations = self._generate_recommendations(
-            pattern_result, code_result, violations
-        )
+        recommendations = self._generate_recommendations(pattern_result, code_result, violations)
 
         return {
-            'project_path': str(self.project_path),
-            'architecture': {
-                'detected_pattern': pattern_result['detected_pattern'],
-                'confidence': pattern_result['confidence'],
-                'layer_assignments': pattern_result['layer_assignments'],
-                'pattern_scores': pattern_result['pattern_scores'],
+            "project_path": str(self.project_path),
+            "architecture": {
+                "detected_pattern": pattern_result["detected_pattern"],
+                "confidence": pattern_result["confidence"],
+                "layer_assignments": pattern_result["layer_assignments"],
+                "pattern_scores": pattern_result["pattern_scores"],
             },
-            'structure': {
-                'directories': pattern_result['directories'],
+            "structure": {
+                "directories": pattern_result["directories"],
             },
-            'code_quality': {
-                'metrics': code_result['metrics'],
-                'issues': code_result['issues'],
+            "code_quality": {
+                "metrics": code_result["metrics"],
+                "issues": code_result["issues"],
             },
-            'layer_violations': violations,
-            'recommendations': recommendations,
-            'summary': {
-                'pattern': pattern_result['detected_pattern'],
-                'confidence': pattern_result['confidence'],
-                'total_issues': len(code_result['issues']) + len(violations),
-                'code_issues': len(code_result['issues']),
-                'layer_violations': len(violations),
+            "layer_violations": violations,
+            "recommendations": recommendations,
+            "summary": {
+                "pattern": pattern_result["detected_pattern"],
+                "confidence": pattern_result["confidence"],
+                "total_issues": len(code_result["issues"]) + len(violations),
+                "code_issues": len(code_result["issues"]),
+                "layer_violations": len(violations),
             },
         }
 
-    def _generate_recommendations(self, pattern_result: Dict, code_result: Dict,
-                                   violations: List[Dict]) -> List[str]:
+    def _generate_recommendations(
+        self, pattern_result: Dict, code_result: Dict, violations: List[Dict]
+    ) -> List[str]:
         """Generate actionable recommendations."""
         recommendations = []
 
         # Pattern recommendations
-        pattern = pattern_result['detected_pattern']
-        confidence = pattern_result['confidence']
+        pattern = pattern_result["detected_pattern"]
+        confidence = pattern_result["confidence"]
 
-        if pattern == 'unstructured' or confidence < 30:
+        if pattern == "unstructured" or confidence < 30:
             recommendations.append(
                 "Consider adopting a clear architectural pattern (Layered, Clean, or Hexagonal) "
                 "to improve code organization and maintainability"
@@ -561,7 +640,7 @@ class ProjectArchitect:
             )
 
         # God class recommendations
-        god_classes = code_result['metrics'].get('god_classes', [])
+        god_classes = code_result["metrics"].get("god_classes", [])
         if god_classes:
             recommendations.append(
                 f"Split {len(god_classes)} large class(es) into smaller, focused classes "
@@ -569,17 +648,17 @@ class ProjectArchitect:
             )
 
         # Large file recommendations
-        large_files = code_result['metrics'].get('large_files', [])
+        large_files = code_result["metrics"].get("large_files", [])
         if large_files:
             recommendations.append(
                 f"Consider refactoring {len(large_files)} large file(s) into smaller modules"
             )
 
         # Missing layer recommendations
-        assigned_layers = set(pattern_result['layer_assignments'].values())
-        if pattern in ['layered', 'clean', 'hexagonal']:
-            expected_layers = {'presentation', 'application', 'domain', 'infrastructure'}
-            missing = expected_layers - assigned_layers - {'unknown'}
+        assigned_layers = set(pattern_result["layer_assignments"].values())
+        if pattern in ["layered", "clean", "hexagonal"]:
+            expected_layers = {"presentation", "application", "domain", "infrastructure"}
+            missing = expected_layers - assigned_layers - {"unknown"}
             if missing:
                 recommendations.append(
                     f"Consider adding missing architectural layer(s): {', '.join(missing)}"
@@ -595,47 +674,47 @@ def print_human_report(report: Dict):
     print("=" * 60)
     print(f"\nProject: {report['project_path']}")
 
-    arch = report['architecture']
+    arch = report["architecture"]
     print(f"\n--- Architecture Pattern ---")
     print(f"Detected: {arch['detected_pattern'].replace('_', ' ').title()}")
     print(f"Confidence: {arch['confidence']}%")
 
-    if arch['layer_assignments']:
+    if arch["layer_assignments"]:
         print(f"\nLayer Assignments:")
-        for dir_name, layer in sorted(arch['layer_assignments'].items()):
-            if layer != 'unknown':
+        for dir_name, layer in sorted(arch["layer_assignments"].items()):
+            if layer != "unknown":
                 status = "OK"
             else:
                 status = "?"
             print(f"  {status} {dir_name:20} -> {layer}")
 
-    summary = report['summary']
+    summary = report["summary"]
     print(f"\n--- Summary ---")
     print(f"Total issues: {summary['total_issues']}")
     print(f"  Code issues: {summary['code_issues']}")
     print(f"  Layer violations: {summary['layer_violations']}")
 
-    if report['code_quality']['issues']:
+    if report["code_quality"]["issues"]:
         print(f"\n--- Code Issues ---")
-        for issue in report['code_quality']['issues'][:10]:
-            severity = issue['severity'].upper()
+        for issue in report["code_quality"]["issues"][:10]:
+            severity = issue["severity"].upper()
             print(f"  [{severity}] {issue.get('file', 'N/A')}")
             print(f"          {issue['message']}")
-            if 'suggestion' in issue:
+            if "suggestion" in issue:
                 print(f"          Suggestion: {issue['suggestion']}")
 
-    if report['layer_violations']:
+    if report["layer_violations"]:
         print(f"\n--- Layer Violations ---")
-        for v in report['layer_violations'][:5]:
+        for v in report["layer_violations"][:5]:
             print(f"  {v['file']}")
             print(f"      {v['message']}")
 
-    if report['recommendations']:
+    if report["recommendations"]:
         print(f"\n--- Recommendations ---")
-        for i, rec in enumerate(report['recommendations'], 1):
+        for i, rec in enumerate(report["recommendations"], 1):
             print(f"  {i}. {rec}")
 
-    metrics = report['code_quality']['metrics']
+    metrics = report["code_quality"]["metrics"]
     print(f"\n--- Metrics ---")
     print(f"  Total lines: {metrics.get('total_lines', 'N/A')}")
     print(f"  File count: {metrics.get('file_count', 'N/A')}")
@@ -646,9 +725,9 @@ def print_human_report(report: Dict):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Analyze project architecture and detect patterns and issues',
+        description="Analyze project architecture and detect patterns and issues",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
+        epilog="""
 Examples:
   %(prog)s ./my-project
   %(prog)s ./my-project --verbose
@@ -660,34 +739,25 @@ Detects:
   - Code organization issues (large files, god classes)
   - Layer violations (incorrect dependencies between layers)
   - Missing architectural components
-        '''
+        """,
     )
 
+    parser.add_argument("project_path", help="Path to the project directory")
     parser.add_argument(
-        'project_path',
-        help='Path to the project directory'
+        "--output",
+        "-o",
+        choices=["human", "json"],
+        default="human",
+        help="Output format (default: human)",
     )
     parser.add_argument(
-        '--output', '-o',
-        choices=['human', 'json'],
-        default='human',
-        help='Output format (default: human)'
+        "--check",
+        choices=["all", "pattern", "layers", "code"],
+        default="all",
+        help="What to check (default: all)",
     )
-    parser.add_argument(
-        '--check',
-        choices=['all', 'pattern', 'layers', 'code'],
-        default='all',
-        help='What to check (default: all)'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    parser.add_argument(
-        '--save', '-s',
-        help='Save report to file'
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    parser.add_argument("--save", "-s", help="Save report to file")
 
     args = parser.parse_args()
 
@@ -705,12 +775,12 @@ Detects:
     report = architect.analyze()
 
     # Handle specific checks
-    if args.check == 'pattern':
-        arch = report['architecture']
+    if args.check == "pattern":
+        arch = report["architecture"]
         print(f"Pattern: {arch['detected_pattern']} (confidence: {arch['confidence']}%)")
         sys.exit(0)
-    elif args.check == 'layers':
-        violations = report['layer_violations']
+    elif args.check == "layers":
+        violations = report["layer_violations"]
         if violations:
             print(f"Found {len(violations)} layer violation(s):")
             for v in violations:
@@ -719,19 +789,19 @@ Detects:
         else:
             print("No layer violations found.")
             sys.exit(0)
-    elif args.check == 'code':
-        issues = report['code_quality']['issues']
+    elif args.check == "code":
+        issues = report["code_quality"]["issues"]
         if issues:
             print(f"Found {len(issues)} code issue(s):")
             for issue in issues[:10]:
                 print(f"  [{issue['severity'].upper()}] {issue['message']}")
-            sys.exit(1 if any(i['severity'] == 'warning' for i in issues) else 0)
+            sys.exit(1 if any(i["severity"] == "warning" for i in issues) else 0)
         else:
             print("No code issues found.")
             sys.exit(0)
 
     # Output report
-    if args.output == 'json':
+    if args.output == "json":
         output = json.dumps(report, indent=2)
         if args.save:
             Path(args.save).write_text(output)
@@ -745,5 +815,5 @@ Detects:
             print(f"\nJSON report saved to {args.save}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

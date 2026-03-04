@@ -96,7 +96,7 @@ def filter_and_sort_models(models_list):
         if not ("gemini" in model_name or "gemma" in model_name):
             continue
 
-        # Metadata check: If the API doesn't provide methods, we rely on name-based 
+        # Metadata check: If the API doesn't provide methods, we rely on name-based
         # filtering above (exclude_patterns) which is more robust.
         supported_methods = m.get("supported_generation_methods", [])
 

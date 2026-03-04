@@ -60,9 +60,7 @@ def calculate_coverage_ratio(deals: list[dict], quota: float) -> dict[str, Any]:
     }
 
 
-def calculate_stage_conversion_rates(
-    deals: list[dict], stages: list[str]
-) -> list[dict[str, Any]]:
+def calculate_stage_conversion_rates(deals: list[dict], stages: list[str]) -> list[dict[str, Any]]:
     """Calculate stage-to-stage conversion rates.
 
     Measures the percentage of deals that progress from one stage to the next.
@@ -86,13 +84,15 @@ def calculate_stage_conversion_rates(
         to_count = stage_counts[to_stage]
         rate = safe_divide(to_count, from_count) * 100
 
-        conversions.append({
-            "from_stage": from_stage,
-            "to_stage": to_stage,
-            "from_count": from_count,
-            "to_count": to_count,
-            "conversion_rate_pct": round(rate, 1),
-        })
+        conversions.append(
+            {
+                "from_stage": from_stage,
+                "to_stage": to_stage,
+                "from_count": from_count,
+                "to_count": to_count,
+                "conversion_rate_pct": round(rate, 1),
+            }
+        )
 
     return conversions
 
@@ -118,17 +118,11 @@ def calculate_sales_velocity(deals: list[dict]) -> dict[str, Any]:
     all_considered = deals
 
     num_opportunities = len(all_considered)
-    avg_deal_size = safe_divide(
-        sum(d["value"] for d in all_considered), num_opportunities
-    )
+    avg_deal_size = safe_divide(sum(d["value"] for d in all_considered), num_opportunities)
     win_rate = safe_divide(len(won_deals), num_opportunities)
-    avg_cycle_days = safe_divide(
-        sum(d["age_days"] for d in all_considered), num_opportunities
-    )
+    avg_cycle_days = safe_divide(sum(d["age_days"] for d in all_considered), num_opportunities)
 
-    velocity_per_day = safe_divide(
-        num_opportunities * avg_deal_size * win_rate, avg_cycle_days
-    )
+    velocity_per_day = safe_divide(num_opportunities * avg_deal_size * win_rate, avg_cycle_days)
 
     return {
         "num_opportunities": num_opportunities,
@@ -176,15 +170,17 @@ def analyze_deal_aging(
 
         if age > threshold:
             at_risk_deals += 1
-            aging_deals.append({
-                "id": deal["id"],
-                "name": deal["name"],
-                "stage": stage,
-                "age_days": age,
-                "threshold_days": threshold,
-                "days_over": age - threshold,
-                "value": deal["value"],
-            })
+            aging_deals.append(
+                {
+                    "id": deal["id"],
+                    "name": deal["name"],
+                    "stage": stage,
+                    "age_days": age,
+                    "threshold_days": threshold,
+                    "days_over": age - threshold,
+                    "value": deal["value"],
+                }
+            )
         else:
             healthy_deals += 1
 
@@ -200,9 +196,7 @@ def analyze_deal_aging(
     }
 
 
-def assess_pipeline_risk(
-    deals: list[dict], quota: float, stages: list[str]
-) -> dict[str, Any]:
+def assess_pipeline_risk(deals: list[dict], quota: float, stages: list[str]) -> dict[str, Any]:
     """Assess overall pipeline risk.
 
     Checks for:
@@ -218,25 +212,27 @@ def assess_pipeline_risk(
     for deal in open_deals:
         pct = safe_divide(deal["value"], total_pipeline) * 100
         if pct > 40:
-            concentration_risks.append({
-                "id": deal["id"],
-                "name": deal["name"],
-                "value": deal["value"],
-                "pct_of_pipeline": round(pct, 1),
-                "risk_level": "HIGH",
-            })
+            concentration_risks.append(
+                {
+                    "id": deal["id"],
+                    "name": deal["name"],
+                    "value": deal["value"],
+                    "pct_of_pipeline": round(pct, 1),
+                    "risk_level": "HIGH",
+                }
+            )
         elif pct > 25:
-            concentration_risks.append({
-                "id": deal["id"],
-                "name": deal["name"],
-                "value": deal["value"],
-                "pct_of_pipeline": round(pct, 1),
-                "risk_level": "MEDIUM",
-            })
+            concentration_risks.append(
+                {
+                    "id": deal["id"],
+                    "name": deal["name"],
+                    "value": deal["value"],
+                    "pct_of_pipeline": round(pct, 1),
+                    "risk_level": "MEDIUM",
+                }
+            )
 
-    has_concentration_risk = any(
-        r["risk_level"] == "HIGH" for r in concentration_risks
-    )
+    has_concentration_risk = any(r["risk_level"] == "HIGH" for r in concentration_risks)
 
     # Stage distribution
     stage_distribution: dict[str, dict] = {}
@@ -253,9 +249,7 @@ def assess_pipeline_risk(
         }
 
     # Check for empty stages (unhealthy funnel)
-    empty_stages = [
-        stage for stage, data in stage_distribution.items() if data["count"] == 0
-    ]
+    empty_stages = [stage for stage, data in stage_distribution.items() if data["count"] == 0]
 
     # Coverage gap by quarter
     today = date.today()
@@ -264,9 +258,7 @@ def assess_pipeline_risk(
         try:
             close_date = parse_date(deal["close_date"])
             quarter = get_quarter(close_date)
-            quarterly_coverage[quarter] = (
-                quarterly_coverage.get(quarter, 0) + deal["value"]
-            )
+            quarterly_coverage[quarter] = quarterly_coverage.get(quarter, 0) + deal["value"]
         except (ValueError, KeyError):
             pass
 
@@ -275,13 +267,15 @@ def assess_pipeline_risk(
     for quarter, value in sorted(quarterly_coverage.items()):
         coverage = safe_divide(value, quarterly_target)
         if coverage < 3.0:
-            coverage_gaps.append({
-                "quarter": quarter,
-                "pipeline_value": value,
-                "quarterly_target": quarterly_target,
-                "coverage_ratio": round(coverage, 2),
-                "gap": "Below 3x target",
-            })
+            coverage_gaps.append(
+                {
+                    "quarter": quarter,
+                    "pipeline_value": value,
+                    "quarterly_target": quarterly_target,
+                    "coverage_ratio": round(coverage, 2),
+                    "gap": "Below 3x target",
+                }
+            )
 
     # Overall risk rating
     risk_factors = 0

@@ -104,9 +104,7 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
         # Log error to file for debugging
         # TODO: Implement log rotation using Python's logging module with RotatingFileHandler
         with open("recipe_error.txt", "a") as f:
-            f.write(
-                f"\nLast Error (Image Gen): {repr(e)}\nTraceback:\n{traceback_str}\n"
-            )
+            f.write(f"\nLast Error (Image Gen): {repr(e)}\nTraceback:\n{traceback_str}\n")
 
         return None, {"error": error_msg, "status": 500}
 

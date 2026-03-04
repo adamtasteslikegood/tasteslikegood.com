@@ -60,27 +60,30 @@ def list_recipes(user_id, guest_session_id):
     try:
         recipes = db_recipe_repository.get_user_recipes(user_id, guest_session_id)
 
-        return jsonify(
-            {
-                "recipes": [
-                    {
-                        "id": recipe.id,
-                        "name": recipe.name,
-                        "data": recipe.data,
-                        "created_at": recipe.created_at.isoformat()
-                        if recipe.created_at
-                        else None,
-                        "updated_at": recipe.updated_at.isoformat()
-                        if recipe.updated_at
-                        else None,
-                    }
-                    for recipe in recipes
-                ],
-                "count": len(recipes),
-                "user_id": user_id,
-                "guest_session_id": guest_session_id,
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "recipes": [
+                        {
+                            "id": recipe.id,
+                            "name": recipe.name,
+                            "data": recipe.data,
+                            "created_at": (
+                                recipe.created_at.isoformat() if recipe.created_at else None
+                            ),
+                            "updated_at": (
+                                recipe.updated_at.isoformat() if recipe.updated_at else None
+                            ),
+                        }
+                        for recipe in recipes
+                    ],
+                    "count": len(recipes),
+                    "user_id": user_id,
+                    "guest_session_id": guest_session_id,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error listing recipes: {e}")
@@ -113,9 +116,7 @@ def create_recipe(user_id, guest_session_id):
         if "name" not in recipe_data:
             return jsonify({"error": "Recipe name is required"}), 400
 
-        recipe = db_recipe_repository.create_recipe(
-            recipe_data, user_id, guest_session_id
-        )
+        recipe = db_recipe_repository.create_recipe(recipe_data, user_id, guest_session_id)
 
         if not recipe:
             return jsonify({"error": "Failed to create recipe"}), 500
@@ -136,9 +137,7 @@ def get_recipe(user_id, guest_session_id, recipe_id):
     Only returns recipe if it belongs to the current user (or is anonymous for guests).
     """
     try:
-        recipe = db_recipe_repository.get_recipe_by_id(
-            recipe_id, user_id, guest_session_id
-        )
+        recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
 
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
@@ -192,9 +191,7 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
     Only allows deletion if recipe belongs to current user (or is anonymous for guests).
     """
     try:
-        success = db_recipe_repository.delete_recipe(
-            recipe_id, user_id, guest_session_id
-        )
+        success = db_recipe_repository.delete_recipe(recipe_id, user_id, guest_session_id)
 
         if not success:
             return jsonify({"error": "Recipe not found or delete failed"}), 404
@@ -221,13 +218,16 @@ def get_recipe_stats(user_id, guest_session_id):
     try:
         count = db_recipe_repository.count_user_recipes(user_id, guest_session_id)
 
-        return jsonify(
-            {
-                "total_recipes": count,
-                "user_id": user_id,
-                "guest_session_id": guest_session_id,
-            }
-        ), 200
+        return (
+            jsonify(
+                {
+                    "total_recipes": count,
+                    "user_id": user_id,
+                    "guest_session_id": guest_session_id,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error fetching recipe stats: {e}")

@@ -45,10 +45,7 @@ def login():
     }
 
     # Check if credentials are present
-    if (
-        not client_config["web"]["client_id"]
-        or not client_config["web"]["client_secret"]
-    ):
+    if not client_config["web"]["client_id"] or not client_config["web"]["client_secret"]:
         return (
             "Error: GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET not set in environment.",
             500,
@@ -93,9 +90,7 @@ def callback():
         session["credentials"] = credentials_to_dict(credentials)
 
         # Get user info
-        userinfo_service = googleapiclient.discovery.build(
-            "oauth2", "v2", credentials=credentials
-        )
+        userinfo_service = googleapiclient.discovery.build("oauth2", "v2", credentials=credentials)
         user_info = userinfo_service.userinfo().get().execute()
         session["user_info"] = user_info
 

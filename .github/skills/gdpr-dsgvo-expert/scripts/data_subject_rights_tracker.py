@@ -21,7 +21,6 @@ from pathlib import Path
 from typing import Dict, List, Optional
 from uuid import uuid4
 
-
 # GDPR Articles for each right
 RIGHTS_TYPES = {
     "access": {
@@ -36,8 +35,8 @@ RIGHTS_TYPES = {
             "Retention period or criteria",
             "Right to lodge complaint",
             "Source of data (if not collected from subject)",
-            "Existence of automated decision-making"
-        ]
+            "Existence of automated decision-making",
+        ],
     },
     "rectification": {
         "article": "Art. 16",
@@ -47,8 +46,8 @@ RIGHTS_TYPES = {
         "response_includes": [
             "Confirmation of correction",
             "Details of corrected data",
-            "Notification to recipients"
-        ]
+            "Notification to recipients",
+        ],
     },
     "erasure": {
         "article": "Art. 17",
@@ -61,15 +60,15 @@ RIGHTS_TYPES = {
             "Objection to processing (no overriding grounds)",
             "Unlawful processing",
             "Legal obligation to erase",
-            "Data collected from child"
+            "Data collected from child",
         ],
         "exceptions": [
             "Freedom of expression",
             "Legal obligation to retain",
             "Public health reasons",
             "Archiving in public interest",
-            "Legal claims"
-        ]
+            "Legal claims",
+        ],
     },
     "restriction": {
         "article": "Art. 18",
@@ -80,8 +79,8 @@ RIGHTS_TYPES = {
             "Accuracy contested (during verification)",
             "Processing is unlawful (erasure opposed)",
             "Controller no longer needs data (subject needs for legal claims)",
-            "Objection pending verification"
-        ]
+            "Objection pending verification",
+        ],
     },
     "portability": {
         "article": "Art. 20",
@@ -90,13 +89,13 @@ RIGHTS_TYPES = {
         "description": "Data subject has the right to receive their data in a portable format",
         "conditions": [
             "Processing based on consent or contract",
-            "Processing carried out by automated means"
+            "Processing carried out by automated means",
         ],
         "format_requirements": [
             "Structured format",
             "Commonly used format",
-            "Machine-readable format"
-        ]
+            "Machine-readable format",
+        ],
     },
     "objection": {
         "article": "Art. 21",
@@ -106,8 +105,8 @@ RIGHTS_TYPES = {
         "applies_to": [
             "Processing based on legitimate interests",
             "Processing for direct marketing",
-            "Processing for research/statistics"
-        ]
+            "Processing for research/statistics",
+        ],
     },
     "automated": {
         "article": "Art. 22",
@@ -117,9 +116,9 @@ RIGHTS_TYPES = {
         "includes": [
             "Right to human intervention",
             "Right to express point of view",
-            "Right to contest decision"
-        ]
-    }
+            "Right to contest decision",
+        ],
+    },
 }
 
 # Request statuses
@@ -131,7 +130,7 @@ STATUSES = {
     "extended": "Deadline extended (complex request)",
     "completed": "Request completed and response sent",
     "refused": "Request refused (with justification)",
-    "escalated": "Escalated to DPO/legal"
+    "escalated": "Escalated to DPO/legal",
 }
 
 
@@ -161,11 +160,7 @@ class RightsTracker:
         return f"DSR-{datetime.now().strftime('%Y%m')}-{count:04d}"
 
     def add_request(
-        self,
-        right_type: str,
-        subject_name: str,
-        subject_email: str,
-        details: str = ""
+        self, right_type: str, subject_name: str, subject_email: str, details: str = ""
     ) -> Dict:
         """Add a new data subject request."""
         if right_type not in RIGHTS_TYPES:
@@ -180,11 +175,7 @@ class RightsTracker:
             "type": right_type,
             "article": right_info["article"],
             "right_name": right_info["name"],
-            "subject": {
-                "name": subject_name,
-                "email": subject_email,
-                "verified": False
-            },
+            "subject": {"name": subject_name, "email": subject_email, "verified": False},
             "details": details,
             "status": "received",
             "status_description": STATUSES["received"],
@@ -192,22 +183,17 @@ class RightsTracker:
                 "received": now.isoformat(),
                 "deadline": deadline.isoformat(),
                 "verified": None,
-                "completed": None
+                "completed": None,
             },
             "notes": [],
-            "response": None
+            "response": None,
         }
 
         self.requests["requests"].append(request)
         self._save_requests()
         return request
 
-    def update_status(
-        self,
-        request_id: str,
-        new_status: str,
-        note: str = ""
-    ) -> Optional[Dict]:
+    def update_status(self, request_id: str, new_status: str, note: str = "") -> Optional[Dict]:
         """Update request status."""
         if new_status not in STATUSES:
             raise ValueError(f"Invalid status. Must be one of: {list(STATUSES.keys())}")
@@ -228,10 +214,7 @@ class RightsTracker:
                     req["dates"]["deadline"] = (original_deadline + timedelta(days=60)).isoformat()
 
                 if note:
-                    req["notes"].append({
-                        "timestamp": datetime.now().isoformat(),
-                        "note": note
-                    })
+                    req["notes"].append({"timestamp": datetime.now().isoformat(), "note": note})
 
                 self._save_requests()
                 return req
@@ -246,9 +229,7 @@ class RightsTracker:
         return None
 
     def list_requests(
-        self,
-        status_filter: Optional[str] = None,
-        overdue_only: bool = False
+        self, status_filter: Optional[str] = None, overdue_only: bool = False
     ) -> List[Dict]:
         """List requests with optional filtering."""
         results = []
@@ -267,7 +248,7 @@ class RightsTracker:
             req_summary = {
                 **req,
                 "is_overdue": is_overdue,
-                "days_remaining": (deadline - now).days if not is_overdue else 0
+                "days_remaining": (deadline - now).days if not is_overdue else 0,
             }
             results.append(req_summary)
 
@@ -280,11 +261,15 @@ class RightsTracker:
 
         status_counts = {}
         for status in STATUSES:
-            status_counts[status] = sum(1 for r in self.requests["requests"] if r["status"] == status)
+            status_counts[status] = sum(
+                1 for r in self.requests["requests"] if r["status"] == status
+            )
 
         type_counts = {}
         for right_type in RIGHTS_TYPES:
-            type_counts[right_type] = sum(1 for r in self.requests["requests"] if r["type"] == right_type)
+            type_counts[right_type] = sum(
+                1 for r in self.requests["requests"] if r["type"] == right_type
+            )
 
         overdue = []
         completed_on_time = 0
@@ -300,22 +285,30 @@ class RightsTracker:
                 else:
                     completed_late += 1
             elif deadline < now:
-                overdue.append({
-                    "id": req["id"],
-                    "type": req["type"],
-                    "subject": req["subject"]["name"],
-                    "days_overdue": (now - deadline).days
-                })
+                overdue.append(
+                    {
+                        "id": req["id"],
+                        "type": req["type"],
+                        "subject": req["subject"]["name"],
+                        "days_overdue": (now - deadline).days,
+                    }
+                )
 
-        compliance_rate = (completed_on_time / (completed_on_time + completed_late) * 100) if (completed_on_time + completed_late) > 0 else 100
+        compliance_rate = (
+            (completed_on_time / (completed_on_time + completed_late) * 100)
+            if (completed_on_time + completed_late) > 0
+            else 100
+        )
 
         return {
             "report_date": now.isoformat(),
             "summary": {
                 "total_requests": total,
-                "open_requests": total - status_counts.get("completed", 0) - status_counts.get("refused", 0),
+                "open_requests": total
+                - status_counts.get("completed", 0)
+                - status_counts.get("refused", 0),
                 "overdue_requests": len(overdue),
-                "compliance_rate": round(compliance_rate, 1)
+                "compliance_rate": round(compliance_rate, 1),
             },
             "by_status": status_counts,
             "by_type": type_counts,
@@ -323,8 +316,8 @@ class RightsTracker:
             "performance": {
                 "completed_on_time": completed_on_time,
                 "completed_late": completed_late,
-                "average_response_days": self._calculate_avg_response_time()
-            }
+                "average_response_days": self._calculate_avg_response_time(),
+            },
         }
 
     def _calculate_avg_response_time(self) -> float:
@@ -427,13 +420,11 @@ Reference: {req['id']}
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Track and manage data subject rights requests"
-    )
+    parser = argparse.ArgumentParser(description="Track and manage data subject rights requests")
     parser.add_argument(
         "--data-file",
         default="dsr_requests.json",
-        help="Path to requests data file (default: dsr_requests.json)"
+        help="Path to requests data file (default: dsr_requests.json)",
     )
 
     subparsers = parser.add_subparsers(dest="command", help="Commands")
@@ -473,9 +464,7 @@ def main():
     tracker = RightsTracker(args.data_file)
 
     if args.command == "add":
-        request = tracker.add_request(
-            args.type, args.subject, args.email, args.details
-        )
+        request = tracker.add_request(args.type, args.subject, args.email, args.details)
         print(f"Request created: {request['id']}")
         print(f"Type: {request['right_name']} ({request['article']})")
         print(f"Deadline: {request['dates']['deadline'][:10]}")
@@ -488,11 +477,15 @@ def main():
             if not requests:
                 print("No requests found.")
                 return
-            print(f"{'ID':<20} {'Type':<15} {'Subject':<20} {'Status':<15} {'Deadline':<12} {'Overdue'}")
+            print(
+                f"{'ID':<20} {'Type':<15} {'Subject':<20} {'Status':<15} {'Deadline':<12} {'Overdue'}"
+            )
             print("-" * 95)
             for req in requests:
                 overdue_flag = "YES" if req.get("is_overdue") else ""
-                print(f"{req['id']:<20} {req['type']:<15} {req['subject']['name'][:20]:<20} {req['status']:<15} {req['dates']['deadline'][:10]:<12} {overdue_flag}")
+                print(
+                    f"{req['id']:<20} {req['type']:<15} {req['subject']['name'][:20]:<20} {req['status']:<15} {req['dates']['deadline'][:10]:<12} {overdue_flag}"
+                )
 
     elif args.command == "status":
         if args.update:

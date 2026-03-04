@@ -7,6 +7,7 @@ Handles loading of:
 - Environment variables (API keys)
 - Directory paths and caching settings
 """
+
 import os
 import json
 from dotenv import load_dotenv
@@ -20,11 +21,11 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # Configuration file path
-CONFIG_PATH = 'config.json'
+CONFIG_PATH = "config.json"
 
 # Directory and file paths
-RECIPES_DIR = 'recipes'
-RECIPE_SCHEMA_PATH = 'recipe_schema.json'
+RECIPES_DIR = "recipes"
+RECIPE_SCHEMA_PATH = "recipe_schema.json"
 
 # Ensure the recipes directory exists
 os.makedirs(RECIPES_DIR, exist_ok=True)
@@ -49,7 +50,7 @@ if SQLALCHEMY_DATABASE_URI.startswith("postgres://"):
 SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Simple cache for recipe list to avoid reading all files on every request
-_recipes_cache = {'data': None, 'timestamp': 0}
+_recipes_cache = {"data": None, "timestamp": 0}
 
 
 def load_config() -> Dict[str, Any]:
@@ -60,7 +61,7 @@ def load_config() -> Dict[str, Any]:
         dict: Configuration dictionary, or empty dict if loading fails
     """
     try:
-        with open(CONFIG_PATH, 'r') as f:
+        with open(CONFIG_PATH, "r") as f:
             return json.load(f)
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logger.warning(f"Could not load config.json: {e}")
@@ -75,7 +76,7 @@ def load_recipe_schema() -> Optional[Dict[str, Any]]:
         dict: Recipe schema dictionary, or None if loading fails
     """
     try:
-        with open(RECIPE_SCHEMA_PATH, 'r') as schema_file:
+        with open(RECIPE_SCHEMA_PATH, "r") as schema_file:
             return json.load(schema_file)
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         logger.warning(f"Unable to load recipe schema. Error: {exc}")

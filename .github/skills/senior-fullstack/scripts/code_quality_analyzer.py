@@ -24,7 +24,6 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-
 # File extensions to analyze
 FRONTEND_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".vue", ".svelte"}
 BACKEND_EXTENSIONS = {".py", ".go", ".java", ".rb", ".php", ".cs"}
@@ -32,66 +31,69 @@ CONFIG_EXTENSIONS = {".json", ".yaml", ".yml", ".toml", ".env"}
 ALL_CODE_EXTENSIONS = FRONTEND_EXTENSIONS | BACKEND_EXTENSIONS
 
 # Skip patterns
-SKIP_DIRS = {"node_modules", "vendor", ".git", "__pycache__", "dist", "build",
-             ".next", ".venv", "venv", "env", "coverage", ".pytest_cache"}
+SKIP_DIRS = {
+    "node_modules",
+    "vendor",
+    ".git",
+    "__pycache__",
+    "dist",
+    "build",
+    ".next",
+    ".venv",
+    "venv",
+    "env",
+    "coverage",
+    ".pytest_cache",
+}
 
 # Security patterns to detect
 SECURITY_PATTERNS = {
     "hardcoded_secret": {
         "pattern": r"(?:password|secret|api_key|apikey|token|auth)[\s]*[=:][\s]*['\"][^'\"]{8,}['\"]",
         "severity": "critical",
-        "message": "Potential hardcoded secret detected"
+        "message": "Potential hardcoded secret detected",
     },
     "sql_injection": {
         "pattern": r"(?:execute|query|raw)\s*\(\s*[f'\"].*\{.*\}|%s|%d|\$\d",
         "severity": "high",
-        "message": "Potential SQL injection vulnerability"
+        "message": "Potential SQL injection vulnerability",
     },
     "xss_vulnerable": {
         "pattern": r"innerHTML\s*=|v-html",
         "severity": "medium",
-        "message": "Potential XSS vulnerability - unescaped HTML rendering"
+        "message": "Potential XSS vulnerability - unescaped HTML rendering",
     },
     "unsafe_react_html": {
         "pattern": r"__html",
         "severity": "medium",
-        "message": "React unsafe HTML pattern detected - ensure content is sanitized"
+        "message": "React unsafe HTML pattern detected - ensure content is sanitized",
     },
     "insecure_protocol": {
         "pattern": r"http://(?!localhost|127\.0\.0\.1)",
         "severity": "medium",
-        "message": "Insecure HTTP protocol used"
+        "message": "Insecure HTTP protocol used",
     },
     "debug_code": {
         "pattern": r"console\.log|print\(|debugger|DEBUG\s*=\s*True",
         "severity": "low",
-        "message": "Debug code should be removed in production"
+        "message": "Debug code should be removed in production",
     },
     "todo_fixme": {
         "pattern": r"(?:TODO|FIXME|HACK|XXX):",
         "severity": "info",
-        "message": "Unresolved TODO/FIXME comment"
-    }
+        "message": "Unresolved TODO/FIXME comment",
+    },
 }
 
 # Code smell patterns
 CODE_SMELL_PATTERNS = {
-    "long_function": {
-        "description": "Function exceeds recommended length",
-        "threshold": 50
-    },
-    "deep_nesting": {
-        "description": "Excessive nesting depth",
-        "threshold": 4
-    },
-    "large_file": {
-        "description": "File exceeds recommended size",
-        "threshold": 500
-    },
+    "long_function": {"description": "Function exceeds recommended length", "threshold": 50},
+    "deep_nesting": {"description": "Excessive nesting depth", "threshold": 4},
+    "large_file": {"description": "File exceeds recommended size", "threshold": 500},
     "magic_number": {
         "pattern": r"(?<![a-zA-Z_])\b(?:[2-9]\d{2,}|\d{4,})\b(?![a-zA-Z_])",
-        "description": "Magic number should be named constant"
-    }
+        "description": "Magic number should be named constant",
+    },
 }
 
 # Dependency vulnerability patterns (simplified - in production use a CVE database)
@@ -148,9 +150,18 @@ def calculate_complexity(content: str, language: str) -> Dict:
     """Calculate cyclomatic complexity estimate."""
     # Count decision points
     decision_patterns = [
-        r"\bif\b", r"\belse\b", r"\belif\b", r"\bfor\b", r"\bwhile\b",
-        r"\bcase\b", r"\bcatch\b", r"\b\?\b", r"\b&&\b", r"\b\|\|\b",
-        r"\band\b", r"\bor\b"
+        r"\bif\b",
+        r"\belse\b",
+        r"\belif\b",
+        r"\bfor\b",
+        r"\bwhile\b",
+        r"\bcase\b",
+        r"\bcatch\b",
+        r"\b\?\b",
+        r"\b&&\b",
+        r"\b\|\|\b",
+        r"\band\b",
+        r"\bor\b",
     ]
 
     complexity = 1  # Base complexity
@@ -170,7 +181,7 @@ def calculate_complexity(content: str, language: str) -> Dict:
     return {
         "cyclomatic": complexity,
         "max_nesting": max_depth,
-        "rating": "low" if complexity < 10 else "medium" if complexity < 20 else "high"
+        "rating": "low" if complexity < 10 else "medium" if complexity < 20 else "high",
     }
 
 
@@ -183,13 +194,15 @@ def analyze_security(filepath: Path, content: str) -> List[Dict]:
         regex = re.compile(pattern_info["pattern"], re.IGNORECASE)
         for line_num, line in enumerate(lines, 1):
             if regex.search(line):
-                issues.append({
-                    "file": str(filepath),
-                    "line": line_num,
-                    "type": pattern_name,
-                    "severity": pattern_info["severity"],
-                    "message": pattern_info["message"]
-                })
+                issues.append(
+                    {
+                        "file": str(filepath),
+                        "line": line_num,
+                        "type": pattern_name,
+                        "severity": pattern_info["severity"],
+                        "message": pattern_info["message"],
+                    }
+                )
 
     return issues
 
@@ -201,7 +214,7 @@ def analyze_dependencies(project_path: Path) -> Dict:
         "total_deps": 0,
         "outdated": [],
         "vulnerable": [],
-        "recommendations": []
+        "recommendations": [],
     }
 
     # Check package.json
@@ -221,12 +234,14 @@ def analyze_dependencies(project_path: Path) -> Dict:
                     # Simplified version check
                     clean_version = re.sub(r"[^\d.]", "", version)
                     if clean_version and clean_version < vuln["vulnerable_below"]:
-                        findings["vulnerable"].append({
-                            "package": dep,
-                            "current": version,
-                            "fix_version": vuln["vulnerable_below"],
-                            "cve": vuln["cve"]
-                        })
+                        findings["vulnerable"].append(
+                            {
+                                "package": dep,
+                                "current": version,
+                                "fix_version": vuln["vulnerable_below"],
+                                "cve": vuln["cve"],
+                            }
+                        )
         except Exception:
             pass
 
@@ -279,7 +294,9 @@ def analyze_test_coverage(project_path: Path) -> Dict:
         "test_files": test_count,
         "estimated_coverage": ratio,
         "rating": "good" if ratio >= 70 else "adequate" if ratio >= 40 else "poor",
-        "recommendation": None if ratio >= 70 else f"Consider adding more tests ({70 - ratio}% gap to target)"
+        "recommendation": (
+            None if ratio >= 70 else f"Consider adding more tests ({70 - ratio}% gap to target)"
+        ),
     }
 
 
@@ -291,7 +308,7 @@ def analyze_documentation(project_path: Path) -> Dict:
         "has_license": False,
         "has_changelog": False,
         "api_docs": [],
-        "score": 0
+        "score": 0,
     }
 
     readme_patterns = ["README.md", "README.rst", "README.txt", "readme.md"]
@@ -334,29 +351,15 @@ def analyze_documentation(project_path: Path) -> Dict:
 def analyze_project(project_path: Path) -> Dict:
     """Perform full project analysis."""
     results = {
-        "summary": {
-            "files_analyzed": 0,
-            "total_lines": 0,
-            "code_lines": 0,
-            "comment_lines": 0
-        },
+        "summary": {"files_analyzed": 0, "total_lines": 0, "code_lines": 0, "comment_lines": 0},
         "languages": defaultdict(lambda: {"files": 0, "lines": 0}),
-        "security": {
-            "critical": [],
-            "high": [],
-            "medium": [],
-            "low": [],
-            "info": []
-        },
-        "complexity": {
-            "high_complexity_files": [],
-            "average_complexity": 0
-        },
+        "security": {"critical": [], "high": [], "medium": [], "low": [], "info": []},
+        "complexity": {"high_complexity_files": [], "average_complexity": 0},
         "code_smells": [],
         "dependencies": {},
         "tests": {},
         "documentation": {},
-        "overall_score": 100
+        "overall_score": 100,
     }
 
     complexity_scores = []
@@ -379,10 +382,19 @@ def analyze_project(project_path: Path) -> Dict:
         results["summary"]["comment_lines"] += comments
 
         # Track by language
-        lang = "typescript" if filepath.suffix in {".ts", ".tsx"} else \
-               "javascript" if filepath.suffix in {".js", ".jsx"} else \
-               "python" if filepath.suffix == ".py" else \
-               "go" if filepath.suffix == ".go" else "other"
+        lang = (
+            "typescript"
+            if filepath.suffix in {".ts", ".tsx"}
+            else (
+                "javascript"
+                if filepath.suffix in {".js", ".jsx"}
+                else (
+                    "python"
+                    if filepath.suffix == ".py"
+                    else "go" if filepath.suffix == ".go" else "other"
+                )
+            )
+        )
         results["languages"][lang]["files"] += 1
         results["languages"][lang]["lines"] += code
 
@@ -397,11 +409,13 @@ def analyze_project(project_path: Path) -> Dict:
         complexity = calculate_complexity(content, lang)
         complexity_scores.append(complexity["cyclomatic"])
         if complexity["rating"] == "high":
-            results["complexity"]["high_complexity_files"].append({
-                "file": str(filepath.relative_to(project_path)),
-                "complexity": complexity["cyclomatic"],
-                "nesting": complexity["max_nesting"]
-            })
+            results["complexity"]["high_complexity_files"].append(
+                {
+                    "file": str(filepath.relative_to(project_path)),
+                    "complexity": complexity["cyclomatic"],
+                    "nesting": complexity["max_nesting"],
+                }
+            )
 
         # Security analysis
         issues = analyze_security(filepath.relative_to(project_path), content)
@@ -409,11 +423,13 @@ def analyze_project(project_path: Path) -> Dict:
 
         # Code smell: large file
         if total > CODE_SMELL_PATTERNS["large_file"]["threshold"]:
-            results["code_smells"].append({
-                "file": str(filepath.relative_to(project_path)),
-                "type": "large_file",
-                "details": f"{total} lines (threshold: {CODE_SMELL_PATTERNS['large_file']['threshold']})"
-            })
+            results["code_smells"].append(
+                {
+                    "file": str(filepath.relative_to(project_path)),
+                    "type": "large_file",
+                    "details": f"{total} lines (threshold: {CODE_SMELL_PATTERNS['large_file']['threshold']})",
+                }
+            )
 
     # Categorize security issues
     for issue in security_issues:
@@ -468,10 +484,9 @@ def analyze_project(project_path: Path) -> Dict:
 
     results["overall_score"] = max(0, min(100, score))
     results["grade"] = (
-        "A" if score >= 90 else
-        "B" if score >= 80 else
-        "C" if score >= 70 else
-        "D" if score >= 60 else "F"
+        "A"
+        if score >= 90
+        else "B" if score >= 80 else "C" if score >= 70 else "D" if score >= 60 else "F"
     )
 
     # Generate recommendations
@@ -489,61 +504,73 @@ def generate_recommendations(analysis: Dict) -> List[Dict]:
 
     # Critical security issues
     for issue in analysis["security"]["critical"][:3]:
-        recs.append({
-            "priority": "P0",
-            "category": "security",
-            "issue": issue["message"],
-            "file": issue["file"],
-            "action": f"Remove or secure sensitive data at line {issue['line']}"
-        })
+        recs.append(
+            {
+                "priority": "P0",
+                "category": "security",
+                "issue": issue["message"],
+                "file": issue["file"],
+                "action": f"Remove or secure sensitive data at line {issue['line']}",
+            }
+        )
 
     # Vulnerable dependencies
     for vuln in analysis["dependencies"].get("vulnerable", [])[:3]:
-        recs.append({
-            "priority": "P0",
-            "category": "security",
-            "issue": f"Vulnerable dependency: {vuln['package']} ({vuln['cve']})",
-            "action": f"Update to version {vuln['fix_version']} or later"
-        })
+        recs.append(
+            {
+                "priority": "P0",
+                "category": "security",
+                "issue": f"Vulnerable dependency: {vuln['package']} ({vuln['cve']})",
+                "action": f"Update to version {vuln['fix_version']} or later",
+            }
+        )
 
     # High security issues
     for issue in analysis["security"]["high"][:3]:
-        recs.append({
-            "priority": "P1",
-            "category": "security",
-            "issue": issue["message"],
-            "file": issue["file"],
-            "action": "Review and fix security vulnerability"
-        })
+        recs.append(
+            {
+                "priority": "P1",
+                "category": "security",
+                "issue": issue["message"],
+                "file": issue["file"],
+                "action": "Review and fix security vulnerability",
+            }
+        )
 
     # Test coverage
     tests = analysis.get("tests", {})
     if tests.get("estimated_coverage", 0) < 50:
-        recs.append({
-            "priority": "P1",
-            "category": "quality",
-            "issue": f"Low test coverage: {tests.get('estimated_coverage', 0)}%",
-            "action": "Add unit tests to improve coverage to at least 70%"
-        })
+        recs.append(
+            {
+                "priority": "P1",
+                "category": "quality",
+                "issue": f"Low test coverage: {tests.get('estimated_coverage', 0)}%",
+                "action": "Add unit tests to improve coverage to at least 70%",
+            }
+        )
 
     # High complexity files
     for cplx in analysis["complexity"]["high_complexity_files"][:2]:
-        recs.append({
-            "priority": "P2",
-            "category": "maintainability",
-            "issue": f"High complexity in {cplx['file']}",
-            "action": "Refactor to reduce cyclomatic complexity"
-        })
+        recs.append(
+            {
+                "priority": "P2",
+                "category": "maintainability",
+                "issue": f"High complexity in {cplx['file']}",
+                "action": "Refactor to reduce cyclomatic complexity",
+            }
+        )
 
     # Documentation
     docs = analysis.get("documentation", {})
     if not docs.get("has_readme"):
-        recs.append({
-            "priority": "P2",
-            "category": "documentation",
-            "issue": "Missing README.md",
-            "action": "Add README with project overview and setup instructions"
-        })
+        recs.append(
+            {
+                "priority": "P2",
+                "category": "documentation",
+                "issue": "Missing README.md",
+                "action": "Add README with project overview and setup instructions",
+            }
+        )
 
     return recs[:10]
 
@@ -582,7 +609,9 @@ def print_report(analysis: Dict, verbose: bool = False) -> None:
         print("  Issues:")
         for severity in ["critical", "high", "medium"]:
             for issue in sec[severity][:3]:
-                print(f"    [{severity.upper()}] {issue['file']}:{issue['line']} - {issue['message']}")
+                print(
+                    f"    [{severity.upper()}] {issue['file']}:{issue['line']} - {issue['message']}"
+                )
     print()
 
     # Complexity
@@ -605,7 +634,9 @@ def print_report(analysis: Dict, verbose: bool = False) -> None:
     print("--- TEST COVERAGE ---")
     print(f"  Source Files: {tests.get('source_files', 0)}")
     print(f"  Test Files: {tests.get('test_files', 0)}")
-    print(f"  Estimated Coverage: {tests.get('estimated_coverage', 0)}% ({tests.get('rating', 'unknown')})")
+    print(
+        f"  Estimated Coverage: {tests.get('estimated_coverage', 0)}% ({tests.get('rating', 'unknown')})"
+    )
     print()
 
     # Documentation
@@ -639,28 +670,17 @@ Examples:
   %(prog)s /path/to/project
   %(prog)s . --verbose
   %(prog)s /path/to/project --json --output report.json
-        """
+        """,
     )
     parser.add_argument(
         "project_path",
         nargs="?",
         default=".",
-        help="Path to project directory (default: current directory)"
+        help="Path to project directory (default: current directory)",
     )
-    parser.add_argument(
-        "--json",
-        action="store_true",
-        help="Output in JSON format"
-    )
-    parser.add_argument(
-        "--output", "-o",
-        help="Write output to file"
-    )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Show detailed findings"
-    )
+    parser.add_argument("--json", action="store_true", help="Output in JSON format")
+    parser.add_argument("--output", "-o", help="Write output to file")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Show detailed findings")
 
     args = parser.parse_args()
 

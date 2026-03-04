@@ -24,6 +24,7 @@ from datetime import datetime
 @dataclass
 class RouteInfo:
     """Information about a detected route"""
+
     path: str  # URL path e.g., /dashboard
     file_path: str  # File system path
     route_type: str  # 'page', 'layout', 'api', 'dynamic'
@@ -37,6 +38,7 @@ class RouteInfo:
 @dataclass
 class TestSpec:
     """A Playwright test specification"""
+
     route: RouteInfo
     test_cases: List[str]
     imports: Set[str] = field(default_factory=set)
@@ -45,6 +47,7 @@ class TestSpec:
 @dataclass
 class PageObject:
     """Page Object Model class definition"""
+
     name: str
     route: str
     locators: List[Tuple[str, str, str]]  # (name, selector, description)
@@ -56,29 +59,47 @@ class RouteScanner:
 
     # Pattern to detect page files
     PAGE_PATTERNS = {
-        'page.tsx', 'page.ts', 'page.jsx', 'page.js',  # App Router
-        'index.tsx', 'index.ts', 'index.jsx', 'index.js'  # Pages Router
+        "page.tsx",
+        "page.ts",
+        "page.jsx",
+        "page.js",  # App Router
+        "index.tsx",
+        "index.ts",
+        "index.jsx",
+        "index.js",  # Pages Router
     }
 
     # Patterns indicating specific features
     FORM_PATTERNS = [
-        r'<form', r'handleSubmit', r'onSubmit', r'useForm',
-        r'<input', r'<textarea', r'<select'
+        r"<form",
+        r"handleSubmit",
+        r"onSubmit",
+        r"useForm",
+        r"<input",
+        r"<textarea",
+        r"<select",
     ]
 
     AUTH_PATTERNS = [
-        r'auth', r'login', r'signin', r'signup', r'register',
-        r'useAuth', r'useSession', r'getServerSession', r'withAuth'
+        r"auth",
+        r"login",
+        r"signin",
+        r"signup",
+        r"register",
+        r"useAuth",
+        r"useSession",
+        r"getServerSession",
+        r"withAuth",
     ]
 
     INTERACTION_PATTERNS = {
-        'click': r'onClick|button|Button|<a\s|Link',
-        'type': r'<input|<textarea|onChange',
-        'select': r'<select|Dropdown|Select',
-        'navigation': r'useRouter|router\.push|Link',
-        'modal': r'Modal|Dialog|isOpen|onClose',
-        'toggle': r'toggle|Switch|Checkbox',
-        'upload': r'<input.*type=["\']file|upload|dropzone'
+        "click": r"onClick|button|Button|<a\s|Link",
+        "type": r"<input|<textarea|onChange",
+        "select": r"<select|Dropdown|Select",
+        "navigation": r"useRouter|router\.push|Link",
+        "modal": r"Modal|Dialog|isOpen|onClose",
+        "toggle": r"toggle|Switch|Checkbox",
+        "upload": r'<input.*type=["\']file|upload|dropzone',
     }
 
     def __init__(self, source_path: Path, verbose: bool = False):
@@ -91,11 +112,11 @@ class RouteScanner:
         """Detect if using App Router or Pages Router"""
         # App Router: has 'app' directory with page.tsx files
         # Pages Router: has 'pages' directory with index.tsx files
-        app_dir = self.source_path / 'app'
-        if app_dir.exists() and list(app_dir.rglob('page.*')):
+        app_dir = self.source_path / "app"
+        if app_dir.exists() and list(app_dir.rglob("page.*")):
             return True
 
-        return 'app' in str(self.source_path).lower()
+        return "app" in str(self.source_path).lower()
 
     def scan(self, filter_routes: Optional[List[str]] = None) -> List[RouteInfo]:
         """Scan for all routes"""
@@ -103,41 +124,38 @@ class RouteScanner:
 
         # Filter if specific routes requested
         if filter_routes:
-            self.routes = [
-                r for r in self.routes
-                if any(fr in r.path for fr in filter_routes)
-            ]
+            self.routes = [r for r in self.routes if any(fr in r.path for fr in filter_routes)]
 
         return self.routes
 
-    def _scan_directory(self, directory: Path, url_path: str = ''):
+    def _scan_directory(self, directory: Path, url_path: str = ""):
         """Recursively scan directory for routes"""
         if not directory.exists():
             return
 
         for item in directory.iterdir():
-            if item.name.startswith('.') or item.name == 'node_modules':
+            if item.name.startswith(".") or item.name == "node_modules":
                 continue
 
             if item.is_dir():
                 # Handle route groups (parentheses) and dynamic routes
                 dir_name = item.name
 
-                if dir_name.startswith('(') and dir_name.endswith(')'):
+                if dir_name.startswith("(") and dir_name.endswith(")"):
                     # Route group - doesn't add to URL path
                     self._scan_directory(item, url_path)
-                elif dir_name.startswith('[') and dir_name.endswith(']'):
+                elif dir_name.startswith("[") and dir_name.endswith("]"):
                     # Dynamic route
                     param_name = dir_name[1:-1]
-                    if param_name.startswith('...'):
+                    if param_name.startswith("..."):
                         # Catch-all route
                         new_path = f"{url_path}/[...{param_name[3:]}]"
                     else:
                         new_path = f"{url_path}/[{param_name}]"
                     self._scan_directory(item, new_path)
-                elif dir_name == 'api':
+                elif dir_name == "api":
                     # API routes - scan but mark differently
-                    self._scan_api_directory(item, '/api')
+                    self._scan_api_directory(item, "/api")
                 else:
                     new_path = f"{url_path}/{dir_name}"
                     self._scan_directory(item, new_path)
@@ -151,22 +169,22 @@ class RouteScanner:
             return
 
         # Skip if it's a layout or other special file
-        if any(x in file_path.name for x in ['layout', 'loading', 'error', 'template']):
+        if any(x in file_path.name for x in ["layout", "loading", "error", "template"]):
             return
 
         try:
-            content = file_path.read_text(encoding='utf-8')
+            content = file_path.read_text(encoding="utf-8")
         except Exception:
             return
 
         # Determine route path
-        if url_path == '':
-            route_path = '/'
+        if url_path == "":
+            route_path = "/"
         else:
             route_path = url_path
 
         # Detect dynamic parameters
-        params = re.findall(r'\[([^\]]+)\]', route_path)
+        params = re.findall(r"\[([^\]]+)\]", route_path)
         has_params = len(params) > 0
 
         # Detect features
@@ -182,12 +200,12 @@ class RouteScanner:
         route = RouteInfo(
             path=route_path,
             file_path=str(file_path),
-            route_type='dynamic' if has_params else 'page',
+            route_type="dynamic" if has_params else "page",
             has_params=has_params,
             params=params,
             has_form=has_form,
             has_auth=has_auth,
-            interactions=interactions
+            interactions=interactions,
         )
 
         self.routes.append(route)
@@ -201,7 +219,7 @@ class RouteScanner:
             if item.is_dir():
                 new_path = f"{url_path}/{item.name}"
                 self._scan_api_directory(item, new_path)
-            elif item.is_file() and item.suffix in {'.ts', '.tsx', '.js', '.jsx'}:
+            elif item.is_file() and item.suffix in {".ts", ".tsx", ".js", ".jsx"}:
                 # API routes don't get E2E tests typically
                 pass
 
@@ -224,23 +242,23 @@ class TestGenerator:
             page_class = self._get_page_class_name(route.path)
             lines.append(f"import {{ {page_class} }} from './pages/{page_class}';")
 
-        lines.append('')
+        lines.append("")
 
         # Test describe block
-        route_name = route.path if route.path != '/' else 'Home'
+        route_name = route.path if route.path != "/" else "Home"
         lines.append(f"test.describe('{route_name}', () => {{")
 
         # Generate test cases based on route features
         test_cases = self._generate_test_cases(route)
 
         for test_case in test_cases:
-            lines.append('')
+            lines.append("")
             lines.append(test_case)
 
-        lines.append('});')
-        lines.append('')
+        lines.append("});")
+        lines.append("")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _generate_test_cases(self, route: RouteInfo) -> List[str]:
         """Generate test cases based on route features"""
@@ -248,22 +266,22 @@ class TestGenerator:
         url = self._get_test_url(route)
 
         # Basic navigation test
-        cases.append(f'''  test('loads successfully', async ({{ page }}) => {{
+        cases.append(f"""  test('loads successfully', async ({{ page }}) => {{
     await page.goto('{url}');
     await expect(page).toHaveURL(/{re.escape(route.path.replace('[', '').replace(']', '.*'))}/);
     // TODO: Add specific content assertions
-  }});''')
+  }});""")
 
         # Page title test
-        cases.append(f'''  test('has correct title', async ({{ page }}) => {{
+        cases.append(f"""  test('has correct title', async ({{ page }}) => {{
     await page.goto('{url}');
     // TODO: Update expected title
     await expect(page).toHaveTitle(/.*/);
-  }});''')
+  }});""")
 
         # Auth-related tests
         if route.has_auth:
-            cases.append(f'''  test('redirects unauthenticated users', async ({{ page }}) => {{
+            cases.append(f"""  test('redirects unauthenticated users', async ({{ page }}) => {{
     await page.goto('{url}');
     // TODO: Verify redirect to login
     // await expect(page).toHaveURL('/login');
@@ -274,11 +292,11 @@ class TestGenerator:
     // await page.context().addCookies([{{ name: 'session', value: '...' }}]);
     await page.goto('{url}');
     await expect(page).toHaveURL(/{re.escape(route.path.replace('[', '').replace(']', '.*'))}/);
-  }});''')
+  }});""")
 
         # Form tests
         if route.has_form:
-            cases.append(f'''  test('form submission works', async ({{ page }}) => {{
+            cases.append(f"""  test('form submission works', async ({{ page }}) => {{
     await page.goto('{url}');
 
     // TODO: Fill in form fields
@@ -300,32 +318,32 @@ class TestGenerator:
 
     // TODO: Assert validation errors shown
     // await expect(page.getByText('Required')).toBeVisible();
-  }});''')
+  }});""")
 
         # Click interaction tests
-        if 'click' in route.interactions:
-            cases.append(f'''  test('button interactions work', async ({{ page }}) => {{
+        if "click" in route.interactions:
+            cases.append(f"""  test('button interactions work', async ({{ page }}) => {{
     await page.goto('{url}');
 
     // TODO: Find and click interactive elements
     // const button = page.getByRole('button', {{ name: '...' }});
     // await button.click();
     // await expect(page.getByText('...')).toBeVisible();
-  }});''')
+  }});""")
 
         # Navigation tests
-        if 'navigation' in route.interactions:
-            cases.append(f'''  test('navigation works correctly', async ({{ page }}) => {{
+        if "navigation" in route.interactions:
+            cases.append(f"""  test('navigation works correctly', async ({{ page }}) => {{
     await page.goto('{url}');
 
     // TODO: Click navigation links
     // await page.getByRole('link', {{ name: '...' }}).click();
     // await expect(page).toHaveURL('...');
-  }});''')
+  }});""")
 
         # Modal tests
-        if 'modal' in route.interactions:
-            cases.append(f'''  test('modal opens and closes', async ({{ page }}) => {{
+        if "modal" in route.interactions:
+            cases.append(f"""  test('modal opens and closes', async ({{ page }}) => {{
     await page.goto('{url}');
 
     // TODO: Open modal
@@ -335,15 +353,15 @@ class TestGenerator:
     // TODO: Close modal
     // await page.getByRole('button', {{ name: 'Close' }}).click();
     // await expect(page.getByRole('dialog')).not.toBeVisible();
-  }});''')
+  }});""")
 
         # Dynamic route test
         if route.has_params:
-            cases.append(f'''  test('handles dynamic parameters', async ({{ page }}) => {{
+            cases.append(f"""  test('handles dynamic parameters', async ({{ page }}) => {{
     // TODO: Test with different parameter values
     await page.goto('{url}');
     await expect(page.locator('body')).toBeVisible();
-  }});''')
+  }});""")
 
         return cases
 
@@ -353,23 +371,23 @@ class TestGenerator:
 
         # Replace dynamic segments with example values
         for param in route.params:
-            if param.startswith('...'):
-                url = url.replace(f'[...{param[3:]}]', 'example/path')
+            if param.startswith("..."):
+                url = url.replace(f"[...{param[3:]}]", "example/path")
             else:
-                url = url.replace(f'[{param}]', 'test-id')
+                url = url.replace(f"[{param}]", "test-id")
 
         return url
 
     def _get_page_class_name(self, route_path: str) -> str:
         """Get Page Object class name from route path"""
-        if route_path == '/':
-            return 'HomePage'
+        if route_path == "/":
+            return "HomePage"
 
         # Remove leading slash and convert to PascalCase
-        name = route_path.strip('/')
-        name = re.sub(r'\[.*?\]', '', name)  # Remove dynamic segments
-        parts = name.split('/')
-        return ''.join(p.title() for p in parts if p) + 'Page'
+        name = route_path.strip("/")
+        name = re.sub(r"\[.*?\]", "", name)  # Remove dynamic segments
+        parts = name.split("/")
+        return "".join(p.title() for p in parts if p) + "Page"
 
 
 class PageObjectGenerator:
@@ -385,13 +403,13 @@ class PageObjectGenerator:
 
         # Replace dynamic segments
         for param in route.params:
-            url = url.replace(f'[{param}]', f'${{{param}}}')
+            url = url.replace(f"[{param}]", f"${{{param}}}")
 
         lines = []
 
         # Imports
         lines.append("import { Page, Locator, expect } from '@playwright/test';")
-        lines.append('')
+        lines.append("")
 
         # Class definition
         lines.append(f"export class {class_name} {{")
@@ -402,7 +420,7 @@ class PageObjectGenerator:
         for name, selector, _ in locators:
             lines.append(f"  readonly {name}: Locator;")
 
-        lines.append('')
+        lines.append("")
 
         # Constructor
         lines.append("  constructor(page: Page) {")
@@ -410,14 +428,14 @@ class PageObjectGenerator:
         for name, selector, _ in locators:
             lines.append(f"    this.{name} = page.{selector};")
         lines.append("  }")
-        lines.append('')
+        lines.append("")
 
         # Navigation method
         if route.has_params:
-            param_args = ', '.join(f'{p}: string' for p in route.params)
-            url_parts = url.split('/')
-            url_template = '/'.join(
-                f'${{{p}}}' if f'${{{p}}}' in part else part
+            param_args = ", ".join(f"{p}: string" for p in route.params)
+            url_parts = url.split("/")
+            url_template = "/".join(
+                f"${{{p}}}" if f"${{{p}}}" in part else part
                 for p, part in zip(route.params, url_parts)
             )
             lines.append(f"  async goto({param_args}) {{")
@@ -426,89 +444,122 @@ class PageObjectGenerator:
             lines.append("  async goto() {")
             lines.append(f"    await this.page.goto('{route.path}');")
         lines.append("  }")
-        lines.append('')
+        lines.append("")
 
         # Add methods based on features
         methods = self._get_methods(route, locators)
         for method_name, method_code in methods:
             lines.append(method_code)
-            lines.append('')
+            lines.append("")
 
-        lines.append('}')
-        lines.append('')
+        lines.append("}")
+        lines.append("")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _get_class_name(self, route_path: str) -> str:
         """Get class name from route path"""
-        if route_path == '/':
-            return 'HomePage'
+        if route_path == "/":
+            return "HomePage"
 
-        name = route_path.strip('/')
-        name = re.sub(r'\[.*?\]', '', name)
-        parts = name.split('/')
-        return ''.join(p.title() for p in parts if p) + 'Page'
+        name = route_path.strip("/")
+        name = re.sub(r"\[.*?\]", "", name)
+        parts = name.split("/")
+        return "".join(p.title() for p in parts if p) + "Page"
 
     def _get_locators(self, route: RouteInfo) -> List[Tuple[str, str, str]]:
         """Get common locators for a page"""
         locators = []
 
         # Always add a heading locator
-        locators.append(('heading', "getByRole('heading', { level: 1 })", 'Main heading'))
+        locators.append(("heading", "getByRole('heading', { level: 1 })", "Main heading"))
 
         if route.has_form:
-            locators.extend([
-                ('submitButton', "getByRole('button', { name: /submit/i })", 'Form submit button'),
-                ('form', "locator('form')", 'Main form element'),
-            ])
+            locators.extend(
+                [
+                    (
+                        "submitButton",
+                        "getByRole('button', { name: /submit/i })",
+                        "Form submit button",
+                    ),
+                    ("form", "locator('form')", "Main form element"),
+                ]
+            )
 
         if route.has_auth:
-            locators.extend([
-                ('emailInput', "getByLabel('Email')", 'Email input field'),
-                ('passwordInput', "getByLabel('Password')", 'Password input field'),
-            ])
+            locators.extend(
+                [
+                    ("emailInput", "getByLabel('Email')", "Email input field"),
+                    ("passwordInput", "getByLabel('Password')", "Password input field"),
+                ]
+            )
 
-        if 'navigation' in route.interactions:
-            locators.append(('navLinks', "getByRole('navigation').getByRole('link')", 'Navigation links'))
+        if "navigation" in route.interactions:
+            locators.append(
+                ("navLinks", "getByRole('navigation').getByRole('link')", "Navigation links")
+            )
 
-        if 'modal' in route.interactions:
-            locators.append(('modal', "getByRole('dialog')", 'Modal dialog'))
+        if "modal" in route.interactions:
+            locators.append(("modal", "getByRole('dialog')", "Modal dialog"))
 
         return locators
 
     def _get_methods(
-        self,
-        route: RouteInfo,
-        locators: List[Tuple[str, str, str]]
+        self, route: RouteInfo, locators: List[Tuple[str, str, str]]
     ) -> List[Tuple[str, str]]:
         """Get methods for the page object"""
         methods = []
 
         # Wait for load method
-        methods.append(('waitForLoad', '''  async waitForLoad() {
+        methods.append(
+            (
+                "waitForLoad",
+                """  async waitForLoad() {
     await expect(this.heading).toBeVisible();
-  }'''))
+  }""",
+            )
+        )
 
         if route.has_form:
-            methods.append(('submitForm', '''  async submitForm() {
+            methods.append(
+                (
+                    "submitForm",
+                    """  async submitForm() {
     await this.submitButton.click();
-  }'''))
+  }""",
+                )
+            )
 
         if route.has_auth:
-            methods.append(('login', '''  async login(email: string, password: string) {
+            methods.append(
+                (
+                    "login",
+                    """  async login(email: string, password: string) {
     await this.emailInput.fill(email);
     await this.passwordInput.fill(password);
     await this.submitButton.click();
-  }'''))
+  }""",
+                )
+            )
 
-        if 'modal' in route.interactions:
-            methods.append(('waitForModal', '''  async waitForModal() {
+        if "modal" in route.interactions:
+            methods.append(
+                (
+                    "waitForModal",
+                    """  async waitForModal() {
     await expect(this.modal).toBeVisible();
-  }'''))
-            methods.append(('closeModal', '''  async closeModal() {
+  }""",
+                )
+            )
+            methods.append(
+                (
+                    "closeModal",
+                    """  async closeModal() {
     await this.page.keyboard.press('Escape');
     await expect(this.modal).not.toBeVisible();
-  }'''))
+  }""",
+                )
+            )
 
         return methods
 
@@ -518,7 +569,7 @@ class ConfigGenerator:
 
     def generate_config(self) -> str:
         """Generate playwright.config.ts"""
-        return '''import { defineConfig, devices } from '@playwright/test';
+        return """import { defineConfig, devices } from '@playwright/test';
 
 /**
  * Playwright Test Configuration
@@ -564,11 +615,11 @@ export default defineConfig({
     timeout: 120 * 1000,
   },
 });
-'''
+"""
 
     def generate_auth_fixture(self) -> str:
         """Generate authentication fixture"""
-        return '''import { test as base, Page } from '@playwright/test';
+        return """import { test as base, Page } from '@playwright/test';
 
 interface AuthFixtures {
   authenticatedPage: Page;
@@ -600,7 +651,7 @@ export const test = base.extend<AuthFixtures>({
 });
 
 export { expect } from '@playwright/test';
-'''
+"""
 
 
 class E2ETestScaffolder:
@@ -612,19 +663,19 @@ class E2ETestScaffolder:
         output_path: Optional[str] = None,
         include_pom: bool = False,
         routes: Optional[str] = None,
-        verbose: bool = False
+        verbose: bool = False,
     ):
         self.source_path = Path(source_path)
-        self.output_path = Path(output_path) if output_path else Path('e2e')
+        self.output_path = Path(output_path) if output_path else Path("e2e")
         self.include_pom = include_pom
-        self.routes_filter = routes.split(',') if routes else None
+        self.routes_filter = routes.split(",") if routes else None
         self.verbose = verbose
         self.results = {
-            'status': 'success',
-            'source': str(self.source_path),
-            'routes': [],
-            'generated_files': [],
-            'summary': {}
+            "status": "success",
+            "source": str(self.source_path),
+            "routes": [],
+            "generated_files": [],
+            "summary": {},
         }
 
     def run(self) -> Dict:
@@ -644,7 +695,7 @@ class E2ETestScaffolder:
         # Create output directories
         self.output_path.mkdir(parents=True, exist_ok=True)
         if self.include_pom:
-            (self.output_path / 'pages').mkdir(exist_ok=True)
+            (self.output_path / "pages").mkdir(exist_ok=True)
 
         # Generate test files
         test_generator = TestGenerator(self.include_pom, self.verbose)
@@ -658,13 +709,11 @@ class E2ETestScaffolder:
             test_filename = self._get_test_filename(route.path)
             test_path = self.output_path / test_filename
 
-            test_path.write_text(test_content, encoding='utf-8')
+            test_path.write_text(test_content, encoding="utf-8")
 
-            self.results['generated_files'].append({
-                'type': 'test',
-                'route': route.path,
-                'path': str(test_path)
-            })
+            self.results["generated_files"].append(
+                {"type": "test", "route": route.path, "path": str(test_path)}
+            )
 
             print(f"  {test_filename}")
 
@@ -672,77 +721,73 @@ class E2ETestScaffolder:
             if self.include_pom:
                 pom_content = pom_generator.generate(route)
                 pom_filename = self._get_pom_filename(route.path)
-                pom_path = self.output_path / 'pages' / pom_filename
+                pom_path = self.output_path / "pages" / pom_filename
 
-                pom_path.write_text(pom_content, encoding='utf-8')
+                pom_path.write_text(pom_content, encoding="utf-8")
 
-                self.results['generated_files'].append({
-                    'type': 'page_object',
-                    'route': route.path,
-                    'path': str(pom_path)
-                })
+                self.results["generated_files"].append(
+                    {"type": "page_object", "route": route.path, "path": str(pom_path)}
+                )
 
                 print(f"  pages/{pom_filename}")
 
         # Generate config files if not exists
-        config_path = Path('playwright.config.ts')
+        config_path = Path("playwright.config.ts")
         if not config_path.exists():
             config_content = config_generator.generate_config()
-            config_path.write_text(config_content, encoding='utf-8')
-            self.results['generated_files'].append({
-                'type': 'config',
-                'path': str(config_path)
-            })
+            config_path.write_text(config_content, encoding="utf-8")
+            self.results["generated_files"].append({"type": "config", "path": str(config_path)})
             print(f"  playwright.config.ts")
 
         # Generate auth fixture
-        fixtures_dir = self.output_path / 'fixtures'
+        fixtures_dir = self.output_path / "fixtures"
         fixtures_dir.mkdir(exist_ok=True)
-        auth_fixture_path = fixtures_dir / 'auth.ts'
+        auth_fixture_path = fixtures_dir / "auth.ts"
         if not auth_fixture_path.exists():
             auth_content = config_generator.generate_auth_fixture()
-            auth_fixture_path.write_text(auth_content, encoding='utf-8')
-            self.results['generated_files'].append({
-                'type': 'fixture',
-                'path': str(auth_fixture_path)
-            })
+            auth_fixture_path.write_text(auth_content, encoding="utf-8")
+            self.results["generated_files"].append(
+                {"type": "fixture", "path": str(auth_fixture_path)}
+            )
             print(f"  fixtures/auth.ts")
 
         # Store route info
-        self.results['routes'] = [asdict(r) for r in routes]
+        self.results["routes"] = [asdict(r) for r in routes]
 
         # Summary
-        self.results['summary'] = {
-            'total_routes': len(routes),
-            'total_files': len(self.results['generated_files']),
-            'output_directory': str(self.output_path),
-            'include_pom': self.include_pom
+        self.results["summary"] = {
+            "total_routes": len(routes),
+            "total_files": len(self.results["generated_files"]),
+            "output_directory": str(self.output_path),
+            "include_pom": self.include_pom,
         }
 
-        print('')
-        print(f"Summary: {len(routes)} routes, {len(self.results['generated_files'])} files generated")
+        print("")
+        print(
+            f"Summary: {len(routes)} routes, {len(self.results['generated_files'])} files generated"
+        )
 
         return self.results
 
     def _get_test_filename(self, route_path: str) -> str:
         """Get test filename from route path"""
-        if route_path == '/':
-            return 'home.spec.ts'
+        if route_path == "/":
+            return "home.spec.ts"
 
-        name = route_path.strip('/')
-        name = re.sub(r'\[([^\]]+)\]', r'\1', name)  # [id] -> id
-        name = name.replace('/', '-')
+        name = route_path.strip("/")
+        name = re.sub(r"\[([^\]]+)\]", r"\1", name)  # [id] -> id
+        name = name.replace("/", "-")
         return f"{name}.spec.ts"
 
     def _get_pom_filename(self, route_path: str) -> str:
         """Get Page Object filename from route path"""
-        if route_path == '/':
-            return 'HomePage.ts'
+        if route_path == "/":
+            return "HomePage.ts"
 
-        name = route_path.strip('/')
-        name = re.sub(r'\[.*?\]', '', name)
-        parts = name.split('/')
-        class_name = ''.join(p.title() for p in parts if p) + 'Page'
+        name = route_path.strip("/")
+        name = re.sub(r"\[.*?\]", "", name)
+        parts = name.split("/")
+        class_name = "".join(p.title() for p in parts if p) + "Page"
         return f"{class_name}.ts"
 
 
@@ -764,36 +809,18 @@ Examples:
 
   # Verbose output
   python e2e_test_scaffolder.py pages/ -v
-        """
+        """,
+    )
+    parser.add_argument("source", help="Source directory (app/ or pages/)")
+    parser.add_argument(
+        "--output", "-o", default="e2e", help="Output directory for test files (default: e2e/)"
     )
     parser.add_argument(
-        'source',
-        help='Source directory (app/ or pages/)'
+        "--include-pom", action="store_true", help="Generate Page Object Model classes"
     )
-    parser.add_argument(
-        '--output', '-o',
-        default='e2e',
-        help='Output directory for test files (default: e2e/)'
-    )
-    parser.add_argument(
-        '--include-pom',
-        action='store_true',
-        help='Generate Page Object Model classes'
-    )
-    parser.add_argument(
-        '--routes',
-        help='Comma-separated list of routes to generate tests for'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Output results as JSON'
-    )
+    parser.add_argument("--routes", help="Comma-separated list of routes to generate tests for")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
 
     args = parser.parse_args()
 
@@ -803,7 +830,7 @@ Examples:
             output_path=args.output,
             include_pom=args.include_pom,
             routes=args.routes,
-            verbose=args.verbose
+            verbose=args.verbose,
         )
 
         results = scaffolder.run()
@@ -816,5 +843,5 @@ Examples:
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

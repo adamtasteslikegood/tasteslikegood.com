@@ -17,10 +17,9 @@ import sys
 from pathlib import Path
 from datetime import datetime
 
-
 # Component templates
 TEMPLATES = {
-    "client": '''\'use client\';
+    "client": """\'use client\';
 
 import {{ useState }} from 'react';
 import {{ cn }} from '@/lib/utils';
@@ -37,9 +36,8 @@ export function {name}({{ className, children }}: {name}Props) {{
     </div>
   );
 }}
-''',
-
-    "server": '''import {{ cn }} from '@/lib/utils';
+""",
+    "server": """import {{ cn }} from '@/lib/utils';
 
 interface {name}Props {{
   className?: string;
@@ -53,9 +51,8 @@ export async function {name}({{ className, children }}: {name}Props) {{
     </div>
   );
 }}
-''',
-
-    "hook": '''import {{ useState, useEffect, useCallback }} from 'react';
+""",
+    "hook": """import {{ useState, useEffect, useCallback }} from 'react';
 
 interface Use{name}Options {{
   // Add options here
@@ -80,9 +77,8 @@ export function use{name}(options: Use{name}Options = {{}}): Use{name}Return {{
     error,
   }};
 }}
-''',
-
-    "test": '''import {{ render, screen }} from '@testing-library/react';
+""",
+    "test": """import {{ render, screen }} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import {{ {name} }} from './{name}';
 
@@ -99,9 +95,8 @@ describe('{name}', () => {{
 
   // Add more tests here
 }});
-''',
-
-    "story": '''import type {{ Meta, StoryObj }} from '@storybook/react';
+""",
+    "story": """import type {{ Meta, StoryObj }} from '@storybook/react';
 import {{ {name} }} from './{name}';
 
 const meta: Meta<typeof {name}> = {{
@@ -131,19 +126,18 @@ export const WithCustomClass: Story = {{
     children: 'Styled content',
   }},
 }};
-''',
-
-    "index": '''export {{ {name} }} from './{name}';
+""",
+    "index": """export {{ {name} }} from './{name}';
 export type {{ {name}Props }} from './{name}';
-''',
+""",
 }
 
 
 def to_pascal_case(name: str) -> str:
     """Convert string to PascalCase."""
     # Handle kebab-case and snake_case
-    words = name.replace('-', '_').split('_')
-    return ''.join(word.capitalize() for word in words)
+    words = name.replace("-", "_").split("_")
+    return "".join(word.capitalize() for word in words)
 
 
 def to_kebab_case(name: str) -> str:
@@ -151,9 +145,9 @@ def to_kebab_case(name: str) -> str:
     result = []
     for i, char in enumerate(name):
         if char.isupper() and i > 0:
-            result.append('-')
+            result.append("-")
         result.append(char.lower())
-    return ''.join(result)
+    return "".join(result)
 
 
 def generate_component(
@@ -229,12 +223,12 @@ def print_result(result: dict, verbose: bool = False) -> None:
     print(f"Type: {result['type']}")
     print(f"Directory: {result['directory']}")
     print(f"\nFiles created:")
-    for file in result['files']:
+    for file in result["files"]:
         print(f"  - {file}")
     print(f"{'='*50}\n")
 
     # Print usage hint
-    if result['type'] != 'hook':
+    if result["type"] != "hook":
         print("Usage:")
         print(f"  import {{ {result['name']} }} from '@/components/{result['name']}';")
         print(f"\n  <{result['name']}>Content</{result['name']}>")
@@ -248,51 +242,29 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate React/Next.js components with TypeScript and Tailwind CSS"
     )
+    parser.add_argument("name", help="Component name (PascalCase or kebab-case)")
     parser.add_argument(
-        "name",
-        help="Component name (PascalCase or kebab-case)"
+        "--dir", "-d", default="src/components", help="Output directory (default: src/components)"
     )
     parser.add_argument(
-        "--dir", "-d",
-        default="src/components",
-        help="Output directory (default: src/components)"
-    )
-    parser.add_argument(
-        "--type", "-t",
+        "--type",
+        "-t",
         choices=["client", "server", "hook"],
         default="client",
-        help="Component type (default: client)"
+        help="Component type (default: client)",
     )
-    parser.add_argument(
-        "--with-test",
-        action="store_true",
-        help="Generate test file"
-    )
-    parser.add_argument(
-        "--with-story",
-        action="store_true",
-        help="Generate Storybook story file"
-    )
-    parser.add_argument(
-        "--no-index",
-        action="store_true",
-        help="Skip generating index.ts file"
-    )
+    parser.add_argument("--with-test", action="store_true", help="Generate test file")
+    parser.add_argument("--with-story", action="store_true", help="Generate Storybook story file")
+    parser.add_argument("--no-index", action="store_true", help="Skip generating index.ts file")
     parser.add_argument(
         "--flat",
         action="store_true",
-        help="Create files directly in output dir without subdirectory"
+        help="Create files directly in output dir without subdirectory",
     )
     parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be generated without creating files"
+        "--dry-run", action="store_true", help="Show what would be generated without creating files"
     )
-    parser.add_argument(
-        "--verbose", "-v",
-        action="store_true",
-        help="Enable verbose output"
-    )
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
 
     args = parser.parse_args()
 

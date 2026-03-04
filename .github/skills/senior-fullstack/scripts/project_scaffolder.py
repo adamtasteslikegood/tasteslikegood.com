@@ -19,7 +19,6 @@ import sys
 from pathlib import Path
 from typing import Dict, List, Optional
 
-
 # Project templates with file structures
 TEMPLATES = {
     "nextjs": {
@@ -32,9 +31,16 @@ TEMPLATES = {
             "src/lib": ["utils.ts", "db.ts"],
             "src/types": ["index.ts"],
             "public": [],
-            "": ["package.json", "tsconfig.json", "tailwind.config.ts", "next.config.js",
-                 ".env.example", ".gitignore", "README.md"]
-        }
+            "": [
+                "package.json",
+                "tsconfig.json",
+                "tailwind.config.ts",
+                "next.config.js",
+                ".env.example",
+                ".gitignore",
+                "README.md",
+            ],
+        },
     },
     "fastapi-react": {
         "name": "FastAPI + React",
@@ -49,8 +55,8 @@ TEMPLATES = {
             "frontend/src/components": ["Layout.tsx"],
             "frontend/src/hooks": ["useApi.ts"],
             "frontend": ["package.json", "tsconfig.json", "vite.config.ts", "Dockerfile"],
-            "": ["docker-compose.yml", ".env.example", ".gitignore", "README.md"]
-        }
+            "": ["docker-compose.yml", ".env.example", ".gitignore", "README.md"],
+        },
     },
     "mern": {
         "name": "MERN Stack",
@@ -65,22 +71,28 @@ TEMPLATES = {
             "client/src/components": ["Layout.tsx"],
             "client/src/services": ["api.ts"],
             "client": ["package.json", "tsconfig.json", "vite.config.ts", "Dockerfile"],
-            "": ["docker-compose.yml", ".env.example", ".gitignore", "README.md"]
-        }
+            "": ["docker-compose.yml", ".env.example", ".gitignore", "README.md"],
+        },
     },
     "django-react": {
         "name": "Django + React",
         "description": "Django REST Framework backend with React frontend",
         "structure": {
             "backend/config": ["__init__.py", "settings.py", "urls.py", "wsgi.py"],
-            "backend/apps/users": ["__init__.py", "models.py", "serializers.py", "views.py", "urls.py"],
+            "backend/apps/users": [
+                "__init__.py",
+                "models.py",
+                "serializers.py",
+                "views.py",
+                "urls.py",
+            ],
             "backend": ["manage.py", "requirements.txt", "Dockerfile"],
             "frontend/src": ["App.tsx", "main.tsx"],
             "frontend/src/components": ["Layout.tsx"],
             "frontend": ["package.json", "tsconfig.json", "vite.config.ts", "Dockerfile"],
-            "": ["docker-compose.yml", ".env.example", ".gitignore", "README.md"]
-        }
-    }
+            "": ["docker-compose.yml", ".env.example", ".gitignore", "README.md"],
+        },
+    },
 }
 
 
@@ -90,7 +102,7 @@ def get_file_content(template: str, filepath: str, project_name: str) -> str:
 
     contents = {
         # Next.js files
-        "layout.tsx": f'''import type {{ Metadata }} from "next";
+        "layout.tsx": f"""import type {{ Metadata }} from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {{
@@ -109,8 +121,8 @@ export default function RootLayout({{
     </html>
   );
 }}
-''',
-        "page.tsx": f'''export default function Home() {{
+""",
+        "page.tsx": f"""export default function Home() {{
   return (
     <main className="min-h-screen p-8">
       <h1 className="text-4xl font-bold">{project_name}</h1>
@@ -118,12 +130,12 @@ export default function RootLayout({{
     </main>
   );
 }}
-''',
-        "globals.css": '''@tailwind base;
+""",
+        "globals.css": """@tailwind base;
 @tailwind components;
 @tailwind utilities;
-''',
-        "route.ts": '''import { NextResponse } from "next/server";
+""",
+        "route.ts": """import { NextResponse } from "next/server";
 
 export async function GET() {
   return NextResponse.json({
@@ -131,8 +143,8 @@ export async function GET() {
     timestamp: new Date().toISOString(),
   });
 }
-''',
-        "Button.tsx": '''import { ButtonHTMLAttributes, forwardRef } from "react";
+""",
+        "Button.tsx": """import { ButtonHTMLAttributes, forwardRef } from "react";
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "outline";
@@ -152,8 +164,8 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   }
 );
 Button.displayName = "Button";
-''',
-        "Card.tsx": '''interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
+""",
+        "Card.tsx": """interface CardProps extends React.HTMLAttributes<HTMLDivElement> {}
 
 export function Card({ className = "", children, ...props }: CardProps) {
   return (
@@ -162,8 +174,8 @@ export function Card({ className = "", children, ...props }: CardProps) {
     </div>
   );
 }
-''',
-        "Input.tsx": '''import { InputHTMLAttributes, forwardRef } from "react";
+""",
+        "Input.tsx": """import { InputHTMLAttributes, forwardRef } from "react";
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
@@ -184,8 +196,8 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
   )
 );
 Input.displayName = "Input";
-''',
-        "Header.tsx": f'''import Link from "next/link";
+""",
+        "Header.tsx": f"""import Link from "next/link";
 
 export function Header() {{
   return (
@@ -199,16 +211,16 @@ export function Header() {{
     </header>
   );
 }}
-''',
-        "Footer.tsx": '''export function Footer() {
+""",
+        "Footer.tsx": """export function Footer() {
   return (
     <footer className="border-t py-8 text-center text-sm text-gray-500">
       <p>&copy; {new Date().getFullYear()} All rights reserved.</p>
     </footer>
   );
 }
-''',
-        "utils.ts": '''export function cn(...classes: (string | undefined | false)[]): string {
+""",
+        "utils.ts": """export function cn(...classes: (string | undefined | false)[]): string {
   return classes.filter(Boolean).join(" ");
 }
 
@@ -221,16 +233,16 @@ export function formatDate(date: Date): string {
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
-''',
-        "db.ts": '''// Database connection (Prisma example)
+""",
+        "db.ts": """// Database connection (Prisma example)
 // import { PrismaClient } from "@prisma/client";
 // export const db = new PrismaClient();
 
 export const db = {
   // Placeholder - configure your database
 };
-''',
-        "index.ts": '''export interface User {
+""",
+        "index.ts": """export interface User {
   id: string;
   email: string;
   name: string | null;
@@ -242,9 +254,9 @@ export interface ApiResponse<T> {
   error: string | null;
   success: boolean;
 }
-''',
+""",
         # FastAPI files
-        "main.py": f'''from fastapi import FastAPI
+        "main.py": f"""from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes import router
 from app.config import settings
@@ -264,8 +276,8 @@ app.include_router(router, prefix="/api")
 @app.get("/health")
 async def health_check():
     return {{"status": "healthy"}}
-''',
-        "config.py": '''from pydantic_settings import BaseSettings
+""",
+        "config.py": """from pydantic_settings import BaseSettings
 from typing import List
 
 class Settings(BaseSettings):
@@ -277,8 +289,8 @@ class Settings(BaseSettings):
         env_file = ".env"
 
 settings = Settings()
-''',
-        "database.py": '''from sqlalchemy import create_engine
+""",
+        "database.py": """from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from app.config import settings
@@ -293,8 +305,8 @@ def get_db():
         yield db
     finally:
         db.close()
-''',
-        "routes.py": '''from fastapi import APIRouter, Depends, HTTPException
+""",
+        "routes.py": """from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database import get_db
 
@@ -307,8 +319,8 @@ async def get_users(db: Session = Depends(get_db)):
 @router.post("/users")
 async def create_user(db: Session = Depends(get_db)):
     return {"message": "User created"}
-''',
-        "deps.py": '''from typing import Generator
+""",
+        "deps.py": """from typing import Generator
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -316,8 +328,8 @@ from app.database import get_db
 def get_current_user():
     # Implement authentication
     pass
-''',
-        "user.py": '''from sqlalchemy import Column, Integer, String, DateTime
+""",
+        "user.py": """from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.sql import func
 from app.database import Base
 
@@ -327,8 +339,8 @@ class User(Base):
     email = Column(String, unique=True, nullable=False)
     name = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-''',
-        "requirements.txt": '''fastapi>=0.104.0
+""",
+        "requirements.txt": """fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
 sqlalchemy>=2.0.0
 pydantic>=2.0.0
@@ -337,13 +349,13 @@ alembic>=1.12.0
 psycopg2-binary>=2.9.0
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.0
-''',
-        "alembic.ini": '''[alembic]
+""",
+        "alembic.ini": """[alembic]
 script_location = alembic
 sqlalchemy.url = driver://user:pass@localhost/dbname
-''',
+""",
         # Express files
-        "index.ts": '''import express from "express";
+        "index.ts": """import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import routes from "./routes";
@@ -359,22 +371,22 @@ app.use("/api", routes);
 app.get("/health", (_, res) => res.json({ status: "healthy" }));
 
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-''',
-        "config.ts": '''export const config = {
+""",
+        "config.ts": """export const config = {
   PORT: parseInt(process.env.PORT || "8000"),
   MONGODB_URI: process.env.MONGODB_URI || "mongodb://localhost:27017/app",
   JWT_SECRET: process.env.JWT_SECRET || "change-me",
 };
-''',
-        "database.ts": '''import mongoose from "mongoose";
+""",
+        "database.ts": """import mongoose from "mongoose";
 import { config } from "./config";
 
 export async function connectDatabase(): Promise<void> {
   await mongoose.connect(config.MONGODB_URI);
   console.log("Connected to MongoDB");
 }
-''',
-        "users.ts": '''import { Router } from "express";
+""",
+        "users.ts": """import { Router } from "express";
 const router = Router();
 
 router.get("/", async (req, res) => {
@@ -386,8 +398,8 @@ router.post("/", async (req, res) => {
 });
 
 export default router;
-''',
-        "User.ts": '''import mongoose, { Schema, Document } from "mongoose";
+""",
+        "User.ts": """import mongoose, { Schema, Document } from "mongoose";
 
 export interface IUser extends Document {
   email: string;
@@ -401,8 +413,8 @@ const userSchema = new Schema<IUser>({
 }, { timestamps: true });
 
 export const User = mongoose.model<IUser>("User", userSchema);
-''',
-        "auth.ts": '''import { Request, Response, NextFunction } from "express";
+""",
+        "auth.ts": """import { Request, Response, NextFunction } from "express";
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const token = req.headers.authorization?.replace("Bearer ", "");
@@ -410,16 +422,16 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction) 
   // Verify token
   next();
 }
-''',
-        "error.ts": '''import { Request, Response, NextFunction } from "express";
+""",
+        "error.ts": """import { Request, Response, NextFunction } from "express";
 
 export function errorHandler(err: Error, req: Request, res: Response, next: NextFunction) {
   console.error(err.stack);
   res.status(500).json({ error: "Internal server error" });
 }
-''',
+""",
         # React/Vite files
-        "App.tsx": f'''function App() {{
+        "App.tsx": f"""function App() {{
   return (
     <div className="min-h-screen bg-gray-50">
       <main className="container mx-auto p-4">
@@ -430,8 +442,8 @@ export function errorHandler(err: Error, req: Request, res: Response, next: Next
   );
 }}
 export default App;
-''',
-        "main.tsx": '''import React from "react";
+""",
+        "main.tsx": """import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
@@ -439,12 +451,12 @@ import "./index.css";
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode><App /></React.StrictMode>
 );
-''',
-        "index.css": '''@tailwind base;
+""",
+        "index.css": """@tailwind base;
 @tailwind components;
 @tailwind utilities;
-''',
-        "Layout.tsx": f'''import {{ ReactNode }} from "react";
+""",
+        "Layout.tsx": f"""import {{ ReactNode }} from "react";
 
 export function Layout({{ children }}: {{ children: ReactNode }}) {{
   return (
@@ -456,8 +468,8 @@ export function Layout({{ children }}: {{ children: ReactNode }}) {{
     </div>
   );
 }}
-''',
-        "useApi.ts": '''import { useState, useCallback } from "react";
+""",
+        "useApi.ts": """import { useState, useCallback } from "react";
 
 export function useApi<T>(baseUrl = "/api") {
   const [data, setData] = useState<T | null>(null);
@@ -486,8 +498,8 @@ export function useApi<T>(baseUrl = "/api") {
 
   return { data, loading, error, request };
 }
-''',
-        "api.ts": '''const API_BASE = import.meta.env.VITE_API_URL || "/api";
+""",
+        "api.ts": """const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${endpoint}`, {
@@ -504,8 +516,8 @@ export const api = {
   put: <T>(endpoint: string, body: unknown) => request<T>(endpoint, { method: "PUT", body: JSON.stringify(body) }),
   delete: <T>(endpoint: string) => request<T>(endpoint, { method: "DELETE" }),
 };
-''',
-        "vite.config.ts": '''import { defineConfig } from "vite";
+""",
+        "vite.config.ts": """import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig({
@@ -515,9 +527,9 @@ export default defineConfig({
     proxy: { "/api": { target: "http://localhost:8000", changeOrigin: true } },
   },
 });
-''',
+""",
         # Django files
-        "settings.py": f'''from pathlib import Path
+        "settings.py": f"""from pathlib import Path
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -562,45 +574,45 @@ DATABASES = {{
 }}
 
 CORS_ALLOWED_ORIGINS = ["http://localhost:5173"]
-''',
-        "urls.py": '''from django.contrib import admin
+""",
+        "urls.py": """from django.contrib import admin
 from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/", include("apps.users.urls")),
 ]
-''',
-        "wsgi.py": '''import os
+""",
+        "wsgi.py": """import os
 from django.core.wsgi import get_wsgi_application
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 application = get_wsgi_application()
-''',
-        "models.py": '''from django.contrib.auth.models import AbstractUser
+""",
+        "models.py": """from django.contrib.auth.models import AbstractUser
 from django.db import models
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["username"]
-''',
-        "serializers.py": '''from rest_framework import serializers
+""",
+        "serializers.py": """from rest_framework import serializers
 from .models import User
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = ["id", "email", "username", "date_joined"]
-''',
-        "views.py": '''from rest_framework import viewsets
+""",
+        "views.py": """from rest_framework import viewsets
 from .models import User
 from .serializers import UserSerializer
 
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-''',
-        "manage.py": '''#!/usr/bin/env python
+""",
+        "manage.py": """#!/usr/bin/env python
 import os
 import sys
 
@@ -611,25 +623,25 @@ def main():
 
 if __name__ == "__main__":
     main()
-''',
+""",
         # Config files
-        "package.json": f'''{{"name": "{project_name}", "version": "0.1.0", "private": true,
+        "package.json": f"""{{"name": "{project_name}", "version": "0.1.0", "private": true,
   "scripts": {{"dev": "next dev", "build": "next build", "start": "next start", "lint": "next lint"}},
   "dependencies": {{"next": "^14.0.0", "react": "^18.2.0", "react-dom": "^18.2.0"}},
   "devDependencies": {{"@types/node": "^20.0.0", "@types/react": "^18.2.0", "typescript": "^5.0.0", "tailwindcss": "^3.3.0", "autoprefixer": "^10.4.0", "postcss": "^8.4.0"}}
-}}''',
-        "tsconfig.json": '''{"compilerOptions": {"target": "ES2020", "lib": ["dom", "dom.iterable", "esnext"], "allowJs": true, "skipLibCheck": true, "strict": true, "noEmit": true, "esModuleInterop": true, "module": "esnext", "moduleResolution": "bundler", "resolveJsonModule": true, "isolatedModules": true, "jsx": "preserve", "incremental": true, "baseUrl": ".", "paths": {"@/*": ["./src/*"]}}, "include": ["**/*.ts", "**/*.tsx"], "exclude": ["node_modules"]}''',
-        "tailwind.config.ts": '''import type { Config } from "tailwindcss";
+}}""",
+        "tsconfig.json": """{"compilerOptions": {"target": "ES2020", "lib": ["dom", "dom.iterable", "esnext"], "allowJs": true, "skipLibCheck": true, "strict": true, "noEmit": true, "esModuleInterop": true, "module": "esnext", "moduleResolution": "bundler", "resolveJsonModule": true, "isolatedModules": true, "jsx": "preserve", "incremental": true, "baseUrl": ".", "paths": {"@/*": ["./src/*"]}}, "include": ["**/*.ts", "**/*.tsx"], "exclude": ["node_modules"]}""",
+        "tailwind.config.ts": """import type { Config } from "tailwindcss";
 const config: Config = { content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"], theme: { extend: {} }, plugins: [] };
 export default config;
-''',
-        "next.config.js": '''/** @type {import('next').NextConfig} */
+""",
+        "next.config.js": """/** @type {import('next').NextConfig} */
 module.exports = { reactStrictMode: true };
-''',
-        ".env.example": '''DATABASE_URL="postgresql://user:password@localhost:5432/dbname"
+""",
+        ".env.example": """DATABASE_URL="postgresql://user:password@localhost:5432/dbname"
 SECRET_KEY="your-secret-here"
-''',
-        ".gitignore": '''node_modules/
+""",
+        ".gitignore": """node_modules/
 .next/
 dist/
 build/
@@ -639,8 +651,8 @@ __pycache__/
 *.pyc
 .venv/
 .DS_Store
-''',
-        "docker-compose.yml": f'''version: "3.8"
+""",
+        "docker-compose.yml": f"""version: "3.8"
 services:
   db:
     image: postgres:15-alpine
@@ -654,16 +666,16 @@ services:
       - postgres_data:/var/lib/postgresql/data
 volumes:
   postgres_data:
-''',
-        "Dockerfile": '''FROM node:20-alpine
+""",
+        "Dockerfile": """FROM node:20-alpine
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
 COPY . .
 EXPOSE 3000
 CMD ["npm", "run", "dev"]
-''',
-        "README.md": f'''# {project_name}
+""",
+        "README.md": f"""# {project_name}
 
 Generated by Fullstack Project Scaffolder.
 
@@ -675,22 +687,22 @@ npm run dev
 ```
 
 Open http://localhost:3000.
-''',
+""",
         "__init__.py": "",
     }
 
     # Handle special cases
     if "routes" in filepath and filename == "index.ts":
-        return '''import { Router } from "express";
+        return """import { Router } from "express";
 import usersRouter from "./users";
 
 const router = Router();
 router.use("/users", usersRouter);
 export default router;
-'''
+"""
 
     if "schemas" in filepath and filename == "user.py":
-        return '''from pydantic import BaseModel, EmailStr
+        return """from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional
 
@@ -706,17 +718,17 @@ class UserResponse(UserBase):
     created_at: datetime
     class Config:
         from_attributes = True
-'''
+"""
 
     if "users" in filepath and filename == "urls.py":
-        return '''from django.urls import path, include
+        return """from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import UserViewSet
 
 router = DefaultRouter()
 router.register("users", UserViewSet)
 urlpatterns = [path("", include(router.urls))]
-'''
+"""
 
     return contents.get(filename, f"// {filename}\n")
 
@@ -727,7 +739,7 @@ def create_project(template_name: str, project_name: str, output_dir: Path) -> D
         return {
             "success": False,
             "error": f"Unknown template: {template_name}",
-            "available": list(TEMPLATES.keys())
+            "available": list(TEMPLATES.keys()),
         }
 
     template = TEMPLATES[template_name]
@@ -763,7 +775,7 @@ def create_project(template_name: str, project_name: str, output_dir: Path) -> D
         "location": str(project_dir),
         "files_created": len(created_files),
         "directories_created": len(created_dirs),
-        "next_steps": get_next_steps(template_name, project_name)
+        "next_steps": get_next_steps(template_name, project_name),
     }
 
 
@@ -775,20 +787,20 @@ def get_next_steps(template: str, name: str) -> List[str]:
             f"cd {name}",
             "docker-compose up -d db",
             "cd backend && pip install -r requirements.txt && uvicorn app.main:app --reload",
-            "cd frontend && npm install && npm run dev"
+            "cd frontend && npm install && npm run dev",
         ],
         "mern": [
             f"cd {name}",
             "docker-compose up -d mongo",
             "cd server && npm install && npm run dev",
-            "cd client && npm install && npm run dev"
+            "cd client && npm install && npm run dev",
         ],
         "django-react": [
             f"cd {name}",
             "docker-compose up -d db",
             "cd backend && pip install -r requirements.txt && python manage.py migrate && python manage.py runserver",
-            "cd frontend && npm install && npm run dev"
-        ]
+            "cd frontend && npm install && npm run dev",
+        ],
     }
     return steps.get(template, [f"cd {name}"])
 
@@ -838,7 +850,7 @@ def main():
     parser = argparse.ArgumentParser(
         description="Generate fullstack project scaffolding",
         epilog="Examples:\n  %(prog)s nextjs my-app\n  %(prog)s fastapi-react my-api\n  %(prog)s --list-templates",
-        formatter_class=argparse.RawDescriptionHelpFormatter
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("template", nargs="?", help="Project template")
     parser.add_argument("project_name", nargs="?", help="Project name")

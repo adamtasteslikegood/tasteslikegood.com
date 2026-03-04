@@ -28,10 +28,10 @@ class PowerShellScriptGenerator:
         Returns:
             PowerShell script
         """
-        policy_name = policy_config.get('name', 'MFA Policy')
-        require_mfa = policy_config.get('require_mfa', True)
-        include_users = policy_config.get('include_users', 'All')
-        exclude_users = policy_config.get('exclude_users', [])
+        policy_name = policy_config.get("name", "MFA Policy")
+        require_mfa = policy_config.get("require_mfa", True)
+        include_users = policy_config.get("include_users", "All")
+        exclude_users = policy_config.get("exclude_users", [])
 
         script = f"""<#
 .SYNOPSIS

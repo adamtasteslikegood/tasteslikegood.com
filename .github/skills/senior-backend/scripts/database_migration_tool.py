@@ -25,6 +25,7 @@ from dataclasses import dataclass, field, asdict
 @dataclass
 class Column:
     """Database column definition."""
+
     name: str
     data_type: str
     nullable: bool = True
@@ -37,6 +38,7 @@ class Column:
 @dataclass
 class Index:
     """Database index definition."""
+
     name: str
     table: str
     columns: List[str]
@@ -47,6 +49,7 @@ class Index:
 @dataclass
 class Table:
     """Database table definition."""
+
     name: str
     columns: Dict[str, Column] = field(default_factory=dict)
     indexes: List[Index] = field(default_factory=list)
@@ -57,6 +60,7 @@ class Table:
 @dataclass
 class Issue:
     """Schema issue or recommendation."""
+
     severity: str  # 'error', 'warning', 'info'
     category: str  # 'index', 'naming', 'type', 'constraint'
     table: str
@@ -70,26 +74,26 @@ class SQLParser:
     # Common patterns
     CREATE_TABLE_PATTERN = re.compile(
         r'CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?\s*\((.*?)\)\s*;',
-        re.IGNORECASE | re.DOTALL
+        re.IGNORECASE | re.DOTALL,
     )
 
     CREATE_INDEX_PATTERN = re.compile(
         r'CREATE\s+(UNIQUE\s+)?INDEX\s+(?:IF\s+NOT\s+EXISTS\s+)?["`]?(\w+)["`]?\s+'
         r'ON\s+["`]?(\w+)["`]?\s*\(([^)]+)\)(?:\s+WHERE\s+(.+?))?;',
-        re.IGNORECASE | re.DOTALL
+        re.IGNORECASE | re.DOTALL,
     )
 
     COLUMN_PATTERN = re.compile(
         r'["`]?(\w+)["`]?\s+'  # Column name
-        r'(\w+(?:\s*\([^)]+\))?)'  # Data type
-        r'([^,]*)',  # Constraints
-        re.IGNORECASE
+        r"(\w+(?:\s*\([^)]+\))?)"  # Data type
+        r"([^,]*)",  # Constraints
+        re.IGNORECASE,
     )
 
     FK_PATTERN = re.compile(
         r'FOREIGN\s+KEY\s*\(["`]?(\w+)["`]?\)\s+'
         r'REFERENCES\s+["`]?(\w+)["`]?\s*\(["`]?(\w+)["`]?\)',
-        re.IGNORECASE
+        re.IGNORECASE,
     )
 
     def parse(self, sql: str) -> Dict[str, Table]:
@@ -108,7 +112,7 @@ class SQLParser:
             unique = bool(match.group(1))
             index_name = match.group(2)
             table_name = match.group(3)
-            columns = [c.strip().strip('"`') for c in match.group(4).split(',')]
+            columns = [c.strip().strip('"`') for c in match.group(4).split(",")]
             where_clause = match.group(5)
 
             index = Index(
@@ -116,7 +120,7 @@ class SQLParser:
                 table=table_name,
                 columns=columns,
                 unique=unique,
-                partial=where_clause.strip() if where_clause else None
+                partial=where_clause.strip() if where_clause else None,
             )
 
             if table_name in tables:
@@ -139,38 +143,42 @@ class SQLParser:
                 continue
 
             # Check for PRIMARY KEY constraint
-            if part.upper().startswith('PRIMARY KEY'):
-                pk_match = re.search(r'PRIMARY\s+KEY\s*\(([^)]+)\)', part, re.IGNORECASE)
+            if part.upper().startswith("PRIMARY KEY"):
+                pk_match = re.search(r"PRIMARY\s+KEY\s*\(([^)]+)\)", part, re.IGNORECASE)
                 if pk_match:
-                    cols = [c.strip().strip('"`') for c in pk_match.group(1).split(',')]
+                    cols = [c.strip().strip('"`') for c in pk_match.group(1).split(",")]
                     table.primary_key = cols
 
             # Check for FOREIGN KEY constraint
-            elif part.upper().startswith('FOREIGN KEY'):
+            elif part.upper().startswith("FOREIGN KEY"):
                 fk_match = self.FK_PATTERN.search(part)
                 if fk_match:
-                    table.foreign_keys.append({
-                        'column': fk_match.group(1),
-                        'ref_table': fk_match.group(2),
-                        'ref_column': fk_match.group(3),
-                    })
+                    table.foreign_keys.append(
+                        {
+                            "column": fk_match.group(1),
+                            "ref_table": fk_match.group(2),
+                            "ref_column": fk_match.group(3),
+                        }
+                    )
 
             # Check for CONSTRAINT
-            elif part.upper().startswith('CONSTRAINT'):
+            elif part.upper().startswith("CONSTRAINT"):
                 # Handle named constraints
-                if 'PRIMARY KEY' in part.upper():
-                    pk_match = re.search(r'PRIMARY\s+KEY\s*\(([^)]+)\)', part, re.IGNORECASE)
+                if "PRIMARY KEY" in part.upper():
+                    pk_match = re.search(r"PRIMARY\s+KEY\s*\(([^)]+)\)", part, re.IGNORECASE)
                     if pk_match:
-                        cols = [c.strip().strip('"`') for c in pk_match.group(1).split(',')]
+                        cols = [c.strip().strip('"`') for c in pk_match.group(1).split(",")]
                         table.primary_key = cols
-                elif 'FOREIGN KEY' in part.upper():
+                elif "FOREIGN KEY" in part.upper():
                     fk_match = self.FK_PATTERN.search(part)
                     if fk_match:
-                        table.foreign_keys.append({
-                            'column': fk_match.group(1),
-                            'ref_table': fk_match.group(2),
-                            'ref_column': fk_match.group(3),
-                        })
+                        table.foreign_keys.append(
+                            {
+                                "column": fk_match.group(1),
+                                "ref_table": fk_match.group(2),
+                                "ref_column": fk_match.group(3),
+                            }
+                        )
 
             # Regular column definition
             else:
@@ -178,18 +186,18 @@ class SQLParser:
                 if col_match:
                     col_name = col_match.group(1)
                     col_type = col_match.group(2)
-                    constraints = col_match.group(3).upper() if col_match.group(3) else ''
+                    constraints = col_match.group(3).upper() if col_match.group(3) else ""
 
                     column = Column(
                         name=col_name,
                         data_type=col_type.upper(),
-                        nullable='NOT NULL' not in constraints,
-                        primary_key='PRIMARY KEY' in constraints,
-                        unique='UNIQUE' in constraints,
+                        nullable="NOT NULL" not in constraints,
+                        primary_key="PRIMARY KEY" in constraints,
+                        unique="UNIQUE" in constraints,
                     )
 
                     # Extract default value
-                    default_match = re.search(r'DEFAULT\s+(\S+)', constraints, re.IGNORECASE)
+                    default_match = re.search(r"DEFAULT\s+(\S+)", constraints, re.IGNORECASE)
                     if default_match:
                         column.default = default_match.group(1)
 
@@ -197,15 +205,17 @@ class SQLParser:
                     ref_match = re.search(
                         r'REFERENCES\s+["`]?(\w+)["`]?\s*\(["`]?(\w+)["`]?\)',
                         constraints,
-                        re.IGNORECASE
+                        re.IGNORECASE,
                     )
                     if ref_match:
                         column.references = f"{ref_match.group(1)}({ref_match.group(2)})"
-                        table.foreign_keys.append({
-                            'column': col_name,
-                            'ref_table': ref_match.group(1),
-                            'ref_column': ref_match.group(2),
-                        })
+                        table.foreign_keys.append(
+                            {
+                                "column": col_name,
+                                "ref_table": ref_match.group(1),
+                                "ref_column": ref_match.group(2),
+                            }
+                        )
 
                     if column.primary_key and col_name not in table.primary_key:
                         table.primary_key.append(col_name)
@@ -221,18 +231,18 @@ class SQLParser:
         depth = 0
 
         for char in s:
-            if char == '(':
+            if char == "(":
                 depth += 1
-            elif char == ')':
+            elif char == ")":
                 depth -= 1
-            elif char == ',' and depth == 0:
-                parts.append(''.join(current))
+            elif char == "," and depth == 0:
+                parts.append("".join(current))
                 current = []
                 continue
             current.append(char)
 
         if current:
-            parts.append(''.join(current))
+            parts.append("".join(current))
 
         return parts
 
@@ -241,13 +251,13 @@ class SchemaAnalyzer:
     """Analyze database schema for issues and optimizations."""
 
     # Columns that typically need indexes (foreign keys)
-    FK_COLUMN_PATTERNS = ['_id', 'Id', '_ID']
+    FK_COLUMN_PATTERNS = ["_id", "Id", "_ID"]
 
     # Columns that typically need indexes for filtering
-    FILTER_COLUMN_PATTERNS = ['status', 'state', 'type', 'category', 'active', 'enabled', 'deleted']
+    FILTER_COLUMN_PATTERNS = ["status", "state", "type", "category", "active", "enabled", "deleted"]
 
     # Columns that typically need indexes for sorting/ordering
-    SORT_COLUMN_PATTERNS = ['created_at', 'updated_at', 'date', 'timestamp', 'order', 'position']
+    SORT_COLUMN_PATTERNS = ["created_at", "updated_at", "date", "timestamp", "order", "position"]
 
     def __init__(self, tables: Dict[str, Table]):
         self.tables = tables
@@ -271,44 +281,52 @@ class SchemaAnalyzer:
         """Check table and column naming conventions."""
         # Table name should be lowercase
         if table.name != table.name.lower():
-            self.issues.append(Issue(
-                severity='warning',
-                category='naming',
-                table=table.name,
-                message=f"Table name '{table.name}' should be lowercase",
-                suggestion=f"Rename to '{table.name.lower()}'"
-            ))
+            self.issues.append(
+                Issue(
+                    severity="warning",
+                    category="naming",
+                    table=table.name,
+                    message=f"Table name '{table.name}' should be lowercase",
+                    suggestion=f"Rename to '{table.name.lower()}'",
+                )
+            )
 
         # Table name should be plural (basic check)
-        if not table.name.endswith('s') and not table.name.endswith('es'):
-            self.issues.append(Issue(
-                severity='info',
-                category='naming',
-                table=table.name,
-                message=f"Table name '{table.name}' should typically be plural",
-            ))
+        if not table.name.endswith("s") and not table.name.endswith("es"):
+            self.issues.append(
+                Issue(
+                    severity="info",
+                    category="naming",
+                    table=table.name,
+                    message=f"Table name '{table.name}' should typically be plural",
+                )
+            )
 
         for col_name, col in table.columns.items():
             # Column names should be lowercase with underscores
             if col_name != col_name.lower():
-                self.issues.append(Issue(
-                    severity='warning',
-                    category='naming',
-                    table=table.name,
-                    message=f"Column '{col_name}' should use snake_case",
-                    suggestion=f"Rename to '{self._to_snake_case(col_name)}'"
-                ))
+                self.issues.append(
+                    Issue(
+                        severity="warning",
+                        category="naming",
+                        table=table.name,
+                        message=f"Column '{col_name}' should use snake_case",
+                        suggestion=f"Rename to '{self._to_snake_case(col_name)}'",
+                    )
+                )
 
     def _check_primary_key(self, table: Table):
         """Check for missing primary key."""
         if not table.primary_key:
-            self.issues.append(Issue(
-                severity='error',
-                category='constraint',
-                table=table.name,
-                message=f"Table '{table.name}' has no primary key",
-                suggestion="Add a primary key column (e.g., 'id SERIAL PRIMARY KEY')"
-            ))
+            self.issues.append(
+                Issue(
+                    severity="error",
+                    category="constraint",
+                    table=table.name,
+                    message=f"Table '{table.name}' has no primary key",
+                    suggestion="Add a primary key column (e.g., 'id SERIAL PRIMARY KEY')",
+                )
+            )
 
     def _check_foreign_key_indexes(self, table: Table):
         """Check that foreign key columns have indexes."""
@@ -320,30 +338,34 @@ class SchemaAnalyzer:
         indexed_columns.update(table.primary_key)
 
         for fk in table.foreign_keys:
-            fk_col = fk['column']
+            fk_col = fk["column"]
             if fk_col not in indexed_columns:
-                self.issues.append(Issue(
-                    severity='warning',
-                    category='index',
-                    table=table.name,
-                    message=f"Foreign key column '{fk_col}' is not indexed",
-                    suggestion=f"CREATE INDEX idx_{table.name}_{fk_col} ON {table.name}({fk_col});"
-                ))
+                self.issues.append(
+                    Issue(
+                        severity="warning",
+                        category="index",
+                        table=table.name,
+                        message=f"Foreign key column '{fk_col}' is not indexed",
+                        suggestion=f"CREATE INDEX idx_{table.name}_{fk_col} ON {table.name}({fk_col});",
+                    )
+                )
 
         # Also check columns that look like foreign keys but aren't declared
         for col_name in table.columns:
             if any(col_name.endswith(pattern) for pattern in self.FK_COLUMN_PATTERNS):
                 if col_name not in indexed_columns:
                     # Check if it's actually a declared FK
-                    is_declared_fk = any(fk['column'] == col_name for fk in table.foreign_keys)
+                    is_declared_fk = any(fk["column"] == col_name for fk in table.foreign_keys)
                     if not is_declared_fk:
-                        self.issues.append(Issue(
-                            severity='info',
-                            category='index',
-                            table=table.name,
-                            message=f"Column '{col_name}' looks like a foreign key but has no index",
-                            suggestion=f"CREATE INDEX idx_{table.name}_{col_name} ON {table.name}({col_name});"
-                        ))
+                        self.issues.append(
+                            Issue(
+                                severity="info",
+                                category="index",
+                                table=table.name,
+                                message=f"Column '{col_name}' looks like a foreign key but has no index",
+                                suggestion=f"CREATE INDEX idx_{table.name}_{col_name} ON {table.name}({col_name});",
+                            )
+                        )
 
     def _check_common_filter_columns(self, table: Table):
         """Check for indexes on commonly filtered columns."""
@@ -356,36 +378,42 @@ class SchemaAnalyzer:
             col_lower = col_name.lower()
             if any(pattern in col_lower for pattern in self.FILTER_COLUMN_PATTERNS):
                 if col_name not in indexed_columns:
-                    self.issues.append(Issue(
-                        severity='info',
-                        category='index',
-                        table=table.name,
-                        message=f"Column '{col_name}' is commonly used for filtering but has no index",
-                        suggestion=f"CREATE INDEX idx_{table.name}_{col_name} ON {table.name}({col_name});"
-                    ))
+                    self.issues.append(
+                        Issue(
+                            severity="info",
+                            category="index",
+                            table=table.name,
+                            message=f"Column '{col_name}' is commonly used for filtering but has no index",
+                            suggestion=f"CREATE INDEX idx_{table.name}_{col_name} ON {table.name}({col_name});",
+                        )
+                    )
 
     def _check_timestamp_columns(self, table: Table):
         """Check for indexes on timestamp columns used for sorting."""
-        has_created_at = 'created_at' in table.columns
-        has_updated_at = 'updated_at' in table.columns
+        has_created_at = "created_at" in table.columns
+        has_updated_at = "updated_at" in table.columns
 
         if not has_created_at:
-            self.issues.append(Issue(
-                severity='info',
-                category='convention',
-                table=table.name,
-                message=f"Table '{table.name}' has no 'created_at' column",
-                suggestion="Consider adding: created_at TIMESTAMP DEFAULT NOW()"
-            ))
+            self.issues.append(
+                Issue(
+                    severity="info",
+                    category="convention",
+                    table=table.name,
+                    message=f"Table '{table.name}' has no 'created_at' column",
+                    suggestion="Consider adding: created_at TIMESTAMP DEFAULT NOW()",
+                )
+            )
 
         if not has_updated_at:
-            self.issues.append(Issue(
-                severity='info',
-                category='convention',
-                table=table.name,
-                message=f"Table '{table.name}' has no 'updated_at' column",
-                suggestion="Consider adding: updated_at TIMESTAMP DEFAULT NOW()"
-            ))
+            self.issues.append(
+                Issue(
+                    severity="info",
+                    category="convention",
+                    table=table.name,
+                    message=f"Table '{table.name}' has no 'updated_at' column",
+                    suggestion="Consider adding: updated_at TIMESTAMP DEFAULT NOW()",
+                )
+            )
 
     def _check_data_types(self, table: Table):
         """Check for potential data type issues."""
@@ -393,41 +421,51 @@ class SchemaAnalyzer:
             dtype = col.data_type.upper()
 
             # Check for VARCHAR without length
-            if 'VARCHAR' in dtype and '(' not in dtype:
-                self.issues.append(Issue(
-                    severity='warning',
-                    category='type',
-                    table=table.name,
-                    message=f"Column '{col_name}' uses VARCHAR without length",
-                    suggestion="Specify a maximum length, e.g., VARCHAR(255)"
-                ))
+            if "VARCHAR" in dtype and "(" not in dtype:
+                self.issues.append(
+                    Issue(
+                        severity="warning",
+                        category="type",
+                        table=table.name,
+                        message=f"Column '{col_name}' uses VARCHAR without length",
+                        suggestion="Specify a maximum length, e.g., VARCHAR(255)",
+                    )
+                )
 
             # Check for FLOAT/DOUBLE for monetary values
-            if 'FLOAT' in dtype or 'DOUBLE' in dtype:
-                if 'price' in col_name.lower() or 'amount' in col_name.lower() or 'total' in col_name.lower():
-                    self.issues.append(Issue(
-                        severity='warning',
-                        category='type',
-                        table=table.name,
-                        message=f"Column '{col_name}' uses floating point for monetary value",
-                        suggestion="Use DECIMAL or NUMERIC for monetary values"
-                    ))
+            if "FLOAT" in dtype or "DOUBLE" in dtype:
+                if (
+                    "price" in col_name.lower()
+                    or "amount" in col_name.lower()
+                    or "total" in col_name.lower()
+                ):
+                    self.issues.append(
+                        Issue(
+                            severity="warning",
+                            category="type",
+                            table=table.name,
+                            message=f"Column '{col_name}' uses floating point for monetary value",
+                            suggestion="Use DECIMAL or NUMERIC for monetary values",
+                        )
+                    )
 
             # Check for TEXT columns that might benefit from length limits
-            if dtype == 'TEXT':
-                if 'email' in col_name.lower() or 'url' in col_name.lower():
-                    self.issues.append(Issue(
-                        severity='info',
-                        category='type',
-                        table=table.name,
-                        message=f"Column '{col_name}' uses TEXT but might benefit from VARCHAR",
-                        suggestion=f"Consider VARCHAR(255) for {col_name}"
-                    ))
+            if dtype == "TEXT":
+                if "email" in col_name.lower() or "url" in col_name.lower():
+                    self.issues.append(
+                        Issue(
+                            severity="info",
+                            category="type",
+                            table=table.name,
+                            message=f"Column '{col_name}' uses TEXT but might benefit from VARCHAR",
+                            suggestion=f"Consider VARCHAR(255) for {col_name}",
+                        )
+                    )
 
     def _to_snake_case(self, name: str) -> str:
         """Convert name to snake_case."""
-        s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-        return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+        s1 = re.sub("(.)([A-Z][a-z]+)", r"\1_\2", name)
+        return re.sub("([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
 
 
 class MigrationGenerator:
@@ -462,8 +500,8 @@ class MigrationGenerator:
             up_statements.extend(up)
             down_statements.extend(down)
 
-        up_sql = '\n\n'.join(up_statements) if up_statements else '-- No changes'
-        down_sql = '\n\n'.join(down_statements) if down_statements else '-- No changes'
+        up_sql = "\n\n".join(up_statements) if up_statements else "-- No changes"
+        down_sql = "\n\n".join(down_statements) if down_statements else "-- No changes"
 
         return up_sql, down_sql
 
@@ -486,7 +524,7 @@ class MigrationGenerator:
 
         # Add composite primary key
         if len(table.primary_key) > 1:
-            pk_cols = ', '.join(table.primary_key)
+            pk_cols = ", ".join(table.primary_key)
             col_defs.append(f"  PRIMARY KEY ({pk_cols})")
 
         # Add foreign keys
@@ -495,10 +533,10 @@ class MigrationGenerator:
                 f"  FOREIGN KEY ({fk['column']}) REFERENCES {fk['ref_table']}({fk['ref_column']})"
             )
 
-        lines.append(',\n'.join(col_defs))
+        lines.append(",\n".join(col_defs))
         lines.append(");")
 
-        return '\n'.join(lines)
+        return "\n".join(lines)
 
     def _compare_tables(self, old: Table, new: Table) -> Tuple[List[str], List[str]]:
         """Compare two tables and generate ALTER statements."""
@@ -508,18 +546,24 @@ class MigrationGenerator:
         # New columns
         for col_name, col in new.columns.items():
             if col_name not in old.columns:
-                up.append(f"ALTER TABLE {new.name} ADD COLUMN {col_name} {col.data_type}"
-                         + (" NOT NULL" if not col.nullable else "")
-                         + (f" DEFAULT {col.default}" if col.default else "") + ";")
+                up.append(
+                    f"ALTER TABLE {new.name} ADD COLUMN {col_name} {col.data_type}"
+                    + (" NOT NULL" if not col.nullable else "")
+                    + (f" DEFAULT {col.default}" if col.default else "")
+                    + ";"
+                )
                 down.append(f"ALTER TABLE {new.name} DROP COLUMN IF EXISTS {col_name};")
 
         # Removed columns
         for col_name, col in old.columns.items():
             if col_name not in new.columns:
                 up.append(f"ALTER TABLE {old.name} DROP COLUMN IF EXISTS {col_name};")
-                down.append(f"ALTER TABLE {old.name} ADD COLUMN {col_name} {col.data_type}"
-                           + (" NOT NULL" if not col.nullable else "")
-                           + (f" DEFAULT {col.default}" if col.default else "") + ";")
+                down.append(
+                    f"ALTER TABLE {old.name} ADD COLUMN {col_name} {col.data_type}"
+                    + (" NOT NULL" if not col.nullable else "")
+                    + (f" DEFAULT {col.default}" if col.default else "")
+                    + ";"
+                )
 
         # Modified columns (type changes)
         for col_name in set(old.columns.keys()) & set(new.columns.keys()):
@@ -527,17 +571,23 @@ class MigrationGenerator:
             new_col = new.columns[col_name]
 
             if old_col.data_type != new_col.data_type:
-                up.append(f"ALTER TABLE {new.name} ALTER COLUMN {col_name} TYPE {new_col.data_type};")
-                down.append(f"ALTER TABLE {old.name} ALTER COLUMN {col_name} TYPE {old_col.data_type};")
+                up.append(
+                    f"ALTER TABLE {new.name} ALTER COLUMN {col_name} TYPE {new_col.data_type};"
+                )
+                down.append(
+                    f"ALTER TABLE {old.name} ALTER COLUMN {col_name} TYPE {old_col.data_type};"
+                )
 
         # New indexes
         old_index_names = {idx.name for idx in old.indexes}
         for idx in new.indexes:
             if idx.name not in old_index_names:
                 unique = "UNIQUE " if idx.unique else ""
-                cols = ', '.join(idx.columns)
+                cols = ", ".join(idx.columns)
                 where = f" WHERE {idx.partial}" if idx.partial else ""
-                up.append(f"CREATE {unique}INDEX CONCURRENTLY {idx.name} ON {idx.table}({cols}){where};")
+                up.append(
+                    f"CREATE {unique}INDEX CONCURRENTLY {idx.name} ON {idx.table}({cols}){where};"
+                )
                 down.append(f"DROP INDEX IF EXISTS {idx.name};")
 
         # Removed indexes
@@ -545,7 +595,7 @@ class MigrationGenerator:
         for idx in old.indexes:
             if idx.name not in new_index_names:
                 unique = "UNIQUE " if idx.unique else ""
-                cols = ', '.join(idx.columns)
+                cols = ", ".join(idx.columns)
                 where = f" WHERE {idx.partial}" if idx.partial else ""
                 up.append(f"DROP INDEX IF EXISTS {idx.name};")
                 down.append(f"CREATE {unique}INDEX {idx.name} ON {idx.table}({cols}){where};")
@@ -556,15 +606,20 @@ class MigrationGenerator:
 class DatabaseMigrationTool:
     """Main tool for database migration analysis."""
 
-    def __init__(self, schema_path: str, compare_path: Optional[str] = None,
-                 output_dir: Optional[str] = None, verbose: bool = False):
+    def __init__(
+        self,
+        schema_path: str,
+        compare_path: Optional[str] = None,
+        output_dir: Optional[str] = None,
+        verbose: bool = False,
+    ):
         self.schema_path = Path(schema_path)
         self.compare_path = Path(compare_path) if compare_path else None
         self.output_dir = Path(output_dir) if output_dir else None
         self.verbose = verbose
         self.parser = SQLParser()
 
-    def run(self, mode: str = 'analyze') -> Dict:
+    def run(self, mode: str = "analyze") -> Dict:
         """Execute the tool in specified mode."""
         print(f"Database Migration Tool")
         print(f"Schema: {self.schema_path}")
@@ -579,11 +634,11 @@ class DatabaseMigrationTool:
         if self.verbose:
             print(f"Parsed {len(tables)} tables")
 
-        if mode == 'analyze':
+        if mode == "analyze":
             return self._analyze(tables)
-        elif mode == 'compare':
+        elif mode == "compare":
             return self._compare(tables)
-        elif mode == 'suggest-indexes':
+        elif mode == "suggest-indexes":
             return self._suggest_indexes(tables)
         else:
             raise ValueError(f"Unknown mode: {mode}")
@@ -594,9 +649,9 @@ class DatabaseMigrationTool:
         issues = analyzer.analyze()
 
         # Group by severity
-        errors = [i for i in issues if i.severity == 'error']
-        warnings = [i for i in issues if i.severity == 'warning']
-        infos = [i for i in issues if i.severity == 'info']
+        errors = [i for i in issues if i.severity == "error"]
+        warnings = [i for i in issues if i.severity == "warning"]
+        infos = [i for i in issues if i.severity == "info"]
 
         print(f"\nAnalysis Results:")
         print(f"  Tables: {len(tables)}")
@@ -626,14 +681,14 @@ class DatabaseMigrationTool:
                     print(f"    {issue.suggestion}")
 
         return {
-            'status': 'success',
-            'tables_count': len(tables),
-            'issues': {
-                'errors': len(errors),
-                'warnings': len(warnings),
-                'suggestions': len(infos),
+            "status": "success",
+            "tables_count": len(tables),
+            "issues": {
+                "errors": len(errors),
+                "warnings": len(warnings),
+                "suggestions": len(infos),
             },
-            'issues_detail': [asdict(i) for i in issues],
+            "issues_detail": [asdict(i) for i in issues],
         }
 
     def _compare(self, old_tables: Dict[str, Table]) -> Dict:
@@ -664,18 +719,22 @@ class DatabaseMigrationTool:
 
         if self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
             up_file = self.output_dir / f"{timestamp}_migration.sql"
             down_file = self.output_dir / f"{timestamp}_migration_rollback.sql"
 
-            up_file.write_text(f"-- Migration: {self.schema_path} -> {self.compare_path}\n"
-                              f"-- Generated: {datetime.now().isoformat()}\n\n"
-                              f"BEGIN;\n\n{up_sql}\n\nCOMMIT;\n")
+            up_file.write_text(
+                f"-- Migration: {self.schema_path} -> {self.compare_path}\n"
+                f"-- Generated: {datetime.now().isoformat()}\n\n"
+                f"BEGIN;\n\n{up_sql}\n\nCOMMIT;\n"
+            )
 
-            down_file.write_text(f"-- Rollback for migration {timestamp}\n"
-                                f"-- Generated: {datetime.now().isoformat()}\n\n"
-                                f"BEGIN;\n\n{down_sql}\n\nCOMMIT;\n")
+            down_file.write_text(
+                f"-- Rollback for migration {timestamp}\n"
+                f"-- Generated: {datetime.now().isoformat()}\n\n"
+                f"BEGIN;\n\n{down_sql}\n\nCOMMIT;\n"
+            )
 
             print(f"\nGenerated files:")
             print(f"  Migration: {up_file}")
@@ -687,11 +746,11 @@ class DatabaseMigrationTool:
             print(down_sql)
 
         return {
-            'status': 'success',
-            'added_tables': list(added_tables),
-            'removed_tables': list(removed_tables),
-            'up_sql': up_sql,
-            'down_sql': down_sql,
+            "status": "success",
+            "added_tables": list(added_tables),
+            "removed_tables": list(removed_tables),
+            "up_sql": up_sql,
+            "down_sql": down_sql,
         }
 
     def _suggest_indexes(self, tables: Dict[str, Table]) -> Dict:
@@ -707,13 +766,15 @@ class DatabaseMigrationTool:
 
             # Suggest indexes for foreign keys
             for fk in table.foreign_keys:
-                if fk['column'] not in indexed:
-                    suggestions.append({
-                        'table': table_name,
-                        'column': fk['column'],
-                        'reason': 'Foreign key',
-                        'sql': f"CREATE INDEX idx_{table_name}_{fk['column']} ON {table_name}({fk['column']});"
-                    })
+                if fk["column"] not in indexed:
+                    suggestions.append(
+                        {
+                            "table": table_name,
+                            "column": fk["column"],
+                            "reason": "Foreign key",
+                            "sql": f"CREATE INDEX idx_{table_name}_{fk['column']} ON {table_name}({fk['column']});",
+                        }
+                    )
 
             # Suggest indexes for common patterns
             for col_name in table.columns:
@@ -723,31 +784,37 @@ class DatabaseMigrationTool:
                 col_lower = col_name.lower()
 
                 # Foreign key pattern
-                if col_name.endswith('_id') and col_name not in indexed:
-                    suggestions.append({
-                        'table': table_name,
-                        'column': col_name,
-                        'reason': 'Likely foreign key',
-                        'sql': f"CREATE INDEX idx_{table_name}_{col_name} ON {table_name}({col_name});"
-                    })
+                if col_name.endswith("_id") and col_name not in indexed:
+                    suggestions.append(
+                        {
+                            "table": table_name,
+                            "column": col_name,
+                            "reason": "Likely foreign key",
+                            "sql": f"CREATE INDEX idx_{table_name}_{col_name} ON {table_name}({col_name});",
+                        }
+                    )
 
                 # Status/type columns
-                elif col_lower in ['status', 'state', 'type', 'category']:
-                    suggestions.append({
-                        'table': table_name,
-                        'column': col_name,
-                        'reason': 'Common filter column',
-                        'sql': f"CREATE INDEX idx_{table_name}_{col_name} ON {table_name}({col_name});"
-                    })
+                elif col_lower in ["status", "state", "type", "category"]:
+                    suggestions.append(
+                        {
+                            "table": table_name,
+                            "column": col_name,
+                            "reason": "Common filter column",
+                            "sql": f"CREATE INDEX idx_{table_name}_{col_name} ON {table_name}({col_name});",
+                        }
+                    )
 
                 # Timestamp columns
-                elif col_lower in ['created_at', 'updated_at']:
-                    suggestions.append({
-                        'table': table_name,
-                        'column': col_name,
-                        'reason': 'Common sort column',
-                        'sql': f"CREATE INDEX idx_{table_name}_{col_name} ON {table_name}({col_name} DESC);"
-                    })
+                elif col_lower in ["created_at", "updated_at"]:
+                    suggestions.append(
+                        {
+                            "table": table_name,
+                            "column": col_name,
+                            "reason": "Common sort column",
+                            "sql": f"CREATE INDEX idx_{table_name}_{col_name} ON {table_name}({col_name} DESC);",
+                        }
+                    )
 
         print(f"\nIndex Suggestions ({len(suggestions)} found):")
         for s in suggestions:
@@ -756,7 +823,7 @@ class DatabaseMigrationTool:
 
         if self.output_dir:
             self.output_dir.mkdir(parents=True, exist_ok=True)
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_file = self.output_dir / f"{timestamp}_add_indexes.sql"
 
             lines = [
@@ -766,75 +833,53 @@ class DatabaseMigrationTool:
             ]
             for s in suggestions:
                 lines.append(f"-- {s['table']}.{s['column']}: {s['reason']}")
-                lines.append(s['sql'])
+                lines.append(s["sql"])
                 lines.append("")
 
-            output_file.write_text('\n'.join(lines))
+            output_file.write_text("\n".join(lines))
             print(f"\nWritten to: {output_file}")
 
         return {
-            'status': 'success',
-            'suggestions_count': len(suggestions),
-            'suggestions': suggestions,
+            "status": "success",
+            "suggestions_count": len(suggestions),
+            "suggestions": suggestions,
         }
 
 
 def main():
     """CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='Analyze SQL schemas and generate migrations',
+        description="Analyze SQL schemas and generate migrations",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
+        epilog="""
 Examples:
   %(prog)s schema.sql --analyze
   %(prog)s old.sql --compare new.sql --output migrations/
   %(prog)s schema.sql --suggest-indexes --output migrations/
-        '''
+        """,
     )
 
+    parser.add_argument("schema", help="Path to SQL schema file")
     parser.add_argument(
-        'schema',
-        help='Path to SQL schema file'
+        "--analyze", action="store_true", help="Analyze schema for issues and optimizations"
     )
     parser.add_argument(
-        '--analyze',
-        action='store_true',
-        help='Analyze schema for issues and optimizations'
+        "--compare", metavar="FILE", help="Compare with another schema file and generate migration"
     )
-    parser.add_argument(
-        '--compare',
-        metavar='FILE',
-        help='Compare with another schema file and generate migration'
-    )
-    parser.add_argument(
-        '--suggest-indexes',
-        action='store_true',
-        help='Generate index suggestions'
-    )
-    parser.add_argument(
-        '--output', '-o',
-        help='Output directory for generated files'
-    )
-    parser.add_argument(
-        '--verbose', '-v',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    parser.add_argument(
-        '--json',
-        action='store_true',
-        help='Output results as JSON'
-    )
+    parser.add_argument("--suggest-indexes", action="store_true", help="Generate index suggestions")
+    parser.add_argument("--output", "-o", help="Output directory for generated files")
+    parser.add_argument("--verbose", "-v", action="store_true", help="Enable verbose output")
+    parser.add_argument("--json", action="store_true", help="Output results as JSON")
 
     args = parser.parse_args()
 
     # Determine mode
     if args.compare:
-        mode = 'compare'
+        mode = "compare"
     elif args.suggest_indexes:
-        mode = 'suggest-indexes'
+        mode = "suggest-indexes"
     else:
-        mode = 'analyze'
+        mode = "analyze"
 
     try:
         tool = DatabaseMigrationTool(
@@ -854,5 +899,5 @@ Examples:
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
