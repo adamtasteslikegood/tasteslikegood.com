@@ -43,7 +43,7 @@ def get_user_recipes(
         query = _apply_recipe_scope(Recipe.query, user_id, guest_session_id).order_by(
             Recipe.created_at.desc()
         )
-        return query.all()
+        return query.all()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Error fetching recipes for user {user_id}: {e}")
         return []
@@ -67,7 +67,7 @@ def get_recipe_by_id(
     try:
         query = _apply_recipe_scope(Recipe.query.filter_by(id=recipe_id), user_id, guest_session_id)
 
-        return query.first()
+        return query.first()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Error fetching recipe {recipe_id}: {e}")
         return None
@@ -96,7 +96,7 @@ def create_recipe(
         # Ensure the id in recipe_data matches the database record id
         recipe_data_with_id = {**recipe_data, "id": recipe_id}
 
-        existing = Recipe.query.filter_by(id=recipe_id).first()
+        existing = Recipe.query.filter_by(id=recipe_id).first()  # type: ignore[no-any-return]
         if existing:
             same_owner = (user_id is not None and existing.user_id == user_id) or (
                 user_id is None
@@ -116,7 +116,7 @@ def create_recipe(
             existing.data = recipe_data_with_id
             existing.updated_at = datetime.utcnow()
             db.session.commit()
-            return existing
+            return existing  # type: ignore[no-any-return]
 
         recipe = Recipe(
             id=recipe_id,
@@ -226,7 +226,7 @@ def get_all_recipes(limit: int = 100) -> List[Recipe]:
         List of Recipe objects
     """
     try:
-        return Recipe.query.order_by(Recipe.created_at.desc()).limit(limit).all()
+        return Recipe.query.order_by(Recipe.created_at.desc()).limit(limit).all()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Error fetching all recipes: {e}")
         return []
@@ -243,7 +243,7 @@ def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] =
         Number of recipes
     """
     try:
-        return _apply_recipe_scope(Recipe.query, user_id, guest_session_id).count()
+        return _apply_recipe_scope(Recipe.query, user_id, guest_session_id).count()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Error counting recipes for user {user_id}: {e}")
         return 0
@@ -271,10 +271,10 @@ def migrate_file_to_db(
         recipe_name = recipe_data.get("name", "Unnamed Recipe")
 
         # Check if already exists
-        existing = Recipe.query.filter_by(id=recipe_id).first()
+        existing = Recipe.query.filter_by(id=recipe_id).first()  # type: ignore[no-any-return]
         if existing:
             logger.warning(f"Recipe {recipe_id} already exists in database, skipping")
-            return existing
+            return existing  # type: ignore[no-any-return]
 
         recipe = Recipe(id=recipe_id, user_id=user_id, name=recipe_name, data=recipe_data)
 

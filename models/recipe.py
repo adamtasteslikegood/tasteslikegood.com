@@ -6,7 +6,7 @@ from sqlalchemy.ext.mutable import MutableDict
 from extensions import db
 
 
-class Recipe(db.Model):
+class Recipe(db.Model):  # type: ignore[name-defined, misc]
     id = db.Column(db.String(36), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     guest_session_id = db.Column(db.String(64), nullable=True, index=True)

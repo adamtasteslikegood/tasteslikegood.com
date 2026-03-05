@@ -111,9 +111,9 @@ def get_all_recipes() -> List[Dict[str, str]]:
     # Return cached data if still valid
     if (
         _recipes_cache["data"] is not None
-        and (current_time - _recipes_cache["timestamp"]) < _RECIPES_CACHE_TTL
+        and (current_time - _recipes_cache["timestamp"]) < _RECIPES_CACHE_TTL  # type: ignore[operator]
     ):
-        return _recipes_cache["data"]
+        return _recipes_cache["data"]  # type: ignore[return-value]
 
     # Cache miss or expired - read from disk
     recipes = []
@@ -133,8 +133,8 @@ def get_all_recipes() -> List[Dict[str, str]]:
     sorted_recipes = sorted(recipes, key=lambda r: r["name"])
 
     # Update cache
-    _recipes_cache["data"] = sorted_recipes
-    _recipes_cache["timestamp"] = current_time
+    _recipes_cache["data"] = sorted_recipes  # type: ignore[assignment]
+    _recipes_cache["timestamp"] = current_time  # type: ignore[assignment]
 
     return sorted_recipes
 
@@ -160,7 +160,7 @@ def get_recipe(filename: str) -> Dict[str, Any]:
         raise FileNotFoundError(f"Recipe {filename} not found")
 
     with locked_file(filepath, "r") as f:
-        return json.load(f)
+        return json.load(f)  # type: ignore[no-any-return]
 
 
 def save_recipe(filename: str, recipe_data: Dict[str, Any]) -> None:

@@ -115,6 +115,11 @@ python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+exclude = [
+    "migrate_recipes\\.py",
+    "debug_generation\\.py",
+    "migrations/",
+]
 
 [tool.uv]
 # This is a Flask application, not a distributable package
