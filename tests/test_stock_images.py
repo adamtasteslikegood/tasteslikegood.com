@@ -17,6 +17,14 @@ from services.stock_image_service import (
     FALLBACK_FOOD_IMAGES,
 )
 
+# Standard mock user metadata returned by get_user_metadata() in tests
+MOCK_USER_METADATA = {
+    "user_id": "test_user_123",
+    "display_name": "Test User",
+    "is_authenticated": False,
+    "session_id": "session_abc123",
+}
+
 
 class TestFallbackImages(unittest.TestCase):
     """Test the curated fallback image system."""
@@ -133,8 +141,9 @@ class TestValidateImageUrl(unittest.TestCase):
 class TestGetSmartStockImage(unittest.TestCase):
     """Test the main stock image retrieval function (Unsplash-based)."""
 
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.stock_image_service.search_unsplash")
-    def test_no_unsplash_key_uses_fallback(self, mock_search):
+    def test_no_unsplash_key_uses_fallback(self, mock_search, mock_user_meta):
         """When Unsplash returns None (no key), use fallback image."""
         mock_search.return_value = None
 
@@ -145,8 +154,9 @@ class TestGetSmartStockImage(unittest.TestCase):
         self.assertTrue(metadata["success"])
         self.assertTrue(metadata["fallback_used"])
 
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.stock_image_service.search_unsplash")
-    def test_valid_unsplash_response(self, mock_search):
+    def test_valid_unsplash_response(self, mock_search, mock_user_meta):
         """When Unsplash returns valid URL, use it."""
         mock_search.return_value = {
             "url": "https://images.unsplash.com/photo-12345",
@@ -168,8 +178,9 @@ class TestGetSmartStockImage(unittest.TestCase):
         self.assertFalse(metadata.get("fallback_used", False))
         self.assertIsNotNone(metadata.get("attribution"))
 
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.stock_image_service.search_unsplash")
-    def test_unsplash_returns_none_uses_fallback(self, mock_search):
+    def test_unsplash_returns_none_uses_fallback(self, mock_search, mock_user_meta):
         """When Unsplash returns None, use fallback."""
         mock_search.return_value = None
 
@@ -178,8 +189,9 @@ class TestGetSmartStockImage(unittest.TestCase):
         self.assertIn(url, FALLBACK_FOOD_IMAGES)
         self.assertTrue(metadata["fallback_used"])
 
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.stock_image_service.search_unsplash")
-    def test_uses_image_keywords_first(self, mock_search):
+    def test_uses_image_keywords_first(self, mock_search, mock_user_meta):
         """Should try image_keywords before description or name."""
         mock_search.return_value = {
             "url": "https://images.unsplash.com/photo-keywords",
@@ -202,8 +214,9 @@ class TestGetSmartStockImage(unittest.TestCase):
         call_args = mock_search.call_args[0][0]
         self.assertEqual(call_args, ["vegan", "bowl", "colorful"])
 
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.stock_image_service.search_unsplash")
-    def test_falls_back_to_description(self, mock_search):
+    def test_falls_back_to_description(self, mock_search, mock_user_meta):
         """When no keywords, should use description."""
         # First call (description) returns URL
         mock_search.return_value = {
@@ -222,8 +235,9 @@ class TestGetSmartStockImage(unittest.TestCase):
         # Should have called with description keywords
         mock_search.assert_called_once()
 
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.stock_image_service.search_unsplash")
-    def test_unsplash_exception_uses_fallback(self, mock_search):
+    def test_unsplash_exception_uses_fallback(self, mock_search, mock_user_meta):
         """When Unsplash throws exception, use fallback gracefully."""
         mock_search.side_effect = Exception("API Error")
 
@@ -234,21 +248,34 @@ class TestGetSmartStockImage(unittest.TestCase):
         self.assertTrue(metadata["fallback_used"])
         self.assertTrue(metadata["success"])  # Fallback is still a success
 
-    def test_metadata_includes_user_id(self):
-        """Metadata should include the user_id."""
-        url, metadata = get_smart_stock_image("Test Recipe", user_id="user123")
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
+    @patch("services.stock_image_service.search_unsplash")
+    def test_metadata_includes_user_id(self, mock_search, mock_user_meta):
+        """Metadata should include the user_id from user_metadata."""
+        mock_search.return_value = None
+        custom_metadata = {**MOCK_USER_METADATA, "user_id": "user123"}
+
+        url, metadata = get_smart_stock_image("Test Recipe", user_metadata=custom_metadata)
 
         self.assertEqual(metadata["user_id"], "user123")
 
-    def test_metadata_includes_timestamp(self):
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
+    @patch("services.stock_image_service.search_unsplash")
+    def test_metadata_includes_timestamp(self, mock_search, mock_user_meta):
         """Metadata should include a timestamp."""
+        mock_search.return_value = None
+
         url, metadata = get_smart_stock_image("Test Recipe")
 
         self.assertIn("timestamp", metadata)
         self.assertIsNotNone(metadata["timestamp"])
 
-    def test_no_loremflickr_urls(self):
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
+    @patch("services.stock_image_service.search_unsplash")
+    def test_no_loremflickr_urls(self, mock_search, mock_user_meta):
         """Should never return loremflickr URLs."""
+        mock_search.return_value = None
+
         url, metadata = get_smart_stock_image("Any Recipe")
 
         self.assertNotIn("loremflickr", url)
@@ -266,7 +293,9 @@ class TestValidateAndRefreshStockImage(unittest.TestCase):
             "stock_image_url": "https://images.unsplash.com/existing",
         }
 
-        url, metadata, was_refreshed = validate_and_refresh_stock_image(recipe_data)
+        url, metadata, was_refreshed = validate_and_refresh_stock_image(
+            recipe_data, user_metadata=MOCK_USER_METADATA
+        )
 
         self.assertEqual(url, "https://images.unsplash.com/existing")
         self.assertIsNone(metadata)
@@ -280,7 +309,9 @@ class TestValidateAndRefreshStockImage(unittest.TestCase):
         mock_get_smart.return_value = ("https://new-url.com/image.jpg", {"success": True})
         recipe_data = {"name": "Test Recipe", "stock_image_url": "https://broken-url.com/old.jpg"}
 
-        url, metadata, was_refreshed = validate_and_refresh_stock_image(recipe_data)
+        url, metadata, was_refreshed = validate_and_refresh_stock_image(
+            recipe_data, user_metadata=MOCK_USER_METADATA
+        )
 
         self.assertEqual(url, "https://new-url.com/image.jpg")
         self.assertTrue(was_refreshed)
@@ -295,7 +326,9 @@ class TestValidateAndRefreshStockImage(unittest.TestCase):
             # No stock_image_url
         }
 
-        url, metadata, was_refreshed = validate_and_refresh_stock_image(recipe_data)
+        url, metadata, was_refreshed = validate_and_refresh_stock_image(
+            recipe_data, user_metadata=MOCK_USER_METADATA
+        )
 
         self.assertEqual(url, "https://new-url.com/image.jpg")
         self.assertTrue(was_refreshed)
@@ -304,8 +337,9 @@ class TestValidateAndRefreshStockImage(unittest.TestCase):
 class TestNoRandomBehavior(unittest.TestCase):
     """Ensure no random/lock behavior in stock image generation."""
 
+    @patch("services.stock_image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.stock_image_service.search_unsplash")
-    def test_fallback_is_deterministic(self, mock_search):
+    def test_fallback_is_deterministic(self, mock_search, mock_user_meta):
         """Fallback images should be deterministic, not random."""
         mock_search.return_value = None
 

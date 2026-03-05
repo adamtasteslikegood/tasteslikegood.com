@@ -12,7 +12,7 @@ All images are vegan-appropriate with proper attribution per Unsplash guidelines
 
 import datetime
 
-import requests
+import requests  # type: ignore[import-untyped]
 
 from config import UNSPLASH_ACCESS_KEY
 from utils.session_utils import get_user_metadata

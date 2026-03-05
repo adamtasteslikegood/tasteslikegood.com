@@ -5,7 +5,7 @@ from sqlalchemy import JSON as GenericJSON
 from extensions import db
 
 
-class Cookbook(db.Model):
+class Cookbook(db.Model):  # type: ignore[name-defined, misc]
     __tablename__ = "cookbook"
 
     id = db.Column(db.String(36), primary_key=True)

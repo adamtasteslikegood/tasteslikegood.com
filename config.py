@@ -62,7 +62,7 @@ def load_config() -> Dict[str, Any]:
     """
     try:
         with open(CONFIG_PATH, "r") as f:
-            return json.load(f)
+            return json.load(f)  # type: ignore[no-any-return]
     except (FileNotFoundError, json.JSONDecodeError) as e:
         logger.warning(f"Could not load config.json: {e}")
         return {}
@@ -77,7 +77,7 @@ def load_recipe_schema() -> Optional[Dict[str, Any]]:
     """
     try:
         with open(RECIPE_SCHEMA_PATH, "r") as schema_file:
-            return json.load(schema_file)
+            return json.load(schema_file)  # type: ignore[no-any-return]
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         logger.warning(f"Unable to load recipe schema. Error: {exc}")
         return None

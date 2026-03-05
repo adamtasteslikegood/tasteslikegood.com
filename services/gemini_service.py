@@ -64,7 +64,7 @@ def attempt_generation(client: Client, model: str, prompt: str) -> str:
     logger.info(f"Attempting generation with model {model}")
     try:
         response = client.models.generate_content(model=model, contents=prompt)
-        return response.text
+        return response.text or ""
     except Exception as e:
         logger.error(f"Generation failed: {e}")
         raise
