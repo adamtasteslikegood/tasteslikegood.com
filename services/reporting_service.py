@@ -56,7 +56,7 @@ class ReportingService:
 
         try:
             with open(ReportingService.REPORTS_FILE, "r") as f:
-                return json.load(f)
+                return json.load(f)  # type: ignore[no-any-return]
         except (json.JSONDecodeError, IOError) as e:
             logger.warning(f"Could not load reports file: {e}. Starting fresh.")
             return []
