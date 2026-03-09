@@ -18,6 +18,7 @@ import os
 
 from flask import Flask, render_template, request, session
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Import blueprints
 from auth import auth_bp
@@ -44,6 +45,10 @@ def create_app():
         Flask: Configured Flask application
     """
     app = Flask(__name__)
+
+    # Trust proxy headers (X-Forwarded-Host, X-Forwarded-Proto, etc.)
+    # so url_for(_external=True) generates correct public URLs
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
     # Configure secret key for sessions
     # In production, use a persistent secret key from environment variables
@@ -80,6 +85,12 @@ def create_app():
     # Add production origins from environment if set
     if os.environ.get("PRODUCTION_ORIGIN"):
         cors_origins.append(os.environ.get("PRODUCTION_ORIGIN"))
+
+    # Always allow the production domains
+    cors_origins.extend([
+        "https://www.tasteslikegood.org",
+        "https://tasteslikegood.org",
+    ])
 
     CORS(
         app,
