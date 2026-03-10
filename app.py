@@ -71,6 +71,39 @@ def create_app():
     with app.app_context():
         import models
 
+    # Production should continue using Flask-Migrate/Alembic as the primary path.
+
+
+    # ####### DEVELOPMENT NOTE: If you want to quickly create tables without running migrations #######
+    # # ***** (for example, for local development or testing), you can use db.create_all().  *****
+    # # For local development or quick testing, you can use db.create_all() to create tables without running migrations.
+    # # Uncomment the following lines if you want to use create_all() for quick local development without migrations.
+    #
+    # def create_tables_with_retry(app, db, attempts=5, delay_seconds=2):
+    #     """
+    #     Create database tables with retry logic.
+    #
+    #     Use only for temporary bootstrap scenarios (for example,
+    #     local development, first-run smoke tests, or controlled deployment recovery).
+    #     Prefer schema migrations for normal operation.
+    #     """
+    #     import time
+    #     for attempt in range(attempts):
+    #         try:
+    #             db.create_all()
+    #             app.logger.info("db.create_all() succeeded")
+    #             return
+    #         except Exception as e:
+    #             app.logger.warning(f"db.create_all() attempt {attempt +1} failed: {e}")
+    #             if attempt < attempts -1:
+    #                 time.sleep(delay_seconds)
+    #             else:
+    #                 app.logger.error(f"db.create_all() gave up after {attempts} attempts")
+    # # Uncomment the following line if you want to use create_all() for quick local development without migrations.
+    # create_tables_with_retry(app, db)
+    # # Note: In production, rely on proper migrations instead of create_all() to manage schema changes.
+
+
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins
     cors_origins = [
