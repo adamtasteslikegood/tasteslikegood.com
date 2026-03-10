@@ -1,13 +1,25 @@
 """Tests for the GitHub Actions workflow-run filtering helpers."""
+import importlib.util
 import sys
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
-sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from app import apply_status_filter, fetch_workflow_runs
+def _load_workflow_runs_app():
+    """Load workflow_runs/app.py as a distinct module to avoid conflicts
+    with the root-level app module used by other tests."""
+    module_path = Path(__file__).resolve().parent.parent / 'workflow_runs' / 'app.py'
+    spec = importlib.util.spec_from_file_location("workflow_runs.app", module_path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_wf_app = _load_workflow_runs_app()
+apply_status_filter = _wf_app.apply_status_filter
+fetch_workflow_runs = _wf_app.fetch_workflow_runs
 
 
 # ---------------------------------------------------------------------------
@@ -94,7 +106,7 @@ class TestFetchWorkflowRuns:
                 {"id": 1, "status": "completed", "conclusion": "success"},
             ]
         }
-        with patch("app.requests.get") as mock_get:
+        with patch("workflow_runs.app.requests.get") as mock_get:
             mock_get.return_value.ok = True
             mock_get.return_value.status_code = 200
             mock_get.return_value.json.return_value = mock_payload
@@ -106,7 +118,7 @@ class TestFetchWorkflowRuns:
         assert runs[0]["conclusion"] == "success"
 
     def test_404_returns_descriptive_error(self):
-        with patch("app.requests.get") as mock_get:
+        with patch("workflow_runs.app.requests.get") as mock_get:
             mock_get.return_value.ok = False
             mock_get.return_value.status_code = 404
 
@@ -116,7 +128,7 @@ class TestFetchWorkflowRuns:
         assert "not found" in error.lower()
 
     def test_403_returns_rate_limit_error(self):
-        with patch("app.requests.get") as mock_get:
+        with patch("workflow_runs.app.requests.get") as mock_get:
             mock_get.return_value.ok = False
             mock_get.return_value.status_code = 403
 
@@ -127,7 +139,7 @@ class TestFetchWorkflowRuns:
 
     def test_connection_error_returns_message(self):
         import requests as req_lib
-        with patch("app.requests.get", side_effect=req_lib.exceptions.ConnectionError):
+        with patch("workflow_runs.app.requests.get", side_effect=req_lib.exceptions.ConnectionError):
             runs, error = fetch_workflow_runs("owner", "repo")
 
         assert runs == []
@@ -135,7 +147,7 @@ class TestFetchWorkflowRuns:
 
     def test_timeout_returns_message(self):
         import requests as req_lib
-        with patch("app.requests.get", side_effect=req_lib.exceptions.Timeout):
+        with patch("workflow_runs.app.requests.get", side_effect=req_lib.exceptions.Timeout):
             runs, error = fetch_workflow_runs("owner", "repo")
 
         assert runs == []

@@ -9,7 +9,7 @@
 <body>
     <h1>GitHub Actions Workflow Runs</h1>
 
-    <form class="runs-filter-form" method="get" action="{{ url_for('workflow_runs') }}">
+    <form class="runs-filter-form" method="get" action="/">
         <div class="runs-filter-row">
             <div class="runs-filter-group">
                 <label for="owner">Owner</label>
@@ -111,7 +111,5 @@
         {% endif %}.
     </p>
     {% endif %}
-
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Back to recipes</a>
 </body>
 </html>
