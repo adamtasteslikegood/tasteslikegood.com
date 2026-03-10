@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Actions Workflow Runs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <h1>GitHub Actions Workflow Runs</h1>
+
+    <form class="runs-filter-form" method="get" action="{{ url_for('workflow_runs') }}">
+        <div class="runs-filter-row">
+            <div class="runs-filter-group">
+                <label for="owner">Owner</label>
+                <input id="owner" name="owner" type="text" value="{{ owner }}" required>
+            </div>
+            <div class="runs-filter-group">
+                <label for="repo">Repository</label>
+                <input id="repo" name="repo" type="text" value="{{ repo }}" required>
+            </div>
+        </div>
+
+        <div class="runs-filter-row">
+            <div class="runs-filter-group">
+                <label for="filter_status">Filter by status / conclusion</label>
+                <select id="filter_status" name="filter_status">
+                    <option value="">— Any status —</option>
+                    {% for value in all_filter_values %}
+                    <option value="{{ value }}"{% if filter_status == value %} selected{% endif %}>{{ value }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="runs-filter-group">
+                <label>Filter mode</label>
+                <div class="runs-filter-mode">
+                    <label class="radio-label">
+                        <input type="radio" name="filter_mode" value="include"
+                               {% if filter_mode == 'include' %}checked{% endif %}>
+                        Include (show matching)
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="filter_mode" value="exclude"
+                               {% if filter_mode == 'exclude' %}checked{% endif %}>
+                        Exclude (show non-matching)
+                    </label>
+                </div>
+            </div>
+
+            <div class="runs-filter-group runs-filter-submit">
+                <button type="submit">Apply Filter</button>
+            </div>
+        </div>
+    </form>
+
+    {% if error %}
+    <p class="runs-error">{{ error }}</p>
+    {% elif runs %}
+    <p class="runs-count">
+        Showing <strong>{{ runs | length }}</strong> run(s) for
+        <strong>{{ owner }}/{{ repo }}</strong>
+        {% if filter_status %}
+            where status is
+            {% if filter_mode == 'exclude' %}
+                <strong>not</strong>
+            {% endif %}
+            <span class="status-badge status-{{ filter_status }}">{{ filter_status }}</span>
+        {% endif %}
+    </p>
+    <table class="runs-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Workflow</th>
+                <th>Branch</th>
+                <th>Status</th>
+                <th>Conclusion</th>
+                <th>Triggered by</th>
+                <th>Started at</th>
+                <th>Link</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for run in runs %}
+            <tr>
+                <td>{{ run.run_number }}</td>
+                <td>{{ run.name }}</td>
+                <td>{{ run.head_branch }}</td>
+                <td><span class="status-badge status-{{ run.status }}">{{ run.status }}</span></td>
+                <td>
+                    {% if run.conclusion %}
+                    <span class="status-badge status-{{ run.conclusion }}">{{ run.conclusion }}</span>
+                    {% else %}
+                    <span class="status-badge status-pending">—</span>
+                    {% endif %}
+                </td>
+                <td>{{ run.event }}</td>
+                <td>{{ run.run_started_at or run.created_at }}</td>
+                <td><a href="{{ run.html_url }}" target="_blank" rel="noopener noreferrer">View</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% elif not error %}
+    <p>No workflow runs found for <strong>{{ owner }}/{{ repo }}</strong>
+        {% if filter_status %}
+            with
+            {% if filter_mode == 'exclude' %}non-{% endif %}matching status
+            <span class="status-badge status-{{ filter_status }}">{{ filter_status }}</span>
+        {% endif %}.
+    </p>
+    {% endif %}
+
+    <a href="{{ url_for('index') }}" class="back-link">&larr; Back to recipes</a>
+</body>
+</html>
