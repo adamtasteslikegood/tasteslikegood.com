@@ -16,6 +16,26 @@ RECIPE_SCHEMA_PATH = "recipe_schema.json"
 os.makedirs(RECIPES_DIR, exist_ok=True)
 
 
+def _get_safe_recipe_path(filename: str) -> str:
+    """
+    Safely construct an absolute path for a recipe JSON file under RECIPES_DIR.
+
+    Raises a 404 if the filename would escape the recipes directory or is invalid.
+    """
+    # Only allow .json files
+    if not filename.endswith(".json"):
+        abort(404)
+
+    base_dir = os.path.abspath(RECIPES_DIR)
+    candidate = os.path.normpath(os.path.join(base_dir, filename))
+
+    # Ensure the resulting path is still within the recipes directory
+    if os.path.commonpath([base_dir, candidate]) != base_dir:
+        abort(404)
+
+    return candidate
+
+
 def _load_recipe_schema():
     try:
         with open(RECIPE_SCHEMA_PATH, "r") as schema_file:
@@ -78,7 +98,7 @@ def index():
 @app.route("/recipe/<filename>")
 def show_recipe(filename):
     """The route to display a single recipe."""
-    filepath = os.path.join(RECIPES_DIR, filename)
+    filepath = _get_safe_recipe_path(filename)
     if not os.path.exists(filepath):
         abort(404)
     try:
@@ -94,7 +114,7 @@ def show_recipe(filename):
 @app.route("/recipe/<filename>/json")
 def show_recipe_json(filename):
     """The route to display the raw JSON for a single recipe."""
-    filepath = os.path.join(RECIPES_DIR, filename)
+    filepath = _get_safe_recipe_path(filename)
     if not os.path.exists(filepath):
         abort(404)
     try:
