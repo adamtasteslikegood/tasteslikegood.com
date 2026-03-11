@@ -9,16 +9,36 @@ from jsonschema import Draft7Validator, ValidationError
 app = Flask(__name__)
 
 # The folder where the recipe .json files are stored
-RECIPES_DIR = 'recipes'
-RECIPE_SCHEMA_PATH = 'recipe_schema.json'
+RECIPES_DIR = "recipes"
+RECIPE_SCHEMA_PATH = "recipe_schema.json"
 
 # Ensure the recipes directory exists so list/save operations do not fail
 os.makedirs(RECIPES_DIR, exist_ok=True)
 
 
+def _get_safe_recipe_path(filename: str) -> str:
+    """
+    Safely construct an absolute path for a recipe JSON file under RECIPES_DIR.
+
+    Raises a 404 if the filename would escape the recipes directory or is invalid.
+    """
+    # Only allow .json files
+    if not filename.endswith(".json"):
+        abort(404)
+
+    base_dir = os.path.abspath(RECIPES_DIR)
+    candidate = os.path.normpath(os.path.join(base_dir, filename))
+
+    # Ensure the resulting path is still within the recipes directory
+    if os.path.commonpath([base_dir, candidate]) != base_dir:
+        abort(404)
+
+    return candidate
+
+
 def _load_recipe_schema():
     try:
-        with open(RECIPE_SCHEMA_PATH, 'r') as schema_file:
+        with open(RECIPE_SCHEMA_PATH, "r") as schema_file:
             return json.load(schema_file)
     except (FileNotFoundError, json.JSONDecodeError) as exc:
         print(f"Warning: Unable to load recipe schema. Error: {exc}")
@@ -41,9 +61,7 @@ def validate_recipe_data(recipe_data):
     if RECIPE_VALIDATOR is None:
         raise RuntimeError("Recipe schema is not available for validation.")
 
-    errors = sorted(
-        RECIPE_VALIDATOR.iter_errors(recipe_data), key=lambda e: tuple(e.path)
-    )
+    errors = sorted(RECIPE_VALIDATOR.iter_errors(recipe_data), key=lambda e: tuple(e.path))
     if errors:
         first_error = errors[0]
         location = " -> ".join(str(part) for part in first_error.absolute_path)
@@ -57,72 +75,71 @@ def get_all_recipes():
     """Gets a list of all recipes, reading the name from each JSON file."""
     recipes = []
     for filename in os.listdir(RECIPES_DIR):
-        if filename.endswith('.json'):
+        if filename.endswith(".json"):
             filepath = os.path.join(RECIPES_DIR, filename)
             try:
-                with open(filepath, 'r') as f:
+                with open(filepath, "r") as f:
                     data = json.load(f)
-                    recipes.append({
-                        'name': data.get('name', 'Unnamed Recipe'),
-                        'filename': filename
-                    })
+                    recipes.append(
+                        {"name": data.get("name", "Unnamed Recipe"), "filename": filename}
+                    )
             except (json.JSONDecodeError, IOError) as e:
                 print(f"Warning: Could not read or parse {filename}. Error: {e}")
-    return sorted(recipes, key=lambda r: r['name'])
+    return sorted(recipes, key=lambda r: r["name"])
 
 
-@app.route('/')
+@app.route("/")
 def index():
     """The homepage route. Displays a list of all recipes."""
     recipes = get_all_recipes()
-    return render_template('index.html', recipes=recipes)
+    return render_template("index.html", recipes=recipes)
 
 
-@app.route('/recipe/<filename>')
+@app.route("/recipe/<filename>")
 def show_recipe(filename):
     """The route to display a single recipe."""
-    filepath = os.path.join(RECIPES_DIR, filename)
+    filepath = _get_safe_recipe_path(filename)
     if not os.path.exists(filepath):
         abort(404)
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             recipe_data = json.load(f)
-        recipe_data['filename'] = filename
-        return render_template('recipe.html', recipe=recipe_data)
+        recipe_data["filename"] = filename
+        return render_template("recipe.html", recipe=recipe_data)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
         abort(500)
 
 
-@app.route('/recipe/<filename>/json')
+@app.route("/recipe/<filename>/json")
 def show_recipe_json(filename):
     """The route to display the raw JSON for a single recipe."""
-    filepath = os.path.join(RECIPES_DIR, filename)
+    filepath = _get_safe_recipe_path(filename)
     if not os.path.exists(filepath):
         abort(404)
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             recipe_data = json.load(f)
-        recipe_data['filename'] = filename
+        recipe_data["filename"] = filename
         pretty_json = json.dumps(recipe_data, indent=2)
-        return render_template('json_viewer.html', recipe=recipe_data, recipe_json_str=pretty_json)
+        return render_template("json_viewer.html", recipe=recipe_data, recipe_json_str=pretty_json)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error processing {filename}. Error: {e}")
         abort(500)
 
 
 # --- NEW: Route for generating recipes ---
-@app.route('/generate_recipe', methods=['GET', 'POST'])
+@app.route("/generate_recipe", methods=["GET", "POST"])
 def generate_recipe():
     """Handles both displaying the form and processing the generation request."""
-    if request.method == 'POST':
+    if request.method == "POST":
         if client is None:
             return (
                 "Recipe generation is not configured. Set the GOOGLE_API_KEY environment variable and restart the application.",
                 500,
             )
 
-        prompt = request.form.get('prompt', '').strip()
+        prompt = request.form.get("prompt", "").strip()
         if not prompt:
             return "A prompt describing the desired recipe is required.", 400
 
@@ -130,7 +147,7 @@ def generate_recipe():
             return "Recipe schema is unavailable; cannot validate generated recipes.", 500
 
         # The JSON schema to guide the model's output
-        with open(RECIPE_SCHEMA_PATH, 'r') as f:
+        with open(RECIPE_SCHEMA_PATH, "r") as f:
             schema = f.read()
 
         # Create the full prompt for the model
@@ -147,11 +164,13 @@ def generate_recipe():
         try:
             # Generate the content
             response = client.models.generate_content(
-                model='gemini-2.5-pro',
+                model="gemini-2.5-pro",
                 contents=full_prompt,
             )
             # Extract the JSON string from the response
-            recipe_json_str = response.text.strip().replace('```json', '').replace('```', '').strip()
+            recipe_json_str = (
+                response.text.strip().replace("```json", "").replace("```", "").strip()
+            )
 
             # Parse the JSON string into a Python dictionary
             recipe_data = json.loads(recipe_json_str)
@@ -160,16 +179,18 @@ def generate_recipe():
             validate_recipe_data(recipe_data)
 
             # Create a filename from the recipe name
-            safe_filename = "".join(c for c in recipe_data['name'] if c.isalnum() or c in (' ', '_')).rstrip()
-            filename = safe_filename.replace(' ', '_').lower() + '.json'
+            safe_filename = "".join(
+                c for c in recipe_data["name"] if c.isalnum() or c in (" ", "_")
+            ).rstrip()
+            filename = safe_filename.replace(" ", "_").lower() + ".json"
             filepath = os.path.join(RECIPES_DIR, filename)
 
             # Save the new recipe to a file
-            with open(filepath, 'w') as f:
+            with open(filepath, "w") as f:
                 json.dump(recipe_data, f, indent=2)
 
             # Redirect to the new recipe's page
-            return redirect(url_for('show_recipe', filename=filename))
+            return redirect(url_for("show_recipe", filename=filename))
 
         except json.JSONDecodeError as e:
             # Handle JSON parsing errors
@@ -187,9 +208,9 @@ def generate_recipe():
 
         # Log the error details securely
         try:
-            with open('recipe_error.json', 'a+') as f:
+            with open("recipe_error.json", "a+") as f:
                 f.write(f"{recipe_json_str}\n")
-            with open('recipe_error.txt', 'a') as f:
+            with open("recipe_error.txt", "a") as f:
                 f.write(
                     f"Full prompt:\n{full_prompt}\n\n"
                     f"Response:\n{getattr(response, 'text', 'No response')}\n"
@@ -202,8 +223,9 @@ def generate_recipe():
         return "Sorry, there was an error generating the recipe. Please try again.", 500
 
     # For a GET request, just show the form
-    return render_template('generate_recipe.html')
+    return render_template("generate_recipe.html")
 
 
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    debug_mode = os.getenv("FLASK_DEBUG", "0").lower() in ("1", "true", "yes")
+    app.run(debug=debug_mode, host="0.0.0.0", port=5000)

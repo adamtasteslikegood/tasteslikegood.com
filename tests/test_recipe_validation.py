@@ -19,14 +19,10 @@ def base_recipe():
         "cookTime": 5,
         "servings": 2,
         "ingredients": {
-            "wet": [
-                {"name": "Water", "amount": 1, "units": "cup"}
-            ],
-            "dry": [
-                {"name": "Flour", "amount": 2, "units": "cups"}
-            ]
+            "wet": [{"name": "Water", "amount": 1, "units": "cup"}],
+            "dry": [{"name": "Flour", "amount": 2, "units": "cups"}],
         },
-        "instructions": ["Mix ingredients."]
+        "instructions": ["Mix ingredients."],
     }
 
 
@@ -38,7 +34,7 @@ def test_validate_accepts_object_instructions(base_recipe):
     recipe = copy.deepcopy(base_recipe)
     recipe["instructions"] = [
         {"step": 1, "description": "Combine all dry ingredients."},
-        {"step": 2, "description": "Bake until golden."}
+        {"step": 2, "description": "Bake until golden."},
     ]
 
     validate_recipe_data(recipe)

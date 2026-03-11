@@ -1,0 +1,21 @@
+[flake8]
+max-line-length = 100
+extend-ignore = E203, E266, E501, W503
+exclude =
+    .git,
+    __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    .idea,
+    recipes,
+    .github,
+    scan_paths_for_nonascii.py
+max-complexity = 15
+per-file-ignores =
+    __init__.py:F401
+    tests/*.py:F401,F811,E402
+    scripts/*.py:E402
