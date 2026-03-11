@@ -13,7 +13,6 @@ Refactored into a modular architecture with:
 - blueprints/: Route handlers (recipes, generation, API)
 """
 
-import logging
 import os
 
 from flask import Flask, render_template, request, session
@@ -25,11 +24,11 @@ from auth import auth_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
+from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
 from utils.logging_config import setup_logging
-
 # Import session utilities
 from utils.session_utils import get_or_create_session_id
 
@@ -69,10 +68,9 @@ def create_app():
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured
     with app.app_context():
-        import models
+        pass
 
     # Production should continue using Flask-Migrate/Alembic as the primary path.
-
 
     # ####### DEVELOPMENT NOTE: If you want to quickly create tables without running migrations #######
     # # ***** (for example, for local development or testing), you can use db.create_all().  *****
@@ -102,7 +100,6 @@ def create_app():
     # # Uncomment the following line if you want to use create_all() for quick local development without migrations.
     # create_tables_with_retry(app, db)
     # # Note: In production, rely on proper migrations instead of create_all() to manage schema changes.
-
 
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins
@@ -158,6 +155,7 @@ def create_app():
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
+    app.register_blueprint(generation_api_bp)  # Prefix '/api' — JSON generation endpoints
 
     # Error handlers
     @app.errorhandler(404)
@@ -176,7 +174,6 @@ def create_app():
 
 # Create the app instance
 app = create_app()
-
 
 if __name__ == "__main__":
     # Run the development server

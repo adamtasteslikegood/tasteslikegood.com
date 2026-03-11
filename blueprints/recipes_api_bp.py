@@ -11,9 +11,8 @@ Provides database-backed recipe CRUD operations:
 
 import logging
 
-from flask import Blueprint, jsonify, request, session
-
 from extensions import db
+from flask import Blueprint, jsonify, request, session
 from repositories import db_recipe_repository
 from utils.session_utils import get_or_create_session_id
 
@@ -60,6 +59,12 @@ def list_recipes(user_id, guest_session_id):
     try:
         recipes = db_recipe_repository.get_user_recipes(user_id, guest_session_id)
 
+        def _strip_image_data(data):
+            """Remove bulky ai_image_data from list responses to keep payloads small."""
+            if not data or "ai_image_data" not in data:
+                return data
+            return {k: v for k, v in data.items() if k != "ai_image_data"}
+
         return (
             jsonify(
                 {
@@ -67,7 +72,7 @@ def list_recipes(user_id, guest_session_id):
                         {
                             "id": recipe.id,
                             "name": recipe.name,
-                            "data": recipe.data,
+                            "data": _strip_image_data(recipe.data),
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
