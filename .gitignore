@@ -7,3 +7,7 @@
 /recipes/
 recipe_error.json
 recipe_error.txt
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
