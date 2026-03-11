@@ -1,31 +1,25 @@
-__pycache__
-*.pyc
-*.pyo
-.env
-.env.*
-!.env.example
 .git
 .gitignore
 
 # Virtual environments
-.venv
-venv
+.venv/
+venv/
 
 # IDE and editor files
-.idea
-.vscode
-.cursor
-.zed
+.idea/
+.vscode/
+.cursor/
+.zed/
 *.swp
 *.swo
 *~
 .DS_Store
 
 # AI/agent tooling
-.agent
-.ai
-.claude
-.codex
+.agent/
+.ai/
+.claude/
+.codex/
 skills/
 
 # CI/CD and GitHub
@@ -63,6 +57,9 @@ setup_venv.sh
 init_database.sh
 commit-phase-1.sh
 
+# Tests (not needed in prod image)
+tests/
+
 # Migration dockerfile
 Dockerfile.migrate
 
@@ -73,3 +70,6 @@ Dockerfile.migrate
 # Sample/temp files
 instance/
 pip/
+__pycache__/
+*.pyc
+*.pyo
