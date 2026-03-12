@@ -8,12 +8,13 @@ Handles loading of:
 - Directory paths and caching settings
 """
 
-import os
 import json
-from dotenv import load_dotenv
-from typing import Dict, Any, Optional
-from jsonschema import Draft7Validator
 import logging
+import os
+from typing import Dict, Any, Optional
+
+from dotenv import load_dotenv
+from jsonschema import Draft7Validator
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +36,13 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
 # Default Model Configuration
-DEFAULT_MODEL = "gemini-2.5-pro"
+DEFAULT_MODEL = "gemini-3.1gcloud run services describe flask-backend \
+  --platform=managed \
+  --region=YOUR_REGION \
+  --format="yaml(spec.template.spec.containers, spec.template.metadata.annotations, spec.template.spec.containerConcurrency, spec.template.spec.timeoutSeconds, spec.template.spec.serviceAccountName, spec.template.metadata.labels, spec.template.spec.volumes, spec.template.spec.containers.env)"gcloud run services describe flask-backend \
+    --platform=managed \
+    --region=YOUR_REGION \
+    --format="yaml(spec.template.spec.containers, spec.template.metadata.annotations, spec.template.spec.containerConcurrency, spec.template.spec.timeoutSeconds, spec.template.spec.serviceAccountName, spec.template.metadata.labels, spec.template.spec.volumes, spec.template.spec.containers.env)"-pro"
 
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))

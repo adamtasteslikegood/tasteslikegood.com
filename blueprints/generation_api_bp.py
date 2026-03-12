@@ -12,13 +12,14 @@ import datetime
 import logging
 import uuid
 
+from flask import Blueprint, Response, jsonify, request, session
+
+from config import DEFAULT_MODEL
 from blueprints.generation_bp import (
     build_generation_prompt,
     attempt_recipe_generation,
     validate_generation_input,
 )
-from config import DEFAULT_MODEL
-from flask import Blueprint, Response, jsonify, request, session
 from repositories import db_recipe_repository
 from services.gemini_service import get_genai_client
 from utils.session_utils import get_or_create_session_id, get_user_metadata
