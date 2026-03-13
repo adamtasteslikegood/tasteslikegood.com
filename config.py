@@ -36,13 +36,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
 # Default Model Configuration
-DEFAULT_MODEL = "gemini-3.1gcloud run services describe flask-backend \
-  --platform=managed \
-  --region=YOUR_REGION \
-  --format="yaml(spec.template.spec.containers, spec.template.metadata.annotations, spec.template.spec.containerConcurrency, spec.template.spec.timeoutSeconds, spec.template.spec.serviceAccountName, spec.template.metadata.labels, spec.template.spec.volumes, spec.template.spec.containers.env)"gcloud run services describe flask-backend \
-    --platform=managed \
-    --region=YOUR_REGION \
-    --format="yaml(spec.template.spec.containers, spec.template.metadata.annotations, spec.template.spec.containerConcurrency, spec.template.spec.timeoutSeconds, spec.template.spec.serviceAccountName, spec.template.metadata.labels, spec.template.spec.volumes, spec.template.spec.containers.env)"-pro"
+DEFAULT_MODEL = "gemini-3.1-pro"
 
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
