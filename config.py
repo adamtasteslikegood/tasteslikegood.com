@@ -36,7 +36,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
 # Default Model Configuration
-DEFAULT_MODEL = "gemini-3.1-pro"
+DEFAULT_MODEL = "gemini-3.1-pro-preview"
 
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
