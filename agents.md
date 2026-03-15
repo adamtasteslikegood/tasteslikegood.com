@@ -1,15 +1,22 @@
 # Agent Configurations
 
-This file tracks agent information and configurations used in the Tastes Like Good project.
+> Last updated: 2026-03-14
+
+This file documents the AI agents and service-level components used by the Flask backend
+in the **Vegangenius Chef** three-tier architecture (Angular → Express → Flask → Cloud SQL).
+
+For overall project architecture see the root `AGENTS.md`.
+
+---
 
 ## Agent Name: Gemini Recipe Generator
-**Version:** 2.0 (using gemini-2.0-flash-exp as default)
+**Version:** 3.0 (using gemini-2.5-flash as default)
 **Description:** AI agent specialized in generating creative vegan recipes using Google's Gemini models. Supports multiple Gemini models dynamically fetched from the API.
 
 ### Parameters
 | Parameter Name | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `model` | String | gemini-2.0-flash-exp | The specific Gemini model version to use |
+| `model` | String | gemini-2.5-flash | The specific Gemini model version to use |
 | `temperature` | Float | 0.7 | Controls randomness in generation (0.0 to 1.0) |
 | `max_output_tokens` | Integer | 8192 | Maximum number of tokens in the response |
 | `prompt` | String | (required) | User prompt describing desired recipe (10-500 chars) |
@@ -45,8 +52,8 @@ recipe_data = generate_recipe_with_gemini(
 ---
 
 ## Agent Name: Imagen Food Photographer
-**Version:** 3.0 (Imagen 3)
-**Description:** AI agent for generating high-quality food photography images based on recipe content using Google's Imagen 3 model.
+**Version:** 4.0 (Imagen `imagen-4.0-generate-001`)
+**Description:** AI agent for generating high-quality food photography images based on recipe content using Google's Imagen 4 model.
 
 ### Parameters
 | Parameter Name | Type | Default | Description |
