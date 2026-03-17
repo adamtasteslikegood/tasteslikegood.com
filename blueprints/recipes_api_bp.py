@@ -21,6 +21,21 @@ logger = logging.getLogger(__name__)
 recipes_api_bp = Blueprint("recipes_api", __name__, url_prefix="/api/recipes")
 
 
+def _strip_image_data(data):
+    """Remove bulky ai_image_data from API responses to keep payloads small.
+    Images are served separately via GET /api/recipes/<id>/image."""
+    if not data or "ai_image_data" not in data:
+        return data
+    return {k: v for k, v in data.items() if k != "ai_image_data"}
+
+
+def _recipe_response(recipe):
+    """Build a consistent recipe response dict with image data stripped."""
+    d = recipe.to_dict()
+    d["data"] = _strip_image_data(d.get("data"))
+    return d
+
+
 def get_current_user_id():
     """
     Get the current authenticated user's ID from session.
@@ -58,12 +73,6 @@ def list_recipes(user_id, guest_session_id):
     """
     try:
         recipes = db_recipe_repository.get_user_recipes(user_id, guest_session_id)
-
-        def _strip_image_data(data):
-            """Remove bulky ai_image_data from list responses to keep payloads small."""
-            if not data or "ai_image_data" not in data:
-                return data
-            return {k: v for k, v in data.items() if k != "ai_image_data"}
 
         return (
             jsonify(
@@ -126,7 +135,7 @@ def create_recipe(user_id, guest_session_id):
         if not recipe:
             return jsonify({"error": "Failed to create recipe"}), 500
 
-        return jsonify(recipe.to_dict()), 201
+        return jsonify(_recipe_response(recipe)), 201
 
     except Exception as e:
         logger.error(f"Error creating recipe: {e}")
@@ -147,7 +156,7 @@ def get_recipe(user_id, guest_session_id, recipe_id):
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
 
-        return jsonify(recipe.to_dict()), 200
+        return jsonify(_recipe_response(recipe)), 200
 
     except Exception as e:
         logger.error(f"Error fetching recipe {recipe_id}: {e}")
@@ -180,7 +189,7 @@ def update_recipe(user_id, guest_session_id, recipe_id):
         if not recipe:
             return jsonify({"error": "Recipe not found or update failed"}), 404
 
-        return jsonify(recipe.to_dict()), 200
+        return jsonify(_recipe_response(recipe)), 200
 
     except Exception as e:
         logger.error(f"Error updating recipe {recipe_id}: {e}")

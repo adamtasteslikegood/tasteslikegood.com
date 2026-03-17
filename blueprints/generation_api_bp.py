@@ -242,3 +242,97 @@ def serve_recipe_image(recipe_id):
         mimetype="image/png",
         headers={"Cache-Control": "public, max-age=86400"},
     )
+
+
+@generation_api_bp.route("/admin/migrate-images", methods=["POST"])
+def migrate_image_urls():
+    """
+    One-time migration: fix old recipes that have data: URLs or /static/ paths
+    instead of the /api/recipes/<id>/image pattern.
+
+    - data:image/...;base64,... → extract base64 into ai_image_data, set URL to API path
+    - /static/images/... → set URL to API path (if ai_image_data already exists)
+    - Missing ai_image_url but has ai_image_data → set URL to API path
+
+    Returns summary of migrated recipes.
+    """
+    from models import Recipe
+    from extensions import db
+
+    try:
+        recipes = Recipe.query.all()
+        migrated = []
+
+        for recipe in recipes:
+            data = recipe.data or {}
+            url = data.get("ai_image_url", "")
+            changed = False
+            api_url = f"/api/recipes/{recipe.id}/image"
+
+            # Case 1: data: URL — extract base64 and fix URL
+            if url and url.startswith("data:image/"):
+                # Extract base64 from data URL (format: data:image/png;base64,AAAA...)
+                parts = url.split(",", 1)
+                if len(parts) == 2:
+                    data["ai_image_data"] = parts[1]
+                data["ai_image_url"] = api_url
+                changed = True
+
+            # Case 2: /static/ file path — fix URL (image data should already be in DB)
+            elif url and url.startswith("/static/"):
+                data["ai_image_url"] = api_url
+                changed = True
+
+            # Case 3: No URL but has image data — set the URL
+            elif not url and data.get("ai_image_data"):
+                data["ai_image_url"] = api_url
+                changed = True
+
+            if changed:
+                recipe.data = data
+                migrated.append({"id": recipe.id, "name": recipe.name, "new_url": api_url})
+
+        if migrated:
+            db.session.commit()
+
+        logger.info("Image URL migration complete: %d recipes updated", len(migrated))
+        return jsonify({
+            "migrated": len(migrated),
+            "recipes": migrated,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        logger.error("Image URL migration failed: %s", e)
+        return jsonify({"error": str(e)}), 500
+
+
+@generation_api_bp.route("/recipes/missing-images", methods=["GET"])
+def list_recipes_missing_images():
+    """
+    List recipes that have no valid AI image (no ai_image_data in DB).
+    Used by frontend to offer image regeneration.
+    """
+    from models import Recipe
+
+    user_id = _current_user_id()
+    guest_session_id = _current_guest_session_id()
+
+    query = Recipe.query
+    if user_id is not None:
+        query = query.filter_by(user_id=user_id)
+    elif guest_session_id:
+        query = query.filter_by(user_id=None, guest_session_id=guest_session_id)
+
+    recipes = query.all()
+    missing = []
+    for recipe in recipes:
+        data = recipe.data or {}
+        if not data.get("ai_image_data"):
+            missing.append({
+                "id": recipe.id,
+                "name": recipe.name,
+                "ai_image_url": data.get("ai_image_url"),
+            })
+
+    return jsonify({"recipes": missing, "count": len(missing)}), 200
