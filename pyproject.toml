@@ -63,7 +63,7 @@ dependencies = [
     "websockets==16.0",
     "cachetools==5.5.2",
     # Cryptography & Security
-    "pyasn1==0.6.1",
+    "pyasn1==0.6.3",
     "pyasn1-modules==0.4.2",
     "rsa==4.9.1",
     "flask-cors==5.0.0",
