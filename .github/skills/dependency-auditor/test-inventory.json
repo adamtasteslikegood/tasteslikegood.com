@@ -37,73 +37,23 @@
     },
     {
       "name": "lodash",
-      "version": "4.17.20",
+      "version": "4.17.21",
       "ecosystem": "npm",
       "direct": true,
       "license": null,
-      "vulnerabilities": [
-        {
-          "id": "CVE-2021-23337",
-          "summary": "Prototype pollution in lodash",
-          "severity": "HIGH",
-          "cvss_score": 7.2,
-          "affected_versions": "<4.17.21",
-          "fixed_version": "4.17.21",
-          "published_date": "2021-02-15",
-          "references": [
-            "https://nvd.nist.gov/vuln/detail/CVE-2021-23337"
-          ]
-        },
-        {
-          "id": "CVE-2021-23337",
-          "summary": "Prototype pollution in lodash",
-          "severity": "HIGH",
-          "cvss_score": 7.2,
-          "affected_versions": "<4.17.21",
-          "fixed_version": "4.17.21",
-          "published_date": "2021-02-15",
-          "references": [
-            "https://nvd.nist.gov/vuln/detail/CVE-2021-23337"
-          ]
-        }
-      ]
+      "vulnerabilities": []
     },
     {
       "name": "axios",
-      "version": "1.5.0",
+      "version": "1.13.5",
       "ecosystem": "npm",
       "direct": true,
       "license": null,
-      "vulnerabilities": [
-        {
-          "id": "CVE-2023-45857",
-          "summary": "Cross-site request forgery in axios",
-          "severity": "MEDIUM",
-          "cvss_score": 6.1,
-          "affected_versions": ">=1.0.0 <1.6.0",
-          "fixed_version": "1.6.0",
-          "published_date": "2023-10-11",
-          "references": [
-            "https://nvd.nist.gov/vuln/detail/CVE-2023-45857"
-          ]
-        },
-        {
-          "id": "CVE-2023-45857",
-          "summary": "Cross-site request forgery in axios",
-          "severity": "MEDIUM",
-          "cvss_score": 6.1,
-          "affected_versions": ">=1.0.0 <1.6.0",
-          "fixed_version": "1.6.0",
-          "published_date": "2023-10-11",
-          "references": [
-            "https://nvd.nist.gov/vuln/detail/CVE-2023-45857"
-          ]
-        }
-      ]
+      "vulnerabilities": []
     },
     {
       "name": "jsonwebtoken",
-      "version": "8.5.1",
+      "version": "9.0.0",
       "ecosystem": "npm",
       "direct": true,
       "license": null,
@@ -119,7 +69,7 @@
     },
     {
       "name": "mongoose",
-      "version": "6.10.0",
+      "version": "6.13.6",
       "ecosystem": "npm",
       "direct": true,
       "license": null,
@@ -167,7 +117,7 @@
     },
     {
       "name": "multer",
-      "version": "1.4.5-lts.1",
+      "version": "2.1.1",
       "ecosystem": "npm",
       "direct": true,
       "license": null,
@@ -175,7 +125,7 @@
     },
     {
       "name": "sharp",
-      "version": "0.32.1",
+      "version": "0.32.6",
       "ecosystem": "npm",
       "direct": true,
       "license": null,
@@ -183,7 +133,7 @@
     },
     {
       "name": "nodemailer",
-      "version": "6.9.1",
+      "version": "7.0.11",
       "ecosystem": "npm",
       "direct": true,
       "license": null,
@@ -390,9 +340,9 @@
       "vulnerabilities": []
     }
   ],
-  "vulnerabilities_found": 6,
-  "high_severity_count": 2,
-  "medium_severity_count": 4,
+  "vulnerabilities_found": 2,
+  "high_severity_count": 0,
+  "medium_severity_count": 2,
   "low_severity_count": 0,
   "ecosystems": [
     "npm"
@@ -401,21 +351,16 @@
     "total_dependencies": 39,
     "unique_dependencies": 39,
     "ecosystems_found": 1,
-    "vulnerable_dependencies": 3,
+    "vulnerable_dependencies": 1,
     "vulnerability_breakdown": {
-      "high": 2,
-      "medium": 4,
+      "high": 0,
+      "medium": 2,
       "low": 0
     }
   },
   "recommendations": [
-    "URGENT: Address 2 high-severity vulnerabilities immediately",
-    "Schedule fixes for 4 medium-severity vulnerabilities within 30 days",
+    "Schedule fixes for 2 medium-severity vulnerabilities within 30 days",
     "Update express from 4.18.1 to 4.18.2 to fix CVE-2022-24999",
-    "Update express from 4.18.1 to 4.18.2 to fix CVE-2022-24999",
-    "Update lodash from 4.17.20 to 4.17.21 to fix CVE-2021-23337",
-    "Update lodash from 4.17.20 to 4.17.21 to fix CVE-2021-23337",
-    "Update axios from 1.5.0 to 1.6.0 to fix CVE-2023-45857",
-    "Update axios from 1.5.0 to 1.6.0 to fix CVE-2023-45857"
+    "Update express from 4.18.1 to 4.18.2 to fix CVE-2022-24999"
   ]
 }
