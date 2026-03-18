@@ -48,7 +48,7 @@ dependencies = [
     "httpcore==1.0.9",
     "requests==2.32.5",
     "requests-oauthlib==2.0.0",
-    "urllib3==2.5.0",
+    "urllib3==2.6.3",
     "certifi==2025.11.12",
     "charset-normalizer==3.4.4",
     "idna==3.11",
