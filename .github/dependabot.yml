@@ -1,6 +1,12 @@
 version: 2
+
 updates:
-  - package-ecosystem: pip
-    directory: /
+  - package-ecosystem: "pip"
+    directory: "/"
     schedule:
-      interval: weekly
+      interval: "weekly"
+    target-branch: "dev/backend_sub222"
+    labels:
+      - "dependencies"
+      - "python"
+    open-pull-requests-limit: 10

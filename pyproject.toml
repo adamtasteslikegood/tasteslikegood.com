@@ -1,0 +1,135 @@
+[project]
+name = "tasteslikegood-com"
+version = "0.1.0"
+description = "A Flask-based web application for viewing and generating vegan recipes using Google's Gemini AI models"
+readme = "README.md"
+requires-python = ">=3.13"  # Only support Python 3.13+
+license = { text = "MIT" }
+authors = [
+    { name = "Tastes Like Good Team", email = "contact@tasteslikegood.com" }
+]
+keywords = ["vegan", "recipes", "ai", "gemini", "flask", "web-app", "food"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: End Users/Desktop",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content",
+    "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Framework :: Flask",
+]
+
+dependencies = [
+    # Web Framework
+    "flask==3.1.2",
+    "werkzeug==3.1.3",
+    "jinja2==3.1.6",
+    "blinker==1.9.0",
+    "itsdangerous==2.2.0",
+    # Database (Phase 3) - psycopg2 is optional, only needed for PostgreSQL
+    "flask-sqlalchemy==3.1.1",
+    "flask-migrate==4.0.5",
+    "sqlalchemy>=2.0.35",  # Use stable 2.0.x with Python 3.13 support
+    # Google AI & Authentication
+    "google-genai==1.56.0",
+    "google-generativeai==0.8.5",
+    "google-ai-generativelanguage==0.6.15",
+    "google-auth==2.45.0",
+    "google-auth-oauthlib==1.2.2",
+    "google-api-python-client==2.182.0",
+    "googleapis-common-protos==1.70.0",
+    # Data Validation
+    "jsonschema==4.25.1",
+    "pydantic==2.12.5",
+    "pydantic-core==2.41.5",
+    # Networking & HTTP
+    "httpx==0.28.1",
+    "httpcore==1.0.9",
+    "requests==2.32.5",
+    "requests-oauthlib==2.0.0",
+    "urllib3==2.5.0",
+    "certifi==2025.11.12",
+    "charset-normalizer==3.4.4",
+    "idna==3.11",
+    # Utilities
+    "python-dotenv==1.2.1",
+    "python-multipart==0.0.20",
+    "distro==1.9.0",
+    "sniffio==1.3.1",
+    "anyio==4.11.0",
+    "typing-extensions==4.15.0",
+    "tenacity==9.1.2",
+    "websockets==15.0.1",
+    "cachetools==5.5.2",
+    # Cryptography & Security
+    "pyasn1==0.6.1",
+    "pyasn1-modules==0.4.2",
+    "rsa==4.9.1",
+    "flask-cors==5.0.0",
+    "pandas>=3.0.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]
+postgres = [
+    # PostgreSQL support (for production deployments)
+    "psycopg2-binary>=2.9.0",
+]
+
+[project.urls]
+Homepage = "https://tasteslikegood.com"
+Documentation = "https://github.com/yourusername/tasteslikegood.com/blob/main/README.md"
+Repository = "https://github.com/yourusername/tasteslikegood.com"
+Issues = "https://github.com/yourusername/tasteslikegood.com/issues"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+# This is a Flask application, not a distributable package
+# Don't try to build a wheel
+only-packages = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --strict-markers"
+
+[tool.black]
+line-length = 100
+target-version = ['py313']
+include = '\.pyi?$'
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+exclude = [
+    "migrate_recipes\\.py",
+    "debug_generation\\.py",
+    "migrations/",
+]
+
+[tool.uv]
+# This is a Flask application, not a distributable package
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0",
+]

@@ -1,0 +1,125 @@
+name: Backend CI
+
+permissions:
+  contents: read
+
+on:
+  push:
+    branches: [main, dev/backend_sub222, develop]
+  pull_request:
+    branches: [main, dev/backend_sub222, develop]
+
+jobs:
+  lint:
+    name: Lint (Black + Flake8)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Check formatting with Black
+        run: |
+          uv run black --check .
+
+      - name: Lint with Flake8
+        run: |
+          uv run flake8 . --count --show-source --statistics
+
+  type-check:
+    name: Type Check (mypy)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Type check with mypy
+        run: |
+          uv run mypy . --ignore-missing-imports
+
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Run tests with coverage
+        env:
+          FLASK_SECRET_KEY: test-secret-key-for-ci
+          GOOGLE_CLIENT_ID: test-client-id
+          GOOGLE_CLIENT_SECRET: test-client-secret
+        run: |
+          uv run pytest --cov=. --cov-report=xml --cov-report=term
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage.xml
+          retention-days: 7
+
+  security:
+    name: Security Scan (Safety)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install dependencies
+        run: |
+          uv sync --dev
+
+      - name: Run safety check
+        run: |
+          uv pip install safety
+          uv run safety check --json || true
+        continue-on-error: true

@@ -1,20 +1,146 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Welcome to TastesLikeGood.com!!!</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
-    <h1>Welcome to TastesLikeGood.com!!!</h1>
-    <a href="{{ url_for('generate_recipe') }}" class="generate-link">Generate a New Recipe with AI</a>
-    <ul class="recipe-list">
-        {% for recipe in recipes %}
-        <li>
-            <a href="{{ url_for('show_recipe', filename=recipe.filename) }}">{{ recipe.name }}</a>
-        </li>
+{% extends "base.html" %} {% block title %}Welcome to TastesLikeGood.com!!!{%
+endblock %} {% block head %}
+{% endblock %} {% block content %}
+<h1>Welcome to TastesLikeGood.com!!!</h1>
+
+<div class="search-container">
+    <input type="text" id="search-box" class="search-box" placeholder="Search recipes..." autocomplete="off"
+        aria-label="Search recipes" />
+    <div class="recipe-count" id="recipe-count">
+        Showing <span id="visible-count">{{ recipes|length }}</span> of {{
+        recipes|length }} recipes
+    </div>
+</div>
+
+<div class="recipe-container">
+    <nav class="alphabet-nav" role="navigation" aria-label="Alphabetical navigation">
+        {% for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
+        <a href="#letter-{{ letter }}" class="letter-link" data-letter="{{ letter }}">{{ letter }}</a>
         {% endfor %}
-    </ul>
-</body>
-</html>
+    </nav>
+
+    <div class="recipe-list-container">
+        <div class="no-results" id="no-results">
+            No recipes found matching your search.
+        </div>
+
+        {% set recipes_by_letter = {} %} {% for recipe in recipes %} {% set
+        first_letter = recipe.name[0]|upper %} {% if first_letter not in
+        recipes_by_letter %} {% set _ = recipes_by_letter.update({first_letter:
+        []}) %} {% endif %} {% set _ =
+        recipes_by_letter[first_letter].append(recipe) %} {% endfor %} {% for
+        letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %} {% if letter in
+        recipes_by_letter %}
+        <div class="letter-section" id="letter-{{ letter }}">
+            <h2 class="letter-header">{{ letter }}</h2>
+            <ul class="recipe-list">
+                {% for recipe in recipes_by_letter[letter] %}
+                <li data-recipe-name="{{ recipe.name|lower }}" data-letter="{{ letter }}">
+                    <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">{{ recipe.name }}</a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        {% endif %} {% endfor %}
+    </div>
+</div>
+
+<script>
+    const searchBox = document.getElementById("search-box");
+    const recipeItems = document.querySelectorAll(".recipe-list li");
+    const noResults = document.getElementById("no-results");
+    const visibleCount = document.getElementById("visible-count");
+    const totalCount = recipeItems.length;
+    const letterLinks = document.querySelectorAll(".letter-link");
+    const letterSections = document.querySelectorAll(".letter-section");
+
+    // Update letter link states based on available sections
+    function updateLetterLinks() {
+        const availableLetters = new Set();
+        letterSections.forEach((section) => {
+            const letter = section.id.replace("letter-", "");
+            const visibleRecipes = section.querySelectorAll("li:not(.hidden)");
+            if (visibleRecipes.length > 0) {
+                availableLetters.add(letter);
+            }
+        });
+
+        letterLinks.forEach((link) => {
+            const letter = link.dataset.letter;
+            if (availableLetters.has(letter)) {
+                link.classList.remove("disabled");
+            } else {
+                link.classList.add("disabled");
+            }
+        });
+    }
+
+    // Search functionality
+    searchBox.addEventListener("input", function () {
+        const searchTerm = this.value.toLowerCase().trim();
+        let visibleRecipes = 0;
+
+        recipeItems.forEach((item) => {
+            const recipeName = item.dataset.recipeName;
+            const matches = recipeName.includes(searchTerm);
+
+            if (matches) {
+                item.classList.remove("hidden");
+                visibleRecipes++;
+            } else {
+                item.classList.add("hidden");
+            }
+        });
+
+        // Update visible count
+        visibleCount.textContent = visibleRecipes;
+
+        // Show/hide no results message
+        if (visibleRecipes === 0) {
+            noResults.style.display = "block";
+        } else {
+            noResults.style.display = "none";
+        }
+
+        // Hide empty letter sections
+        letterSections.forEach((section) => {
+            const visibleInSection =
+                section.querySelectorAll("li:not(.hidden)").length;
+            if (visibleInSection === 0) {
+                section.style.display = "none";
+            } else {
+                section.style.display = "block";
+            }
+        });
+
+        // Update letter link states
+        updateLetterLinks();
+    });
+
+    // Smooth scroll for letter navigation
+    letterLinks.forEach((link) => {
+        link.addEventListener("click", function (e) {
+            e.preventDefault();
+            const letter = this.dataset.letter;
+            const target = document.getElementById("letter-" + letter);
+            if (target && !this.classList.contains("disabled")) {
+                target.scrollIntoView({ behavior: "smooth", block: "start" });
+                // Clear search when navigating by letter
+                searchBox.value = "";
+                searchBox.dispatchEvent(new Event("input"));
+            }
+        });
+    });
+
+    // Initial setup
+    updateLetterLinks();
+
+    // Focus search box on "/" key
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "/" && !searchBox.matches(":focus")) {
+            e.preventDefault();
+            searchBox.focus();
+        }
+    });
+</script>
+{% endblock %}

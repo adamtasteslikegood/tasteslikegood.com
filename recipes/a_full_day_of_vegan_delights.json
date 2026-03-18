@@ -216,5 +216,31 @@
     "lunch",
     "dinner",
     "smoothie"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T16:03:36.804171",
+    "prompt": "unknown",
+    "images_working": true,
+    "stock_image_generation": {
+      "model": "gemini-2.0-flash-exp",
+      "user_id": "anonymous",
+      "prompt": "I need a REAL, direct stock image URL for a vegan dish called 'A Full Day of Vegan Delights'.\n\nREQUIREMENTS:\n1. Return ONLY a single direct image URL from Unsplash, Pexels, or Pixabay\n2. The URL must be a real, permanent link to an actual food photo\n3. Format: https://images.unsplash.com/photo-XXXXX or https://images.pexels.com/photos/XXXXX/...\n4. Do NOT return search URLs, API URLs, or placeholder services\n5. If you cannot find a specific real URL, respond with exactly: NONE\n\nReturn ONLY the URL or NONE, nothing else.",
+      "timestamp": "2025-12-20T16:03:36.841090",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of A Full Day of Vegan Delights. Professional lighting, appetizing.",
+      "timestamp": "2025-12-20T16:03:37.822180",
+      "success": true,
+      "image_path": "static/images/ai_a_full_day_of_vegan_delights.png"
+    }
+  },
+  "stock_image_url": "https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg",
+  "ai_image_url": "/static/images/ai_a_full_day_of_vegan_delights.png"
 }

@@ -8,7 +8,9 @@ body {
     color: #333;
 }
 
-h1, h2, h3 {
+h1,
+h2,
+h3 {
     color: #222;
 }
 
@@ -33,11 +35,127 @@ a:hover {
 }
 
 .recipe-list li {
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+    padding: 0;
 }
 
 .recipe-list a {
-    font-size: 1.2em;
+    font-size: 1.1em;
+    color: #007BFF;
+    text-decoration: none;
+}
+
+.recipe-list a:hover {
+    text-decoration: underline;
+}
+
+.recipe-list li.hidden {
+    display: none;
+}
+
+/* Search and Navigation */
+.search-container {
+    margin: 20px 0;
+    max-width: 600px;
+}
+
+.search-box {
+    width: 100%;
+    padding: 10px 15px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.search-box:focus {
+    outline: none;
+    border-color: #007BFF;
+}
+
+.recipe-count {
+    color: #666;
+    font-size: 0.9em;
+    margin-top: 8px;
+}
+
+.recipe-container {
+    display: flex;
+    gap: 30px;
+    margin-top: 20px;
+}
+
+.alphabet-nav {
+    flex-shrink: 0;
+    width: 30px;
+    position: sticky;
+    top: 20px;
+    height: fit-content;
+}
+
+.alphabet-nav a {
+    display: block;
+    text-align: center;
+    padding: 2px;
+    color: #007BFF;
+    font-weight: normal;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+.alphabet-nav a:hover:not(.disabled) {
+    text-decoration: underline;
+}
+
+.alphabet-nav a.disabled {
+    color: #ccc;
+    cursor: default;
+    pointer-events: none;
+}
+
+.recipe-list-container {
+    flex-grow: 1;
+}
+
+.letter-section {
+    margin-top: 30px;
+    scroll-margin-top: 40px;
+}
+
+.letter-header {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: #222;
+    padding: 5px 0;
+    margin-bottom: 10px;
+    border: none;
+}
+
+.no-results {
+    color: #666;
+    font-style: italic;
+    padding: 20px 0;
+    display: none;
+}
+
+@media (max-width: 768px) {
+    .recipe-container {
+        flex-direction: column;
+    }
+
+    .alphabet-nav {
+        display: flex;
+        flex-wrap: wrap;
+        width: 100%;
+        position: static;
+        justify-content: flex-start;
+        gap: 10px;
+        margin-bottom: 20px;
+    }
+
+    .alphabet-nav a {
+        width: auto;
+    }
 }
 
 /* Recipe Page Specifics */
@@ -62,11 +180,13 @@ a:hover {
     gap: 30px;
 }
 
-.ingredient-group ul, .instructions ol {
+.ingredient-group ul,
+.instructions ol {
     padding-left: 20px;
 }
 
-.ingredient-group li, .instructions li {
+.ingredient-group li,
+.instructions li {
     margin-bottom: 8px;
 }
 
@@ -109,10 +229,13 @@ a.back-link {
     margin-top: 20px;
     margin-bottom: 20px;
 }
+
 .converter h3 {
     margin-top: 0;
 }
-.converter-buttons button, .converter-custom button {
+
+.converter-buttons button,
+.converter-custom button {
     padding: 8px 12px;
     margin-right: 10px;
     border: 1px solid #007BFF;
@@ -121,15 +244,19 @@ a.back-link {
     border-radius: 5px;
     cursor: pointer;
 }
-.converter-buttons button:hover, .converter-custom button:hover {
+
+.converter-buttons button:hover,
+.converter-custom button:hover {
     background-color: #007BFF;
     color: #fff;
 }
+
 .converter-custom {
     margin-top: 15px;
     display: flex;
     align-items: center;
 }
+
 .converter-custom input {
     width: 60px;
     padding: 8px;
@@ -156,7 +283,8 @@ textarea {
     border-radius: 5px;
     font-size: 1em;
     font-family: inherit;
-    box-sizing: border-box; /* Ensures padding doesn't affect width */
+    box-sizing: border-box;
+    /* Ensures padding doesn't affect width */
 }
 
 button[type="submit"] {
@@ -181,8 +309,10 @@ button[type="submit"]:hover {
 }
 
 .code-container {
-    background-color: #2d2d2d; /* Dark background */
-    border-radius: 8px;      /* Rounded corners */
+    background-color: #2d2d2d;
+    /* Dark background */
+    border-radius: 8px;
+    /* Rounded corners */
     margin-top: 20px;
     position: relative;
     border: 1px solid #444;
@@ -214,15 +344,16 @@ button[type="submit"]:hover {
     cursor: pointer;
     font-size: 0.8em;
 }
+
 .code-header button:hover {
     background-color: #5a5a5a;
 }
 
 pre {
     padding: 20px;
-    margin: 0; /* Reset default margin */
+    margin: 0;
+    /* Reset default margin */
     color: #f8f8f2;
     white-space: pre-wrap;
     word-wrap: break-word;
 }
-

@@ -95,5 +95,15 @@
     "respect",
     "empowerment",
     "vanilla"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-19T21:00:29.106460",
+    "prompt": "unknown",
+    "images_working": true,
+    "ai_image_url": "/static/images/ai_boundaries_and_respect_cake.png"
+  },
+  "stock_image_url": "https://loremflickr.com/800/600/cake,,respect,,boundaries/all?lock=6125",
+  "ai_image_url": "/static/images/ai_boundaries_and_respect_cake.png"
 }

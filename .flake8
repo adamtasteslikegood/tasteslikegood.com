@@ -10,12 +10,16 @@ exclude =
     dist,
     *.egg-info,
     .pytest_cache,
-    .idea,
-    recipes,
-    .github,
-    scan_paths_for_nonascii.py
-max-complexity = 15
+    instance,
+    migrations,
+    .zed,
+    .cursor,
+    .ai,
+    .agent,
+    .codex,
+    .claude,
+    .github
+max-complexity = 10
 per-file-ignores =
     __init__.py:F401
-    tests/*.py:F401,F811,E402
-    scripts/*.py:E402
+    tests/*.py:F401,F811

@@ -86,5 +86,31 @@
     "kids",
     "sweet and sour",
     "appetizer"
-  ]
+  ],
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T17:05:30.752263",
+    "prompt": "unknown",
+    "images_working": true,
+    "stock_image_generation": {
+      "model": "gemini-2.0-flash-exp",
+      "user_id": "anonymous",
+      "prompt": "Search for a food photography image on Unsplash that matches: Goboly Goo Delight\nReturn the direct image URL in format: https://images.unsplash.com/photo-XXXXXXXXX?w=800\nReturn ONLY the URL, or NONE if not found.",
+      "timestamp": "2025-12-20T17:08:04.578253",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": true
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of Goboly Goo Delight. Professional lighting, appetizing.",
+      "timestamp": "2025-12-20T17:08:05.653299",
+      "success": true,
+      "image_path": "static/images/ai_goboly_goo_delight.png"
+    }
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800&h=600&fit=crop",
+  "ai_image_url": "/static/images/ai_goboly_goo_delight.png"
 }

@@ -1,17 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>JSON: {{ recipe.name }}</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
-<body>
+{% extends "base.html" %}
 
+{% block title %}JSON: {{ recipe.name }}{% endblock %}
+
+{% block content %}
     <h1>JSON for: {{ recipe.name }}</h1>
 
     <div class="json-nav">
-        <a href="{{ url_for('show_recipe', filename=recipe.filename) }}">&larr; Back to Recipe View</a>
+        <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">&larr; Back to Recipe View</a>
     </div>
 
     <div class="code-container">
@@ -21,8 +16,6 @@
         </div>
         <pre><code id="json-code">{{ recipe_json_str }}</code></pre>
     </div>
-
-    <a href="{{ url_for('index') }}" class="back-link">&larr; Back to all recipes</a>
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -48,5 +41,10 @@
         });
     </script>
 
-</body>
-</html>
+    <div class="json-nav">
+        <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">&larr; Return to Recipe View</a>
+    </div>
+
+
+{% endblock %}
+

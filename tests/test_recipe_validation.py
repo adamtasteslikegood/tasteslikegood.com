@@ -7,7 +7,7 @@ from jsonschema import ValidationError
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from app import validate_recipe_data
+from validators import validate_recipe_data
 
 
 @pytest.fixture()

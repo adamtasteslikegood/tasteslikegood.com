@@ -59,5 +59,25 @@
     "topping",
     "easy",
     "frozen fruit"
-  ]
+  ],
+  "stock_image_url": "https://loremflickr.com/800/600/Easy,Vegan,Strawberry,Sauce/all",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-04T16:14:55.223309",
+    "prompt": "unknown",
+    "images_working": true,
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "adamschoen3@tasteslikegood.org",
+      "user_display_name": "Adam Schoen",
+      "is_authenticated": true,
+      "session_id": "session_910683665e204802900f7ce103167dbe",
+      "prompt": "A delicious, high-quality food photography shot of Easy Vegan Strawberry Sauce. Professional lighting, appetizing.",
+      "timestamp": "2026-01-28T14:29:59.742649",
+      "success": true,
+      "image_path": "static/images/ai_vegan_strawberry_sauce.png"
+    }
+  },
+  "ai_image_url": "/static/images/ai_vegan_strawberry_sauce.png"
 }

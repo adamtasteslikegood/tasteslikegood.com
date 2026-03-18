@@ -1,15 +1,72 @@
-/templates/.env
-/api_key.py
-/.venv/
-/.new_venv/
-/.idea/
-.env
-/recipes/
-recipe_error.json
-recipe_error.txt
+# Python cache
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+*.so
+
+# Testing
 .pytest_cache/
 .coverage
 coverage.xml
+htmlcov/
+.tox/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+.zed/
+.cursor/
+.ai/
+.agent/
+.codex/
+.claude/
+
+# Flask
+instance/
+*.db
+*.sqlite
+
+# Environment
+.env
+.env.local
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Logs
+*.log
+
+# Database migrations (don't ignore the migrations folder itself)
+migrations/versions/*.pyc
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# uv
+uv.lock
+
+# Temporary files
+*.tmp
+#*#
+.#*
+
+# Terraform files
+.terraform/
+.tf
+Google Cloud App Designs/app-template-5-main.tf
+Google Cloud App Designs/app-template-5_terraform_code_2026-03-04T21_09_21Z.zip
+Google Cloud App Designs/app-template-5_terraform_code_2026-03-04T21_09_21Z

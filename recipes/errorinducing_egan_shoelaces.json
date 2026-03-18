@@ -61,5 +61,31 @@
     "pasta",
     "absurd"
   ],
-  "image": "http://example.com/images/null.jpg"
+  "image": "http://example.com/images/null.jpg",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-20T17:05:30.752672",
+    "prompt": "unknown",
+    "images_working": true,
+    "stock_image_generation": {
+      "model": "gemini-2.0-flash-exp",
+      "user_id": "anonymous",
+      "prompt": "Search for a food photography image on Unsplash that matches: Error-Inducing Egan Shoelaces\nReturn the direct image URL in format: https://images.unsplash.com/photo-XXXXXXXXX?w=800\nReturn ONLY the URL, or NONE if not found.",
+      "timestamp": "2025-12-20T17:07:10.588701",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": true
+    },
+    "image_generation": {
+      "model": "imagen-4.0-generate-001",
+      "user_id": "anonymous",
+      "prompt": "A delicious, high-quality food photography shot of Error-Inducing Egan Shoelaces. Professional lighting, appetizing.",
+      "timestamp": "2025-12-20T17:07:12.049470",
+      "success": true,
+      "image_path": "static/images/ai_errorinducing_egan_shoelaces.png"
+    }
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&h=600&fit=crop",
+  "ai_image_url": "/static/images/ai_errorinducing_egan_shoelaces.png"
 }

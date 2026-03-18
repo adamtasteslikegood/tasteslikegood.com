@@ -1,231 +1,185 @@
+"""
+Tastes Like Good - Vegan Recipe Generator
+
+A Flask application for viewing and generating vegan recipes using Google's Gemini AI models.
+Features OAuth authentication, AI-powered recipe generation with schema validation,
+and a recipe browsing interface.
+
+Refactored into a modular architecture with:
+- config.py: Configuration and environment loading
+- validators/: Recipe validation logic
+- services/: Business logic (Gemini, images, stock images, models)
+- repositories/: Data persistence with file locking
+- blueprints/: Route handlers (recipes, generation, API)
+"""
+
+import logging
 import os
-import json
 
-from google import genai
-from flask import Flask, render_template, abort, request, redirect, url_for
-from jsonschema import Draft7Validator, ValidationError
+from flask import Flask, render_template, request, session
+from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
-# Initialize the Flask application
-app = Flask(__name__)
+# Import blueprints
+from auth import auth_bp
+from blueprints.api_bp import api_bp
+from blueprints.auth_api_bp import auth_api_bp
+from blueprints.collections_api_bp import collections_api_bp
+from blueprints.generation_bp import generation_bp
+from blueprints.recipes_api_bp import recipes_api_bp
+from blueprints.recipes_bp import recipes_bp
+from utils.logging_config import setup_logging
 
-# The folder where the recipe .json files are stored
-RECIPES_DIR = "recipes"
-RECIPE_SCHEMA_PATH = "recipe_schema.json"
+# Import session utilities
+from utils.session_utils import get_or_create_session_id
 
-# Ensure the recipes directory exists so list/save operations do not fail
-os.makedirs(RECIPES_DIR, exist_ok=True)
+# Initialize logger
+logger = setup_logging()
 
 
-def _get_safe_recipe_path(filename: str) -> str:
+def create_app():
     """
-    Safely construct an absolute path for a recipe JSON file under RECIPES_DIR.
+    Application factory for creating the Flask app.
 
-    Raises a 404 if the filename would escape the recipes directory or is invalid.
+    Returns:
+        Flask: Configured Flask application
     """
-    # Only allow .json files
-    if not filename.endswith(".json"):
-        abort(404)
+    app = Flask(__name__)
 
-    base_dir = os.path.abspath(RECIPES_DIR)
-    candidate = os.path.normpath(os.path.join(base_dir, filename))
+    # Trust proxy headers (X-Forwarded-Host, X-Forwarded-Proto, etc.)
+    # so url_for(_external=True) generates correct public URLs
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-    # Ensure the resulting path is still within the recipes directory
-    if os.path.commonpath([base_dir, candidate]) != base_dir:
-        abort(404)
+    # Configure secret key for sessions
+    # In production, use a persistent secret key from environment variables
+    app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
 
-    return candidate
+    # Configure Database
+    from config import SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
+
+    app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
+    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
+
+    # Initialize extensions
+    from extensions import db, migrate
+
+    db.init_app(app)
+    migrate.init_app(app, db)
+
+    # Import models so they are registered with SQLAlchemy
+    # This must be done after db is created / configured
+    with app.app_context():
+        import models
+
+    # Production should continue using Flask-Migrate/Alembic as the primary path.
 
 
-def _load_recipe_schema():
-    try:
-        with open(RECIPE_SCHEMA_PATH, "r") as schema_file:
-            return json.load(schema_file)
-    except (FileNotFoundError, json.JSONDecodeError) as exc:
-        print(f"Warning: Unable to load recipe schema. Error: {exc}")
+    # ####### DEVELOPMENT NOTE: If you want to quickly create tables without running migrations #######
+    # # ***** (for example, for local development or testing), you can use db.create_all().  *****
+    # # For local development or quick testing, you can use db.create_all() to create tables without running migrations.
+    # # Uncomment the following lines if you want to use create_all() for quick local development without migrations.
+    #
+    # def create_tables_with_retry(app, db, attempts=5, delay_seconds=2):
+    #     """
+    #     Create database tables with retry logic.
+    #
+    #     Use only for temporary bootstrap scenarios (for example,
+    #     local development, first-run smoke tests, or controlled deployment recovery).
+    #     Prefer schema migrations for normal operation.
+    #     """
+    #     import time
+    #     for attempt in range(attempts):
+    #         try:
+    #             db.create_all()
+    #             app.logger.info("db.create_all() succeeded")
+    #             return
+    #         except Exception as e:
+    #             app.logger.warning(f"db.create_all() attempt {attempt +1} failed: {e}")
+    #             if attempt < attempts -1:
+    #                 time.sleep(delay_seconds)
+    #             else:
+    #                 app.logger.error(f"db.create_all() gave up after {attempts} attempts")
+    # # Uncomment the following line if you want to use create_all() for quick local development without migrations.
+    # create_tables_with_retry(app, db)
+    # # Note: In production, rely on proper migrations instead of create_all() to manage schema changes.
+
+
+    # Configure CORS to allow Angular frontend to call this API
+    # Allow both dev (4200, 8080) and production origins
+    cors_origins = [
+        "http://localhost:3000",  # Angular dev server (ng serve)
+        "http://localhost:4200",  # Angular dev server (legacy)
+        "http://localhost:8080",  # Express server dev
+        "http://127.0.0.1:3000",
+        "http://127.0.0.1:4200",
+        "http://127.0.0.1:8080",
+    ]
+
+    # Add production origins from environment if set
+    if os.environ.get("PRODUCTION_ORIGIN"):
+        cors_origins.append(os.environ.get("PRODUCTION_ORIGIN"))
+
+    # Always allow the production domains
+    cors_origins.extend([
+        "https://www.tasteslikegood.org",
+        "https://tasteslikegood.org",
+    ])
+
+    CORS(
+        app,
+        origins=cors_origins,
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization"],
+        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    )
+
+    # Session middleware to ensure all users have session IDs
+    @app.before_request
+    def ensure_session_id():
+        """
+        Ensure all requests have a session ID for anonymous user tracking.
+
+        This runs before every request and creates a session ID if one doesn't exist.
+        For authenticated users, the session_id coexists with their user_id.
+        """
+        # Skip session creation for static files to avoid unnecessary overhead
+        if request.endpoint and "static" in request.endpoint:
+            return None
+
+        # Ensure session has an ID for tracking
+        get_or_create_session_id()
         return None
 
+    # Register blueprints
+    app.register_blueprint(auth_bp, url_prefix="/auth")
+    app.register_blueprint(auth_api_bp)  # /api/auth/* endpoints
+    app.register_blueprint(recipes_bp)  # No prefix - includes '/' and '/recipe/*'
+    app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
+    app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
+    app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
+    app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
 
-RECIPE_SCHEMA = _load_recipe_schema()
-RECIPE_VALIDATOR = Draft7Validator(RECIPE_SCHEMA) if RECIPE_SCHEMA else None
+    # Error handlers
+    @app.errorhandler(404)
+    def not_found(error):
+        """Handle 404 errors with a friendly message."""
+        return render_template("404.html"), 404
 
-# --- NEW: Configure the generative model ---
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-client = None
+    @app.errorhandler(Exception)
+    def handle_unexpected_error(error):
+        """Log and handle unexpected exceptions."""
+        logger.exception(f"Unexpected error: {error}")
+        return render_template("500.html"), 500
 
-if GOOGLE_API_KEY:
-    client = genai.Client(api_key=GOOGLE_API_KEY)
-
-
-def validate_recipe_data(recipe_data):
-    """Validate recipe data against the JSON schema."""
-    if RECIPE_VALIDATOR is None:
-        raise RuntimeError("Recipe schema is not available for validation.")
-
-    errors = sorted(RECIPE_VALIDATOR.iter_errors(recipe_data), key=lambda e: tuple(e.path))
-    if errors:
-        first_error = errors[0]
-        location = " -> ".join(str(part) for part in first_error.absolute_path)
-        message = first_error.message
-        if location:
-            message = f"{message} (at {location})"
-        raise ValidationError(message)
+    return app
 
 
-def get_all_recipes():
-    """Gets a list of all recipes, reading the name from each JSON file."""
-    recipes = []
-    for filename in os.listdir(RECIPES_DIR):
-        if filename.endswith(".json"):
-            filepath = os.path.join(RECIPES_DIR, filename)
-            try:
-                with open(filepath, "r") as f:
-                    data = json.load(f)
-                    recipes.append(
-                        {"name": data.get("name", "Unnamed Recipe"), "filename": filename}
-                    )
-            except (json.JSONDecodeError, IOError) as e:
-                print(f"Warning: Could not read or parse {filename}. Error: {e}")
-    return sorted(recipes, key=lambda r: r["name"])
-
-
-@app.route("/")
-def index():
-    """The homepage route. Displays a list of all recipes."""
-    recipes = get_all_recipes()
-    return render_template("index.html", recipes=recipes)
-
-
-@app.route("/recipe/<filename>")
-def show_recipe(filename):
-    """The route to display a single recipe."""
-    filepath = _get_safe_recipe_path(filename)
-    if not os.path.exists(filepath):
-        abort(404)
-    try:
-        with open(filepath, "r") as f:
-            recipe_data = json.load(f)
-        recipe_data["filename"] = filename
-        return render_template("recipe.html", recipe=recipe_data)
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"Error processing {filename}. Error: {e}")
-        abort(500)
-
-
-@app.route("/recipe/<filename>/json")
-def show_recipe_json(filename):
-    """The route to display the raw JSON for a single recipe."""
-    filepath = _get_safe_recipe_path(filename)
-    if not os.path.exists(filepath):
-        abort(404)
-    try:
-        with open(filepath, "r") as f:
-            recipe_data = json.load(f)
-        recipe_data["filename"] = filename
-        pretty_json = json.dumps(recipe_data, indent=2)
-        return render_template("json_viewer.html", recipe=recipe_data, recipe_json_str=pretty_json)
-    except (json.JSONDecodeError, IOError) as e:
-        print(f"Error processing {filename}. Error: {e}")
-        abort(500)
-
-
-# --- NEW: Route for generating recipes ---
-@app.route("/generate_recipe", methods=["GET", "POST"])
-def generate_recipe():
-    """Handles both displaying the form and processing the generation request."""
-    if request.method == "POST":
-        if client is None:
-            return (
-                "Recipe generation is not configured. Set the GOOGLE_API_KEY environment variable and restart the application.",
-                500,
-            )
-
-        prompt = request.form.get("prompt", "").strip()
-        if not prompt:
-            return "A prompt describing the desired recipe is required.", 400
-
-        if RECIPE_SCHEMA is None or RECIPE_VALIDATOR is None:
-            return "Recipe schema is unavailable; cannot validate generated recipes.", 500
-
-        # The JSON schema to guide the model's output
-        with open(RECIPE_SCHEMA_PATH, "r") as f:
-            schema = f.read()
-
-        # Create the full prompt for the model
-        full_prompt = (
-            f"Generate a Vegan recipe based on the following request: '{prompt}'. "
-            f"The output must be a valid JSON object that strictly follows this schema:\n"
-            f"{schema}"
-            f"Do not include any text before or after the JSON object."
-        )
-
-        recipe_json_str = ""
-        response = None
-
-        try:
-            # Generate the content
-            response = client.models.generate_content(
-                model="gemini-2.5-pro",
-                contents=full_prompt,
-            )
-            # Extract the JSON string from the response
-            recipe_json_str = (
-                response.text.strip().replace("```json", "").replace("```", "").strip()
-            )
-
-            # Parse the JSON string into a Python dictionary
-            recipe_data = json.loads(recipe_json_str)
-
-            # Validate the recipe before saving it
-            validate_recipe_data(recipe_data)
-
-            # Create a filename from the recipe name
-            safe_filename = "".join(
-                c for c in recipe_data["name"] if c.isalnum() or c in (" ", "_")
-            ).rstrip()
-            filename = safe_filename.replace(" ", "_").lower() + ".json"
-            filepath = os.path.join(RECIPES_DIR, filename)
-
-            # Save the new recipe to a file
-            with open(filepath, "w") as f:
-                json.dump(recipe_data, f, indent=2)
-
-            # Redirect to the new recipe's page
-            return redirect(url_for("show_recipe", filename=filename))
-
-        except json.JSONDecodeError as e:
-            # Handle JSON parsing errors
-            error_message = f"JSON parsing error: {e}"
-        except ValidationError as e:
-            error_message = f"Schema validation error: {e.message}"
-        except RuntimeError as e:
-            error_message = str(e)
-        except FileNotFoundError as e:
-            # Handle file I/O errors
-            error_message = f"File error: {e}"
-        except Exception as e:
-            # Handle all other unexpected errors
-            error_message = f"Unexpected error: {e}"
-
-        # Log the error details securely
-        try:
-            with open("recipe_error.json", "a+") as f:
-                f.write(f"{recipe_json_str}\n")
-            with open("recipe_error.txt", "a") as f:
-                f.write(
-                    f"Full prompt:\n{full_prompt}\n\n"
-                    f"Response:\n{getattr(response, 'text', 'No response')}\n"
-                    f"Error: {error_message}\n"
-                )
-        except Exception as logging_error:
-            print(f"Error while logging: {logging_error}")
-
-        # Show the error response to the user
-        return "Sorry, there was an error generating the recipe. Please try again.", 500
-
-    # For a GET request, just show the form
-    return render_template("generate_recipe.html")
+# Create the app instance
+app = create_app()
 
 
 if __name__ == "__main__":
-    debug_mode = os.getenv("FLASK_DEBUG", "0").lower() in ("1", "true", "yes")
-    app.run(debug=debug_mode, host="0.0.0.0", port=5000)
+    # Run the development server
+    # In production, use a WSGI server like gunicorn or uwsgi
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host="0.0.0.0", port=port)

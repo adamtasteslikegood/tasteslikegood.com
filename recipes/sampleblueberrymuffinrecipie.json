@@ -92,14 +92,14 @@
     ]
   },
   "instructions": [
-    "Preheat oven to 350°F (175°C). Grease a 12-cup muffin tin or line with paper liners.",
+    "Preheat oven to 350\u00b0F (175\u00b0C). Grease a 12-cup muffin tin or line with paper liners.",
     "Prepare the egg replacer according to the package instructions and set aside.",
     "In a large bowl, combine the applesauce, plant-based milk, maple syrup, oil, vanilla extract, and apple cider vinegar. Whisk until well combined.",
     "Add the prepared egg replacer and whisk until incorporated.",
     "In a separate bowl, whisk together the whole wheat flour, white whole wheat flour, all-purpose flour, sugar, baking powder, baking soda, salt, and cinnamon (if using).",
     "Gradually add the dry ingredients to the wet ingredients, mixing gently with a spatula or wooden spoon until just combined. Do not overmix.",
     "Gently fold in the blueberries.",
-    "Fill each muffin cup about ¾ full. Bake for 25-30 minutes, or until a toothpick inserted into the center comes out clean.",
+    "Fill each muffin cup about \u00be full. Bake for 25-30 minutes, or until a toothpick inserted into the center comes out clean.",
     "Let the muffins cool in the pan for 10-15 minutes before transferring to a wire rack to cool completely."
   ],
   "notes": "Store leftover muffins in an airtight container at room temperature for up to 3 days or in the refrigerator for up to a week.",
@@ -110,5 +110,14 @@
     "breakfast",
     "snack",
     "blueberry"
-  ]
+  ],
+  "stock_image_url": "https://loremflickr.com/800/600/Vegan,Blueberry,Muffins,(No,Banana)/all",
+  "ai_image_url": "/static/images/ai_sampleblueberrymuffinrecipie.png",
+  "user_id": "anonymous",
+  "ai_metadata": {
+    "model": "unknown",
+    "timestamp": "2025-12-04T18:47:52.865609",
+    "prompt": "unknown",
+    "images_working": true
+  }
 }

@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}404 - Page Not Found | TastesLikeGood.com{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <h1>404 - Page Not Found</h1>
+    <p>The page you're looking for doesn't exist.</p>
+    <p>It might have been moved, deleted, or you may have mistyped the URL.</p>
+
+    <div class="error-actions">
+        <a href="{{ url_for('recipes.index') }}" class="button">Go to Home</a>
+        <a href="{{ url_for('generation.generate_recipe') }}" class="button">Generate a Recipe</a>
+    </div>
+</div>
+
+<style>
+    .error-page {
+        text-align: center;
+        padding: 3rem 1rem;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .error-page h1 {
+        color: #d32f2f;
+        font-size: 2.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .error-page p {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: #666;
+    }
+
+    .error-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .error-actions .button {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background-color: #4CAF50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+
+    .error-actions .button:hover {
+        background-color: #45a049;
+    }
+</style>
+{% endblock %}

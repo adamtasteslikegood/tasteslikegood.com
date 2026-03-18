@@ -1,0 +1,22 @@
+# System Details Report
+---
+
+## Report details
+- **Date generated:**                              2026-01-11 00:24:08
+
+## Hardware Information:
+- **Hardware Model:**                              Lenovo ThinkPad E15 Gen 2
+- **Memory:**                                      32.0 GiB
+- **Processor:**                                   11th Gen Intel® Core™ i5-1135G7 × 8
+- **Graphics:**                                    Intel® Iris® Xe Graphics (TGL GT2)
+- **Disk Capacity:**                               (null)
+
+## Software Information:
+- **Firmware Version:**                            R1EET56W(1.56 )
+- **OS Name:**                                     Ubuntu 24.04.3 LTS
+- **OS Build:**                                    (null)
+- **OS Type:**                                     64-bit
+- **GNOME Version:**                               46
+- **Windowing System:**                            Wayland
+- **Kernel Version:**                              Linux 6.14.0-37-generic
+
