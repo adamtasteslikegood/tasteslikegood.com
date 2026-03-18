@@ -255,14 +255,36 @@ class KeywordAnalyzer:
         Returns:
             Dictionary of keyword: density (percentage)
         """
+        # Normalize text: lowercase and remove punctuation so we can match on tokens
         text_lower = text.lower()
-        total_words = len(text_lower.split())
+        normalized_text = re.sub(r'[^\w\s]', ' ', text_lower)
+        tokens = normalized_text.split()
+        total_words = len(tokens)
 
-        densities = {}
+        densities: Dict[str, float] = {}
         for keyword in target_keywords:
+            # Normalize keyword similarly to text
             keyword_lower = keyword.lower()
-            occurrences = text_lower.count(keyword_lower)
-            density = (occurrences / total_words) * 100 if total_words > 0 else 0
+            normalized_keyword = re.sub(r'[^\w\s]', ' ', keyword_lower).strip()
+
+            if not normalized_keyword:
+                densities[keyword] = 0.0
+                continue
+
+            kw_tokens = normalized_keyword.split()
+
+            # Count occurrences using whole-word / n-gram matching
+            if len(kw_tokens) == 1:
+                target = kw_tokens[0]
+                occurrences = sum(1 for token in tokens if token == target)
+            else:
+                n = len(kw_tokens)
+                occurrences = 0
+                for i in range(len(tokens) - n + 1):
+                    if tokens[i:i + n] == kw_tokens:
+                        occurrences += 1
+
+            density = (occurrences / total_words) * 100 if total_words > 0 else 0.0
             densities[keyword] = round(density, 2)
 
         return densities
