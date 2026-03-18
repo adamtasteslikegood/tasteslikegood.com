@@ -3,7 +3,7 @@ Keyword analysis module for App Store Optimization.
 Analyzes keyword search volume, competition, and relevance for app discovery.
 """
 
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Tuple
 import re
 from collections import Counter
 
