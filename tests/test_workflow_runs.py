@@ -1,4 +1,5 @@
 """Tests for the GitHub Actions workflow-run filtering helpers."""
+
 import importlib.util
 import sys
 from pathlib import Path
@@ -10,7 +11,7 @@ import pytest
 def _load_workflow_runs_app():
     """Load workflow_runs/app.py as a distinct module to avoid conflicts
     with the root-level app module used by other tests."""
-    module_path = Path(__file__).resolve().parent.parent / 'workflow_runs' / 'app.py'
+    module_path = Path(__file__).resolve().parent.parent / "workflow_runs" / "app.py"
     spec = importlib.util.spec_from_file_location("workflow_runs.app", module_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
@@ -26,23 +27,25 @@ fetch_workflow_runs = _wf_app.fetch_workflow_runs
 # Fixtures
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def sample_runs():
     """A small set of workflow-run dicts that cover several status/conclusion
     combinations."""
     return [
-        {"id": 1, "status": "completed", "conclusion": "success",  "name": "CI"},
-        {"id": 2, "status": "completed", "conclusion": "failure",  "name": "CI"},
+        {"id": 1, "status": "completed", "conclusion": "success", "name": "CI"},
+        {"id": 2, "status": "completed", "conclusion": "failure", "name": "CI"},
         {"id": 3, "status": "completed", "conclusion": "cancelled", "name": "CI"},
-        {"id": 4, "status": "in_progress", "conclusion": None,     "name": "CI"},
-        {"id": 5, "status": "queued",     "conclusion": None,      "name": "CI"},
-        {"id": 6, "status": "completed", "conclusion": "success",  "name": "Deploy"},
+        {"id": 4, "status": "in_progress", "conclusion": None, "name": "CI"},
+        {"id": 5, "status": "queued", "conclusion": None, "name": "CI"},
+        {"id": 6, "status": "completed", "conclusion": "success", "name": "Deploy"},
     ]
 
 
 # ---------------------------------------------------------------------------
 # apply_status_filter tests
 # ---------------------------------------------------------------------------
+
 
 class TestApplyStatusFilter:
     def test_no_filter_returns_all_runs(self, sample_runs):
@@ -72,12 +75,16 @@ class TestApplyStatusFilter:
 
     def test_include_in_progress_matches_on_status_field(self, sample_runs):
         """'in_progress' is a *status* value (not conclusion); should still match."""
-        result = apply_status_filter(sample_runs, filter_status="in_progress", filter_mode="include")
+        result = apply_status_filter(
+            sample_runs, filter_status="in_progress", filter_mode="include",
+        )
         assert len(result) == 1
         assert result[0]["id"] == 4
 
     def test_exclude_in_progress(self, sample_runs):
-        result = apply_status_filter(sample_runs, filter_status="in_progress", filter_mode="exclude")
+        result = apply_status_filter(
+            sample_runs, filter_status="in_progress", filter_mode="exclude",
+        )
         assert len(result) == 5
         assert not any(r.get("status") == "in_progress" for r in result)
 
@@ -98,6 +105,7 @@ class TestApplyStatusFilter:
 # ---------------------------------------------------------------------------
 # fetch_workflow_runs tests  (GitHub API is always mocked)
 # ---------------------------------------------------------------------------
+
 
 class TestFetchWorkflowRuns:
     def test_successful_fetch_returns_runs(self):
@@ -139,7 +147,10 @@ class TestFetchWorkflowRuns:
 
     def test_connection_error_returns_message(self):
         import requests as req_lib
-        with patch("workflow_runs.app.requests.get", side_effect=req_lib.exceptions.ConnectionError):
+
+        with patch(
+            "workflow_runs.app.requests.get", side_effect=req_lib.exceptions.ConnectionError
+        ):
             runs, error = fetch_workflow_runs("owner", "repo")
 
         assert runs == []
@@ -147,6 +158,7 @@ class TestFetchWorkflowRuns:
 
     def test_timeout_returns_message(self):
         import requests as req_lib
+
         with patch("workflow_runs.app.requests.get", side_effect=req_lib.exceptions.Timeout):
             runs, error = fetch_workflow_runs("owner", "repo")
 
