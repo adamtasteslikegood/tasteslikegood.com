@@ -76,14 +76,14 @@ class TestApplyStatusFilter:
     def test_include_in_progress_matches_on_status_field(self, sample_runs):
         """'in_progress' is a *status* value (not conclusion); should still match."""
         result = apply_status_filter(
-            sample_runs, filter_status="in_progress", filter_mode="include"
+            sample_runs, filter_status="in_progress", filter_mode="include",
         )
         assert len(result) == 1
         assert result[0]["id"] == 4
 
     def test_exclude_in_progress(self, sample_runs):
         result = apply_status_filter(
-            sample_runs, filter_status="in_progress", filter_mode="exclude"
+            sample_runs, filter_status="in_progress", filter_mode="exclude",
         )
         assert len(result) == 5
         assert not any(r.get("status") == "in_progress" for r in result)
