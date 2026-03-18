@@ -34,7 +34,7 @@ dependencies = [
     # Google AI & Authentication
     "google-genai==1.56.0",
     "google-generativeai==0.8.5",
-    "google-ai-generativelanguage==0.6.15",
+    "google-ai-generativelanguage==0.10.0",
     "google-auth==2.45.0",
     "google-auth-oauthlib==1.2.2",
     "google-api-python-client==2.182.0",
