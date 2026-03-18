@@ -8,7 +8,7 @@ on:
 
 jobs:
   lint:
-    name: Lint (Black + Flake8)
+    name: Lint (Black + Flake8 + Mypy)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -22,13 +22,16 @@ jobs:
           python-version: '3.12'
 
       - name: Install lint tools
-        run: pip install black flake8
+        run: pip install black flake8 mypy types-requests types-jsonschema
 
       - name: Check formatting with Black
         run: black --check --line-length 100 .
 
       - name: Lint with Flake8
         run: flake8 . --count --show-source --statistics
+
+      - name: Type check with mypy
+        run: mypy app.py workflow_runs/app.py
 
   test:
     name: Test (pytest)

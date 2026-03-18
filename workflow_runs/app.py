@@ -10,6 +10,7 @@ Environment variables:
     GITHUB_REPO    – Default repository name pre-filled in the filter form.
     PORT           – Port to listen on (default: 5001).
 """
+
 import os
 
 import requests
@@ -21,8 +22,8 @@ from flask import Flask, render_template, request
 
 app = Flask(
     __name__,
-    template_folder='templates',
-    static_folder='static',
+    template_folder="templates",
+    static_folder="static",
 )
 
 # ---------------------------------------------------------------------------
@@ -39,13 +40,24 @@ GITHUB_DEFAULT_REPO = os.getenv("GITHUB_REPO", "tasteslikegood.com")
 
 # Valid conclusion values surfaced by the GitHub API
 WORKFLOW_CONCLUSION_VALUES = [
-    'success', 'failure', 'cancelled', 'skipped',
-    'timed_out', 'action_required', 'neutral', 'stale',
+    "success",
+    "failure",
+    "cancelled",
+    "skipped",
+    "timed_out",
+    "action_required",
+    "neutral",
+    "stale",
 ]
 
 # Valid status values surfaced by the GitHub API
 WORKFLOW_STATUS_VALUES = [
-    'completed', 'in_progress', 'queued', 'requested', 'waiting', 'pending',
+    "completed",
+    "in_progress",
+    "queued",
+    "requested",
+    "waiting",
+    "pending",
 ]
 
 # Combined list shown to users in the filter UI (conclusions first, then
@@ -120,10 +132,7 @@ def apply_status_filter(runs, filter_status, filter_mode):
 
     def _matches(run):
         """Return True when the run's status *or* conclusion equals filter_status."""
-        return (
-            run.get("conclusion") == filter_status
-            or run.get("status") == filter_status
-        )
+        return run.get("conclusion") == filter_status or run.get("status") == filter_status
 
     if filter_mode == "exclude":
         return [r for r in runs if not _matches(r)]
@@ -136,17 +145,17 @@ def apply_status_filter(runs, filter_status, filter_mode):
 # ---------------------------------------------------------------------------
 
 
-@app.route('/')
+@app.route("/")
 def workflow_runs():
     """Display GitHub Actions workflow runs with optional status filtering."""
-    owner = request.args.get('owner', GITHUB_DEFAULT_OWNER).strip()
-    repo = request.args.get('repo', GITHUB_DEFAULT_REPO).strip()
-    filter_status = request.args.get('filter_status', '').strip()
-    filter_mode = request.args.get('filter_mode', 'include').strip()
+    owner = request.args.get("owner", GITHUB_DEFAULT_OWNER).strip()
+    repo = request.args.get("repo", GITHUB_DEFAULT_REPO).strip()
+    filter_status = request.args.get("filter_status", "").strip()
+    filter_mode = request.args.get("filter_mode", "include").strip()
 
     # Sanitise filter_mode to one of the two accepted values
-    if filter_mode not in ('include', 'exclude'):
-        filter_mode = 'include'
+    if filter_mode not in ("include", "exclude"):
+        filter_mode = "include"
 
     runs, error = fetch_workflow_runs(owner, repo)
 
@@ -154,7 +163,7 @@ def workflow_runs():
         runs = apply_status_filter(runs, filter_status, filter_mode)
 
     return render_template(
-        'workflow_runs.html',
+        "workflow_runs.html",
         runs=runs,
         error=error,
         owner=owner,
@@ -169,7 +178,7 @@ def workflow_runs():
 # Entry point
 # ---------------------------------------------------------------------------
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     port = int(os.getenv("PORT", 5001))
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
-    app.run(debug=debug, host='0.0.0.0', port=port)
+    app.run(debug=debug, host="0.0.0.0", port=port)
