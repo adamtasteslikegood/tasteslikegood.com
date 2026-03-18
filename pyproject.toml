@@ -3,7 +3,7 @@ name = "tasteslikegood-com"
 version = "0.1.0"
 description = "A Flask-based web application for viewing and generating vegan recipes using Google's Gemini AI models"
 readme = "README.md"
-requires-python = ">=3.13"  # Only support Python 3.13+
+requires-python = ">=3.13,<3.14"  # Only support Python 3.13 (3.14+ not yet fully supported by all deps)
 license = { text = "MIT" }
 authors = [
     { name = "Tastes Like Good Team", email = "contact@tasteslikegood.com" }
@@ -35,8 +35,8 @@ dependencies = [
     "google-genai==1.56.0",
     "google-generativeai==0.8.5",
     "google-ai-generativelanguage==0.6.15",
-    "google-auth==2.45.0",
-    "google-auth-oauthlib==1.2.2",
+    "google-auth==2.49.1",
+    "google-auth-oauthlib==1.3.0",
     "google-api-python-client==2.182.0",
     "googleapis-common-protos==1.70.0",
     # Data Validation
@@ -53,7 +53,7 @@ dependencies = [
     "charset-normalizer==3.4.4",
     "idna==3.11",
     # Utilities
-    "python-dotenv==1.2.1",
+    "python-dotenv==1.2.2",
     "python-multipart==0.0.22",
     "distro==1.9.0",
     "sniffio==1.3.1",
