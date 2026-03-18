@@ -32,7 +32,7 @@ dependencies = [
     "flask-migrate==4.1.0",
     "sqlalchemy>=2.0.35",  # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
-    "google-genai==1.56.0",
+    "google-genai==1.68.0",
     "google-generativeai==0.8.5",
     "google-ai-generativelanguage==0.6.15",
     "google-auth==2.45.0",
