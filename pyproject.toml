@@ -61,7 +61,7 @@ dependencies = [
     "typing-extensions==4.15.0",
     "tenacity==9.1.4",
     "websockets==16.0",
-    "cachetools==5.5.2",
+    "cachetools==7.0.5",
     # Cryptography & Security
     "pyasn1==0.6.3",
     "pyasn1-modules==0.4.2",
