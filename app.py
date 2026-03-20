@@ -66,18 +66,46 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
-    # Server-side sessions stored in PostgreSQL via Flask-Session.
-    # Replaces default cookie-based sessions to:
-    #  - Survive container restarts (data in DB, not cookie)
-    #  - Remove 4KB cookie size limit
-    #  - Keep OAuth tokens server-side (security)
-    app.config['SESSION_TYPE'] = 'sqlalchemy'
-    app.config['SESSION_SQLALCHEMY'] = db
-    app.config['SESSION_SQLALCHEMY_TABLE'] = 'flask_sessions'
+    # Server-side session configuration.
+    # Priority: VALKEY_HOST (IAM/password auth) > REDIS_URL (simple URL) > SQLAlchemy fallback
+    from config import VALKEY_HOST, VALKEY_PORT, VALKEY_AUTH_MODE, REDIS_URL
+
+    if VALKEY_HOST:
+        import redis as redis_client
+        valkey_kwargs = dict(host=VALKEY_HOST, port=VALKEY_PORT)
+
+        if VALKEY_AUTH_MODE == 'iam':
+            # GCP IAM auth: use access token as password, TLS required
+            from utils.valkey_auth import create_iam_redis_client
+            valkey_client = create_iam_redis_client(VALKEY_HOST, VALKEY_PORT)
+        else:
+            # Password auth or no auth
+            password = os.environ.get("VALKEY_PASSWORD")
+            valkey_client = redis_client.StrictRedis(
+                **valkey_kwargs, password=password, decode_responses=False
+            )
+
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_REDIS'] = valkey_client
+        app.logger.info(f"Using Valkey session backend ({VALKEY_AUTH_MODE} auth) at {VALKEY_HOST}:{VALKEY_PORT}")
+
+    elif REDIS_URL:
+        # Simple URL mode (local dev with docker redis)
+        import redis as redis_client
+        app.config['SESSION_TYPE'] = 'redis'
+        app.config['SESSION_REDIS'] = redis_client.from_url(REDIS_URL)
+        app.logger.info("Using Redis session backend via REDIS_URL")
+
+    else:
+        app.config['SESSION_TYPE'] = 'sqlalchemy'
+        app.config['SESSION_SQLALCHEMY'] = db
+        app.config['SESSION_SQLALCHEMY_TABLE'] = 'flask_sessions'
+        app.config['SESSION_CLEANUP_N_REQUESTS'] = 100
+        app.logger.info("Using SQLAlchemy session backend (no Valkey/Redis configured)")
+
     app.config['SESSION_PERMANENT'] = True
     app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
     app.config['SESSION_KEY_PREFIX'] = 'vg:'
-    app.config['SESSION_CLEANUP_N_REQUESTS'] = 100
     app.config['SESSION_COOKIE_NAME'] = 'vg_session'
     app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('FLASK_SECRET_KEY'))
     app.config['SESSION_COOKIE_HTTPONLY'] = True

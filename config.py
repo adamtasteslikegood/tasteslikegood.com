@@ -35,6 +35,16 @@ os.makedirs(RECIPES_DIR, exist_ok=True)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
+# Valkey/Redis Configuration
+# VALKEY_HOST: Memorystore private IP (e.g. 10.128.0.11)
+# VALKEY_PORT: defaults to 6379
+# VALKEY_AUTH_MODE: 'iam' for GCP IAM auth (default in prod), 'password' for static password, or unset
+# REDIS_URL: legacy — full redis:// URL (overrides VALKEY_HOST if set; used for local dev)
+VALKEY_HOST = os.getenv("VALKEY_HOST")
+VALKEY_PORT = int(os.getenv("VALKEY_PORT", "6379"))
+VALKEY_AUTH_MODE = os.getenv("VALKEY_AUTH_MODE", "iam")
+REDIS_URL = os.getenv("REDIS_URL")
+
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-3.1-pro-preview"
 
