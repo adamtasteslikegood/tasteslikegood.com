@@ -14,6 +14,7 @@ Refactored into a modular architecture with:
 """
 
 import os
+from datetime import timedelta
 
 from flask import Flask, render_template, request, session
 from flask_cors import CORS
@@ -60,10 +61,29 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 
     # Initialize extensions
-    from extensions import db, migrate
+    from extensions import db, migrate, sess
 
     db.init_app(app)
     migrate.init_app(app, db)
+
+    # Server-side sessions stored in PostgreSQL via Flask-Session.
+    # Replaces default cookie-based sessions to:
+    #  - Survive container restarts (data in DB, not cookie)
+    #  - Remove 4KB cookie size limit
+    #  - Keep OAuth tokens server-side (security)
+    app.config['SESSION_TYPE'] = 'sqlalchemy'
+    app.config['SESSION_SQLALCHEMY'] = db
+    app.config['SESSION_SQLALCHEMY_TABLE'] = 'flask_sessions'
+    app.config['SESSION_PERMANENT'] = True
+    app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=14)
+    app.config['SESSION_KEY_PREFIX'] = 'vg:'
+    app.config['SESSION_CLEANUP_N_REQUESTS'] = 100
+    app.config['SESSION_COOKIE_NAME'] = 'vg_session'
+    app.config['SESSION_COOKIE_SECURE'] = bool(os.environ.get('FLASK_SECRET_KEY'))
+    app.config['SESSION_COOKIE_HTTPONLY'] = True
+    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+    sess.init_app(app)
 
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured
