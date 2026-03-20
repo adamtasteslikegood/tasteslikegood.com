@@ -48,8 +48,8 @@ class IAMCredentialProvider(redis.CredentialProvider):
         with self._lock:
             if not self._token or time.time() >= self._token_expiry:
                 self._refresh_token()
-        # IAM auth uses empty username and token as password
-        return None, self._token
+        # IAM auth: username "default" + access token as password
+        return "default", self._token
 
 
 def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis:
