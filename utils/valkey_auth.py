@@ -64,8 +64,18 @@ def _refresh_token_in_place():
     _, new_token = _get_iam_token()
 
     pool = _current_client.connection_pool
+
+    # Update pool-level kwargs (used when creating NEW connections)
     pool.connection_kwargs['password'] = new_token
-    # Force all pooled connections closed — next request reconnects with new token
+
+    # CRITICAL: also update EXISTING Connection objects — they cache password
+    # independently and will re-auth with the stale token on reconnect
+    for conn in list(getattr(pool, '_available_connections', [])):
+        conn.password = new_token
+    for conn in list(getattr(pool, '_in_use_connections', [])):
+        conn.password = new_token
+
+    # Close all sockets — next use triggers reconnect with the updated password
     pool.disconnect()
 
     # Verify the refreshed token works
