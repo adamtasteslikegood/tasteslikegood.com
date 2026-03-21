@@ -11,13 +11,13 @@ Provides database-backed recipe CRUD operations:
 
 import logging
 
-from extensions import db, cache
+from extensions import db
 from flask import Blueprint, jsonify, request, session
 from repositories import db_recipe_repository
 from utils.session_utils import get_or_create_session_id
 from utils.cache_utils import (
     recipe_key, recipe_stats_key, invalidate_recipe,
-    TTL_MEDIUM, TTL_SHORT,
+    safe_get, safe_set, TTL_MEDIUM, TTL_SHORT,
 )
 
 logger = logging.getLogger(__name__)
@@ -158,7 +158,7 @@ def get_recipe(user_id, guest_session_id, recipe_id):
     try:
         # Check cache first
         ck = recipe_key(user_id, guest_session_id, recipe_id)
-        cached = cache.get(ck)
+        cached = safe_get(ck)
         if cached is not None:
             return jsonify(cached), 200
 
@@ -168,7 +168,7 @@ def get_recipe(user_id, guest_session_id, recipe_id):
             return jsonify({"error": "Recipe not found"}), 404
 
         result = _recipe_response(recipe)
-        cache.set(ck, result, timeout=TTL_MEDIUM)
+        safe_set(ck, result, timeout=TTL_MEDIUM)
         return jsonify(result), 200
 
     except Exception as e:
@@ -246,7 +246,7 @@ def get_recipe_stats(user_id, guest_session_id):
     """
     try:
         ck = recipe_stats_key(user_id, guest_session_id)
-        cached = cache.get(ck)
+        cached = safe_get(ck)
         if cached is not None:
             return jsonify(cached), 200
 
@@ -257,7 +257,7 @@ def get_recipe_stats(user_id, guest_session_id):
             "user_id": user_id,
             "guest_session_id": guest_session_id,
         }
-        cache.set(ck, result, timeout=TTL_SHORT)
+        safe_set(ck, result, timeout=TTL_SHORT)
 
         return jsonify(result), 200
 

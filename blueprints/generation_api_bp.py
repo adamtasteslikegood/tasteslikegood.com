@@ -20,12 +20,11 @@ from blueprints.generation_bp import (
     attempt_recipe_generation,
     validate_generation_input,
 )
-from extensions import cache
 from repositories import db_recipe_repository
 from services.gemini_service import get_genai_client
 from utils.cache_utils import (
     recipe_image_key, invalidate_recipe, invalidate_recipe_image,
-    TTL_IMAGE,
+    safe_get, safe_set, TTL_IMAGE,
 )
 from utils.session_utils import get_or_create_session_id, get_user_metadata
 
@@ -240,7 +239,7 @@ def serve_recipe_image(recipe_id):
 
     # Check cache first (stores raw bytes)
     ck = recipe_image_key(recipe_id)
-    cached_bytes = cache.get(ck)
+    cached_bytes = safe_get(ck)
     if cached_bytes is not None:
         return Response(
             cached_bytes,
@@ -258,7 +257,7 @@ def serve_recipe_image(recipe_id):
         return jsonify({"error": "No image available"}), 404
 
     image_bytes = base64.b64decode(image_b64)
-    cache.set(ck, image_bytes, timeout=TTL_IMAGE)
+    safe_set(ck, image_bytes, timeout=TTL_IMAGE)
 
     return Response(
         image_bytes,

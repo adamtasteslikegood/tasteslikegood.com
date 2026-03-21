@@ -3,6 +3,8 @@ Cache utilities for user-scoped Valkey caching.
 
 Provides helper functions for building per-user cache keys and
 invalidating related caches on mutation operations.
+All cache operations are fault-tolerant — failures log warnings
+and fall through to the database, never crash the request.
 """
 
 import logging
@@ -15,6 +17,29 @@ logger = logging.getLogger(__name__)
 TTL_SHORT = 300       # 5 minutes — recipe stats, collections list
 TTL_MEDIUM = 600      # 10 minutes — individual recipes, collections
 TTL_IMAGE = 86400     # 24 hours — recipe images (rarely change)
+
+
+# ── Safe cache operations (never raise) ───────────────────────────────────────
+
+
+def safe_get(key):
+    """Get from cache. Returns None on any failure."""
+    try:
+        return cache.get(key)
+    except Exception as e:
+        logger.warning(f"Cache GET failed for {key}: {e}")
+        return None
+
+
+def safe_set(key, value, timeout=None):
+    """Set in cache. Silently ignores failures."""
+    try:
+        cache.set(key, value, timeout=timeout)
+    except Exception as e:
+        logger.warning(f"Cache SET failed for {key}: {e}")
+
+
+# ── Key builders ──────────────────────────────────────────────────────────────
 
 
 def _owner_prefix(user_id, guest_session_id):

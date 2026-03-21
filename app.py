@@ -117,7 +117,8 @@ def create_app():
     if VALKEY_HOST or REDIS_URL:
         redis_client_for_cache = app.config.get('SESSION_REDIS')
         app.config['CACHE_TYPE'] = 'RedisCache'
-        app.config['CACHE_REDIS'] = redis_client_for_cache
+        # Pass the pre-configured client as 'host' — cachelib detects isinstance(host, Redis)
+        app.config['CACHE_REDIS_HOST'] = redis_client_for_cache
         app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes
         app.config['CACHE_KEY_PREFIX'] = 'vgc:'
         app.logger.info("Using Valkey/Redis cache backend")

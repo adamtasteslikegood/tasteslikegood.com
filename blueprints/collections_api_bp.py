@@ -16,12 +16,12 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request, session
 
-from extensions import db, cache
+from extensions import db
 from models import Cookbook
 from utils.session_utils import get_or_create_session_id
 from utils.cache_utils import (
     collections_list_key, collection_key, invalidate_collection,
-    TTL_SHORT, TTL_MEDIUM,
+    safe_get, safe_set, TTL_SHORT, TTL_MEDIUM,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ def list_collections(user_id, guest_session_id):
     """List all cookbooks owned by the current user (or anonymous)."""
     try:
         ck = collections_list_key(user_id, guest_session_id)
-        cached = cache.get(ck)
+        cached = safe_get(ck)
         if cached is not None:
             return jsonify(cached), 200
 
@@ -81,7 +81,7 @@ def list_collections(user_id, guest_session_id):
             "user_id": user_id,
             "guest_session_id": guest_session_id,
         }
-        cache.set(ck, result, timeout=TTL_SHORT)
+        safe_set(ck, result, timeout=TTL_SHORT)
         return jsonify(result), 200
     except Exception as e:
         logger.error(f"Error listing collections: {e}")
@@ -126,7 +126,7 @@ def get_collection(user_id, guest_session_id, collection_id):
     """Get a specific cookbook by ID."""
     try:
         ck = collection_key(user_id, guest_session_id, collection_id)
-        cached = cache.get(ck)
+        cached = safe_get(ck)
         if cached is not None:
             return jsonify(cached), 200
 
@@ -136,7 +136,7 @@ def get_collection(user_id, guest_session_id, collection_id):
         if not cookbook:
             return jsonify({"error": "Collection not found"}), 404
         result = cookbook.to_dict()
-        cache.set(ck, result, timeout=TTL_MEDIUM)
+        safe_set(ck, result, timeout=TTL_MEDIUM)
         return jsonify(result), 200
     except Exception as e:
         logger.error(f"Error fetching collection {collection_id}: {e}")
