@@ -16,8 +16,8 @@ import redis
 
 logger = logging.getLogger(__name__)
 
-# Token refresh interval (50 minutes — tokens last 60 min, refresh early)
-_TOKEN_REFRESH_INTERVAL = 50 * 60
+# Token refresh interval (45 minutes — tokens last 60 min, refresh early)
+_TOKEN_REFRESH_INTERVAL = 45 * 60
 
 
 def _get_iam_token():
@@ -53,20 +53,37 @@ def _build_client(host: str, port: int) -> redis.StrictRedis:
     )
 
 
+def _refresh_token_in_place():
+    """Refresh the IAM token on the EXISTING client's connection pool.
+
+    This is critical because Flask-Session and Flask-Caching hold references
+    to the original client object. Creating a new client doesn't help — we
+    must update the password on the pool they're already using, then drop
+    stale connections so new ones authenticate with the fresh token.
+    """
+    _, new_token = _get_iam_token()
+
+    pool = _current_client.connection_pool
+    pool.connection_kwargs['password'] = new_token
+    # Force all pooled connections closed — next request reconnects with new token
+    pool.disconnect()
+
+    # Verify the refreshed token works
+    _current_client.ping()
+
+
 def _refresh_loop():
-    """Background thread that refreshes the Valkey client before token expires."""
-    global _current_client, _token_created_at
+    """Background thread that refreshes the Valkey token before it expires."""
+    global _token_created_at
     while True:
         time.sleep(_TOKEN_REFRESH_INTERVAL)
         try:
             with _lock:
-                if _client_host is None:
+                if _current_client is None:
                     return  # no longer needed
-                new_client = _build_client(_client_host, _client_port)
-                new_client.ping()
-                _current_client = new_client
+                _refresh_token_in_place()
                 _token_created_at = time.time()
-                logger.info("Valkey token refreshed successfully")
+                logger.info("Valkey token refreshed in-place successfully")
         except Exception as e:
             logger.warning("Valkey token refresh failed (will retry next cycle): %s", e)
 
@@ -81,7 +98,8 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
     Create a Redis client configured for GCP IAM authentication + TLS.
 
     Uses password-only auth (no username) as required by Memorystore for Valkey.
-    Starts a background thread that refreshes the token every 50 minutes.
+    Starts a background thread that refreshes the token every 45 minutes
+    by updating the existing connection pool in-place.
 
     Returns None if the connection cannot be established, allowing the
     caller to fall back to a different session backend.

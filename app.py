@@ -77,7 +77,7 @@ def create_app():
 
         if VALKEY_AUTH_MODE == 'iam':
             # GCP IAM auth: use access token as password, TLS required
-            from utils.valkey_auth import create_iam_redis_client
+            from utils.valkey_auth import create_iam_redis_client, _refresh_token_in_place
             valkey_client = create_iam_redis_client(VALKEY_HOST, VALKEY_PORT)
         else:
             # Password auth or no auth
@@ -137,6 +137,29 @@ def create_app():
         app.logger.info("Using in-memory SimpleCache (no Valkey/Redis available)")
 
     cache.init_app(app)
+
+    # ── Valkey auth-retry middleware ──────────────────────────────────────────
+    # If the IAM token expires between refresh cycles, this catches the
+    # AuthenticationError during Flask's open_session() and refreshes on-demand.
+    if VALKEY_HOST and VALKEY_AUTH_MODE == 'iam' and valkey_client is not None:
+        import redis as _redis_mod
+
+        _inner_wsgi = app.wsgi_app
+
+        def _valkey_retry_wsgi(environ, start_response):
+            try:
+                return _inner_wsgi(environ, start_response)
+            except _redis_mod.exceptions.AuthenticationError:
+                logger.warning("Valkey token expired mid-request — refreshing on-demand")
+                try:
+                    _refresh_token_in_place()
+                    logger.info("On-demand Valkey token refresh succeeded, retrying request")
+                except Exception as refresh_err:
+                    logger.error("On-demand Valkey token refresh failed: %s", refresh_err)
+                    raise
+                return _inner_wsgi(environ, start_response)
+
+        app.wsgi_app = _valkey_retry_wsgi
 
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured
