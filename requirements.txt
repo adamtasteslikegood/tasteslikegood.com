@@ -47,3 +47,4 @@ psycopg2-binary==2.9.9
 flask-migrate==4.0.5
 redis>=5.0.0
 Flask-Caching==2.3.0
+google-cloud-storage>=2.18.0

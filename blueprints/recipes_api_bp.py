@@ -26,11 +26,14 @@ recipes_api_bp = Blueprint("recipes_api", __name__, url_prefix="/api/recipes")
 
 
 def _strip_image_data(data):
-    """Remove bulky ai_image_data from API responses to keep payloads small.
+    """Remove bulky image storage fields from API responses.
     Images are served separately via GET /api/recipes/<id>/image."""
-    if not data or "ai_image_data" not in data:
+    if not data:
         return data
-    return {k: v for k, v in data.items() if k != "ai_image_data"}
+    stripped_keys = {"ai_image_data", "ai_image_gcs"}
+    if not stripped_keys.intersection(data):
+        return data
+    return {k: v for k, v in data.items() if k not in stripped_keys}
 
 
 def _recipe_response(recipe):
@@ -223,6 +226,12 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
 
         if not success:
             return jsonify({"error": "Recipe not found or delete failed"}), 404
+
+        # Clean up GCS image if configured
+        from config import GCS_BUCKET_NAME
+        if GCS_BUCKET_NAME:
+            from services.gcs_service import delete_image
+            delete_image(GCS_BUCKET_NAME, recipe_id)
 
         invalidate_recipe(user_id, guest_session_id, recipe_id)
         return jsonify({"message": "Recipe deleted successfully"}), 200

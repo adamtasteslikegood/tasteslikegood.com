@@ -45,6 +45,10 @@ VALKEY_PORT = int(os.getenv("VALKEY_PORT", "6379"))
 VALKEY_AUTH_MODE = os.getenv("VALKEY_AUTH_MODE", "iam")
 REDIS_URL = os.getenv("REDIS_URL")
 
+# GCS Configuration
+# GCS_BUCKET_NAME: bucket for recipe images (replaces base64-in-PostgreSQL storage)
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-3.1-pro-preview"
 
