@@ -123,8 +123,8 @@ def create_app():
     sess.init_app(app)
 
     # ── Cache configuration (reuses the same Valkey/Redis client) ─────────────
-    if VALKEY_HOST or REDIS_URL:
-        redis_client_for_cache = app.config.get('SESSION_REDIS')
+    redis_client_for_cache = app.config.get('SESSION_REDIS')
+    if redis_client_for_cache is not None:
         app.config['CACHE_TYPE'] = 'RedisCache'
         # Pass the pre-configured client as 'host' — cachelib detects isinstance(host, Redis)
         app.config['CACHE_REDIS_HOST'] = redis_client_for_cache
@@ -134,7 +134,7 @@ def create_app():
     else:
         app.config['CACHE_TYPE'] = 'SimpleCache'
         app.config['CACHE_DEFAULT_TIMEOUT'] = 300
-        app.logger.info("Using in-memory SimpleCache (no Valkey/Redis configured)")
+        app.logger.info("Using in-memory SimpleCache (no Valkey/Redis available)")
 
     cache.init_app(app)
 
