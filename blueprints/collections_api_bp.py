@@ -16,9 +16,13 @@ from datetime import datetime
 
 from flask import Blueprint, jsonify, request, session
 
-from extensions import db
+from extensions import db, cache
 from models import Cookbook
 from utils.session_utils import get_or_create_session_id
+from utils.cache_utils import (
+    collections_list_key, collection_key, invalidate_collection,
+    TTL_SHORT, TTL_MEDIUM,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -62,21 +66,23 @@ def _require_auth_or_guest(f):
 def list_collections(user_id, guest_session_id):
     """List all cookbooks owned by the current user (or anonymous)."""
     try:
+        ck = collections_list_key(user_id, guest_session_id)
+        cached = cache.get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         cookbooks = (
             _scope_collections_query(user_id, guest_session_id)
             .order_by(Cookbook.created_at.desc())
             .all()
         )
-        return (
-            jsonify(
-                {
-                    "collections": [cb.to_dict() for cb in cookbooks],
-                    "user_id": user_id,
-                    "guest_session_id": guest_session_id,
-                }
-            ),
-            200,
-        )
+        result = {
+            "collections": [cb.to_dict() for cb in cookbooks],
+            "user_id": user_id,
+            "guest_session_id": guest_session_id,
+        }
+        cache.set(ck, result, timeout=TTL_SHORT)
+        return jsonify(result), 200
     except Exception as e:
         logger.error(f"Error listing collections: {e}")
         return jsonify({"error": "Failed to fetch collections"}), 500
@@ -106,6 +112,7 @@ def create_collection(user_id, guest_session_id):
         )
         db.session.add(cookbook)
         db.session.commit()
+        invalidate_collection(user_id, guest_session_id)
         return jsonify(cookbook.to_dict()), 201
     except Exception as e:
         logger.error(f"Error creating collection: {e}")
@@ -118,12 +125,19 @@ def create_collection(user_id, guest_session_id):
 def get_collection(user_id, guest_session_id, collection_id):
     """Get a specific cookbook by ID."""
     try:
+        ck = collection_key(user_id, guest_session_id, collection_id)
+        cached = cache.get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         cookbook = (
             _scope_collections_query(user_id, guest_session_id).filter_by(id=collection_id).first()
         )
         if not cookbook:
             return jsonify({"error": "Collection not found"}), 404
-        return jsonify(cookbook.to_dict()), 200
+        result = cookbook.to_dict()
+        cache.set(ck, result, timeout=TTL_MEDIUM)
+        return jsonify(result), 200
     except Exception as e:
         logger.error(f"Error fetching collection {collection_id}: {e}")
         return jsonify({"error": "Failed to fetch collection"}), 500
@@ -141,6 +155,7 @@ def delete_collection(user_id, guest_session_id, collection_id):
             return jsonify({"error": "Collection not found"}), 404
         db.session.delete(cookbook)
         db.session.commit()
+        invalidate_collection(user_id, guest_session_id, collection_id)
         return jsonify({"message": "Collection deleted"}), 200
     except Exception as e:
         logger.error(f"Error deleting collection {collection_id}: {e}")
@@ -175,6 +190,7 @@ def add_recipe_to_collection(user_id, guest_session_id, collection_id):
             cookbook.updated_at = datetime.utcnow()
             db.session.commit()
 
+        invalidate_collection(user_id, guest_session_id, collection_id)
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
         logger.error(f"Error adding recipe to collection {collection_id}: {e}")
@@ -198,6 +214,7 @@ def remove_recipe_from_collection(user_id, guest_session_id, collection_id, reci
         cookbook.updated_at = datetime.utcnow()
         db.session.commit()
 
+        invalidate_collection(user_id, guest_session_id, collection_id)
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
         logger.error(f"Error removing recipe from collection {collection_id}: {e}")

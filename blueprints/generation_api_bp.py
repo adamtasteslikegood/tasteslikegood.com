@@ -20,8 +20,13 @@ from blueprints.generation_bp import (
     attempt_recipe_generation,
     validate_generation_input,
 )
+from extensions import cache
 from repositories import db_recipe_repository
 from services.gemini_service import get_genai_client
+from utils.cache_utils import (
+    recipe_image_key, invalidate_recipe, invalidate_recipe_image,
+    TTL_IMAGE,
+)
 from utils.session_utils import get_or_create_session_id, get_user_metadata
 
 logger = logging.getLogger(__name__)
@@ -106,6 +111,8 @@ def generate_recipe_json():
 
     if not db_recipe:
         return jsonify({"error": "Failed to save recipe to database"}), 500
+
+    invalidate_recipe(user_id, guest_session_id, recipe_id)
 
     logger.info(f"Generated and saved recipe '{recipe_data.get('name')}' (id={recipe_id})")
 
@@ -211,6 +218,9 @@ def generate_image_for_recipe():
 
         db_recipe_repository.update_recipe(recipe_id, recipe_data, user_id, guest_session_id)
 
+        invalidate_recipe_image(recipe_id)
+        invalidate_recipe(user_id, guest_session_id, recipe_id)
+
         logger.info(f"Generated image for recipe '{recipe_name}': {image_url}")
         return jsonify({"image_url": image_url}), 200
 
@@ -224,8 +234,19 @@ def serve_recipe_image(recipe_id):
     """
     Serve a recipe's AI-generated image from the database.
     Returns the raw image bytes with appropriate Content-Type.
+    Cached in Valkey for 24 hours to avoid repeated base64 decoding.
     """
     from models import Recipe
+
+    # Check cache first (stores raw bytes)
+    ck = recipe_image_key(recipe_id)
+    cached_bytes = cache.get(ck)
+    if cached_bytes is not None:
+        return Response(
+            cached_bytes,
+            mimetype="image/png",
+            headers={"Cache-Control": "public, max-age=86400"},
+        )
 
     recipe = Recipe.query.filter_by(id=recipe_id).first()
     if not recipe:
@@ -237,6 +258,8 @@ def serve_recipe_image(recipe_id):
         return jsonify({"error": "No image available"}), 404
 
     image_bytes = base64.b64decode(image_b64)
+    cache.set(ck, image_bytes, timeout=TTL_IMAGE)
+
     return Response(
         image_bytes,
         mimetype="image/png",

@@ -61,7 +61,7 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 
     # Initialize extensions
-    from extensions import db, migrate, sess
+    from extensions import db, migrate, sess, cache
 
     db.init_app(app)
     migrate.init_app(app, db)
@@ -112,6 +112,21 @@ def create_app():
     app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
     sess.init_app(app)
+
+    # ── Cache configuration (reuses the same Valkey/Redis client) ─────────────
+    if VALKEY_HOST or REDIS_URL:
+        redis_client_for_cache = app.config.get('SESSION_REDIS')
+        app.config['CACHE_TYPE'] = 'RedisCache'
+        app.config['CACHE_REDIS'] = redis_client_for_cache
+        app.config['CACHE_DEFAULT_TIMEOUT'] = 300  # 5 minutes
+        app.config['CACHE_KEY_PREFIX'] = 'vgc:'
+        app.logger.info("Using Valkey/Redis cache backend")
+    else:
+        app.config['CACHE_TYPE'] = 'SimpleCache'
+        app.config['CACHE_DEFAULT_TIMEOUT'] = 300
+        app.logger.info("Using in-memory SimpleCache (no Valkey/Redis configured)")
+
+    cache.init_app(app)
 
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured

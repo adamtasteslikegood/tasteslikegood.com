@@ -11,10 +11,14 @@ Provides database-backed recipe CRUD operations:
 
 import logging
 
-from extensions import db
+from extensions import db, cache
 from flask import Blueprint, jsonify, request, session
 from repositories import db_recipe_repository
 from utils.session_utils import get_or_create_session_id
+from utils.cache_utils import (
+    recipe_key, recipe_stats_key, invalidate_recipe,
+    TTL_MEDIUM, TTL_SHORT,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +139,7 @@ def create_recipe(user_id, guest_session_id):
         if not recipe:
             return jsonify({"error": "Failed to create recipe"}), 500
 
+        invalidate_recipe(user_id, guest_session_id, recipe.id)
         return jsonify(_recipe_response(recipe)), 201
 
     except Exception as e:
@@ -151,12 +156,20 @@ def get_recipe(user_id, guest_session_id, recipe_id):
     Only returns recipe if it belongs to the current user (or is anonymous for guests).
     """
     try:
+        # Check cache first
+        ck = recipe_key(user_id, guest_session_id, recipe_id)
+        cached = cache.get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
 
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
 
-        return jsonify(_recipe_response(recipe)), 200
+        result = _recipe_response(recipe)
+        cache.set(ck, result, timeout=TTL_MEDIUM)
+        return jsonify(result), 200
 
     except Exception as e:
         logger.error(f"Error fetching recipe {recipe_id}: {e}")
@@ -189,6 +202,7 @@ def update_recipe(user_id, guest_session_id, recipe_id):
         if not recipe:
             return jsonify({"error": "Recipe not found or update failed"}), 404
 
+        invalidate_recipe(user_id, guest_session_id, recipe_id)
         return jsonify(_recipe_response(recipe)), 200
 
     except Exception as e:
@@ -210,6 +224,7 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
         if not success:
             return jsonify({"error": "Recipe not found or delete failed"}), 404
 
+        invalidate_recipe(user_id, guest_session_id, recipe_id)
         return jsonify({"message": "Recipe deleted successfully"}), 200
 
     except Exception as e:
@@ -230,18 +245,21 @@ def get_recipe_stats(user_id, guest_session_id):
         }
     """
     try:
+        ck = recipe_stats_key(user_id, guest_session_id)
+        cached = cache.get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         count = db_recipe_repository.count_user_recipes(user_id, guest_session_id)
 
-        return (
-            jsonify(
-                {
-                    "total_recipes": count,
-                    "user_id": user_id,
-                    "guest_session_id": guest_session_id,
-                }
-            ),
-            200,
-        )
+        result = {
+            "total_recipes": count,
+            "user_id": user_id,
+            "guest_session_id": guest_session_id,
+        }
+        cache.set(ck, result, timeout=TTL_SHORT)
+
+        return jsonify(result), 200
 
     except Exception as e:
         logger.error(f"Error fetching recipe stats: {e}")
