@@ -27,13 +27,19 @@ recipes_api_bp = Blueprint("recipes_api", __name__, url_prefix="/api/recipes")
 
 def _strip_image_data(data):
     """Remove bulky image storage fields from API responses.
-    Images are served separately via GET /api/recipes/<id>/image."""
+    Images are served separately via GET /api/recipes/<id>/image.
+    Also ensures ai_image_url points to the API endpoint when image data exists."""
     if not data:
         return data
+    has_image = bool(data.get("ai_image_data") or data.get("ai_image_gcs"))
     stripped_keys = {"ai_image_data", "ai_image_gcs"}
-    if not stripped_keys.intersection(data):
+    if not stripped_keys.intersection(data) and not has_image:
         return data
-    return {k: v for k, v in data.items() if k not in stripped_keys}
+    result = {k: v for k, v in data.items() if k not in stripped_keys}
+    # Ensure ai_image_url points to the API endpoint for any recipe with image data
+    if has_image and "id" in result:
+        result["ai_image_url"] = f"/api/recipes/{result['id']}/image"
+    return result
 
 
 def _recipe_response(recipe):
