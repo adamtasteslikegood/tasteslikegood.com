@@ -55,23 +55,22 @@ class IAMCredentialProvider(redis.CredentialProvider):
         return self._username, self._token
 
 
-def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis:
+def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | None:
     """
     Create a Redis client configured for GCP IAM authentication + TLS.
 
-    Tries CredentialProvider first. If it fails (protocol error),
-    falls back to direct username/password auth.
+    Returns None if the connection cannot be established, allowing the
+    caller to fall back to a different session backend.
 
     Args:
         host: Memorystore private IP (e.g. '10.128.0.11')
         port: Memorystore port (default 6379)
 
     Returns:
-        redis.StrictRedis configured with IAM auth and TLS
+        redis.StrictRedis configured with IAM auth and TLS, or None on failure
     """
     credential_provider = IAMCredentialProvider()
 
-    # Try CredentialProvider approach first
     client = redis.StrictRedis(
         host=host,
         port=port,
@@ -83,28 +82,26 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis:
 
     try:
         client.ping()
-        logger.info("Valkey connection OK (CredentialProvider auth) at %s:%s", host, port)
+        logger.info("Valkey connection OK at %s:%s", host, port)
         return client
     except Exception as e:
-        logger.warning("CredentialProvider auth failed (%s), trying direct auth", e)
+        logger.warning("Valkey CredentialProvider auth failed: %s", e)
 
     # Fallback: direct username/password (no CredentialProvider)
-    username, token = _get_iam_credentials()
-    client = redis.StrictRedis(
-        host=host,
-        port=port,
-        username=username,
-        password=token,
-        ssl=True,
-        ssl_cert_reqs="none",
-        decode_responses=False,
-    )
-
     try:
+        username, token = _get_iam_credentials()
+        client = redis.StrictRedis(
+            host=host,
+            port=port,
+            username=username,
+            password=token,
+            ssl=True,
+            ssl_cert_reqs="none",
+            decode_responses=False,
+        )
         client.ping()
         logger.info("Valkey connection OK (direct auth) at %s:%s", host, port)
+        return client
     except Exception as e2:
-        logger.error("Both Valkey auth methods failed: %s", e2)
-        raise
-
-    return client
+        logger.error("Both Valkey auth methods failed: %s — falling back to SQLAlchemy sessions", e2)
+        return None

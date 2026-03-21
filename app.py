@@ -73,6 +73,7 @@ def create_app():
     if VALKEY_HOST:
         import redis as redis_client
         valkey_kwargs = dict(host=VALKEY_HOST, port=VALKEY_PORT)
+        valkey_client = None
 
         if VALKEY_AUTH_MODE == 'iam':
             # GCP IAM auth: use access token as password, TLS required
@@ -85,9 +86,17 @@ def create_app():
                 **valkey_kwargs, password=password, decode_responses=False
             )
 
-        app.config['SESSION_TYPE'] = 'redis'
-        app.config['SESSION_REDIS'] = valkey_client
-        app.logger.info(f"Using Valkey session backend ({VALKEY_AUTH_MODE} auth) at {VALKEY_HOST}:{VALKEY_PORT}")
+        if valkey_client is not None:
+            app.config['SESSION_TYPE'] = 'redis'
+            app.config['SESSION_REDIS'] = valkey_client
+            app.logger.info(f"Using Valkey session backend ({VALKEY_AUTH_MODE} auth) at {VALKEY_HOST}:{VALKEY_PORT}")
+        else:
+            # Valkey auth failed — fall back to SQLAlchemy sessions
+            app.config['SESSION_TYPE'] = 'sqlalchemy'
+            app.config['SESSION_SQLALCHEMY'] = db
+            app.config['SESSION_SQLALCHEMY_TABLE'] = 'flask_sessions'
+            app.config['SESSION_CLEANUP_N_REQUESTS'] = 100
+            app.logger.warning("Valkey auth failed — using SQLAlchemy session fallback")
 
     elif REDIS_URL:
         # Simple URL mode (local dev with docker redis)
