@@ -33,26 +33,26 @@ class IAMCredentialProvider(redis.CredentialProvider):
     Redis credential provider that uses GCP IAM access tokens.
 
     Automatically refreshes tokens before they expire. For Memorystore
-    for Valkey with IAM_AUTH, sends AUTH <service-account-email> <token>.
+    for Valkey with IAM_AUTH, sends AUTH <token> (password only, no username).
+    GCP docs: https://cloud.google.com/memorystore/docs/valkey/manage-iam-auth
     """
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._username = None
         self._token = None
         self._token_expiry = 0
 
     def _refresh_token(self):
-        self._username, self._token = _get_iam_credentials()
+        _email, self._token = _get_iam_credentials()
         self._token_expiry = time.time() + _TOKEN_REFRESH_INTERVAL
-        logger.info("Refreshed IAM token for Valkey (user=%s)", self._username)
+        logger.info("Refreshed IAM token for Valkey (sa=%s)", _email)
 
     def get_credentials(self):
-        """Return (username, password) tuple for AUTH command."""
+        """Return token string for AUTH command (password only, no username)."""
         with self._lock:
             if not self._token or time.time() >= self._token_expiry:
                 self._refresh_token()
-        return self._username, self._token
+        return self._token
 
 
 def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | None:
@@ -87,13 +87,12 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
     except Exception as e:
         logger.warning("Valkey CredentialProvider auth failed: %s", e)
 
-    # Fallback: direct username/password (no CredentialProvider)
+    # Fallback: direct password auth (no CredentialProvider, no username)
     try:
-        username, token = _get_iam_credentials()
+        _email, token = _get_iam_credentials()
         client = redis.StrictRedis(
             host=host,
             port=port,
-            username=username,
             password=token,
             ssl=True,
             ssl_cert_reqs="none",
