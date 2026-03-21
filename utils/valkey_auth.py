@@ -29,7 +29,6 @@ class IAMCredentialProvider(redis.CredentialProvider):
     def __init__(self):
         self._lock = threading.Lock()
         self._token = None
-        self._username = None
         self._token_expiry = 0
 
     def _refresh_token(self):
@@ -40,18 +39,20 @@ class IAMCredentialProvider(redis.CredentialProvider):
         creds, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
         creds.refresh(Request())
         self._token = creds.token
-        # Memorystore for Valkey IAM auth requires the SA email as username
-        self._username = creds.service_account_email
         # Tokens last ~3600s; we refresh at 50 min to avoid edge cases
         self._token_expiry = time.time() + _TOKEN_REFRESH_INTERVAL
-        logger.info("Refreshed IAM token for Valkey (user=%s)", self._username)
+        logger.info("Refreshed IAM token for Valkey")
 
     def get_credentials(self):
-        """Return (username, password) for Redis AUTH. Called by redis-py on each connection."""
+        """Return password for Redis AUTH. Called by redis-py on each connection.
+
+        Memorystore for Valkey IAM auth uses token-only AUTH (no username).
+        Returning a single string tells redis-py to send AUTH <password>.
+        """
         with self._lock:
             if not self._token or time.time() >= self._token_expiry:
                 self._refresh_token()
-        return self._username, self._token
+        return self._token
 
 
 def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis:
