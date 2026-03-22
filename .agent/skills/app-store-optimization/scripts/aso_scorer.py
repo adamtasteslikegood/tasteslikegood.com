@@ -140,7 +140,7 @@ class ASOScorer:
         else:
             title_score -= 5
 
-        scores.append(min(title_score, 35))
+        scores.append(max(0, min(title_score, 35)))
 
         # Description score (0-35 points)
         desc_length = metadata.get('description_length', 0)
