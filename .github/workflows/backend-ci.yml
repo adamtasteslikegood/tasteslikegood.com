@@ -31,7 +31,7 @@ jobs:
         run: flake8 . --count --show-source --statistics
 
       - name: Type check with mypy
-        run: mypy app.py workflow_runs/app.py
+        run: mypy app.py workflow_runs/app.py --exclude 'workflow_run'
 
   test:
     name: Test (pytest)

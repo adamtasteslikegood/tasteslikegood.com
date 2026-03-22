@@ -13,10 +13,9 @@ Refactored into a modular architecture with:
 - blueprints/: Route handlers (recipes, generation, API)
 """
 
-import logging
 import os
 
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -69,10 +68,9 @@ def create_app():
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured
     with app.app_context():
-        import models
+        import models  # noqa: F401
 
     # Production should continue using Flask-Migrate/Alembic as the primary path.
-
 
     # ####### DEVELOPMENT NOTE: If you want to quickly create tables without running migrations #######
     # # ***** (for example, for local development or testing), you can use db.create_all().  *****
@@ -103,7 +101,6 @@ def create_app():
     # create_tables_with_retry(app, db)
     # # Note: In production, rely on proper migrations instead of create_all() to manage schema changes.
 
-
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins
     cors_origins = [
@@ -120,10 +117,12 @@ def create_app():
         cors_origins.append(os.environ.get("PRODUCTION_ORIGIN"))
 
     # Always allow the production domains
-    cors_origins.extend([
-        "https://www.tasteslikegood.org",
-        "https://tasteslikegood.org",
-    ])
+    cors_origins.extend(
+        [
+            "https://www.tasteslikegood.org",
+            "https://tasteslikegood.org",
+        ]
+    )
 
     CORS(
         app,

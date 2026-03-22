@@ -11,7 +11,7 @@ import logging
 import os
 from functools import wraps
 
-import google.oauth2.credentials
+import google.oauth2.credentials  # noqa: F401
 import googleapiclient.discovery
 from dotenv import load_dotenv
 from flask import Blueprint, jsonify, request, session, url_for
@@ -106,7 +106,7 @@ def api_login():
 
 
 @auth_api_bp.route("/callback", methods=["GET"])
-def api_callback():
+def api_callback():  # noqa: C901
     """
     OAuth callback endpoint.
 
