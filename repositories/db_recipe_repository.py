@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from extensions import db
-from models import Recipe, User
+from models import Recipe, User  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

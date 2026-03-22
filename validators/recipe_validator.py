@@ -7,7 +7,7 @@ all recipes conform to the expected structure before saving.
 
 import json
 from jsonschema import Draft7Validator, ValidationError
-from config import RECIPE_SCHEMA_PATH, RECIPE_SCHEMA, RECIPE_VALIDATOR
+from config import RECIPE_SCHEMA_PATH, RECIPE_VALIDATOR
 
 
 def load_schema():

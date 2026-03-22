@@ -198,7 +198,7 @@ class TestRefreshModels(unittest.TestCase):
         mock_client_instance.models.list.return_value = [mock_model]
 
         with patch("services.model_service.GOOGLE_API_KEY", "fake-key"):
-            with patch("builtins.open", mock_open()) as mock_file:
+            with patch("builtins.open", mock_open()):
                 response = self.app.post("/api/models/refresh")
 
                 self.assertEqual(response.status_code, 200)

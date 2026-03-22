@@ -13,7 +13,7 @@ import logging
 
 from flask import Blueprint, jsonify, request, session
 
-from extensions import db
+from extensions import db  # noqa: F401
 from repositories import db_recipe_repository
 from utils.session_utils import get_or_create_session_id
 

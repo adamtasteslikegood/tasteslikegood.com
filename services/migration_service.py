@@ -1,6 +1,6 @@
 import os
 import logging
-from typing import List, Dict, Any
+from typing import Dict, Any
 from config import RECIPES_DIR
 from repositories.recipe_repository import (
     get_recipe,

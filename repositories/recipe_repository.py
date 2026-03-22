@@ -15,7 +15,7 @@ import time
 import datetime
 import fcntl  # Unix file locking
 import logging
-from typing import List, Dict, Any, Tuple, Optional, Generator
+from typing import List, Dict, Any, Tuple, Generator
 from contextlib import contextmanager
 from config import RECIPES_DIR, _recipes_cache, _RECIPES_CACHE_TTL
 
@@ -105,8 +105,6 @@ def get_all_recipes() -> List[Dict[str, str]]:
     Returns:
         list: List of recipe dicts with 'name' and 'filename' keys, sorted by name
     """
-    global _recipes_cache
-
     current_time = time.time()
     # Return cached data if still valid
     if (
@@ -191,7 +189,6 @@ def invalidate_cache():
 
     Call this after any recipe create/update/delete operation.
     """
-    global _recipes_cache
     _recipes_cache["data"] = None
     _recipes_cache["timestamp"] = 0
 

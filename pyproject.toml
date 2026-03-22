@@ -77,6 +77,8 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "types-requests>=2.31.0",
+    "types-jsonschema>=4.21.0",
 ]
 postgres = [
     # PostgreSQL support (for production deployments)
@@ -119,6 +121,7 @@ exclude = [
     "migrate_recipes\\.py",
     "debug_generation\\.py",
     "migrations/",
+    "workflow_runs/",
 ]
 
 [tool.uv]
@@ -132,4 +135,6 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "types-requests>=2.31.0",
+    "types-jsonschema>=4.21.0",
 ]

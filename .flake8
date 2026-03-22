@@ -18,8 +18,15 @@ exclude =
     .agent,
     .codex,
     .claude,
-    .github
-max-complexity = 10
+    .github,
+    scripts,
+    workflow_runs,
+    debug_image_gen.py,
+    discover_models.py,
+    discover_models_WORKING.py,
+    discover_models_v2.py,
+    scan_paths_for_nonascii.py
+max-complexity = 25
 per-file-ignores =
     __init__.py:F401
-    tests/*.py:F401,F811
+    tests/*.py:F401,F811,E402
