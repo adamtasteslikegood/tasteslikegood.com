@@ -285,10 +285,21 @@ def serve_recipe_image(recipe_id):
     )
 
 
+def _require_admin():
+    """Check for admin bearer token (FLASK_SECRET_KEY). Returns error response or None."""
+    import os
+    admin_key = os.environ.get("FLASK_SECRET_KEY", "")
+    auth_header = request.headers.get("Authorization", "")
+    if not admin_key or not auth_header.startswith("Bearer ") or auth_header[7:] != admin_key:
+        return jsonify({"error": "Unauthorized — admin token required"}), 403
+    return None
+
+
 @generation_api_bp.route("/admin/migrate-images", methods=["POST"])
 def migrate_image_urls():
     """
     Migration endpoint: moves recipe images from base64-in-DB to GCS.
+    Requires Authorization: Bearer <FLASK_SECRET_KEY>.
 
     For each recipe with ai_image_data (base64):
     1. Decode base64 to raw bytes
@@ -299,6 +310,9 @@ def migrate_image_urls():
     Also fixes legacy URL patterns (data: URLs, /static/ paths).
     Returns summary of migrated recipes.
     """
+    auth_error = _require_admin()
+    if auth_error:
+        return auth_error
     from models import Recipe
     from extensions import db
 
