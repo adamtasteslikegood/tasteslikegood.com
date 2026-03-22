@@ -429,10 +429,10 @@ Trusted by 500,000+ professionals.
 
 | Script | Purpose | Usage |
 |--------|---------|-------|
-| [keyword_analyzer.py](scripts/keyword_analyzer.py) | Analyze keywords for volume and competition | `python keyword_analyzer.py --keywords "todo,task,planner"` |
+| [keyword_analyzer.py](scripts/keyword_analyzer.py) | Analyze keywords for volume and competition | Import into your Python code and call its functions (no CLI entrypoint) |
 | [metadata_optimizer.py](scripts/metadata_optimizer.py) | Validate metadata character limits and density | `python metadata_optimizer.py --platform ios --title "App Title"` |
 | [competitor_analyzer.py](scripts/competitor_analyzer.py) | Extract and compare competitor keywords | `python competitor_analyzer.py --competitors "App1,App2,App3"` |
-| [aso_scorer.py](scripts/aso_scorer.py) | Calculate overall ASO health score | `python aso_scorer.py --app-id com.example.app` |
+| [aso_scorer.py](scripts/aso_scorer.py) | Calculate overall ASO health score | Import into your Python code and call its functions (no CLI entrypoint) |
 | [ab_test_planner.py](scripts/ab_test_planner.py) | Plan tests and calculate sample sizes | `python ab_test_planner.py --cvr 0.05 --lift 0.10` |
 | [review_analyzer.py](scripts/review_analyzer.py) | Analyze review sentiment and themes | `python review_analyzer.py --app-id com.example.app` |
 | [launch_checklist.py](scripts/launch_checklist.py) | Generate platform-specific launch checklists | `python launch_checklist.py --platform ios` |

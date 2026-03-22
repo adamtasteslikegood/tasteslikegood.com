@@ -6,6 +6,7 @@ Creates well-formed user stories with acceptance criteria
 
 import json
 from typing import Dict, List, Tuple
+import hashlib
 
 class UserStoryGenerator:
     """Generate INVEST-compliant user stories"""
@@ -100,8 +101,11 @@ class UserStoryGenerator:
     def generate_enabler_story(self, requirement: str, epic: str) -> Dict:
         """Generate technical enabler story"""
         
+        # Use a stable hash of the requirement text to avoid ID collisions
+        requirement_hash = hashlib.sha1(requirement.encode("utf-8")).hexdigest()[:8]
+        
         return {
-            'id': f"{epic[:3].upper()}-E{len(requirement):02d}",
+            'id': f"{epic[:3].upper()}-E{requirement_hash}",
             'type': 'enabler',
             'title': f"Technical: {requirement}",
             'narrative': f"As a developer, I need to {requirement} to enable user features",
