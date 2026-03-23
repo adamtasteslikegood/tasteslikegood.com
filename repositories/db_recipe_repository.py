@@ -115,12 +115,11 @@ def create_recipe(
             existing.name = recipe_name
 
             # Preserve server-only fields that the frontend never receives
-            # (ai_image_data is stripped from API responses by _strip_image_data).
+            # (ai_image_data and ai_image_gcs are stripped from API responses by _strip_image_data).
             existing_data = existing.data or {}
-            if "ai_image_data" not in recipe_data_with_id and "ai_image_data" in existing_data:
-                recipe_data_with_id["ai_image_data"] = existing_data["ai_image_data"]
-            if "ai_image_url" not in recipe_data_with_id and "ai_image_url" in existing_data:
-                recipe_data_with_id["ai_image_url"] = existing_data["ai_image_url"]
+            for key in ("ai_image_data", "ai_image_gcs", "ai_image_url"):
+                if key not in recipe_data_with_id and key in existing_data:
+                    recipe_data_with_id[key] = existing_data[key]
 
             existing.data = recipe_data_with_id
             existing.updated_at = datetime.utcnow()
@@ -176,10 +175,9 @@ def update_recipe(
 
         # Preserve server-only image data if not present in incoming data
         existing_data = recipe.data or {}
-        if "ai_image_data" not in recipe_data_with_id and "ai_image_data" in existing_data:
-            recipe_data_with_id["ai_image_data"] = existing_data["ai_image_data"]
-        if "ai_image_url" not in recipe_data_with_id and "ai_image_url" in existing_data:
-            recipe_data_with_id["ai_image_url"] = existing_data["ai_image_url"]
+        for key in ("ai_image_data", "ai_image_gcs", "ai_image_url"):
+            if key not in recipe_data_with_id and key in existing_data:
+                recipe_data_with_id[key] = existing_data[key]
 
         # Update fields
         recipe.name = recipe_data.get("name", recipe.name)
