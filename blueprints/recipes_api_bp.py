@@ -25,10 +25,15 @@ logger = logging.getLogger(__name__)
 recipes_api_bp = Blueprint("recipes_api", __name__, url_prefix="/api/recipes")
 
 
-def _strip_image_data(data):
+def _strip_image_data(data, recipe_id=None):
     """Remove bulky image storage fields from API responses.
     Images are served separately via GET /api/recipes/<id>/image.
-    Also ensures ai_image_url points to the API endpoint when image data exists."""
+    Also ensures ai_image_url points to the API endpoint when image data exists.
+
+    Args:
+        data: The recipe's JSON data dict.
+        recipe_id: Explicit recipe ID (use when data may not contain 'id').
+    """
     if not data:
         return data
     has_image = bool(data.get("ai_image_data") or data.get("ai_image_gcs"))
@@ -37,15 +42,16 @@ def _strip_image_data(data):
         return data
     result = {k: v for k, v in data.items() if k not in stripped_keys}
     # Ensure ai_image_url points to the API endpoint for any recipe with image data
-    if has_image and "id" in result:
-        result["ai_image_url"] = f"/api/recipes/{result['id']}/image"
+    rid = recipe_id or result.get("id")
+    if has_image and rid:
+        result["ai_image_url"] = f"/api/recipes/{rid}/image"
     return result
 
 
 def _recipe_response(recipe):
     """Build a consistent recipe response dict with image data stripped."""
     d = recipe.to_dict()
-    d["data"] = _strip_image_data(d.get("data"))
+    d["data"] = _strip_image_data(d.get("data"), recipe_id=recipe.id)
     return d
 
 
@@ -94,7 +100,7 @@ def list_recipes(user_id, guest_session_id):
                         {
                             "id": recipe.id,
                             "name": recipe.name,
-                            "data": _strip_image_data(recipe.data),
+                            "data": _strip_image_data(recipe.data, recipe_id=recipe.id),
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
