@@ -295,6 +295,44 @@ def _require_admin():
     return None
 
 
+@generation_api_bp.route("/admin/image-audit", methods=["GET"])
+def audit_recipe_images():
+    """Diagnostic: show which recipes have/lack image data in the DB.
+    Requires admin bearer token."""
+    err = _require_admin()
+    if err:
+        return err
+
+    from models import Recipe
+    recipes = Recipe.query.all()
+    results = []
+    for r in recipes:
+        d = r.data or {}
+        has_b64 = bool(d.get("ai_image_data"))
+        has_gcs = bool(d.get("ai_image_gcs"))
+        has_url = bool(d.get("ai_image_url"))
+        has_id_in_data = "id" in d
+        results.append({
+            "id": r.id,
+            "name": r.name,
+            "has_base64": has_b64,
+            "has_gcs": has_gcs,
+            "has_url_in_data": has_url,
+            "url_in_data": d.get("ai_image_url", ""),
+            "has_id_in_data": has_id_in_data,
+            "has_any_image": has_b64 or has_gcs,
+        })
+
+    missing = [r for r in results if not r["has_any_image"]]
+    have_image = [r for r in results if r["has_any_image"]]
+    return jsonify({
+        "total": len(results),
+        "with_image_data": len(have_image),
+        "without_image_data": len(missing),
+        "missing": missing,
+    }), 200
+
+
 @generation_api_bp.route("/admin/migrate-images", methods=["POST"])
 def migrate_image_urls():
     """
