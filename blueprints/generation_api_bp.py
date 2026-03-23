@@ -151,8 +151,9 @@ def generate_image_for_recipe():
 
     recipe_data = db_recipe.data or {}
 
-    # Check if image already exists
-    if not force_regenerate and recipe_data.get("ai_image_url"):
+    # Check if image already exists (verify actual image data, not just URL)
+    has_real_image = bool(recipe_data.get("ai_image_data") or recipe_data.get("ai_image_gcs"))
+    if not force_regenerate and has_real_image and recipe_data.get("ai_image_url"):
         return jsonify({"image_url": recipe_data["ai_image_url"]}), 200
 
     # Get authenticated client
