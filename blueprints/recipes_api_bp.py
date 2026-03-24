@@ -11,7 +11,6 @@ Provides database-backed recipe CRUD operations:
 
 import logging
 
-from extensions import db
 from flask import Blueprint, jsonify, request, session
 from repositories import db_recipe_repository
 from utils.session_utils import get_or_create_session_id

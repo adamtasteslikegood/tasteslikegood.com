@@ -16,7 +16,7 @@ Refactored into a modular architecture with:
 import os
 from datetime import timedelta
 
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 

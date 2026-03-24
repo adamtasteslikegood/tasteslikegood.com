@@ -1,7 +1,6 @@
 import os
 from functools import wraps
 
-import google.oauth2.credentials
 import googleapiclient.discovery
 from dotenv import load_dotenv
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for

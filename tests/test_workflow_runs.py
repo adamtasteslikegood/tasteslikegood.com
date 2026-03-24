@@ -146,7 +146,7 @@ class TestFetchWorkflowRuns:
         assert "rate limit" in error.lower() or "permission" in error.lower()
 
     def test_connection_error_returns_message(self):
-        import requests as req_lib
+        import requests as req_lib  # type: ignore[import-untyped]
 
         with patch(
             "workflow_runs.app.requests.get", side_effect=req_lib.exceptions.ConnectionError
@@ -157,7 +157,7 @@ class TestFetchWorkflowRuns:
         assert "connect" in error.lower()
 
     def test_timeout_returns_message(self):
-        import requests as req_lib
+        import requests as req_lib  # type: ignore[import-untyped]
 
         with patch("workflow_runs.app.requests.get", side_effect=req_lib.exceptions.Timeout):
             runs, error = fetch_workflow_runs("owner", "repo")

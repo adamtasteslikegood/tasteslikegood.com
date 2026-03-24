@@ -59,6 +59,7 @@ def upload_image(bucket_name: str, recipe_id: str, image_bytes: bytes) -> Option
     """
     if not _init_gcs(bucket_name):
         return None
+    assert _bucket is not None
     try:
         blob = _bucket.blob(_object_name(recipe_id))
         blob.upload_from_string(image_bytes, content_type="image/png")
@@ -83,11 +84,12 @@ def download_image(bucket_name: str, recipe_id: str) -> Optional[bytes]:
     """
     if not _init_gcs(bucket_name):
         return None
+    assert _bucket is not None
     try:
         blob = _bucket.blob(_object_name(recipe_id))
         if not blob.exists():
             return None
-        return blob.download_as_bytes()
+        return blob.download_as_bytes()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Failed to download image for recipe {recipe_id}: {e}")
         return None
@@ -106,6 +108,7 @@ def delete_image(bucket_name: str, recipe_id: str) -> bool:
     """
     if not _init_gcs(bucket_name):
         return False
+    assert _bucket is not None
     try:
         blob = _bucket.blob(_object_name(recipe_id))
         if blob.exists():
@@ -121,9 +124,10 @@ def image_exists(bucket_name: str, recipe_id: str) -> bool:
     """Check if an image exists in GCS for a given recipe."""
     if not _init_gcs(bucket_name):
         return False
+    assert _bucket is not None
     try:
         blob = _bucket.blob(_object_name(recipe_id))
-        return blob.exists()
+        return blob.exists()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Failed to check image existence for recipe {recipe_id}: {e}")
         return False
