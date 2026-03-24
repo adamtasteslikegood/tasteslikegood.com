@@ -1,0 +1,30 @@
+==========================================
+  Backend CI/CD Test Script
+==========================================
+
+Step 1: Syncing dependencies with uv...
+✅ Dependencies synced
+
+Step 2: Checking code formatting with Black...
+✅ Black: Code is properly formatted
+
+Step 3: Linting code with Flake8...
+✅ Flake8: No linting errors
+
+Step 4: Type checking with mypy...
+Success: no issues found in 59 source files
+✅ mypy: Type checking passed
+
+Step 5: Running tests with pytest...
+⚠️  pytest: Some tests failed (review above)
+
+==========================================
+  Summary
+==========================================
+✅ All checks completed!
+
+Next steps:
+1. Review any warnings above
+2. Stage changes: git add .
+3. Commit: git commit -m 'ci: Add CI/CD pipeline for Flask backend'
+4. Push: git push origin dev/backend_sub222

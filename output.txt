@@ -1,0 +1,39 @@
+==========================================
+  Backend CI/CD Test Script
+==========================================
+
+Step 1: Syncing dependencies with uv...
+Resolved 91 packages in 1ms
+Checked 87 packages in 1ms
+✅ Dependencies synced
+
+Step 2: Checking code formatting with Black...
+All done! ✨ 🍰 ✨
+233 files would be left unchanged.
+✅ Black: Code is properly formatted
+
+Step 3: Linting code with Flake8...
+✅ Flake8: No linting errors
+
+Step 4: Type checking with mypy...
+Success: no issues found in 59 source files
+✅ mypy: Type checking passed
+
+Step 5: Running tests with pytest...
+ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]
+pytest: error: unrecognized arguments: --cov-omit=tests/*,debug_*.py,discover_*.py,migrate_recipes.py,scan_paths_for_nonascii.py,services/gcs_service.py,test_*.py,utils/valkey_auth.py,workflow_runs/*,config.py,*__init__.py,app.py,extensions.py
+  inifile: /workspaces/tasteslikegood.com/pyproject.toml
+  rootdir: /workspaces/tasteslikegood.com
+
+⚠️  pytest: Some tests failed (review above)
+
+==========================================
+  Summary
+==========================================
+✅ All checks completed!
+
+Next steps:
+1. Review any warnings above
+2. Stage changes: git add .
+3. Commit: git commit -m 'ci: Add CI/CD pipeline for Flask backend'
+4. Push: git push origin dev/backend_sub222

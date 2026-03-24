@@ -1,0 +1,337 @@
+==========================================
+  Backend CI/CD Test Script
+==========================================
+
+Step 1: Syncing dependencies with uv...
+✅ Dependencies synced
+
+Step 2: Checking code formatting with Black...
+⚠️  Black: Formatting issues found - running auto-fix...
+✅ Black: Code formatted
+
+Step 3: Linting code with Flake8...
+./tests/test_backend_improvements.py:1:1: F401 'pytest' imported but unused
+./tests/test_backend_improvements.py:2:1: F401 'os' imported but unused
+./tests/test_backend_improvements.py:6:1: F401 'repositories.recipe_repository.save_recipe' imported but unused
+./tests/test_backend_improvements.py:6:1: F401 'repositories.recipe_repository.get_recipe' imported but unused
+./tests/test_backend_improvements.py:6:1: F401 'repositories.recipe_repository.RECIPES_DIR' imported but unused
+./tests/test_image_service.py:11:1: F401 'services.image_service.save_image_file' imported but unused
+./tests/test_session_utils.py:12:1: F401 'unittest.mock.MagicMock' imported but unused
+./tests/test_session_utils.py:12:1: F401 'unittest.mock.patch' imported but unused
+./tests/test_stock_images.py:11:1: F401 'services.stock_image_service.search_unsplash' imported but unused
+⚠️  Flake8: Linting issues found (review above)
+
+Step 4: Type checking with mypy...
+Success: no issues found in 59 source files
+✅ mypy: Type checking passed
+
+Step 5: Running tests with pytest...
+============================= test session starts ==============================
+platform linux -- Python 3.13.12, pytest-9.0.2, pluggy-1.6.0 -- /workspaces/tasteslikegood.com/.venv/bin/python
+cachedir: .pytest_cache
+rootdir: /workspaces/tasteslikegood.com
+configfile: pyproject.toml
+testpaths: tests
+plugins: cov-7.0.0, anyio-4.12.1
+collecting ... collected 99 items
+
+tests/test_auth.py::AuthTestCase::test_login PASSED                      [  1%]
+tests/test_auth.py::AuthTestCase::test_logout PASSED                     [  2%]
+tests/test_auth.py::AuthTestCase::test_profile_access PASSED             [  3%]
+tests/test_backend_improvements.py::test_reporting_service_logic PASSED  [  4%]
+tests/test_backend_improvements.py::test_migration_service_logic PASSED  [  5%]
+tests/test_gemini_service.py::TestGetGenaiClient::test_get_client_api_key_only PASSED [  6%]
+tests/test_gemini_service.py::TestGetGenaiClient::test_get_client_fallback_to_api_key PASSED [  7%]
+tests/test_gemini_service.py::TestGetGenaiClient::test_get_client_no_auth PASSED [  8%]
+tests/test_gemini_service.py::TestGetGenaiClient::test_get_client_with_valid_session_credentials PASSED [  9%]
+tests/test_gemini_service.py::TestAttemptGeneration::test_generation_failure PASSED [ 10%]
+tests/test_gemini_service.py::TestAttemptGeneration::test_successful_generation PASSED [ 11%]
+tests/test_image_service.py::TestImageService::test_generate_fails_without_client FAILED [ 12%]
+tests/test_image_service.py::TestImageService::test_generate_returns_existing_image PASSED [ 13%]
+tests/test_image_service.py::TestImageService::test_generation_exception_handling FAILED [ 14%]
+tests/test_image_service.py::TestImageService::test_successful_generation FAILED [ 15%]
+tests/test_image_service.py::TestImageServiceHelpers::test_update_recipe_with_image PASSED [ 16%]
+tests/test_instruction_parsing.py::test_instructions_as_strings PASSED   [ 17%]
+tests/test_instruction_parsing.py::test_instructions_as_objects PASSED   [ 18%]
+tests/test_instruction_parsing.py::test_mixed_instructions PASSED        [ 19%]
+tests/test_instruction_parsing.py::test_invalid_instruction_object PASSED [ 20%]
+tests/test_instruction_parsing.py::test_invalid_instruction_type PASSED  [ 21%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_corrupt_cache PASSED [ 22%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_filter_unsupported PASSED [ 23%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_no_cache PASSED [ 24%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_success_from_cache PASSED [ 25%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_filters_embedding_models PASSED [ 26%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_filters_imagen_models PASSED [ 27%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_limits_to_8_models PASSED [ 28%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_sorts_preferred_models_first PASSED [ 29%]
+tests/test_model_fetching.py::TestRefreshModels::test_refresh_models_no_auth PASSED [ 30%]
+tests/test_model_fetching.py::TestRefreshModels::test_refresh_models_success PASSED [ 31%]
+tests/test_normalization.py::TestNormalization::test_normalize_keys_fuzzy PASSED [ 32%]
+tests/test_normalization.py::TestNormalization::test_normalize_recipe_defaults PASSED [ 33%]
+tests/test_normalization.py::TestNormalization::test_normalize_recipe_flat_ingredients PASSED [ 34%]
+tests/test_normalization.py::TestNormalization::test_normalize_recipe_nested_ingredients PASSED [ 35%]
+tests/test_normalization.py::TestNormalization::test_normalize_unit_exact PASSED [ 36%]
+tests/test_normalization.py::TestNormalization::test_normalize_unit_fallback PASSED [ 37%]
+tests/test_normalization.py::TestNormalization::test_normalize_unit_fuzzy PASSED [ 38%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_fallback PASSED [ 39%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_number PASSED [ 40%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_string_fraction PASSED [ 41%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_string_range PASSED [ 42%]
+tests/test_recipe_validation.py::test_validate_accepts_string_instructions PASSED [ 43%]
+tests/test_recipe_validation.py::test_validate_accepts_object_instructions PASSED [ 44%]
+tests/test_recipe_validation.py::test_validate_rejects_missing_required_field PASSED [ 45%]
+tests/test_session_utils.py::TestSessionUtils::test_get_or_create_session_id_creates_new PASSED [ 46%]
+tests/test_session_utils.py::TestSessionUtils::test_get_or_create_session_id_returns_existing PASSED [ 47%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_display_name_anonymous PASSED [ 48%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_display_name_authenticated PASSED [ 49%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_id_anonymous PASSED [ 50%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_id_authenticated_with_email PASSED [ 51%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_id_authenticated_without_email PASSED [ 52%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_metadata_anonymous PASSED [ 53%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_metadata_authenticated PASSED [ 54%]
+tests/test_session_utils.py::TestSessionUtils::test_is_authenticated_false PASSED [ 55%]
+tests/test_session_utils.py::TestSessionUtils::test_is_authenticated_true PASSED [ 56%]
+tests/test_session_utils.py::TestSessionUtils::test_session_id_persistence PASSED [ 57%]
+tests/test_stock_images.py::TestFallbackImages::test_fallback_images_are_unsplash_urls PASSED [ 58%]
+tests/test_stock_images.py::TestFallbackImages::test_fallback_images_have_size_params PASSED [ 59%]
+tests/test_stock_images.py::TestFallbackImages::test_fallback_images_list_exists PASSED [ 60%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_case_insensitive PASSED [ 61%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_deterministic PASSED [ 62%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_different_recipes PASSED [ 63%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_returns_valid_url PASSED [ 64%]
+tests/test_stock_images.py::TestValidateImageUrl::test_accepts_png_content_type PASSED [ 65%]
+tests/test_stock_images.py::TestValidateImageUrl::test_accepts_webp_content_type PASSED [ 66%]
+tests/test_stock_images.py::TestValidateImageUrl::test_invalid_status_code PASSED [ 67%]
+tests/test_stock_images.py::TestValidateImageUrl::test_non_image_content_type PASSED [ 68%]
+tests/test_stock_images.py::TestValidateImageUrl::test_request_exception PASSED [ 69%]
+tests/test_stock_images.py::TestValidateImageUrl::test_valid_image_url PASSED [ 70%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_falls_back_to_description PASSED [ 71%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_metadata_includes_timestamp PASSED [ 72%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_metadata_includes_user_id PASSED [ 73%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_no_loremflickr_urls PASSED [ 74%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_no_unsplash_key_uses_fallback PASSED [ 75%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_unsplash_exception_uses_fallback PASSED [ 76%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_unsplash_returns_none_uses_fallback PASSED [ 77%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_uses_image_keywords_first PASSED [ 78%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_valid_unsplash_response PASSED [ 79%]
+tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_invalid_existing_url_refreshed PASSED [ 80%]
+tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_missing_url_gets_new_one PASSED [ 81%]
+tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_valid_existing_url_not_refreshed PASSED [ 82%]
+tests/test_stock_images.py::TestNoRandomBehavior::test_fallback_is_deterministic PASSED [ 83%]
+tests/test_stock_images.py::TestNoRandomBehavior::test_no_lock_parameter_in_fallbacks PASSED [ 84%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_no_filter_returns_all_runs PASSED [ 85%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_include_success_returns_only_successful_runs PASSED [ 86%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_exclude_success_returns_all_non_successful_runs PASSED [ 87%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_include_failure PASSED [ 88%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_exclude_failure PASSED [ 89%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_include_in_progress_matches_on_status_field PASSED [ 90%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_exclude_in_progress PASSED [ 91%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_unknown_filter_mode_defaults_to_include PASSED [ 92%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_filter_status_with_no_matches_returns_empty_list PASSED [ 93%]
+tests/test_workflow_runs.py::TestApplyStatusFilter::test_exclude_filter_with_no_matches_returns_all_runs PASSED [ 94%]
+tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_successful_fetch_returns_runs PASSED [ 95%]
+tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_404_returns_descriptive_error PASSED [ 96%]
+tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_403_returns_rate_limit_error PASSED [ 97%]
+tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_connection_error_returns_message PASSED [ 98%]
+tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_timeout_returns_message PASSED [100%]
+
+=================================== FAILURES ===================================
+_____________ TestImageService.test_generate_fails_without_client ______________
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1423: in patched
+    with self.decoration_helper(patched,
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1405: in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py:530: in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1524: in __enter__
+    elif spec is None and _is_async_obj(original):
+                          ^^^^^^^^^^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:58: in _is_async_obj
+    if hasattr(obj, '__func__'):
+       ^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/werkzeug/local.py:318: in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _get_current_object() -> T:
+        try:
+            obj = local.get()
+        except LookupError:
+>           raise RuntimeError(unbound_message) from None
+E           RuntimeError: Working outside of request context.
+E           
+E           This typically means that you attempted to use functionality that needed
+E           an active HTTP request. Consult the documentation on testing for
+E           information about how to avoid this problem.
+
+.venv/lib/python3.13/site-packages/werkzeug/local.py:519: RuntimeError
+_____________ TestImageService.test_generation_exception_handling ______________
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1423: in patched
+    with self.decoration_helper(patched,
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1405: in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py:530: in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1524: in __enter__
+    elif spec is None and _is_async_obj(original):
+                          ^^^^^^^^^^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:58: in _is_async_obj
+    if hasattr(obj, '__func__'):
+       ^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/werkzeug/local.py:318: in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _get_current_object() -> T:
+        try:
+            obj = local.get()
+        except LookupError:
+>           raise RuntimeError(unbound_message) from None
+E           RuntimeError: Working outside of request context.
+E           
+E           This typically means that you attempted to use functionality that needed
+E           an active HTTP request. Consult the documentation on testing for
+E           information about how to avoid this problem.
+
+.venv/lib/python3.13/site-packages/werkzeug/local.py:519: RuntimeError
+_________________ TestImageService.test_successful_generation __________________
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1423: in patched
+    with self.decoration_helper(patched,
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py:141: in __enter__
+    return next(self.gen)
+           ^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1405: in decoration_helper
+    arg = exit_stack.enter_context(patching)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/contextlib.py:530: in enter_context
+    result = _enter(cm)
+             ^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1524: in __enter__
+    elif spec is None and _is_async_obj(original):
+                          ^^^^^^^^^^^^^^^^^^^^^^^
+/home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:58: in _is_async_obj
+    if hasattr(obj, '__func__'):
+       ^^^^^^^^^^^^^^^^^^^^^^^^
+.venv/lib/python3.13/site-packages/werkzeug/local.py:318: in __get__
+    obj = instance._get_current_object()
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+    def _get_current_object() -> T:
+        try:
+            obj = local.get()
+        except LookupError:
+>           raise RuntimeError(unbound_message) from None
+E           RuntimeError: Working outside of request context.
+E           
+E           This typically means that you attempted to use functionality that needed
+E           an active HTTP request. Consult the documentation on testing for
+E           information about how to avoid this problem.
+
+.venv/lib/python3.13/site-packages/werkzeug/local.py:519: RuntimeError
+=============================== warnings summary ===============================
+tests/test_auth.py: 6 warnings
+tests/test_model_fetching.py: 6 warnings
+  /workspaces/tasteslikegood.com/.venv/lib/python3.13/site-packages/flask_session/sqlalchemy/sqlalchemy.py:168: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    storage_expiration_datetime = datetime.utcnow() + session_lifetime
+
+tests/test_auth.py::AuthTestCase::test_logout
+tests/test_auth.py::AuthTestCase::test_profile_access
+tests/test_auth.py::AuthTestCase::test_profile_access
+tests/test_auth.py::AuthTestCase::test_profile_access
+  /workspaces/tasteslikegood.com/.venv/lib/python3.13/site-packages/flask_session/sqlalchemy/sqlalchemy.py:141: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    if record and (record.expiry is None or record.expiry <= datetime.utcnow()):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================================ tests coverage ================================
+_______________ coverage: platform linux, python 3.13.12-final-0 _______________
+
+Name                                   Stmts   Miss  Cover
+----------------------------------------------------------
+app.py                                   123     48    61%
+auth.py                                   62     23    63%
+blueprints/__init__.py                     0      0   100%
+blueprints/api_bp.py                     110     70    36%
+blueprints/auth_api_bp.py                128    100    22%
+blueprints/collections_api_bp.py         126     91    28%
+blueprints/generation_api_bp.py          234    206    12%
+blueprints/generation_bp.py              129    109    16%
+blueprints/recipes_api_bp.py             121     89    26%
+blueprints/recipes_bp.py                  64     50    22%
+config.py                                 48      8    83%
+debug_generation.py                       20     20     0%
+debug_image_gen.py                        39     39     0%
+discover_models.py                        23     23     0%
+discover_models_WORKING.py                43     43     0%
+discover_models_v2.py                     38     38     0%
+extensions.py                              8      0   100%
+migrate_recipes.py                        34     34     0%
+models/__init__.py                         4      0   100%
+models/cookbook.py                        17      1    94%
+models/recipe.py                          15      1    93%
+models/user.py                            10      1    90%
+repositories/__init__.py                   0      0   100%
+repositories/db_recipe_repository.py     120    104    13%
+repositories/recipe_repository.py         85     12    86%
+scan_paths_for_nonascii.py               265    265     0%
+services/__init__.py                       0      0   100%
+services/gcs_service.py                   72     72     0%
+services/gemini_service.py                27      2    93%
+services/image_service.py                 57     37    35%
+services/migration_service.py             31      5    84%
+services/model_service.py                 67     14    79%
+services/reporting_service.py             33      9    73%
+services/stock_image_service.py          115     45    61%
+test_models.py                            31     31     0%
+test_session_manual.py                    84     84     0%
+tests/test_auth.py                        43      1    98%
+tests/test_backend_improvements.py        34      0   100%
+tests/test_gemini_service.py              57      1    98%
+tests/test_image_service.py               62     25    60%
+tests/test_instruction_parsing.py         32      0   100%
+tests/test_model_fetching.py              86      1    99%
+tests/test_normalization.py               56      1    98%
+tests/test_recipe_validation.py           21      0   100%
+tests/test_session_utils.py               72      1    99%
+tests/test_stock_images.py               188      1    99%
+tests/test_workflow_runs.py               90      0   100%
+utils/__init__.py                          3      0   100%
+utils/cache_utils.py                      47     29    38%
+utils/logging_config.py                   11      1    91%
+utils/normalization.py                   103     18    83%
+utils/session_utils.py                    39      5    87%
+utils/valkey_auth.py                      71     71     0%
+validators/__init__.py                     2      0   100%
+validators/recipe_validator.py            25      9    64%
+workflow_runs/app.py                      55     16    71%
+----------------------------------------------------------
+TOTAL                                   3480   1854    47%
+=========================== short test summary info ============================
+FAILED tests/test_image_service.py::TestImageService::test_generate_fails_without_client
+FAILED tests/test_image_service.py::TestImageService::test_generation_exception_handling
+FAILED tests/test_image_service.py::TestImageService::test_successful_generation
+================== 3 failed, 96 passed, 16 warnings in 3.80s ===================
+⚠️  pytest: Some tests failed (review above)
+
+==========================================
+  Summary
+==========================================
+✅ All checks completed!
+
+Next steps:
+1. Review any warnings above
+2. Stage changes: git add .
+3. Commit: git commit -m 'ci: Add CI/CD pipeline for Flask backend'
+4. Push: git push origin dev/backend_sub222
