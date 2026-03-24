@@ -10,13 +10,13 @@ For overall project architecture see the root `AGENTS.md`.
 ---
 
 ## Agent Name: Gemini Recipe Generator
-**Version:** 3.0 (using gemini-2.5-flash as default)
+**Version:** 3.0 (using models/gemini-3.1-pro-preview as default)
 **Description:** AI agent specialized in generating creative vegan recipes using Google's Gemini models. Supports multiple Gemini models dynamically fetched from the API.
 
 ### Parameters
 | Parameter Name | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `model` | String | gemini-2.5-flash | The specific Gemini model version to use |
+| `model` | String | models/gemini-3.1-pro-preview | The specific Gemini model version to use (always with `models/` prefix) |
 | `temperature` | Float | 0.7 | Controls randomness in generation (0.0 to 1.0) |
 | `max_output_tokens` | Integer | 8192 | Maximum number of tokens in the response |
 | `prompt` | String | (required) | User prompt describing desired recipe (10-500 chars) |

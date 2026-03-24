@@ -27,7 +27,8 @@ def _get_iam_token():
 
     creds, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
     creds.refresh(Request())
-    return creds.service_account_email, creds.token
+    sa_email = getattr(creds, "service_account_email", None)
+    return sa_email, creds.token
 
 
 # ── Module-level state for token refresh ──────────────────────────
@@ -42,44 +43,58 @@ _refresh_thread: threading.Thread | None = None
 def _build_client(host: str, port: int) -> redis.StrictRedis:
     """Create a Redis client with a fresh IAM token (password-only, no username)."""
     email, token = _get_iam_token()
-    logger.info("Creating Valkey client with fresh IAM token (sa=%s)", email)
+    if email:
+        logger.info("Creating Valkey client with fresh IAM token (sa=%s)", email)
+    else:
+        logger.info("Creating Valkey client with fresh IAM token (user credentials)")
     return redis.StrictRedis(
         host=host,
         port=port,
         password=token,
         ssl=True,
-        ssl_cert_reqs="none",
         decode_responses=False,
     )
 
 
-def _refresh_token_in_place():
+def _refresh_token_in_place() -> bool:
     """Refresh the IAM token on the EXISTING client's connection pool.
 
     This is critical because Flask-Session and Flask-Caching hold references
     to the original client object. Creating a new client doesn't help — we
     must update the password on the pool they're already using, then drop
     stale connections so new ones authenticate with the fresh token.
+
+    Returns:
+        bool: True if a client was present and successfully refreshed,
+        False if there is no current client (nothing to refresh).
     """
-    _, new_token = _get_iam_token()
+    with _lock:
+        if _current_client is None:
+            return False
 
-    pool = _current_client.connection_pool
+        _, new_token = _get_iam_token()
 
-    # Update pool-level kwargs (used when creating NEW connections)
-    pool.connection_kwargs['password'] = new_token
+        # Work with a local reference while holding the lock to avoid races.
+        client = _current_client
+        pool = client.connection_pool
 
-    # CRITICAL: also update EXISTING Connection objects — they cache password
-    # independently and will re-auth with the stale token on reconnect
-    for conn in list(getattr(pool, '_available_connections', [])):
-        conn.password = new_token
-    for conn in list(getattr(pool, '_in_use_connections', [])):
-        conn.password = new_token
+        # Update pool-level kwargs (used when creating NEW connections)
+        pool.connection_kwargs["password"] = new_token
 
-    # Close all sockets — next use triggers reconnect with the updated password
-    pool.disconnect()
+        # CRITICAL: also update EXISTING Connection objects — they cache password
+        # independently and will re-auth with the stale token on reconnect
+        for conn in list(getattr(pool, "_available_connections", [])):
+            conn.password = new_token
+        for conn in list(getattr(pool, "_in_use_connections", [])):
+            conn.password = new_token
 
-    # Verify the refreshed token works
-    _current_client.ping()
+        # Close all sockets — next use triggers reconnect with the updated password
+        pool.disconnect()
+
+        # Verify the refreshed token works
+        client.ping()
+
+        return True
 
 
 def _refresh_loop():
@@ -88,12 +103,11 @@ def _refresh_loop():
     while True:
         time.sleep(_TOKEN_REFRESH_INTERVAL)
         try:
-            with _lock:
-                if _current_client is None:
-                    return  # no longer needed
-                _refresh_token_in_place()
-                _token_created_at = time.time()
-                logger.info("Valkey token refreshed in-place successfully")
+            refreshed = _refresh_token_in_place()
+            if not refreshed:
+                return  # no client to manage; stop the thread
+            _token_created_at = time.time()
+            logger.info("Valkey token refreshed in-place successfully")
         except Exception as e:
             logger.warning("Valkey token refresh failed (will retry next cycle): %s", e)
 

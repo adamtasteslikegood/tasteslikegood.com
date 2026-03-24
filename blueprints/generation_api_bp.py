@@ -23,8 +23,12 @@ from blueprints.generation_bp import (
 from repositories import db_recipe_repository
 from services.gemini_service import get_genai_client
 from utils.cache_utils import (
-    recipe_image_key, invalidate_recipe, invalidate_recipe_image,
-    safe_get, safe_set, TTL_IMAGE,
+    recipe_image_key,
+    invalidate_recipe,
+    invalidate_recipe_image,
+    safe_get,
+    safe_set,
+    TTL_IMAGE,
 )
 from utils.session_utils import get_or_create_session_id, get_user_metadata
 
@@ -122,7 +126,9 @@ def generate_recipe_json():
 def generate_image_for_recipe():
     """
     Generate an AI image for a recipe stored in the database.
-    Image bytes are stored as base64 in the recipe's data JSON (Cloud Run safe).
+    When GCS_BUCKET_NAME is configured, image bytes are uploaded to GCS and only the
+    GCS URI and API URL are stored in the recipe JSON. When GCS is not configured,
+    image bytes are base64-encoded and stored directly in the recipe's data JSON.
 
     Request body:
         {
@@ -196,6 +202,7 @@ def generate_image_for_recipe():
         # Upload to GCS if configured, otherwise fall back to base64-in-DB
         if GCS_BUCKET_NAME:
             from services.gcs_service import upload_image
+
             gcs_uri = upload_image(GCS_BUCKET_NAME, recipe_id, image_bytes)
             if not gcs_uri:
                 return jsonify({"error": "Failed to upload image to storage"}), 500
@@ -243,9 +250,8 @@ def serve_recipe_image(recipe_id):
     Serve a recipe's AI-generated image.
     Tries in order: Valkey cache → GCS bucket → legacy base64 in DB.
     Cached in Valkey for 24 hours.
+    Only serves the image if the recipe belongs to the current user/guest session.
     """
-    from models import Recipe
-
     # Check Valkey cache first (stores raw bytes)
     ck = recipe_image_key(recipe_id)
     cached_bytes = safe_get(ck)
@@ -256,7 +262,9 @@ def serve_recipe_image(recipe_id):
             headers={"Cache-Control": "public, max-age=86400"},
         )
 
-    recipe = Recipe.query.filter_by(id=recipe_id).first()
+    user_id = _current_user_id()
+    guest_session_id = _current_guest_session_id()
+    recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
     if not recipe:
         return jsonify({"error": "Recipe not found"}), 404
 
@@ -266,6 +274,7 @@ def serve_recipe_image(recipe_id):
     # Try GCS first
     if GCS_BUCKET_NAME and recipe_data.get("ai_image_gcs"):
         from services.gcs_service import download_image
+
         image_bytes = download_image(GCS_BUCKET_NAME, recipe_id)
 
     # Fall back to legacy base64 in DB
@@ -287,9 +296,10 @@ def serve_recipe_image(recipe_id):
 
 
 def _require_admin():
-    """Check for admin bearer token (FLASK_SECRET_KEY). Returns error response or None."""
+    """Check for admin bearer token (ADMIN_API_TOKEN). Returns error response or None."""
     import os
-    admin_key = os.environ.get("FLASK_SECRET_KEY", "")
+
+    admin_key = os.environ.get("ADMIN_API_TOKEN", "")
     auth_header = request.headers.get("Authorization", "")
     if not admin_key or not auth_header.startswith("Bearer ") or auth_header[7:] != admin_key:
         return jsonify({"error": "Unauthorized — admin token required"}), 403
@@ -305,6 +315,7 @@ def audit_recipe_images():
         return err
 
     from models import Recipe
+
     recipes = Recipe.query.all()
     results = []
     for r in recipes:
@@ -313,32 +324,39 @@ def audit_recipe_images():
         has_gcs = bool(d.get("ai_image_gcs"))
         has_url = bool(d.get("ai_image_url"))
         has_id_in_data = "id" in d
-        results.append({
-            "id": r.id,
-            "name": r.name,
-            "has_base64": has_b64,
-            "has_gcs": has_gcs,
-            "has_url_in_data": has_url,
-            "url_in_data": d.get("ai_image_url", ""),
-            "has_id_in_data": has_id_in_data,
-            "has_any_image": has_b64 or has_gcs,
-        })
+        results.append(
+            {
+                "id": r.id,
+                "name": r.name,
+                "has_base64": has_b64,
+                "has_gcs": has_gcs,
+                "has_url_in_data": has_url,
+                "url_in_data": d.get("ai_image_url", ""),
+                "has_id_in_data": has_id_in_data,
+                "has_any_image": has_b64 or has_gcs,
+            }
+        )
 
     missing = [r for r in results if not r["has_any_image"]]
     have_image = [r for r in results if r["has_any_image"]]
-    return jsonify({
-        "total": len(results),
-        "with_image_data": len(have_image),
-        "without_image_data": len(missing),
-        "missing": missing,
-    }), 200
+    return (
+        jsonify(
+            {
+                "total": len(results),
+                "with_image_data": len(have_image),
+                "without_image_data": len(missing),
+                "missing": missing,
+            }
+        ),
+        200,
+    )
 
 
 @generation_api_bp.route("/admin/migrate-images", methods=["POST"])
 def migrate_image_urls():
     """
     Migration endpoint: moves recipe images from base64-in-DB to GCS.
-    Requires Authorization: Bearer <FLASK_SECRET_KEY>.
+    Requires Authorization: Bearer <ADMIN_API_TOKEN>.
 
     For each recipe with ai_image_data (base64):
     1. Decode base64 to raw bytes
@@ -360,72 +378,86 @@ def migrate_image_urls():
 
     from services.gcs_service import upload_image
 
+    BATCH_SIZE = 100
+    migrated = []
+    errors = []
+
     try:
-        recipes = Recipe.query.all()
-        migrated = []
-        errors = []
+        offset = 0
+        while True:
+            recipes = Recipe.query.limit(BATCH_SIZE).offset(offset).all()
+            if not recipes:
+                break
 
-        for recipe in recipes:
-            data = recipe.data or {}
-            url = data.get("ai_image_url", "")
-            api_url = f"/api/recipes/{recipe.id}/image"
-            changed = False
+            batch_changed = False
+            for recipe in recipes:
+                data = recipe.data or {}
+                url = data.get("ai_image_url", "")
+                api_url = f"/api/recipes/{recipe.id}/image"
+                changed = False
 
-            # Case 1: Has base64 data — migrate to GCS
-            image_b64 = data.get("ai_image_data")
-            if image_b64 and not data.get("ai_image_gcs"):
-                try:
-                    # Handle data: URL prefix if present
-                    if image_b64.startswith("data:image/"):
-                        parts = image_b64.split(",", 1)
-                        image_b64 = parts[1] if len(parts) == 2 else image_b64
+                # Case 1: Has base64 data — migrate to GCS
+                image_b64 = data.get("ai_image_data")
+                if image_b64 and not data.get("ai_image_gcs"):
+                    try:
+                        # Handle data: URL prefix if present
+                        if image_b64.startswith("data:image/"):
+                            parts = image_b64.split(",", 1)
+                            image_b64 = parts[1] if len(parts) == 2 else image_b64
 
-                    image_bytes = base64.b64decode(image_b64)
-                    gcs_uri = upload_image(GCS_BUCKET_NAME, recipe.id, image_bytes)
-                    if gcs_uri:
-                        data["ai_image_gcs"] = gcs_uri
-                        data["ai_image_url"] = api_url
-                        del data["ai_image_data"]
-                        changed = True
-                    else:
-                        errors.append({"id": recipe.id, "error": "GCS upload failed"})
-                except Exception as e:
-                    errors.append({"id": recipe.id, "error": str(e)})
-
-            # Case 2: data: URL in ai_image_url — extract, upload, fix
-            elif url and url.startswith("data:image/"):
-                try:
-                    parts = url.split(",", 1)
-                    if len(parts) == 2:
-                        image_bytes = base64.b64decode(parts[1])
+                        image_bytes = base64.b64decode(image_b64)
                         gcs_uri = upload_image(GCS_BUCKET_NAME, recipe.id, image_bytes)
                         if gcs_uri:
                             data["ai_image_gcs"] = gcs_uri
                             data["ai_image_url"] = api_url
-                            data.pop("ai_image_data", None)
+                            del data["ai_image_data"]
                             changed = True
-                except Exception as e:
-                    errors.append({"id": recipe.id, "error": str(e)})
+                        else:
+                            errors.append({"id": recipe.id, "error": "GCS upload failed"})
+                    except Exception as e:
+                        errors.append({"id": recipe.id, "error": str(e)})
 
-            # Case 3: /static/ path or missing URL but has GCS — fix URL
-            elif (url and url.startswith("/static/")) or (not url and data.get("ai_image_gcs")):
-                data["ai_image_url"] = api_url
-                changed = True
+                # Case 2: data: URL in ai_image_url — extract, upload, fix
+                elif url and url.startswith("data:image/"):
+                    try:
+                        parts = url.split(",", 1)
+                        if len(parts) == 2:
+                            image_bytes = base64.b64decode(parts[1])
+                            gcs_uri = upload_image(GCS_BUCKET_NAME, recipe.id, image_bytes)
+                            if gcs_uri:
+                                data["ai_image_gcs"] = gcs_uri
+                                data["ai_image_url"] = api_url
+                                data.pop("ai_image_data", None)
+                                changed = True
+                    except Exception as e:
+                        errors.append({"id": recipe.id, "error": str(e)})
 
-            if changed:
-                recipe.data = data
-                migrated.append({"id": recipe.id, "name": recipe.name, "new_url": api_url})
+                # Case 3: /static/ path or missing URL but has GCS — fix URL
+                elif (url and url.startswith("/static/")) or (not url and data.get("ai_image_gcs")):
+                    data["ai_image_url"] = api_url
+                    changed = True
 
-        if migrated:
-            db.session.commit()
+                if changed:
+                    recipe.data = data
+                    migrated.append({"id": recipe.id, "name": recipe.name, "new_url": api_url})
+                    batch_changed = True
+
+            if batch_changed:
+                db.session.commit()
+            offset += BATCH_SIZE
 
         logger.info("Image migration complete: %d migrated, %d errors", len(migrated), len(errors))
-        return jsonify({
-            "migrated": len(migrated),
-            "errors": len(errors),
-            "recipes": migrated,
-            "error_details": errors,
-        }), 200
+        return (
+            jsonify(
+                {
+                    "migrated": len(migrated),
+                    "errors": len(errors),
+                    "recipes": migrated,
+                    "error_details": errors,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         db.session.rollback()
@@ -455,10 +487,12 @@ def list_recipes_missing_images():
     for recipe in recipes:
         data = recipe.data or {}
         if not data.get("ai_image_gcs") and not data.get("ai_image_data"):
-            missing.append({
-                "id": recipe.id,
-                "name": recipe.name,
-                "ai_image_url": data.get("ai_image_url"),
-            })
+            missing.append(
+                {
+                    "id": recipe.id,
+                    "name": recipe.name,
+                    "ai_image_url": data.get("ai_image_url"),
+                }
+            )
 
     return jsonify({"recipes": missing, "count": len(missing)}), 200
