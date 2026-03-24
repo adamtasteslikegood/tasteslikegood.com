@@ -14,9 +14,9 @@ from extensions import cache
 logger = logging.getLogger(__name__)
 
 # TTLs in seconds
-TTL_SHORT = 300       # 5 minutes — recipe stats, collections list
-TTL_MEDIUM = 600      # 10 minutes — individual recipes, collections
-TTL_IMAGE = 86400     # 24 hours — recipe images (rarely change)
+TTL_SHORT = 300  # 5 minutes — recipe stats, collections list
+TTL_MEDIUM = 600  # 10 minutes — individual recipes, collections
+TTL_IMAGE = 86400  # 24 hours — recipe images (rarely change)
 
 
 # ── Safe cache operations (never raise) ───────────────────────────────────────

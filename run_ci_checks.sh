@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd /home/adam/projects/tasteslikegoodtheangularsvegancookbook/Backend
+# cd /home/adam/projects/tasteslikegoodtheangularsvegancookbook/Backend
 
 echo "=========================================="
 echo "  Backend CI/CD Test Script"

@@ -16,8 +16,13 @@ from flask import Blueprint, jsonify, request, session
 from repositories import db_recipe_repository
 from utils.session_utils import get_or_create_session_id
 from utils.cache_utils import (
-    recipe_key, recipe_stats_key, invalidate_recipe,
-    safe_get, safe_set, TTL_MEDIUM, TTL_SHORT,
+    recipe_key,
+    recipe_stats_key,
+    invalidate_recipe,
+    safe_get,
+    safe_set,
+    TTL_MEDIUM,
+    TTL_SHORT,
 )
 
 logger = logging.getLogger(__name__)
@@ -241,8 +246,10 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
 
         # Clean up GCS image if configured
         from config import GCS_BUCKET_NAME
+
         if GCS_BUCKET_NAME:
             from services.gcs_service import delete_image
+
             delete_image(GCS_BUCKET_NAME, recipe_id)
 
         invalidate_recipe(user_id, guest_session_id, recipe_id)

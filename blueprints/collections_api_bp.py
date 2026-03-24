@@ -20,8 +20,13 @@ from extensions import db
 from models import Cookbook
 from utils.session_utils import get_or_create_session_id
 from utils.cache_utils import (
-    collections_list_key, collection_key, invalidate_collection,
-    safe_get, safe_set, TTL_SHORT, TTL_MEDIUM,
+    collections_list_key,
+    collection_key,
+    invalidate_collection,
+    safe_get,
+    safe_set,
+    TTL_SHORT,
+    TTL_MEDIUM,
 )
 
 logger = logging.getLogger(__name__)

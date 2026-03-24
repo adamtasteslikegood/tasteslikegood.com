@@ -72,16 +72,17 @@ def _get_generation_schema():
     # Remove fields that are set server-side — seeing these in the prompt
     # causes the model to hallucinate metadata, model names, etc.
     fields_to_remove = [
-        "stock_image_url", "ai_image_url", "image",
-        "user_id", "ai_metadata",
+        "stock_image_url",
+        "ai_image_url",
+        "image",
+        "user_id",
+        "ai_metadata",
     ]
     for field in fields_to_remove:
         schema.get("properties", {}).pop(field, None)
 
     if "required" in schema:
-        schema["required"] = [
-            r for r in schema["required"] if r not in fields_to_remove
-        ]
+        schema["required"] = [r for r in schema["required"] if r not in fields_to_remove]
 
     return json.dumps(schema, indent=2)
 
