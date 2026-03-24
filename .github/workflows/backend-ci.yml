@@ -28,7 +28,7 @@ jobs:
         run: black --check --line-length 100 .
 
       - name: Lint with Flake8
-        run: flake8 . --count --show-source --statistics --extend-ignore=F401,E501,E402
+        run: flake8 . --count --show-source --statistics --extend-ignore=E501,E402
 
   test:
     name: Test (pytest)

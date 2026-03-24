@@ -3,8 +3,8 @@
 ==========================================
 
 Step 1: Syncing dependencies with uv...
-Resolved 91 packages in 1ms
-Checked 87 packages in 1ms
+Resolved 91 packages in 4ms
+Checked 87 packages in 4ms
 ✅ Dependencies synced
 
 Step 2: Checking code formatting with Black...
@@ -127,7 +127,10 @@ tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_successful_fetch_return
 tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_404_returns_descriptive_error PASSED [ 96%]
 tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_403_returns_rate_limit_error PASSED [ 97%]
 tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_connection_error_returns_message PASSED [ 98%]
-tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_timeout_returns_message PASSED [100%]
+tests/test_workflow_runs.py::TestFetchWorkflowRuns::test_timeout_returns_message PASSED [100%]/workspaces/tasteslikegood.com/.venv/lib/python3.13/site-packages/_pytest/unraisableexception.py:33: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+  gc.collect()
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+
 
 =============================== warnings summary ===============================
 tests/test_auth.py: 6 warnings
@@ -142,10 +145,9 @@ tests/test_auth.py::AuthTestCase::test_profile_access
   /workspaces/tasteslikegood.com/.venv/lib/python3.13/site-packages/flask_session/sqlalchemy/sqlalchemy.py:141: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
     if record and (record.expiry is None or record.expiry <= datetime.utcnow()):
 
-tests/test_image_service.py::TestImageService::test_generation_exception_handling
-tests/test_model_fetching.py::TestModelFetching::test_get_models_corrupt_cache
-  /home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:2247: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
-    def __init__(self, name, parent):
+tests/test_image_service.py::TestImageService::test_successful_generation
+  /home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:1221: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    def _execute_mock_call(self, /, *args, **kwargs):
   Enable tracemalloc to get traceback where the object was allocated.
   See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
 
@@ -181,7 +183,7 @@ utils/session_utils.py                    39      5    87%
 validators/recipe_validator.py            25      9    64%
 ----------------------------------------------------------
 TOTAL                                   1776   1004    43%
-======================= 99 passed, 18 warnings in 2.95s ========================
+======================= 99 passed, 17 warnings in 3.56s ========================
 ✅ pytest: All tests passed
 
 ==========================================

@@ -1,4 +1,7 @@
-Resolved 91 packages in 1ms
-Checked 87 packages in 1ms
+Resolved 91 packages in 4ms
+Checked 87 packages in 4ms
 All done! ✨ 🍰 ✨
 233 files would be left unchanged.
+/workspaces/tasteslikegood.com/.venv/lib/python3.13/site-packages/_pytest/unraisableexception.py:33: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+  gc.collect()
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
