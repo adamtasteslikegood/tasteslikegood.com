@@ -50,7 +50,7 @@ REDIS_URL = os.getenv("REDIS_URL")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
 
 # Default Model Configuration
-DEFAULT_MODEL = "gemini-3.1-pro-preview"
+DEFAULT_MODEL = "models/gemini-3.1-pro-preview"
 
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
