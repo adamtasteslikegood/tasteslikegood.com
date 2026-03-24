@@ -1,13 +1,21 @@
 [flake8]
 max-line-length = 100
-extend-ignore = E402, C901
+extend-ignore = E402, C901, E501
 exclude =
     .venv,
     .git,
+    .github,
+    .codex,
+    .gemini,
     __pycache__,
     migrations,
     scripts,
     workflow_runs,
     debug_*.py,
     discover_*.py,
-    scan_paths_for_nonascii.py
+    scan_paths_for_nonascii.py,
+    .skills,
+    skills,
+    .agent,
+    .claude,
+    .zed

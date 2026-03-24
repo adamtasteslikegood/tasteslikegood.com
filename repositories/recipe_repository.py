@@ -17,7 +17,7 @@ import fcntl  # Unix file locking
 import logging
 from typing import List, Dict, Any, Tuple, Generator
 from contextlib import contextmanager
-from config import RECIPES_DIR, _RECIPES_CACHE_TTL
+from config import RECIPES_DIR, _RECIPES_CACHE_TTL, _recipes_cache
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ def get_all_recipes() -> List[Dict[str, str]]:
         _recipes_cache["data"] is not None
         and (current_time - _recipes_cache["timestamp"]) < _RECIPES_CACHE_TTL  # type: ignore[operator]
     ):
-        return _recipes_cache["data"]  # type: ignore[return-value]
+        return _recipes_cache["data"]  # type: ignore[return-value, no-any-return]
 
     # Cache miss or expired - read from disk
     recipes = []

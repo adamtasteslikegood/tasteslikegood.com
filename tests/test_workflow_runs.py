@@ -1,7 +1,6 @@
 """Tests for the GitHub Actions workflow-run filtering helpers."""
 
 import importlib.util
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
