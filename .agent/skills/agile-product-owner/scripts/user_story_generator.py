@@ -4,8 +4,7 @@ User Story Generator with INVEST Criteria
 Creates well-formed user stories with acceptance criteria
 """
 
-import json
-from typing import Dict, List, Tuple
+from typing import Dict, List
 import hashlib
 
 class UserStoryGenerator:
@@ -41,13 +40,6 @@ class UserStoryGenerator:
             'fix': "As a {persona}, I expect {behavior} when {condition}",
             'integration': "As a {persona}, I want to {integrate} so that {workflow}"
         }
-        
-        self.acceptance_criteria_patterns = [
-            "Given {precondition}, When {action}, Then {outcome}",
-            "Should {behavior} when {condition}",
-            "Must {requirement} to {achieve}",
-            "Can {capability} without {negative_outcome}"
-        ]
     
     def generate_epic_stories(self, epic: Dict) -> List[Dict]:
         """Break down epic into user stories"""
@@ -55,7 +47,6 @@ class UserStoryGenerator:
         
         # Analyze epic for key components
         epic_name = epic.get('name', 'Feature')
-        epic_description = epic.get('description', '')
         personas = epic.get('personas', ['end_user'])
         scope = epic.get('scope', [])
         
