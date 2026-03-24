@@ -10,9 +10,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from services.image_service import (
     generate_ai_image,
-    save_image_file,
     update_recipe_with_image,
 )
+
+from app import app
 
 MOCK_USER_METADATA = {
     "user_id": "test_user_123",
@@ -23,6 +24,15 @@ MOCK_USER_METADATA = {
 
 
 class TestImageService(unittest.TestCase):
+    def setUp(self):
+        """Set up a test request context so url_for() works."""
+        self.req_context = app.test_request_context()
+        self.req_context.push()
+
+    def tearDown(self):
+        """Pop the request context after each test."""
+        self.req_context.pop()
+
     def test_generate_returns_existing_image(self):
         """Should return the existing image URL if force_regenerate is False."""
         recipe_data = {"name": "Test Recipe", "ai_image_url": "/static/images/existing.png"}

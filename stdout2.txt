@@ -27,7 +27,7 @@ rootdir: /workspaces/tasteslikegood.com
 configfile: pyproject.toml
 testpaths: tests
 plugins: cov-7.0.0, anyio-4.12.1
-collecting ... collected 99 items / 5 deselected / 94 selected
+collecting ... collected 99 items
 
 tests/test_auth.py::AuthTestCase::test_login PASSED                      [  1%]
 tests/test_auth.py::AuthTestCase::test_logout PASSED                     [  2%]
@@ -40,73 +40,78 @@ tests/test_gemini_service.py::TestGetGenaiClient::test_get_client_no_auth PASSED
 tests/test_gemini_service.py::TestGetGenaiClient::test_get_client_with_valid_session_credentials PASSED [  9%]
 tests/test_gemini_service.py::TestAttemptGeneration::test_generation_failure PASSED [ 10%]
 tests/test_gemini_service.py::TestAttemptGeneration::test_successful_generation PASSED [ 11%]
-tests/test_instruction_parsing.py::test_instructions_as_strings PASSED   [ 12%]
-tests/test_instruction_parsing.py::test_instructions_as_objects PASSED   [ 13%]
-tests/test_instruction_parsing.py::test_mixed_instructions PASSED        [ 14%]
-tests/test_instruction_parsing.py::test_invalid_instruction_object PASSED [ 15%]
-tests/test_instruction_parsing.py::test_invalid_instruction_type PASSED  [ 17%]
-tests/test_model_fetching.py::TestModelFetching::test_get_models_corrupt_cache PASSED [ 18%]
-tests/test_model_fetching.py::TestModelFetching::test_get_models_filter_unsupported PASSED [ 19%]
-tests/test_model_fetching.py::TestModelFetching::test_get_models_no_cache PASSED [ 20%]
-tests/test_model_fetching.py::TestModelFetching::test_get_models_success_from_cache PASSED [ 21%]
-tests/test_model_fetching.py::TestFilterAndSortModels::test_filters_embedding_models PASSED [ 22%]
-tests/test_model_fetching.py::TestFilterAndSortModels::test_filters_imagen_models PASSED [ 23%]
-tests/test_model_fetching.py::TestFilterAndSortModels::test_limits_to_8_models PASSED [ 24%]
-tests/test_model_fetching.py::TestFilterAndSortModels::test_sorts_preferred_models_first PASSED [ 25%]
-tests/test_model_fetching.py::TestRefreshModels::test_refresh_models_no_auth PASSED [ 26%]
-tests/test_model_fetching.py::TestRefreshModels::test_refresh_models_success PASSED [ 27%]
-tests/test_normalization.py::TestNormalization::test_normalize_keys_fuzzy PASSED [ 28%]
-tests/test_normalization.py::TestNormalization::test_normalize_recipe_defaults PASSED [ 29%]
-tests/test_normalization.py::TestNormalization::test_normalize_recipe_flat_ingredients PASSED [ 30%]
-tests/test_normalization.py::TestNormalization::test_normalize_recipe_nested_ingredients PASSED [ 31%]
-tests/test_normalization.py::TestNormalization::test_normalize_unit_exact PASSED [ 32%]
-tests/test_normalization.py::TestNormalization::test_normalize_unit_fallback PASSED [ 34%]
-tests/test_normalization.py::TestNormalization::test_normalize_unit_fuzzy PASSED [ 35%]
-tests/test_normalization.py::TestNormalization::test_parse_amount_fallback PASSED [ 36%]
-tests/test_normalization.py::TestNormalization::test_parse_amount_number PASSED [ 37%]
-tests/test_normalization.py::TestNormalization::test_parse_amount_string_fraction PASSED [ 38%]
-tests/test_normalization.py::TestNormalization::test_parse_amount_string_range PASSED [ 39%]
-tests/test_recipe_validation.py::test_validate_accepts_string_instructions PASSED [ 40%]
-tests/test_recipe_validation.py::test_validate_accepts_object_instructions PASSED [ 41%]
-tests/test_recipe_validation.py::test_validate_rejects_missing_required_field PASSED [ 42%]
-tests/test_session_utils.py::TestSessionUtils::test_get_or_create_session_id_creates_new PASSED [ 43%]
-tests/test_session_utils.py::TestSessionUtils::test_get_or_create_session_id_returns_existing PASSED [ 44%]
-tests/test_session_utils.py::TestSessionUtils::test_get_user_display_name_anonymous PASSED [ 45%]
-tests/test_session_utils.py::TestSessionUtils::test_get_user_display_name_authenticated PASSED [ 46%]
-tests/test_session_utils.py::TestSessionUtils::test_get_user_id_anonymous PASSED [ 47%]
-tests/test_session_utils.py::TestSessionUtils::test_get_user_id_authenticated_with_email PASSED [ 48%]
-tests/test_session_utils.py::TestSessionUtils::test_get_user_id_authenticated_without_email PASSED [ 50%]
-tests/test_session_utils.py::TestSessionUtils::test_get_user_metadata_anonymous PASSED [ 51%]
-tests/test_session_utils.py::TestSessionUtils::test_get_user_metadata_authenticated PASSED [ 52%]
-tests/test_session_utils.py::TestSessionUtils::test_is_authenticated_false PASSED [ 53%]
-tests/test_session_utils.py::TestSessionUtils::test_is_authenticated_true PASSED [ 54%]
-tests/test_session_utils.py::TestSessionUtils::test_session_id_persistence PASSED [ 55%]
-tests/test_stock_images.py::TestFallbackImages::test_fallback_images_are_unsplash_urls PASSED [ 56%]
-tests/test_stock_images.py::TestFallbackImages::test_fallback_images_have_size_params PASSED [ 57%]
-tests/test_stock_images.py::TestFallbackImages::test_fallback_images_list_exists PASSED [ 58%]
-tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_case_insensitive PASSED [ 59%]
-tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_deterministic PASSED [ 60%]
-tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_different_recipes PASSED [ 61%]
-tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_returns_valid_url PASSED [ 62%]
-tests/test_stock_images.py::TestValidateImageUrl::test_accepts_png_content_type PASSED [ 63%]
-tests/test_stock_images.py::TestValidateImageUrl::test_accepts_webp_content_type PASSED [ 64%]
-tests/test_stock_images.py::TestValidateImageUrl::test_invalid_status_code PASSED [ 65%]
-tests/test_stock_images.py::TestValidateImageUrl::test_non_image_content_type PASSED [ 67%]
-tests/test_stock_images.py::TestValidateImageUrl::test_request_exception PASSED [ 68%]
-tests/test_stock_images.py::TestValidateImageUrl::test_valid_image_url PASSED [ 69%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_falls_back_to_description PASSED [ 70%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_metadata_includes_timestamp PASSED [ 71%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_metadata_includes_user_id PASSED [ 72%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_no_loremflickr_urls PASSED [ 73%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_no_unsplash_key_uses_fallback PASSED [ 74%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_unsplash_exception_uses_fallback PASSED [ 75%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_unsplash_returns_none_uses_fallback PASSED [ 76%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_uses_image_keywords_first PASSED [ 77%]
-tests/test_stock_images.py::TestGetSmartStockImage::test_valid_unsplash_response PASSED [ 78%]
-tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_invalid_existing_url_refreshed PASSED [ 79%]
-tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_missing_url_gets_new_one PASSED [ 80%]
-tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_valid_existing_url_not_refreshed PASSED [ 81%]
-tests/test_stock_images.py::TestNoRandomBehavior::test_fallback_is_deterministic PASSED [ 82%]
+tests/test_image_service.py::TestImageService::test_generate_fails_without_client PASSED [ 12%]
+tests/test_image_service.py::TestImageService::test_generate_returns_existing_image PASSED [ 13%]
+tests/test_image_service.py::TestImageService::test_generation_exception_handling PASSED [ 14%]
+tests/test_image_service.py::TestImageService::test_successful_generation PASSED [ 15%]
+tests/test_image_service.py::TestImageServiceHelpers::test_update_recipe_with_image PASSED [ 16%]
+tests/test_instruction_parsing.py::test_instructions_as_strings PASSED   [ 17%]
+tests/test_instruction_parsing.py::test_instructions_as_objects PASSED   [ 18%]
+tests/test_instruction_parsing.py::test_mixed_instructions PASSED        [ 19%]
+tests/test_instruction_parsing.py::test_invalid_instruction_object PASSED [ 20%]
+tests/test_instruction_parsing.py::test_invalid_instruction_type PASSED  [ 21%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_corrupt_cache PASSED [ 22%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_filter_unsupported PASSED [ 23%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_no_cache PASSED [ 24%]
+tests/test_model_fetching.py::TestModelFetching::test_get_models_success_from_cache PASSED [ 25%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_filters_embedding_models PASSED [ 26%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_filters_imagen_models PASSED [ 27%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_limits_to_8_models PASSED [ 28%]
+tests/test_model_fetching.py::TestFilterAndSortModels::test_sorts_preferred_models_first PASSED [ 29%]
+tests/test_model_fetching.py::TestRefreshModels::test_refresh_models_no_auth PASSED [ 30%]
+tests/test_model_fetching.py::TestRefreshModels::test_refresh_models_success PASSED [ 31%]
+tests/test_normalization.py::TestNormalization::test_normalize_keys_fuzzy PASSED [ 32%]
+tests/test_normalization.py::TestNormalization::test_normalize_recipe_defaults PASSED [ 33%]
+tests/test_normalization.py::TestNormalization::test_normalize_recipe_flat_ingredients PASSED [ 34%]
+tests/test_normalization.py::TestNormalization::test_normalize_recipe_nested_ingredients PASSED [ 35%]
+tests/test_normalization.py::TestNormalization::test_normalize_unit_exact PASSED [ 36%]
+tests/test_normalization.py::TestNormalization::test_normalize_unit_fallback PASSED [ 37%]
+tests/test_normalization.py::TestNormalization::test_normalize_unit_fuzzy PASSED [ 38%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_fallback PASSED [ 39%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_number PASSED [ 40%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_string_fraction PASSED [ 41%]
+tests/test_normalization.py::TestNormalization::test_parse_amount_string_range PASSED [ 42%]
+tests/test_recipe_validation.py::test_validate_accepts_string_instructions PASSED [ 43%]
+tests/test_recipe_validation.py::test_validate_accepts_object_instructions PASSED [ 44%]
+tests/test_recipe_validation.py::test_validate_rejects_missing_required_field PASSED [ 45%]
+tests/test_session_utils.py::TestSessionUtils::test_get_or_create_session_id_creates_new PASSED [ 46%]
+tests/test_session_utils.py::TestSessionUtils::test_get_or_create_session_id_returns_existing PASSED [ 47%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_display_name_anonymous PASSED [ 48%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_display_name_authenticated PASSED [ 49%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_id_anonymous PASSED [ 50%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_id_authenticated_with_email PASSED [ 51%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_id_authenticated_without_email PASSED [ 52%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_metadata_anonymous PASSED [ 53%]
+tests/test_session_utils.py::TestSessionUtils::test_get_user_metadata_authenticated PASSED [ 54%]
+tests/test_session_utils.py::TestSessionUtils::test_is_authenticated_false PASSED [ 55%]
+tests/test_session_utils.py::TestSessionUtils::test_is_authenticated_true PASSED [ 56%]
+tests/test_session_utils.py::TestSessionUtils::test_session_id_persistence PASSED [ 57%]
+tests/test_stock_images.py::TestFallbackImages::test_fallback_images_are_unsplash_urls PASSED [ 58%]
+tests/test_stock_images.py::TestFallbackImages::test_fallback_images_have_size_params PASSED [ 59%]
+tests/test_stock_images.py::TestFallbackImages::test_fallback_images_list_exists PASSED [ 60%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_case_insensitive PASSED [ 61%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_deterministic PASSED [ 62%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_different_recipes PASSED [ 63%]
+tests/test_stock_images.py::TestFallbackImages::test_get_fallback_image_returns_valid_url PASSED [ 64%]
+tests/test_stock_images.py::TestValidateImageUrl::test_accepts_png_content_type PASSED [ 65%]
+tests/test_stock_images.py::TestValidateImageUrl::test_accepts_webp_content_type PASSED [ 66%]
+tests/test_stock_images.py::TestValidateImageUrl::test_invalid_status_code PASSED [ 67%]
+tests/test_stock_images.py::TestValidateImageUrl::test_non_image_content_type PASSED [ 68%]
+tests/test_stock_images.py::TestValidateImageUrl::test_request_exception PASSED [ 69%]
+tests/test_stock_images.py::TestValidateImageUrl::test_valid_image_url PASSED [ 70%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_falls_back_to_description PASSED [ 71%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_metadata_includes_timestamp PASSED [ 72%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_metadata_includes_user_id PASSED [ 73%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_no_loremflickr_urls PASSED [ 74%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_no_unsplash_key_uses_fallback PASSED [ 75%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_unsplash_exception_uses_fallback PASSED [ 76%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_unsplash_returns_none_uses_fallback PASSED [ 77%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_uses_image_keywords_first PASSED [ 78%]
+tests/test_stock_images.py::TestGetSmartStockImage::test_valid_unsplash_response PASSED [ 79%]
+tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_invalid_existing_url_refreshed PASSED [ 80%]
+tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_missing_url_gets_new_one PASSED [ 81%]
+tests/test_stock_images.py::TestValidateAndRefreshStockImage::test_valid_existing_url_not_refreshed PASSED [ 82%]
+tests/test_stock_images.py::TestNoRandomBehavior::test_fallback_is_deterministic PASSED [ 83%]
 tests/test_stock_images.py::TestNoRandomBehavior::test_no_lock_parameter_in_fallbacks PASSED [ 84%]
 tests/test_workflow_runs.py::TestApplyStatusFilter::test_no_filter_returns_all_runs PASSED [ 85%]
 tests/test_workflow_runs.py::TestApplyStatusFilter::test_include_success_returns_only_successful_runs PASSED [ 86%]
@@ -137,6 +142,13 @@ tests/test_auth.py::AuthTestCase::test_profile_access
   /workspaces/tasteslikegood.com/.venv/lib/python3.13/site-packages/flask_session/sqlalchemy/sqlalchemy.py:141: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
     if record and (record.expiry is None or record.expiry <= datetime.utcnow()):
 
+tests/test_image_service.py::TestImageService::test_generation_exception_handling
+tests/test_model_fetching.py::TestModelFetching::test_get_models_corrupt_cache
+  /home/codespace/.local/share/uv/python/cpython-3.13.12-linux-x86_64-gnu/lib/python3.13/unittest/mock.py:2247: RuntimeWarning: coroutine 'AsyncMockMixin._execute_mock_call' was never awaited
+    def __init__(self, name, parent):
+  Enable tracemalloc to get traceback where the object was allocated.
+  See https://docs.pytest.org/en/stable/how-to/capture-warnings.html#resource-warnings for more info.
+
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
 ================================ tests coverage ================================
 _______________ coverage: platform linux, python 3.13.12-final-0 _______________
@@ -157,7 +169,7 @@ models/user.py                            10      1    90%
 repositories/db_recipe_repository.py     120    104    13%
 repositories/recipe_repository.py         85     12    86%
 services/gemini_service.py                27      2    93%
-services/image_service.py                 57     47    18%
+services/image_service.py                 57     10    82%
 services/migration_service.py             31      5    84%
 services/model_service.py                 67     14    79%
 services/reporting_service.py             33      9    73%
@@ -168,8 +180,8 @@ utils/normalization.py                   103     18    83%
 utils/session_utils.py                    39      5    87%
 validators/recipe_validator.py            25      9    64%
 ----------------------------------------------------------
-TOTAL                                   1776   1041    41%
-================ 94 passed, 5 deselected, 16 warnings in 7.48s =================
+TOTAL                                   1776   1004    43%
+======================= 99 passed, 18 warnings in 2.95s ========================
 ✅ pytest: All tests passed
 
 ==========================================

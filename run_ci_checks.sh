@@ -37,6 +37,8 @@ echo ""
 
 # Step 4: Run mypy type checker
 echo "Step 4: Type checking with mypy..."
+# Clear mypy cache to prevent 'is_bound' corruption errors
+rm -rf .mypy_cache
 if uv run mypy . --ignore-missing-imports ; then
     echo "✅ mypy: Type checking passed"
 else
@@ -46,9 +48,8 @@ echo ""
 
 # Step 5: Run pytest
 echo "Step 5: Running tests with pytest..."
-# -k "not TestImageService" skips the 3 known failing tests as a temporary measure.
 # Coverage omissions are now handled by the .coveragerc file.
-if uv run pytest --cov=. --cov-report=term -k "not TestImageService" ; then
+if uv run pytest --cov=. --cov-report=term ; then
     echo "✅ pytest: All tests passed"
 else
     echo "⚠️  pytest: Some tests failed (review above)"

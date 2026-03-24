@@ -48,4 +48,4 @@ jobs:
         run: pip install -r requirements.txt pytest pytest-cov
 
       - name: Run tests
-        run: pytest --cov=. --cov-report=term -k "not TestImageService"
+        run: pytest --cov=. --cov-report=term
