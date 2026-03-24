@@ -9,7 +9,7 @@ Handles routes for:
 
 import json
 
-from flask import Blueprint, Response, abort, render_template, request, session
+from flask import Blueprint, Response, abort, render_template, request
 
 from repositories.recipe_repository import (
     get_all_recipes,
@@ -44,7 +44,7 @@ def show_recipe(filename):
     in the repository layer, concurrent requests may still experience some delays.
     """
     try:
-        filepath = validate_recipe_filepath(filename)
+        validate_recipe_filepath(filename)
     except ValueError:
         abort(404)
 
@@ -109,7 +109,7 @@ def show_recipe(filename):
 def show_json(filename):
     """Display the raw JSON of a recipe with syntax highlighting."""
     try:
-        filepath = validate_recipe_filepath(filename)
+        validate_recipe_filepath(filename)
     except ValueError:
         abort(404)
 

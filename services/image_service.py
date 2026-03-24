@@ -58,7 +58,6 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
     try:
         # Get comprehensive user metadata
         user_metadata = get_user_metadata()
-        user_id = user_metadata["user_id"]
 
         model_to_use = "imagen-4.0-generate-001"
         image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."

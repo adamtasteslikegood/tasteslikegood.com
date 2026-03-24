@@ -27,6 +27,9 @@ dependencies = [
     "jinja2==3.1.6",
     "blinker==1.9.0",
     "itsdangerous==2.2.0",
+    "flask-session>=0.8.0",
+    "flask-caching>=2.1.0",
+    "redis>=5.0.0",
     # Database (Phase 3) - psycopg2 is optional, only needed for PostgreSQL
     "flask-sqlalchemy==3.1.1",
     "flask-migrate==4.1.0",
@@ -116,6 +119,7 @@ exclude = [
     "migrate_recipes\\.py",
     "debug_generation\\.py",
     "migrations/",
+    "workflow_runs/",
 ]
 
 [tool.uv]

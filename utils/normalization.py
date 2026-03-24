@@ -1,4 +1,3 @@
-import re
 import difflib
 
 # Canonical units and their common variations

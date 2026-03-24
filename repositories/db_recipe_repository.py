@@ -13,7 +13,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from extensions import db
-from models import Recipe, User
+from models import Recipe
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +113,14 @@ def create_recipe(
                 return None
 
             existing.name = recipe_name
+
+            # Preserve server-only fields that the frontend never receives
+            # (ai_image_data and ai_image_gcs are stripped from API responses by _strip_image_data).
+            existing_data = existing.data or {}
+            for key in ("ai_image_data", "ai_image_gcs", "ai_image_url"):
+                if key not in recipe_data_with_id and key in existing_data:
+                    recipe_data_with_id[key] = existing_data[key]
+
             existing.data = recipe_data_with_id
             existing.updated_at = datetime.utcnow()
             db.session.commit()
@@ -164,6 +172,12 @@ def update_recipe(
 
         # Ensure the id in recipe_data matches the database record id
         recipe_data_with_id = {**recipe_data, "id": recipe_id}
+
+        # Preserve server-only image data if not present in incoming data
+        existing_data = recipe.data or {}
+        for key in ("ai_image_data", "ai_image_gcs", "ai_image_url"):
+            if key not in recipe_data_with_id and key in existing_data:
+                recipe_data_with_id[key] = existing_data[key]
 
         # Update fields
         recipe.name = recipe_data.get("name", recipe.name)

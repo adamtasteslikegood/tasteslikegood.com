@@ -13,10 +13,10 @@ Refactored into a modular architecture with:
 - blueprints/: Route handlers (recipes, generation, API)
 """
 
-import logging
 import os
+from datetime import timedelta
 
-from flask import Flask, render_template, request, session
+from flask import Flask, render_template, request
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -25,6 +25,7 @@ from auth import auth_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
+from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
@@ -61,18 +62,119 @@ def create_app():
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 
     # Initialize extensions
-    from extensions import db, migrate
+    from extensions import db, migrate, sess, cache
 
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # Server-side session configuration.
+    # Priority: VALKEY_HOST (IAM/password auth) > REDIS_URL (simple URL) > SQLAlchemy fallback
+    from config import VALKEY_HOST, VALKEY_PORT, VALKEY_AUTH_MODE, REDIS_URL
+
+    if VALKEY_HOST:
+        import redis as redis_client
+
+        valkey_kwargs = dict(host=VALKEY_HOST, port=VALKEY_PORT)
+        valkey_client = None
+
+        if VALKEY_AUTH_MODE == "iam":
+            # GCP IAM auth: use access token as password, TLS required
+            from utils.valkey_auth import create_iam_redis_client, _refresh_token_in_place
+
+            valkey_client = create_iam_redis_client(VALKEY_HOST, VALKEY_PORT)
+        else:
+            # Password auth or no auth
+            password = os.environ.get("VALKEY_PASSWORD")
+            valkey_client = redis_client.StrictRedis(
+                **valkey_kwargs, password=password, decode_responses=False
+            )
+
+        if valkey_client is not None:
+            app.config["SESSION_TYPE"] = "redis"
+            app.config["SESSION_REDIS"] = valkey_client
+            app.logger.info(
+                f"Using Valkey session backend ({VALKEY_AUTH_MODE} auth) at {VALKEY_HOST}:{VALKEY_PORT}"
+            )
+        else:
+            # Valkey auth failed — fall back to SQLAlchemy sessions
+            app.config["SESSION_TYPE"] = "sqlalchemy"
+            app.config["SESSION_SQLALCHEMY"] = db
+            app.config["SESSION_SQLALCHEMY_TABLE"] = "flask_sessions"
+            app.config["SESSION_CLEANUP_N_REQUESTS"] = 100
+            app.logger.warning("Valkey auth failed — using SQLAlchemy session fallback")
+
+    elif REDIS_URL:
+        # Simple URL mode (local dev with docker redis)
+        import redis as redis_client
+
+        app.config["SESSION_TYPE"] = "redis"
+        app.config["SESSION_REDIS"] = redis_client.from_url(REDIS_URL)
+        app.logger.info("Using Redis session backend via REDIS_URL")
+
+    else:
+        app.config["SESSION_TYPE"] = "sqlalchemy"
+        app.config["SESSION_SQLALCHEMY"] = db
+        app.config["SESSION_SQLALCHEMY_TABLE"] = "flask_sessions"
+        app.config["SESSION_CLEANUP_N_REQUESTS"] = 100
+        app.logger.info("Using SQLAlchemy session backend (no Valkey/Redis configured)")
+
+    app.config["SESSION_PERMANENT"] = True
+    app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=14)
+    app.config["SESSION_KEY_PREFIX"] = "vg:"
+    app.config["SESSION_COOKIE_NAME"] = "vg_session"
+    app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("FLASK_SECRET_KEY"))
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+
+    sess.init_app(app)
+
+    # ── Cache configuration (reuses the same Valkey/Redis client) ─────────────
+    redis_client_for_cache = app.config.get("SESSION_REDIS")
+    if redis_client_for_cache is not None:
+        app.config["CACHE_TYPE"] = "RedisCache"
+        # Pass the pre-configured client as 'host' — cachelib detects isinstance(host, Redis)
+        app.config["CACHE_REDIS_HOST"] = redis_client_for_cache
+        app.config["CACHE_DEFAULT_TIMEOUT"] = 300  # 5 minutes
+        app.config["CACHE_KEY_PREFIX"] = ""
+        app.logger.info("Using Valkey/Redis cache backend")
+    else:
+        app.config["CACHE_TYPE"] = "SimpleCache"
+        app.config["CACHE_DEFAULT_TIMEOUT"] = 300
+        app.logger.info("Using in-memory SimpleCache (no Valkey/Redis available)")
+
+    cache.init_app(app)
+
+    # ── Valkey pre-request token check ───────────────────────────────────────
+    # Ping Valkey before each request to detect an expired IAM token and refresh
+    # it before any application code runs, avoiding side-effect duplication that
+    # a full WSGI-level retry would cause.
+    if VALKEY_HOST and VALKEY_AUTH_MODE == "iam" and valkey_client is not None:
+        import redis as _redis_mod
+
+        _inner_wsgi = app.wsgi_app
+
+        def _valkey_precheck_wsgi(environ, start_response):
+            try:
+                valkey_client.ping()
+            except _redis_mod.exceptions.AuthenticationError:
+                logger.warning("Valkey token expired before request — refreshing on-demand")
+                try:
+                    _refresh_token_in_place()
+                    logger.info("On-demand Valkey token refresh succeeded")
+                except Exception as refresh_err:
+                    logger.error("On-demand Valkey token refresh failed: %s", refresh_err)
+                    raise
+
+            return _inner_wsgi(environ, start_response)
+
+        app.wsgi_app = _valkey_precheck_wsgi
+
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured
     with app.app_context():
-        import models
+        pass
 
     # Production should continue using Flask-Migrate/Alembic as the primary path.
-
 
     # ####### DEVELOPMENT NOTE: If you want to quickly create tables without running migrations #######
     # # ***** (for example, for local development or testing), you can use db.create_all().  *****
@@ -103,7 +205,6 @@ def create_app():
     # create_tables_with_retry(app, db)
     # # Note: In production, rely on proper migrations instead of create_all() to manage schema changes.
 
-
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins
     cors_origins = [
@@ -120,10 +221,12 @@ def create_app():
         cors_origins.append(os.environ.get("PRODUCTION_ORIGIN"))
 
     # Always allow the production domains
-    cors_origins.extend([
-        "https://www.tasteslikegood.org",
-        "https://tasteslikegood.org",
-    ])
+    cors_origins.extend(
+        [
+            "https://www.tasteslikegood.org",
+            "https://tasteslikegood.org",
+        ]
+    )
 
     CORS(
         app,
@@ -158,6 +261,7 @@ def create_app():
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
+    app.register_blueprint(generation_api_bp)  # Prefix '/api' — JSON generation endpoints
 
     # Error handlers
     @app.errorhandler(404)
@@ -176,7 +280,6 @@ def create_app():
 
 # Create the app instance
 app = create_app()
-
 
 if __name__ == "__main__":
     # Run the development server

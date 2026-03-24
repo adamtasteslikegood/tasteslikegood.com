@@ -8,29 +8,25 @@ Handles routes for:
 
 import datetime
 import json
-import os
 import re
 import time
 
 import google.oauth2.credentials
-from flask import Blueprint, redirect, render_template, request, session, url_for
-from google.genai import Client
-
 from config import (
     CONFIG,
     DEFAULT_MODEL,
     GOOGLE_API_KEY,
     RECIPE_SCHEMA_PATH,
     RECIPE_VALIDATOR,
-    RECIPES_DIR,
 )
+from flask import Blueprint, redirect, render_template, request, session, url_for
+from google.genai import Client
 from repositories.recipe_repository import (
     invalidate_cache,
-    sanitize_filename,
     save_recipe,
 )
 from utils import normalize_recipe_data
-from utils.session_utils import get_user_id, get_user_metadata
+from utils.session_utils import get_user_metadata
 from validators import validate_recipe_data
 
 generation_bp = Blueprint("generation", __name__)
@@ -63,6 +59,32 @@ def validate_generation_input(prompt):
     return True, None
 
 
+def _get_generation_schema():
+    """
+    Load the recipe schema and strip fields that the AI should not generate.
+    Returns only the fields relevant to recipe content.
+    """
+    with open(RECIPE_SCHEMA_PATH, "r") as f:
+        schema = json.loads(f.read())
+
+    # Remove fields that are set server-side — seeing these in the prompt
+    # causes the model to hallucinate metadata, model names, etc.
+    fields_to_remove = [
+        "stock_image_url",
+        "ai_image_url",
+        "image",
+        "user_id",
+        "ai_metadata",
+    ]
+    for field in fields_to_remove:
+        schema.get("properties", {}).pop(field, None)
+
+    if "required" in schema:
+        schema["required"] = [r for r in schema["required"] if r not in fields_to_remove]
+
+    return json.dumps(schema, indent=2)
+
+
 def build_generation_prompt(user_prompt):
     """
     Build the full prompt for the AI model including schema.
@@ -73,19 +95,15 @@ def build_generation_prompt(user_prompt):
     Returns:
         str: Complete prompt with schema and instructions
     """
-    # Load the JSON schema
-    with open(RECIPE_SCHEMA_PATH, "r") as f:
-        schema = f.read()
+    schema = _get_generation_schema()
 
     full_prompt = (
         f"Generate a Vegan recipe based on the following request: '{user_prompt}'. "
         f"The output must be a valid JSON object that strictly follows this schema:\n"
         f"{schema}\n"
-        f"IMPORTANT: Include 'image_keywords' - an array of 3-5 descriptive terms optimized for "
+        f"Include 'image_keywords' - an array of 3-5 descriptive terms optimized for "
         f"stock photo searches (e.g., ['vegan buddha bowl', 'colorful vegetables', 'healthy lunch']). "
         f"Focus on visual descriptions of the finished dish, not recipe names.\n"
-        f"Do NOT include these fields (we handle them separately): 'stock_image_url', 'ai_image_url', 'image', 'user_id', 'ai_metadata'. "
-        f"Just omit them entirely - do not set them to null.\n"
         f"CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it inside a 'properties' or 'type' object. "
         f"The top-level keys must be 'name', 'description', 'ingredients', etc.\n"
         f"Do not include any text before or after the JSON object."

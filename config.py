@@ -8,12 +8,13 @@ Handles loading of:
 - Directory paths and caching settings
 """
 
-import os
 import json
-from dotenv import load_dotenv
-from typing import Dict, Any, Optional
-from jsonschema import Draft7Validator
 import logging
+import os
+from typing import Dict, Any, Optional
+
+from dotenv import load_dotenv
+from jsonschema import Draft7Validator
 
 logger = logging.getLogger(__name__)
 
@@ -34,8 +35,22 @@ os.makedirs(RECIPES_DIR, exist_ok=True)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 
+# Valkey/Redis Configuration
+# VALKEY_HOST: Memorystore private IP (e.g. 10.128.0.11)
+# VALKEY_PORT: defaults to 6379
+# VALKEY_AUTH_MODE: 'iam' for GCP IAM auth (default in prod), 'password' for static password, or unset
+# REDIS_URL: legacy — full redis:// URL (overrides VALKEY_HOST if set; used for local dev)
+VALKEY_HOST = os.getenv("VALKEY_HOST")
+VALKEY_PORT = int(os.getenv("VALKEY_PORT", "6379"))
+VALKEY_AUTH_MODE = os.getenv("VALKEY_AUTH_MODE", "iam")
+REDIS_URL = os.getenv("REDIS_URL")
+
+# GCS Configuration
+# GCS_BUCKET_NAME: bucket for recipe images (replaces base64-in-PostgreSQL storage)
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME")
+
 # Default Model Configuration
-DEFAULT_MODEL = "gemini-2.0-flash-exp"
+DEFAULT_MODEL = "models/gemini-3.1-pro-preview"
 
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))

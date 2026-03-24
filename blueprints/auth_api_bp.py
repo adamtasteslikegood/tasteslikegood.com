@@ -11,7 +11,6 @@ import logging
 import os
 from functools import wraps
 
-import google.oauth2.credentials
 import googleapiclient.discovery
 from dotenv import load_dotenv
 from flask import Blueprint, jsonify, request, session, url_for
@@ -187,12 +186,29 @@ def api_callback():
         # Merge anonymous rows for this browser session into the authenticated user.
         if previous_guest_session_id:
             try:
-                Recipe.query.filter_by(
+                # Migrate guest recipes — update ownership AND fix metadata
+                guest_recipes = Recipe.query.filter_by(
                     user_id=None, guest_session_id=previous_guest_session_id
-                ).update(
-                    {"user_id": user.id, "guest_session_id": None},
-                    synchronize_session=False,
-                )
+                ).all()
+
+                for recipe in guest_recipes:
+                    recipe.user_id = user.id
+                    recipe.guest_session_id = None
+
+                    # Update ai_metadata inside the data JSON so exported
+                    # recipes reflect the real owner instead of "anonymous".
+                    data = recipe.data or {}
+                    meta = data.get("ai_metadata", {})
+                    gen = meta.get("recipe_generation", {})
+                    if gen:
+                        gen["user_display_name"] = name or email
+                        gen["user_id"] = email
+                        gen["is_authenticated"] = True
+                        meta["recipe_generation"] = gen
+                        data["ai_metadata"] = meta
+                        recipe.data = data
+
+                migrated_recipe_count = len(guest_recipes)
 
                 Cookbook.query.filter_by(
                     user_id=None, guest_session_id=previous_guest_session_id
@@ -202,6 +218,14 @@ def api_callback():
                 )
 
                 db.session.commit()
+
+                if migrated_recipe_count:
+                    logger.info(
+                        "Migrated %d guest recipe(s) to user %s (%s)",
+                        migrated_recipe_count,
+                        user.id,
+                        email,
+                    )
             except Exception as merge_error:
                 db.session.rollback()
                 logger.warning(
