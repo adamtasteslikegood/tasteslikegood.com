@@ -23,7 +23,7 @@ classifiers = [
 dependencies = [
     # Web Framework
     "flask==3.1.3",
-    "werkzeug==3.1.6",
+    "werkzeug==3.1.7",
     "jinja2==3.1.6",
     "blinker==1.9.0",
     "itsdangerous==2.2.0",
