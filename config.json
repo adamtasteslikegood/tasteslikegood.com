@@ -1,6 +1,6 @@
 {
   "app": {
-    "default_model": "models/gemini-3.1-pro-preview",
+    "default_model": "models/gemini-2.5-flash",
     "joke_file": "computer_jokes.csv",
     "recipes_dir": "recipes",
     "models_cache_file": "models_list.json",

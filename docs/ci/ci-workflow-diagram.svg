@@ -1,0 +1,192 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 820" font-family="Segoe UI, Arial, sans-serif" font-size="13">
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 6" refX="10" refY="3" markerWidth="8" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 3 L 0 6 z" fill="#475569"/>
+    </marker>
+    <linearGradient id="headerGrad" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#8b5cf6"/>
+    </linearGradient>
+    <filter id="shadow" x="-4%" y="-4%" width="108%" height="108%">
+      <feDropShadow dx="1" dy="2" stdDeviation="2" flood-opacity="0.12"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="820" rx="12" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Title -->
+  <rect x="0" y="0" width="1100" height="52" rx="12" fill="url(#headerGrad)"/>
+  <rect x="0" y="24" width="1100" height="28" fill="url(#headerGrad)"/>
+  <text x="550" y="34" text-anchor="middle" fill="white" font-size="18" font-weight="bold">CI/CD Workflow Diagram — tasteslikegood.com</text>
+
+  <!-- ═══════ Trigger Lane ═══════ -->
+  <rect x="20" y="65" width="1060" height="60" rx="8" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1" filter="url(#shadow)"/>
+  <text x="40" y="85" fill="#1e40af" font-weight="bold" font-size="14">Triggers</text>
+
+  <rect x="40" y="93" width="100" height="24" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="90" y="109" text-anchor="middle" fill="#1e40af" font-size="11">git push</text>
+
+  <rect x="155" y="93" width="110" height="24" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="210" y="109" text-anchor="middle" fill="#1e40af" font-size="11">pull_request</text>
+
+  <rect x="280" y="93" width="100" height="24" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="330" y="109" text-anchor="middle" fill="#1e40af" font-size="11">schedule</text>
+
+  <rect x="395" y="93" width="120" height="24" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="455" y="109" text-anchor="middle" fill="#1e40af" font-size="11">issue_comment</text>
+
+  <rect x="530" y="93" width="120" height="24" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="590" y="109" text-anchor="middle" fill="#1e40af" font-size="11">issues opened</text>
+
+  <rect x="665" y="93" width="140" height="24" rx="12" fill="#dbeafe" stroke="#93c5fd"/>
+  <text x="735" y="109" text-anchor="middle" fill="#1e40af" font-size="11">workflow_dispatch</text>
+
+  <!-- Arrows from triggers down -->
+  <line x1="160" y1="125" x2="160" y2="145" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="455" y1="125" x2="455" y2="145" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="735" y1="125" x2="735" y2="145" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+  <!-- ═══════ Backend CI Workflow ═══════ -->
+  <rect x="20" y="148" width="340" height="310" rx="8" fill="#f0fdf4" stroke="#86efac" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="40" y="172" fill="#166534" font-weight="bold" font-size="14">Backend CI (ci.yml)</text>
+  <text x="40" y="188" fill="#4ade80" font-size="10">push/PR → main, develop, dev/*</text>
+
+  <!-- Lint Job -->
+  <rect x="35" y="200" width="145" height="54" rx="6" fill="white" stroke="#a3e635" stroke-width="1.5"/>
+  <text x="107" y="218" text-anchor="middle" fill="#365314" font-weight="bold" font-size="12">Lint</text>
+  <text x="107" y="234" text-anchor="middle" fill="#65a30d" font-size="10">Black + Flake8</text>
+  <text x="107" y="246" text-anchor="middle" fill="#65a30d" font-size="10">format + style</text>
+
+  <!-- Type Check Job -->
+  <rect x="195" y="200" width="150" height="54" rx="6" fill="white" stroke="#a3e635" stroke-width="1.5"/>
+  <text x="270" y="218" text-anchor="middle" fill="#365314" font-weight="bold" font-size="12">Type Check</text>
+  <text x="270" y="234" text-anchor="middle" fill="#65a30d" font-size="10">mypy</text>
+  <text x="270" y="246" text-anchor="middle" fill="#65a30d" font-size="10">static analysis</text>
+
+  <!-- Test Job -->
+  <rect x="35" y="268" width="145" height="54" rx="6" fill="white" stroke="#a3e635" stroke-width="1.5"/>
+  <text x="107" y="286" text-anchor="middle" fill="#365314" font-weight="bold" font-size="12">Test</text>
+  <text x="107" y="302" text-anchor="middle" fill="#65a30d" font-size="10">pytest + coverage</text>
+  <text x="107" y="314" text-anchor="middle" fill="#65a30d" font-size="10">88 tests</text>
+
+  <!-- Security Job -->
+  <rect x="195" y="268" width="150" height="54" rx="6" fill="white" stroke="#fbbf24" stroke-width="1.5"/>
+  <text x="270" y="286" text-anchor="middle" fill="#92400e" font-weight="bold" font-size="12">Security</text>
+  <text x="270" y="302" text-anchor="middle" fill="#b45309" font-size="10">Safety scan</text>
+  <text x="270" y="314" text-anchor="middle" fill="#b45309" font-size="10">advisory only</text>
+
+  <!-- Tool chain -->
+  <rect x="35" y="336" width="310" height="32" rx="6" fill="#ecfdf5" stroke="#6ee7b7"/>
+  <text x="190" y="356" text-anchor="middle" fill="#047857" font-size="11">🛠 uv sync --dev → Python 3.13 → pyproject.toml</text>
+
+  <!-- Coverage artifact -->
+  <rect x="35" y="380" width="310" height="28" rx="6" fill="#fefce8" stroke="#fde047"/>
+  <text x="190" y="398" text-anchor="middle" fill="#854d0e" font-size="11">📦 Artifact: coverage.xml (7-day retention)</text>
+
+  <!-- Merge arrow from CI -->
+  <rect x="35" y="418" width="310" height="28" rx="6" fill="#dcfce7" stroke="#4ade80"/>
+  <text x="190" y="436" text-anchor="middle" fill="#166534" font-size="12" font-weight="bold">✅ All 4 jobs must pass</text>
+
+  <!-- ═══════ Gemini AI Workflows ═══════ -->
+  <rect x="380" y="148" width="340" height="310" rx="8" fill="#faf5ff" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="400" y="172" fill="#581c87" font-weight="bold" font-size="14">🤖 Gemini AI Workflows</text>
+  <text x="400" y="188" fill="#a78bfa" font-size="10">PR, issues, @gemini-cli comments</text>
+
+  <!-- Dispatch -->
+  <rect x="395" y="200" width="310" height="40" rx="6" fill="white" stroke="#8b5cf6" stroke-width="1.5"/>
+  <text x="550" y="218" text-anchor="middle" fill="#5b21b6" font-weight="bold" font-size="12">🔀 Dispatch Router</text>
+  <text x="550" y="232" text-anchor="middle" fill="#7c3aed" font-size="10">Parses event → routes to handler</text>
+
+  <!-- Three handlers -->
+  <rect x="395" y="252" width="95" height="50" rx="6" fill="white" stroke="#8b5cf6"/>
+  <text x="442" y="272" text-anchor="middle" fill="#5b21b6" font-weight="bold" font-size="11">🔎 Review</text>
+  <text x="442" y="288" text-anchor="middle" fill="#7c3aed" font-size="9">PR code review</text>
+
+  <rect x="500" y="252" width="95" height="50" rx="6" fill="white" stroke="#8b5cf6"/>
+  <text x="547" y="272" text-anchor="middle" fill="#5b21b6" font-weight="bold" font-size="11">🏷 Triage</text>
+  <text x="547" y="288" text-anchor="middle" fill="#7c3aed" font-size="9">Label issues</text>
+
+  <rect x="605" y="252" width="100" height="50" rx="6" fill="white" stroke="#8b5cf6"/>
+  <text x="655" y="272" text-anchor="middle" fill="#5b21b6" font-weight="bold" font-size="11">▶️ Invoke</text>
+  <text x="655" y="288" text-anchor="middle" fill="#7c3aed" font-size="9">General tasks</text>
+
+  <!-- Scheduled Triage -->
+  <rect x="395" y="316" width="310" height="40" rx="6" fill="white" stroke="#c084fc"/>
+  <text x="550" y="334" text-anchor="middle" fill="#5b21b6" font-weight="bold" font-size="12">📋 Scheduled Triage</text>
+  <text x="550" y="348" text-anchor="middle" fill="#7c3aed" font-size="10">Hourly scan → label untriaged issues</text>
+
+  <!-- Fallthrough -->
+  <rect x="395" y="368" width="310" height="36" rx="6" fill="#fef2f2" stroke="#fca5a5"/>
+  <text x="550" y="390" text-anchor="middle" fill="#991b1b" font-size="11">🔁 Fallthrough: error comment on unrecognized commands</text>
+
+  <!-- Gemini infra -->
+  <rect x="395" y="416" width="310" height="32" rx="6" fill="#f5f3ff" stroke="#c4b5fd"/>
+  <text x="550" y="436" text-anchor="middle" fill="#6d28d9" font-size="11">🔑 GCP WIF + GitHub App Token + MCP Server</text>
+
+  <!-- ═══════ Utility Workflows ═══════ -->
+  <rect x="740" y="148" width="340" height="162" rx="8" fill="#fff7ed" stroke="#fed7aa" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="760" y="172" fill="#9a3412" font-weight="bold" font-size="14">🔧 Utility Workflows</text>
+
+  <rect x="755" y="186" width="310" height="40" rx="6" fill="white" stroke="#fb923c"/>
+  <text x="910" y="204" text-anchor="middle" fill="#9a3412" font-weight="bold" font-size="12">Check Non-ASCII Filenames</text>
+  <text x="910" y="218" text-anchor="middle" fill="#c2410c" font-size="10">Push/PR to any branch + manual fix</text>
+
+  <rect x="755" y="236" width="310" height="40" rx="6" fill="white" stroke="#fb923c"/>
+  <text x="910" y="254" text-anchor="middle" fill="#9a3412" font-weight="bold" font-size="12">Dependabot Auto-Merge</text>
+  <text x="910" y="268" text-anchor="middle" fill="#c2410c" font-size="10">Auto squash-merge dependabot PRs</text>
+
+  <!-- ═══════ Platform Services ═══════ -->
+  <rect x="740" y="328" width="340" height="130" rx="8" fill="#f0f9ff" stroke="#7dd3fc" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="760" y="352" fill="#0c4a6e" font-weight="bold" font-size="14">☁️ Platform Services (dynamic)</text>
+
+  <rect x="755" y="366" width="150" height="36" rx="6" fill="white" stroke="#38bdf8"/>
+  <text x="830" y="388" text-anchor="middle" fill="#0369a1" font-size="11">CodeQL Analysis</text>
+
+  <rect x="915" y="366" width="150" height="36" rx="6" fill="white" stroke="#38bdf8"/>
+  <text x="990" y="388" text-anchor="middle" fill="#0369a1" font-size="11">Dependabot Updates</text>
+
+  <rect x="755" y="410" width="150" height="36" rx="6" fill="white" stroke="#38bdf8"/>
+  <text x="830" y="432" text-anchor="middle" fill="#0369a1" font-size="11">Copilot Agent</text>
+
+  <rect x="915" y="410" width="150" height="36" rx="6" fill="white" stroke="#38bdf8"/>
+  <text x="990" y="432" text-anchor="middle" fill="#0369a1" font-size="11">Dep Graph Submission</text>
+
+  <!-- ═══════ Merge Gate ═══════ -->
+  <rect x="20" y="478" width="1060" height="52" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="550" y="502" text-anchor="middle" fill="#991b1b" font-weight="bold" font-size="15">🚧 Merge Gate — Required Status Checks</text>
+  <text x="550" y="520" text-anchor="middle" fill="#b91c1c" font-size="12">Backend CI (Lint ✓ + Type Check ✓ + Test ✓ + Security ✓) + Non-ASCII Filenames ✓ + Copilot Review ✓</text>
+
+  <!-- Arrow to merge -->
+  <line x1="550" y1="530" x2="550" y2="548" stroke="#475569" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="430" y="550" width="240" height="40" rx="20" fill="#22c55e" stroke="#16a34a" stroke-width="2" filter="url(#shadow)"/>
+  <text x="550" y="575" text-anchor="middle" fill="white" font-weight="bold" font-size="16">✅ Merge to main</text>
+
+  <!-- ═══════ Legend ═══════ -->
+  <rect x="20" y="610" width="1060" height="200" rx="8" fill="white" stroke="#e2e8f0" filter="url(#shadow)"/>
+  <text x="40" y="635" fill="#1e293b" font-weight="bold" font-size="15">Legend</text>
+
+  <rect x="40" y="648" width="20" height="14" rx="3" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="68" y="660" fill="#475569" font-size="12">Backend CI — code quality, testing, security</text>
+
+  <rect x="40" y="670" width="20" height="14" rx="3" fill="#faf5ff" stroke="#c4b5fd"/>
+  <text x="68" y="682" fill="#475569" font-size="12">Gemini AI — automated reviews, triage, general tasks</text>
+
+  <rect x="40" y="692" width="20" height="14" rx="3" fill="#fff7ed" stroke="#fed7aa"/>
+  <text x="68" y="704" fill="#475569" font-size="12">Utility — repository hygiene and dependency automation</text>
+
+  <rect x="40" y="714" width="20" height="14" rx="3" fill="#f0f9ff" stroke="#7dd3fc"/>
+  <text x="68" y="726" fill="#475569" font-size="12">Platform — GitHub-managed dynamic workflows (CodeQL, Dependabot, Copilot)</text>
+
+  <!-- Stats -->
+  <text x="550" y="660" fill="#1e293b" font-weight="bold" font-size="12">Quick Stats</text>
+  <text x="550" y="680" fill="#475569" font-size="11">• 9 custom workflows + 5 dynamic platform workflows = 14 total</text>
+  <text x="550" y="698" fill="#475569" font-size="11">• 4 parallel CI jobs per push/PR (lint, type, test, security)</text>
+  <text x="550" y="716" fill="#475569" font-size="11">• Python 3.13 + uv package manager throughout</text>
+  <text x="550" y="734" fill="#475569" font-size="11">• 88 pytest tests with coverage reporting</text>
+  <text x="550" y="752" fill="#475569" font-size="11">• AI-powered code review + issue triage via Gemini CLI</text>
+
+  <!-- Watermark -->
+  <text x="550" y="800" text-anchor="middle" fill="#cbd5e1" font-size="10">Generated for tasteslikegood.com CI/CD audit — April 2026</text>
+</svg>

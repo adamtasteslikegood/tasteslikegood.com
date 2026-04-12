@@ -3,73 +3,10 @@ __pycache__
 *.pyo
 .env
 .env.*
-!.env.example
 .git
 .gitignore
-
-# Virtual environments
+*.md
 .venv
 venv
-
-# IDE and editor files
 .idea
 .vscode
-.cursor
-.zed
-*.swp
-*.swo
-*~
-.DS_Store
-
-# AI/agent tooling
-.agent
-.ai
-.claude
-.codex
-skills/
-
-# CI/CD and GitHub
-.github/
-.flake8
-pyproject.toml
-uv.lock
-.python-version
-
-# Documentation (not needed at runtime)
-*.md
-docs/
-LICENSE
-
-# Debug and scratch files
-debug_*.py
-discover_models*.py
-test_models.py
-test_session_manual.py
-image_gen_debug*.log
-models_debug.txt
-models_list.json
-model_discovery_output.txt
-recipe_error.*
-\#*\#
-user_reports.json
-computer_jokes.csv
-
-# Scripts not needed at runtime
-scripts/
-check_*.sh
-run_*.sh
-make_executable.sh
-setup_venv.sh
-init_database.sh
-commit-phase-1.sh
-
-# Migration dockerfile
-Dockerfile.migrate
-
-# Terraform state
-*.tfstate
-*.tfstate.*
-
-# Sample/temp files
-instance/
-pip/

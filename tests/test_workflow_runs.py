@@ -1,6 +1,7 @@
 """Tests for the GitHub Actions workflow-run filtering helpers."""
 
 import importlib.util
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -75,14 +76,18 @@ class TestApplyStatusFilter:
     def test_include_in_progress_matches_on_status_field(self, sample_runs):
         """'in_progress' is a *status* value (not conclusion); should still match."""
         result = apply_status_filter(
-            sample_runs, filter_status="in_progress", filter_mode="include"
+            sample_runs,
+            filter_status="in_progress",
+            filter_mode="include",
         )
         assert len(result) == 1
         assert result[0]["id"] == 4
 
     def test_exclude_in_progress(self, sample_runs):
         result = apply_status_filter(
-            sample_runs, filter_status="in_progress", filter_mode="exclude"
+            sample_runs,
+            filter_status="in_progress",
+            filter_mode="exclude",
         )
         assert len(result) == 5
         assert not any(r.get("status") == "in_progress" for r in result)
@@ -145,7 +150,7 @@ class TestFetchWorkflowRuns:
         assert "rate limit" in error.lower() or "permission" in error.lower()
 
     def test_connection_error_returns_message(self):
-        import requests as req_lib  # type: ignore[import-untyped]
+        import requests as req_lib
 
         with patch(
             "workflow_runs.app.requests.get", side_effect=req_lib.exceptions.ConnectionError
@@ -156,7 +161,7 @@ class TestFetchWorkflowRuns:
         assert "connect" in error.lower()
 
     def test_timeout_returns_message(self):
-        import requests as req_lib  # type: ignore[import-untyped]
+        import requests as req_lib
 
         with patch("workflow_runs.app.requests.get", side_effect=req_lib.exceptions.Timeout):
             runs, error = fetch_workflow_runs("owner", "repo")

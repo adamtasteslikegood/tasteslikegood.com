@@ -120,7 +120,7 @@ def filter_and_sort_models(models_list):
     return filtered_models[:10]  # Return up to 10 models
 
 
-def refresh_models_from_api(session_credentials=None):
+def refresh_models_from_api(session_credentials=None):  # noqa: C901
     """
     Fetches fresh models from Gemini API and updates the cache.
 
