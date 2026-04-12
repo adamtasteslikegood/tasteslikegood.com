@@ -9,7 +9,6 @@ Tests cover:
 """
 
 import unittest
-from unittest.mock import MagicMock, patch
 
 from flask import Flask, session
 

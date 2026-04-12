@@ -1,9 +1,6 @@
-import pytest
-import os
 import json
 from services.reporting_service import ReportingService
 from services.migration_service import MigrationService
-from repositories.recipe_repository import save_recipe, get_recipe, RECIPES_DIR
 
 
 def test_reporting_service_logic(tmp_path):
