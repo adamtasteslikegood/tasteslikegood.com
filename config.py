@@ -33,6 +33,7 @@ os.makedirs(RECIPES_DIR, exist_ok=True)
 # API Keys
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
+GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
 
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-2.0-flash-exp"
