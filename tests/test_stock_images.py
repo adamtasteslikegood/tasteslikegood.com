@@ -13,7 +13,6 @@ from services.stock_image_service import (
     validate_image_url,
     validate_and_refresh_stock_image,
     _get_fallback_image,
-    search_unsplash,
     FALLBACK_FOOD_IMAGES,
 )
 
