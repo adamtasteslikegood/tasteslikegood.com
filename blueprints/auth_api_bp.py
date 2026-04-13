@@ -35,13 +35,16 @@ SCOPES = [
 
 
 def credentials_to_dict(credentials):
-    """Convert credentials object to a JSON-serializable dictionary."""
+    """Convert credentials object to a JSON-serializable dictionary.
+
+    Intentionally excludes client_secret — it must not be stored in the
+    session cookie. Token refresh reads the secret from GOOGLE_CLIENT_SECRET.
+    """
     return {
         "token": credentials.token,
         "refresh_token": credentials.refresh_token,
         "token_uri": credentials.token_uri,
         "client_id": credentials.client_id,
-        "client_secret": credentials.client_secret,
         "scopes": credentials.scopes,
     }
 

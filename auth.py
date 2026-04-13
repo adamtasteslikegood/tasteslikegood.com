@@ -9,8 +9,10 @@ from google_auth_oauthlib.flow import Flow
 
 load_dotenv()
 
-# Allow OAuth over HTTP for local development
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+# Allow OAuth over HTTP for local development only.
+# Production runs over HTTPS via Cloud Run so this flag must not be set there.
+if os.environ.get("FLASK_ENV") != "production":
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -125,11 +127,13 @@ def logout():
 
 
 def credentials_to_dict(credentials):
+    # Intentionally excludes client_secret — it must not be stored in the
+    # session cookie. Credential reconstruction reads the secret from the
+    # environment at token-refresh time via GOOGLE_CLIENT_SECRET.
     return {
         "token": credentials.token,
         "refresh_token": credentials.refresh_token,
         "token_uri": credentials.token_uri,
         "client_id": credentials.client_id,
-        "client_secret": credentials.client_secret,
         "scopes": credentials.scopes,
     }
