@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd /home/adam/projects/tasteslikegoodtheangularsvegancookbook/Backend
+cd "$(dirname "$0")"
 
 echo "=========================================="
 echo "  Backend CI/CD Test Script"
