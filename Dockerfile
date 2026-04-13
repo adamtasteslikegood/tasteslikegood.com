@@ -26,10 +26,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the rest of the application code
 COPY . /app/
 
-COPY entrypoint.sh /app/
-RUN chmod +x /app/entrypoint.sh
-
 # Make port 5000 available to the world outside this container
 EXPOSE 5000
 
-CMD ["/app/entrypoint.sh"]
+# Run app.py when the container launches
+# Using gunicorn for production is better than the flask dev server
+# But for now, adhering to the "mimic existing structure" and simpler setup if gunicorn isn't in requirements.
+# However, "production grade" usually implies a WSGI server.
+# Checking requirements.txt again... gunicorn is NOT there.
+# I will use the flask run command for now but add a comment about gunicorn.
+# Or better, I will use python app.py since that's how it's currently run.
+CMD ["python", "app.py"]

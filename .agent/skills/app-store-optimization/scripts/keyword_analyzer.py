@@ -261,56 +261,31 @@ class KeywordAnalyzer:
         tokens = normalized_text.split()
         total_words = len(tokens)
 
-        # Precompute unigram counts once for the entire text
-        unigram_counts = Counter(tokens)
-
-        # Preprocess keywords: normalize once, collect needed n-gram sizes
-        preprocessed_keywords = []
-        needed_ngram_sizes = set()
-
+        densities: Dict[str, float] = {}
         for keyword in target_keywords:
+            # Normalize keyword similarly to text
             keyword_lower = keyword.lower()
             normalized_keyword = re.sub(r'[^\w\s]', ' ', keyword_lower).strip()
 
             if not normalized_keyword:
-                preprocessed_keywords.append((keyword, []))
+                densities[keyword] = 0.0
                 continue
 
             kw_tokens = normalized_keyword.split()
-            preprocessed_keywords.append((keyword, kw_tokens))
 
-            if len(kw_tokens) > 1:
-                needed_ngram_sizes.add(len(kw_tokens))
-
-        # Precompute n-gram counts for all required n values
-        ngram_counts = {}
-        for n in needed_ngram_sizes:
-            if total_words < n:
-                ngram_counts[n] = Counter()
-                continue
-
-            joined_ngrams = [
-                ' '.join(tokens[i:i + n])
-                for i in range(total_words - n + 1)
-            ]
-            ngram_counts[n] = Counter(joined_ngrams)
-
-        densities: Dict[str, float] = {}
-        for original_keyword, kw_tokens in preprocessed_keywords:
-            if not kw_tokens:
-                densities[original_keyword] = 0.0
-                continue
-
+            # Count occurrences using whole-word / n-gram matching
             if len(kw_tokens) == 1:
                 target = kw_tokens[0]
-                occurrences = unigram_counts.get(target, 0)
+                occurrences = sum(1 for token in tokens if token == target)
             else:
                 n = len(kw_tokens)
-                ngram_key = ' '.join(kw_tokens)
-                occurrences = ngram_counts.get(n, Counter()).get(ngram_key, 0)
+                occurrences = 0
+                for i in range(len(tokens) - n + 1):
+                    if tokens[i:i + n] == kw_tokens:
+                        occurrences += 1
 
             density = (occurrences / total_words) * 100 if total_words > 0 else 0.0
-            densities[original_keyword] = round(density, 2)
+            densities[keyword] = round(density, 2)
 
         return densities
 

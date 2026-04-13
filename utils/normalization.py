@@ -50,7 +50,7 @@ def normalize_unit(unit_str):
     return unit_str.strip()
 
 
-def parse_amount(amount_val):
+def parse_amount(amount_val):  # noqa: C901
     """
     Parses amount which can be number, string (fraction/range), or list.
     Returns a float or a list of two floats (range).
@@ -95,7 +95,7 @@ def parse_amount(amount_val):
     return 0
 
 
-def normalize_recipe_data(data):
+def normalize_recipe_data(data):  # noqa: C901
     """
     Normalizes the entire recipe data structure to be more compliant
     with the schema and application expectations.

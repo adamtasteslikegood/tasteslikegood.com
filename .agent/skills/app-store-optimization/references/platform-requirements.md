@@ -53,19 +53,19 @@ task manager, todo list, productivity app, task tracking
 | Category | Field | Required |
 |----------|-------|----------|
 | **App Information** | Name | Yes |
-| **App Information** | Subtitle | No |
-| **App Information** | Category | Yes |
-| **App Information** | Secondary Category | No |
-| **App Information** | Content Rights | Yes |
-| **App Information** | Age Rating | Yes |
+| | Subtitle | No |
+| | Category | Yes |
+| | Secondary Category | No |
+| | Content Rights | Yes |
+| | Age Rating | Yes |
 | **Version Information** | Description | Yes |
-| **Version Information** | Keywords | Yes |
-| **Version Information** | Promotional Text | No |
-| **Version Information** | What's New | Yes (for updates) |
-| **Version Information** | Support URL | Yes |
-| **Version Information** | Marketing URL | No |
+| | Keywords | Yes |
+| | Promotional Text | No |
+| | What's New | Yes (for updates) |
+| | Support URL | Yes |
+| | Marketing URL | No |
 | **Pricing** | Price Tier | Yes |
-| **Pricing** | Availability | Yes |
+| | Availability | Yes |
 
 ### Age Rating Content Descriptors
 
@@ -113,16 +113,16 @@ Google Play has no separate keyword field. Keywords are extracted from:
 | Category | Field | Required |
 |----------|-------|----------|
 | **Store Listing** | Title | Yes |
-| **Store Listing** | Short Description | Yes |
-| **Store Listing** | Full Description | Yes |
-| **Store Listing** | App Icon | Yes |
-| **Store Listing** | Feature Graphic | Yes |
-| **Store Listing** | Screenshots | Yes (min 2) |
-| **Store Listing** | Video | No |
+| | Short Description | Yes |
+| | Full Description | Yes |
+| | App Icon | Yes |
+| | Feature Graphic | Yes |
+| | Screenshots | Yes (min 2) |
+| | Video | No |
 | **Store Settings** | App Category | Yes |
-| **Store Settings** | Tags | No |
-| **Store Settings** | Contact Email | Yes |
-| **Store Settings** | Privacy Policy | Yes |
+| | Tags | No |
+| | Contact Email | Yes |
+| | Privacy Policy | Yes |
 | **Content Rating** | IARC Questionnaire | Yes |
 
 ### Content Rating (IARC)

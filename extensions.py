@@ -1,9 +1,20 @@
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from flask_session import Session
-from flask_caching import Cache
+
+
+class _NullCache:
+    """No-op cache used until a real cache backend (Valkey/Redis) is wired up."""
+
+    def get(self, key):
+        return None
+
+    def set(self, key, value, timeout=None):
+        pass
+
+    def delete(self, key):
+        pass
+
 
 db = SQLAlchemy()
 migrate = Migrate()
-sess = Session()
-cache = Cache()
+cache = _NullCache()

@@ -1,9 +1,0 @@
-Resolved 91 packages in 0.99ms
-Checked 87 packages in 1ms
-All done! ✨ 🍰 ✨
-233 files would be left unchanged.
-ERROR: usage: pytest [options] [file_or_dir] [file_or_dir] [...]
-pytest: error: unrecognized arguments: --cov-omit=tests/*,debug_*.py,discover_*.py,migrate_recipes.py,scan_paths_for_nonascii.py,services/gcs_service.py,test_*.py,utils/valkey_auth.py,workflow_runs/*,config.py,*__init__.py,app.py,extensions.py
-  inifile: /workspaces/tasteslikegood.com/pyproject.toml
-  rootdir: /workspaces/tasteslikegood.com
-

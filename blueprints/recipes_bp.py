@@ -36,7 +36,7 @@ def index():
 
 
 @recipes_bp.route("/recipe/<filename>")
-def show_recipe(filename):
+def show_recipe(filename):  # noqa: C901
     """
     Display a single recipe with auto-migration and lazy image loading.
 

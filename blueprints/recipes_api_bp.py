@@ -12,51 +12,14 @@ Provides database-backed recipe CRUD operations:
 import logging
 
 from flask import Blueprint, jsonify, request, session
+
+from extensions import db  # noqa: F401
 from repositories import db_recipe_repository
 from utils.session_utils import get_or_create_session_id
-from utils.cache_utils import (
-    recipe_key,
-    recipe_stats_key,
-    invalidate_recipe,
-    safe_get,
-    safe_set,
-    TTL_MEDIUM,
-    TTL_SHORT,
-)
 
 logger = logging.getLogger(__name__)
 
 recipes_api_bp = Blueprint("recipes_api", __name__, url_prefix="/api/recipes")
-
-
-def _strip_image_data(data, recipe_id=None):
-    """Remove bulky image storage fields from API responses.
-    Images are served separately via GET /api/recipes/<id>/image.
-    Also ensures ai_image_url points to the API endpoint when image data exists.
-
-    Args:
-        data: The recipe's JSON data dict.
-        recipe_id: Explicit recipe ID (use when data may not contain 'id').
-    """
-    if not data:
-        return data
-    has_image = bool(data.get("ai_image_data") or data.get("ai_image_gcs"))
-    stripped_keys = {"ai_image_data", "ai_image_gcs"}
-    if not stripped_keys.intersection(data) and not has_image:
-        return data
-    result = {k: v for k, v in data.items() if k not in stripped_keys}
-    # Ensure ai_image_url points to the API endpoint for any recipe with image data
-    rid = recipe_id or result.get("id")
-    if has_image and rid:
-        result["ai_image_url"] = f"/api/recipes/{rid}/image"
-    return result
-
-
-def _recipe_response(recipe):
-    """Build a consistent recipe response dict with image data stripped."""
-    d = recipe.to_dict()
-    d["data"] = _strip_image_data(d.get("data"), recipe_id=recipe.id)
-    return d
 
 
 def get_current_user_id():
@@ -104,7 +67,7 @@ def list_recipes(user_id, guest_session_id):
                         {
                             "id": recipe.id,
                             "name": recipe.name,
-                            "data": _strip_image_data(recipe.data, recipe_id=recipe.id),
+                            "data": recipe.data,
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
@@ -158,8 +121,7 @@ def create_recipe(user_id, guest_session_id):
         if not recipe:
             return jsonify({"error": "Failed to create recipe"}), 500
 
-        invalidate_recipe(user_id, guest_session_id, recipe.id)
-        return jsonify(_recipe_response(recipe)), 201
+        return jsonify(recipe.to_dict()), 201
 
     except Exception as e:
         logger.error(f"Error creating recipe: {e}")
@@ -175,20 +137,12 @@ def get_recipe(user_id, guest_session_id, recipe_id):
     Only returns recipe if it belongs to the current user (or is anonymous for guests).
     """
     try:
-        # Check cache first
-        ck = recipe_key(user_id, guest_session_id, recipe_id)
-        cached = safe_get(ck)
-        if cached is not None:
-            return jsonify(cached), 200
-
         recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
 
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
 
-        result = _recipe_response(recipe)
-        safe_set(ck, result, timeout=TTL_MEDIUM)
-        return jsonify(result), 200
+        return jsonify(recipe.to_dict()), 200
 
     except Exception as e:
         logger.error(f"Error fetching recipe {recipe_id}: {e}")
@@ -221,8 +175,7 @@ def update_recipe(user_id, guest_session_id, recipe_id):
         if not recipe:
             return jsonify({"error": "Recipe not found or update failed"}), 404
 
-        invalidate_recipe(user_id, guest_session_id, recipe_id)
-        return jsonify(_recipe_response(recipe)), 200
+        return jsonify(recipe.to_dict()), 200
 
     except Exception as e:
         logger.error(f"Error updating recipe {recipe_id}: {e}")
@@ -243,15 +196,6 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
         if not success:
             return jsonify({"error": "Recipe not found or delete failed"}), 404
 
-        # Clean up GCS image if configured
-        from config import GCS_BUCKET_NAME
-
-        if GCS_BUCKET_NAME:
-            from services.gcs_service import delete_image
-
-            delete_image(GCS_BUCKET_NAME, recipe_id)
-
-        invalidate_recipe(user_id, guest_session_id, recipe_id)
         return jsonify({"message": "Recipe deleted successfully"}), 200
 
     except Exception as e:
@@ -272,21 +216,18 @@ def get_recipe_stats(user_id, guest_session_id):
         }
     """
     try:
-        ck = recipe_stats_key(user_id, guest_session_id)
-        cached = safe_get(ck)
-        if cached is not None:
-            return jsonify(cached), 200
-
         count = db_recipe_repository.count_user_recipes(user_id, guest_session_id)
 
-        result = {
-            "total_recipes": count,
-            "user_id": user_id,
-            "guest_session_id": guest_session_id,
-        }
-        safe_set(ck, result, timeout=TTL_SHORT)
-
-        return jsonify(result), 200
+        return (
+            jsonify(
+                {
+                    "total_recipes": count,
+                    "user_id": user_id,
+                    "guest_session_id": guest_session_id,
+                }
+            ),
+            200,
+        )
 
     except Exception as e:
         logger.error(f"Error fetching recipe stats: {e}")

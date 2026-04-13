@@ -3,7 +3,7 @@ name = "tasteslikegood-com"
 version = "0.1.0"
 description = "A Flask-based web application for viewing and generating vegan recipes using Google's Gemini AI models"
 readme = "README.md"
-requires-python = ">=3.13"  # Only support Python 3.13+
+requires-python = ">=3.13,<3.14"  # Only support Python 3.13 (3.14+ not yet fully supported by all deps)
 license = { text = "MIT" }
 authors = [
     { name = "Tastes Like Good Team", email = "contact@tasteslikegood.com" }
@@ -27,46 +27,46 @@ dependencies = [
     "jinja2==3.1.6",
     "blinker==1.9.0",
     "itsdangerous==2.2.0",
-    "flask-session>=0.8.0",
-    "flask-caching>=2.1.0",
-    "redis>=5.0.0",
     # Database (Phase 3) - psycopg2 is optional, only needed for PostgreSQL
     "flask-sqlalchemy==3.1.1",
-    "flask-migrate==4.1.0",
+    "flask-migrate==4.0.5",
     "sqlalchemy>=2.0.35",  # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
-    "google-genai==1.68.0",
+    "google-genai==1.56.0",
+    "google-generativeai==0.8.5",
+    "google-ai-generativelanguage==0.6.15",
     "google-auth==2.49.1",
     "google-auth-oauthlib==1.3.0",
-    "google-api-python-client==2.193.0",
-    "googleapis-common-protos==1.73.0",
+    "google-api-python-client==2.182.0",
+    "googleapis-common-protos==1.70.0",
     # Data Validation
-    "jsonschema==4.26.0",
+    "jsonschema==4.25.1",
     "pydantic==2.12.5",
+    "pydantic-core==2.41.5",
     # Networking & HTTP
     "httpx==0.28.1",
     "httpcore==1.0.9",
-    "requests==2.32.5",
+    "requests==2.33.1",
     "requests-oauthlib==2.0.0",
     "urllib3==2.6.3",
-    "certifi==2026.2.25",
-    "charset-normalizer==3.4.6",
+    "certifi==2025.11.12",
+    "charset-normalizer==3.4.4",
     "idna==3.11",
     # Utilities
     "python-dotenv==1.2.2",
     "python-multipart==0.0.22",
     "distro==1.9.0",
     "sniffio==1.3.1",
-    "anyio==4.12.1",
+    "anyio==4.11.0",
     "typing-extensions==4.15.0",
-    "tenacity==9.1.4",
-    "websockets==16.0",
-    "cachetools==7.0.5",
+    "tenacity==9.1.2",
+    "websockets==15.0.1",
+    "cachetools==5.5.2",
     # Cryptography & Security
     "pyasn1==0.6.3",
     "pyasn1-modules==0.4.2",
     "rsa==4.9.1",
-    "flask-cors==6.0.2",
+    "flask-cors==6.0.0",
     "pandas>=3.0.1",
 ]
 
@@ -77,6 +77,8 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "types-requests>=2.31.0",
+    "types-jsonschema>=4.21.0",
 ]
 postgres = [
     # PostgreSQL support (for production deployments)
@@ -133,4 +135,6 @@ dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
     "mypy>=1.0.0",
+    "types-requests>=2.31.0",
+    "types-jsonschema>=4.21.0",
 ]

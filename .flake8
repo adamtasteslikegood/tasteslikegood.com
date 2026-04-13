@@ -1,21 +1,32 @@
 [flake8]
 max-line-length = 100
-extend-ignore = E402, C901, E501
+extend-ignore = E203, E266, E501, W503
 exclude =
-    .venv,
     .git,
-    .github,
-    .codex,
-    .gemini,
     __pycache__,
+    .venv,
+    venv,
+    build,
+    dist,
+    *.egg-info,
+    .pytest_cache,
+    instance,
     migrations,
+    .zed,
+    .cursor,
+    .ai,
+    .agent,
+    .codex,
+    .claude,
+    .github,
     scripts,
     workflow_runs,
-    debug_*.py,
-    discover_*.py,
-    scan_paths_for_nonascii.py,
-    .skills,
-    skills,
-    .agent,
-    .claude,
-    .zed
+    debug_image_gen.py,
+    discover_models.py,
+    discover_models_WORKING.py,
+    discover_models_v2.py,
+    scan_paths_for_nonascii.py
+max-complexity = 25
+per-file-ignores =
+    __init__.py:F401
+    tests/*.py:F401,F811,E402
