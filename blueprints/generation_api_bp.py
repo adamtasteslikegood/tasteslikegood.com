@@ -241,7 +241,7 @@ def generate_image_for_recipe():
 
     except Exception as e:
         logger.error(f"Image generation error for recipe {recipe_id}: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Image generation failed"}), 500
 
 
 @generation_api_bp.route("/recipes/<recipe_id>/image", methods=["GET"])
@@ -462,7 +462,7 @@ def migrate_image_urls():
     except Exception as e:
         db.session.rollback()
         logger.error("Image migration failed: %s", e)
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Image migration failed"}), 500
 
 
 @generation_api_bp.route("/recipes/missing-images", methods=["GET"])

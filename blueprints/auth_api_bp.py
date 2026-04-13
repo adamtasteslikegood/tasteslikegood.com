@@ -105,7 +105,7 @@ def api_login():
         return jsonify({"authorization_url": authorization_url, "state": state}), 200
 
     except Exception as e:
-        return jsonify({"error": f"Failed to initiate login: {str(e)}"}), 500
+        return jsonify({"error": "Failed to initiate login"}), 500
 
 
 @auth_api_bp.route("/callback", methods=["GET"])
@@ -219,7 +219,7 @@ def api_callback():  # noqa: C901
         return f'<script>window.location.href = "{frontend_url}?auth=success";</script>'
 
     except Exception as e:
-        return jsonify({"error": f"Authentication failed: {str(e)}"}), 500
+        return jsonify({"error": "Authentication failed"}), 500
 
 
 @auth_api_bp.route("/me", methods=["GET"])
