@@ -27,8 +27,8 @@ echo ""
 
 # Step 3: Run Flake8 linter
 echo "Step 3: Linting code with Flake8..."
-# Ignoring E501 and E402 for now. These should be cleaned up later.
-if uv run flake8 . --extend-ignore=E501,E402 ; then
+# Ignoring E501 here for now. E402 handling remains scoped via .flake8.
+if uv run flake8 . --extend-ignore=E501 ; then
     echo "✅ Flake8: No linting errors"
 else
     echo "⚠️  Flake8: Linting issues found (review above)"

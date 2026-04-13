@@ -5,12 +5,9 @@ omit =
     discover_*.py
     migrate_recipes.py
     scan_paths_for_nonascii.py
-    services/gcs_service.py
     test_*.py
     test_session_manual.py
     utils/valkey_auth.py
     workflow_runs/*
     config.py
     *__init__.py
-    app.py
-    extensions.py
