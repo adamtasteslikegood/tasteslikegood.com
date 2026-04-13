@@ -8,12 +8,12 @@ from unittest.mock import MagicMock, patch, mock_open
 # Ensure app can be imported
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from flask import Flask
-
 from services.image_service import (
     generate_ai_image,
     update_recipe_with_image,
 )
+
+from app import app
 
 MOCK_USER_METADATA = {
     "user_id": "test_user_123",
@@ -25,13 +25,13 @@ MOCK_USER_METADATA = {
 
 class TestImageService(unittest.TestCase):
     def setUp(self):
-        self.app = Flask(__name__)
-        self.app.secret_key = "test-secret"
-        self.ctx = self.app.test_request_context()
-        self.ctx.push()
+        """Set up a test request context so url_for() works."""
+        self.req_context = app.test_request_context()
+        self.req_context.push()
 
     def tearDown(self):
-        self.ctx.pop()
+        """Pop the request context after each test."""
+        self.req_context.pop()
 
     def test_generate_returns_existing_image(self):
         """Should return the existing image URL if force_regenerate is False."""
