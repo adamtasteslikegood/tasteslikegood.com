@@ -172,7 +172,7 @@ def api_status():
 
         db.session.execute("SELECT 1")
         db_status = "connected"
-    except Exception as e:
+    except Exception:
         db_status = "error"
         db_error = "Database connection error"  # Do not expose exception details
 
