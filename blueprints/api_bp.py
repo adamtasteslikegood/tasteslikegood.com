@@ -49,7 +49,7 @@ def get_models():
 
     except Exception as e:
         logger.error(f"Error fetching models: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to fetch models"}), 500
 
 
 @api_bp.route("/models/refresh", methods=["POST"])
@@ -111,7 +111,7 @@ def generate_recipe_image(filename):
         return jsonify({"error": "Recipe not found"}), 404
     except Exception as e:
         logger.error(f"Image generation error for {filename}: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Image generation failed"}), 500
 
 
 @api_bp.route("/regenerate_image/<filename>", methods=["POST"])
@@ -138,7 +138,7 @@ def regenerate_recipe_image(filename):
         return jsonify({"error": "Recipe not found"}), 404
     except Exception as e:
         logger.error(f"Regeneration error for {filename}: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Image regeneration failed"}), 500
 
 
 @api_bp.route("/report_recipe/<filename>", methods=["POST"])
@@ -158,7 +158,7 @@ def report_recipe(filename):
         return jsonify({"error": str(e)}), 400
     except Exception as e:
         logger.error(f"Error logging report for {filename}: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Failed to submit report"}), 500
 
 
 @api_bp.route("/status", methods=["GET"])
@@ -172,9 +172,9 @@ def api_status():
 
         db.session.execute("SELECT 1")
         db_status = "connected"
-    except Exception as e:
+    except Exception:
         db_status = "error"
-        db_error = str(e)
+        db_error = "Database connection error"  # Do not expose exception details
 
     return jsonify(
         {
@@ -196,7 +196,7 @@ def run_migration():
         return jsonify(results)
     except Exception as e:
         logger.error(f"Migration error: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"error": "Migration failed"}), 500
 
 
 @api_bp.route("/jokes", methods=["GET"])

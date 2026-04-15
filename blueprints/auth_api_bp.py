@@ -35,13 +35,16 @@ SCOPES = [
 
 
 def credentials_to_dict(credentials):
-    """Convert credentials object to a JSON-serializable dictionary."""
+    """Convert credentials object to a JSON-serializable dictionary.
+
+    Intentionally excludes client_secret — it must not be stored in the
+    session cookie. Token refresh reads the secret from GOOGLE_CLIENT_SECRET.
+    """
     return {
         "token": credentials.token,
         "refresh_token": credentials.refresh_token,
         "token_uri": credentials.token_uri,
         "client_id": credentials.client_id,
-        "client_secret": credentials.client_secret,
         "scopes": credentials.scopes,
     }
 
@@ -101,8 +104,8 @@ def api_login():
 
         return jsonify({"authorization_url": authorization_url, "state": state}), 200
 
-    except Exception as e:
-        return jsonify({"error": f"Failed to initiate login: {str(e)}"}), 500
+    except Exception:
+        return jsonify({"error": "Failed to initiate login"}), 500
 
 
 @auth_api_bp.route("/callback", methods=["GET"])
@@ -215,8 +218,8 @@ def api_callback():  # noqa: C901
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
         return f'<script>window.location.href = "{frontend_url}?auth=success";</script>'
 
-    except Exception as e:
-        return jsonify({"error": f"Authentication failed: {str(e)}"}), 500
+    except Exception:
+        return jsonify({"error": "Authentication failed"}), 500
 
 
 @auth_api_bp.route("/me", methods=["GET"])

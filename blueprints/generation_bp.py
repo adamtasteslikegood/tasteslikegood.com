@@ -8,6 +8,7 @@ Handles routes for:
 
 import datetime
 import json
+import os
 import re
 import time
 
@@ -167,7 +168,10 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
 
     if "credentials" in session:
         try:
-            creds = google.oauth2.credentials.Credentials(**session["credentials"])
+            creds = google.oauth2.credentials.Credentials(
+                **session["credentials"],
+                client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+            )
             user_client = Client(credentials=creds)
             recipe_data, recipe_json_str = _attempt_with_client(user_client, "User Credentials")
         except Exception as e:

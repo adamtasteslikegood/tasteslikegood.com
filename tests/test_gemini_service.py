@@ -1,5 +1,6 @@
 """Tests for the Gemini AI service."""
 
+import os
 import sys
 from pathlib import Path
 import unittest
@@ -12,6 +13,7 @@ from services.gemini_service import get_genai_client, attempt_generation
 
 
 class TestGetGenaiClient(unittest.TestCase):
+    @patch.dict(os.environ, {"GOOGLE_CLIENT_SECRET": "test-secret"})
     @patch("services.gemini_service.Client")
     @patch("services.gemini_service.google.oauth2.credentials.Credentials")
     def test_get_client_with_valid_session_credentials(self, mock_creds, mock_client):
@@ -25,8 +27,8 @@ class TestGetGenaiClient(unittest.TestCase):
         # Act
         client = get_genai_client({"token": "fake-token"})
 
-        # Assert
-        mock_creds.assert_called_once_with(token="fake-token")
+        # Assert — client_secret is now passed from GOOGLE_CLIENT_SECRET env var
+        mock_creds.assert_called_once_with(token="fake-token", client_secret="test-secret")
         mock_client.assert_called_once_with(credentials=mock_creds_instance)
         self.assertEqual(client, mock_client_instance)
 

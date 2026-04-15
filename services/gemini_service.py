@@ -7,6 +7,7 @@ Handles:
 - Content generation with error handling
 """
 
+import os
 from typing import Optional, Dict, Any
 import logging
 from google.genai import Client
@@ -32,7 +33,12 @@ def get_genai_client(session_credentials: Optional[Dict[str, Any]] = None) -> Op
     """
     if session_credentials:
         try:
-            creds = google.oauth2.credentials.Credentials(**session_credentials)
+            # client_secret is intentionally excluded from the session dict
+            # (security: never store it in the cookie). Inject from environment.
+            creds = google.oauth2.credentials.Credentials(
+                **session_credentials,
+                client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+            )
             return Client(credentials=creds)
         except Exception as e:
             logger.error(f"Failed to create client from user credentials: {e}")

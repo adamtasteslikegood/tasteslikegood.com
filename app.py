@@ -24,6 +24,7 @@ from auth import auth_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
+from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
@@ -49,9 +50,18 @@ def create_app():
     # so url_for(_external=True) generates correct public URLs
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
 
-    # Configure secret key for sessions
-    # In production, use a persistent secret key from environment variables
-    app.secret_key = os.environ.get("FLASK_SECRET_KEY", os.urandom(24))
+    # Configure secret key for sessions.
+    # In production this MUST be set via Secret Manager — ephemeral keys break
+    # all sessions on every Cloud Run instance restart.
+    _secret_key = os.environ.get("FLASK_SECRET_KEY")
+    if not _secret_key:
+        if os.environ.get("FLASK_ENV") == "production":
+            raise RuntimeError(
+                "FLASK_SECRET_KEY must be set in production. "
+                "Add it to Secret Manager and wire it via --set-secrets."
+            )
+        _secret_key = os.urandom(24)
+    app.secret_key = _secret_key
 
     # Configure Database
     from config import SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
@@ -154,6 +164,7 @@ def create_app():
     app.register_blueprint(auth_api_bp)  # /api/auth/* endpoints
     app.register_blueprint(recipes_bp)  # No prefix - includes '/' and '/recipe/*'
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
+    app.register_blueprint(generation_api_bp)  # Prefix '/api' - Angular JSON endpoints
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
