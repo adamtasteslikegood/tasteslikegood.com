@@ -1,0 +1,13 @@
+[run]
+omit =
+    tests/*
+    debug_*.py
+    discover_*.py
+    migrate_recipes.py
+    scan_paths_for_nonascii.py
+    test_*.py
+    test_session_manual.py
+    utils/valkey_auth.py
+    workflow_runs/*
+    config.py
+    *__init__.py

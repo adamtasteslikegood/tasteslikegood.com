@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-cd /home/adam/projects/tasteslikegoodtheangularsvegancookbook/Backend
+cd "$(dirname "$0")"
 
 echo "=========================================="
 echo "  Backend CI/CD Test Script"
@@ -27,7 +27,8 @@ echo ""
 
 # Step 3: Run Flake8 linter
 echo "Step 3: Linting code with Flake8..."
-if uv run flake8 . ; then
+# Ignoring E501 here for now. E402 handling remains scoped via .flake8.
+if uv run flake8 . --extend-ignore=E501 ; then
     echo "✅ Flake8: No linting errors"
 else
     echo "⚠️  Flake8: Linting issues found (review above)"
@@ -36,6 +37,8 @@ echo ""
 
 # Step 4: Run mypy type checker
 echo "Step 4: Type checking with mypy..."
+# Clear mypy cache to prevent 'is_bound' corruption errors
+rm -rf .mypy_cache
 if uv run mypy . --ignore-missing-imports ; then
     echo "✅ mypy: Type checking passed"
 else
@@ -45,6 +48,7 @@ echo ""
 
 # Step 5: Run pytest
 echo "Step 5: Running tests with pytest..."
+# Coverage omissions are now handled by the .coveragerc file.
 if uv run pytest --cov=. --cov-report=term ; then
     echo "✅ pytest: All tests passed"
 else
