@@ -16,10 +16,31 @@ import json
 import os
 import traceback
 
-from flask import session, url_for
+from flask import has_request_context, session, url_for
 
 from services.gemini_service import get_genai_client
 from utils.session_utils import get_user_metadata
+
+
+def _safe_session_get(key, default=None):
+    """Return a value from Flask's session only when a request context is active.
+
+    This lets the service run in contexts without Flask (unit tests, CLI jobs)
+    without triggering ``RuntimeError: Working outside of request context``.
+    """
+    if not has_request_context():
+        return default
+    return session.get(key, default)
+
+
+def _anonymous_user_metadata():
+    """Default metadata used when no Flask request context is available."""
+    return {
+        "user_id": None,
+        "display_name": None,
+        "is_authenticated": False,
+        "session_id": None,
+    }
 
 
 def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
@@ -48,16 +69,21 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
     if force_regenerate and "ai_image_url" in recipe_data:
         del recipe_data["ai_image_url"]
 
-    # Get authenticated client
-    session_credentials = session.get("credentials") if session else None
+    # Get authenticated client (session is only available inside request context)
+    session_credentials = _safe_session_get("credentials")
     client = get_genai_client(session_credentials)
 
     if not client:
         return None, {"error": "No credentials available", "status": 500}
 
     try:
-        # Get comprehensive user metadata
-        user_metadata = get_user_metadata()
+        # Get comprehensive user metadata when available; fall back to
+        # anonymous metadata when called outside of a Flask request context
+        # (e.g. from unit tests or background/CLI jobs).
+        if has_request_context():
+            user_metadata = get_user_metadata()
+        else:
+            user_metadata = _anonymous_user_metadata()
         _ = user_metadata["user_id"]  # noqa: F841
 
         model_to_use = "imagen-4.0-generate-001"

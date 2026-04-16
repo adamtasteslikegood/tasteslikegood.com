@@ -42,9 +42,8 @@ class TestImageService(unittest.TestCase):
         self.assertEqual(url, "/static/images/existing.png")
         self.assertIsNone(err)
 
-    @patch("services.image_service.session")
     @patch("services.image_service.get_genai_client")
-    def test_generate_fails_without_client(self, mock_get_client, mock_session):
+    def test_generate_fails_without_client(self, mock_get_client):
         """Should return an error if no Gemini client can be created (no auth)."""
         mock_get_client.return_value = None
 
@@ -54,14 +53,13 @@ class TestImageService(unittest.TestCase):
         self.assertEqual(err["status"], 500)
         self.assertIn("credentials", err["error"].lower())
 
-    @patch("services.image_service.session")
     @patch("services.image_service.get_genai_client")
     @patch("services.image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.image_service.save_image_file")
     @patch("services.image_service.update_recipe_with_image")
     @patch("builtins.open", new_callable=mock_open)
     def test_successful_generation(
-        self, mock_file_open, mock_update, mock_save, mock_meta, mock_client, mock_session
+        self, mock_file_open, mock_update, mock_save, mock_meta, mock_client
     ):
         """Should complete the entire generation pipeline and save the JSON."""
         # Setup mock client and response
@@ -87,13 +85,10 @@ class TestImageService(unittest.TestCase):
         # Verify file write for the JSON was called
         mock_file_open().write.assert_called()
 
-    @patch("services.image_service.session")
     @patch("services.image_service.get_genai_client")
     @patch("services.image_service.get_user_metadata", side_effect=Exception("Simulated API Crash"))
     @patch("builtins.open", new_callable=mock_open)
-    def test_generation_exception_handling(
-        self, mock_file_open, mock_meta, mock_client, mock_session
-    ):
+    def test_generation_exception_handling(self, mock_file_open, mock_meta, mock_client):
         """Should catch unexpected exceptions, log them, and return a clean 500 error."""
         mock_client.return_value = MagicMock()
 
