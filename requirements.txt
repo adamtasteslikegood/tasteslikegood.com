@@ -32,6 +32,7 @@ jsonschema==4.25.1
 jsonschema-specifications==2025.9.1
 markupsafe==3.0.3
 oauthlib==3.3.1
+psycopg2-binary==2.9.10
 proto-plus==1.27.1
 protobuf==5.29.6
 pyasn1==0.6.3
