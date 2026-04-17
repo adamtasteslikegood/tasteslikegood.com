@@ -101,6 +101,12 @@ def api_login():
             access_type="offline", include_granted_scopes="true"
         )
         session["state"] = state
+        # google-auth-oauthlib auto-generates a PKCE code_verifier and
+        # embeds code_challenge in the auth URL. The callback must present
+        # the same verifier at token exchange or Google rejects with
+        # invalid_grant "Missing code verifier".
+        if getattr(flow, "code_verifier", None):
+            session["code_verifier"] = flow.code_verifier
 
         return jsonify({"authorization_url": authorization_url, "state": state}), 200
 
@@ -134,6 +140,10 @@ def api_callback():  # noqa: C901
     try:
         flow = Flow.from_client_config(client_config, scopes=SCOPES, state=state)
         flow.redirect_uri = url_for("auth_api.api_callback", _external=True)
+        # Restore PKCE verifier stashed during /api/auth/login.
+        code_verifier = session.get("code_verifier")
+        if code_verifier:
+            flow.code_verifier = code_verifier
         authorization_response = request.url
         flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
