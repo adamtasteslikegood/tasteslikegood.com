@@ -36,7 +36,7 @@ UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
 
 # Default Model Configuration
-DEFAULT_MODEL = "gemini-2.0-flash-exp"
+DEFAULT_MODEL = "gemini-3.1-pro-preview"
 
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
