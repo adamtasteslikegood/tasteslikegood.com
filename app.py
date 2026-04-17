@@ -63,6 +63,19 @@ def create_app():
         _secret_key = os.urandom(24)
     app.secret_key = _secret_key
 
+    # Session cookie scope. In production, allow one cookie to cover both
+    # the apex and www subdomains so OAuth state survives when Google
+    # redirects the user to a different variant of the host than the one
+    # they started on. SESSION_COOKIE_DOMAIN is read from env so local
+    # dev (no domain) still works.
+    session_cookie_domain = os.environ.get("SESSION_COOKIE_DOMAIN")
+    if session_cookie_domain:
+        app.config["SESSION_COOKIE_DOMAIN"] = session_cookie_domain
+    if os.environ.get("FLASK_ENV") == "production":
+        app.config["SESSION_COOKIE_SECURE"] = True
+        app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+        app.config["SESSION_COOKIE_HTTPONLY"] = True
+
     # Configure Database
     from config import SQLALCHEMY_DATABASE_URI, SQLALCHEMY_TRACK_MODIFICATIONS
 
