@@ -104,7 +104,8 @@ def api_login():
 
         return jsonify({"authorization_url": authorization_url, "state": state}), 200
 
-    except Exception:
+    except Exception as e:
+        logger.exception("OAuth login failed: %s", e)
         return jsonify({"error": "Failed to initiate login"}), 500
 
 
@@ -218,7 +219,8 @@ def api_callback():  # noqa: C901
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
         return f'<script>window.location.href = "{frontend_url}?auth=success";</script>'
 
-    except Exception:
+    except Exception as e:
+        logger.exception("OAuth callback failed: %s", e)
         return jsonify({"error": "Authentication failed"}), 500
 
 
