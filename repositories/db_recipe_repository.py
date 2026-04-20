@@ -181,6 +181,29 @@ def update_recipe(
         return None
 
 
+def update_recipe_status(
+    recipe_id: str,
+    status: str,
+    user_id: Optional[int] = None,
+    guest_session_id: Optional[str] = None,
+) -> bool:
+    """
+    Update the status of an existing recipe.
+    """
+    try:
+        recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
+        if not recipe:
+            return False
+            
+        recipe.status = status
+        db.session.commit()
+        return True
+    except Exception as e:
+        logger.error(f"Error updating status for recipe {recipe_id}: {e}")
+        db.session.rollback()
+        return False
+
+
 def delete_recipe(
     recipe_id: str,
     user_id: Optional[int] = None,
