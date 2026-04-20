@@ -232,6 +232,41 @@ def get_all_recipes(limit: int = 100) -> List[Recipe]:
         return []
 
 
+def get_recipe_by_slug(slug: str) -> Optional[Recipe]:
+    """
+    Get a public recipe by its slug.
+
+    Args:
+        slug: The URL slug of the recipe
+
+    Returns:
+        Recipe object if found and public, None otherwise
+    """
+    try:
+        return Recipe.query.filter_by(slug=slug, is_public=True).first()  # type: ignore[no-any-return]
+    except Exception as e:
+        logger.error(f"Error fetching recipe by slug {slug}: {e}")
+        return None
+
+
+def get_public_recipes(page: int = 1, per_page: int = 12) -> Any:
+    """
+    Get a paginated list of public recipes.
+
+    Args:
+        page: Current page number
+        per_page: Number of recipes per page
+
+    Returns:
+        Pagination object containing recipes
+    """
+    try:
+        return Recipe.query.filter_by(is_public=True).order_by(Recipe.created_at.desc()).paginate(page=page, per_page=per_page, error_out=False)
+    except Exception as e:
+        logger.error(f"Error fetching public recipes: {e}")
+        return None
+
+
 def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] = None) -> int:
     """
     Count the number of recipes for a user.

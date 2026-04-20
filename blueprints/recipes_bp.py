@@ -11,6 +11,7 @@ import json
 
 from flask import Blueprint, Response, abort, render_template, request
 
+from repositories import db_recipe_repository
 from repositories.recipe_repository import (
     get_all_recipes,
     get_recipe,
@@ -19,6 +20,7 @@ from repositories.recipe_repository import (
     save_recipe,
     validate_recipe_filepath,
 )
+from services.recipe_presenter import RecipePresenter
 from services.stock_image_service import (
     _get_fallback_image,
     validate_and_refresh_stock_image,
@@ -33,6 +35,67 @@ def index():
     """The homepage route. Displays a list of all recipes."""
     recipes = get_all_recipes()
     return render_template("index.html", recipes=recipes)
+
+
+@recipes_bp.route("/browse")
+def browse_public_recipes():
+    """Display a paginated list of all public recipes."""
+    page = request.args.get("page", 1, type=int)
+    pagination = db_recipe_repository.get_public_recipes(page=page)
+    return render_template("browse.html", pagination=pagination)
+
+
+@recipes_bp.route("/r/<slug>")
+def show_public_recipe(slug):
+    """Display a single public recipe by its slug."""
+    recipe = db_recipe_repository.get_recipe_by_slug(slug)
+    if not recipe:
+        abort(404)
+
+    # Use request.host_url to get the full base URL (Express origin)
+    base_url = request.host_url.rstrip("/")
+    json_ld = RecipePresenter.get_json_ld(recipe, base_url)
+    meta = RecipePresenter.get_meta_tags(recipe, base_url)
+
+    import json
+
+    return render_template(
+        "recipe.html",
+        recipe=recipe,
+        is_public=True,
+        json_ld=json.dumps(json_ld),
+        meta=meta,
+    )
+
+
+@recipes_bp.route("/sitemap.xml")
+def sitemap():
+    """Generate a sitemap.xml for all public recipes."""
+    from models import Recipe
+    from flask import make_response
+
+    recipes = Recipe.query.filter_by(is_public=True).all()
+    
+    # Use request.host_url to get the full base URL (Express origin)
+    base_url = request.host_url.rstrip('/')
+    
+    xml = ['<?xml version="1.0" encoding="UTF-8"?>']
+    xml.append('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">')
+    
+    # Add browse page
+    xml.append(f'  <url><loc>{base_url}/browse</loc><changefreq>daily</changefreq><priority>0.8</priority></url>')
+    
+    # Add all public recipes
+    for recipe in recipes:
+        url = f"{base_url}/r/{recipe.slug}"
+        lastmod = recipe.updated_at.strftime('%Y-%m-%d') if recipe.updated_at else recipe.created_at.strftime('%Y-%m-%d')
+        xml.append(f'  <url><loc>{url}</loc><lastmod>{lastmod}</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>')
+        
+    xml.append('</urlset>')
+    
+    response = make_response('\n'.join(xml))
+    response.headers["Content-Type"] = "application/xml"
+    return response
 
 
 @recipes_bp.route("/recipe/<filename>")

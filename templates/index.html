@@ -1,146 +1,70 @@
-{% extends "base.html" %} {% block title %}Welcome to TastesLikeGood.com!!!{%
-endblock %} {% block head %}
-{% endblock %} {% block content %}
-<h1>Welcome to TastesLikeGood.com!!!</h1>
+{% extends "base.html" %}
 
-<div class="search-container">
-    <input type="text" id="search-box" class="search-box" placeholder="Search recipes..." autocomplete="off"
-        aria-label="Search recipes" />
-    <div class="recipe-count" id="recipe-count">
-        Showing <span id="visible-count">{{ recipes|length }}</span> of {{
-        recipes|length }} recipes
+{% block title %}VeganGenius Chef — AI-Crafted Plant-Based Recipes{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Hero Section -->
+    <div class="ar-border-b" style="padding: 6rem 4rem; display: flex; flex-direction: column; align-items: center; text-align: center; background: #000; color: #fff;">
+        <div class="ar-label" style="color: #aaa; margin-bottom: 24px;">Welcome to the Kitchen of the Future</div>
+        <h1 style="font-family: var(--font-display); font-weight: 700; font-size: clamp(3rem, 8vw, 6rem); line-height: 0.9; margin-bottom: 32px; color: #fff;">
+            Zero Fluff.<br>Just Cooking.
+        </h1>
+        <p class="mono" style="font-size: 1.1rem; max-width: 60ch; color: #ccc; margin-bottom: 48px; line-height: 1.6;">
+            AI-generated vegan recipes with professional photography, precise macros, and a minimalist interface designed for real humans.
+        </p>
+        <div style="display: flex; gap: 16px;">
+            <a href="{{ url_for('recipes.browse_public_recipes') }}" class="save-cta" style="background: #fff; color: #000; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 18px 40px; font-size: 1rem;">
+                Browse Recipes
+            </a>
+            <a href="/dashboard" class="save-cta" style="background: transparent; color: #fff; border: 1px solid #fff; text-decoration: none; display: flex; align-items: center; justify-content: center; padding: 18px 40px; font-size: 1rem;">
+                Generate Yours ↗
+            </a>
+        </div>
+    </div>
+
+    <!-- Features Row -->
+    <div class="grid-2col" style="display: grid; grid-template-columns: 1fr 1fr; background: #fff;">
+        <div class="ar-border-r" style="padding: 4rem;">
+            <div class="ar-label" style="margin-bottom: 16px; color: #777;">01. AI Engine</div>
+            <h2 style="margin-bottom: 1.5rem;">Precise Plant-Based Logic</h2>
+            <p class="mono" style="font-size: 0.9rem; line-height: 1.7; color: #555;">
+                Every recipe is built from a custom vegan knowledge graph, ensuring textures, flavors, and nutritional profiles are optimized for plant-based ingredients.
+            </p>
+        </div>
+        <div style="padding: 4rem;">
+            <div class="ar-label" style="margin-bottom: 16px; color: #777;">02. Anti-Recipe Site</div>
+            <h2 style="margin-bottom: 1.5rem;">No Life Stories. No Popups.</h2>
+            <p class="mono" style="font-size: 0.9rem; line-height: 1.7; color: #555;">
+                We stripped away the fluff. You won't find 2,000 words about a trip to Tuscany here. Just the ingredients, the method, and the results.
+            </p>
+        </div>
+    </div>
+
+    <!-- Scrolling Preview Placeholder (would be dynamic in production) -->
+    <div class="ar-border-t ar-border-b" style="padding: 4rem; overflow: hidden; white-space: nowrap; background: #fafaf9;">
+        <div style="display: inline-flex; gap: 40px; animation: scroll 40s linear infinite;">
+            {% for recipe in recipes[:10] %}
+            <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}" class="mono" style="text-decoration: none; color: #000; font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 12px;">
+                <span>{{ recipe.name }}</span>
+                <span style="color: #aaa;">/</span>
+            </a>
+            {% endfor %}
+            <!-- Duplicate for seamless loop -->
+            {% for recipe in recipes[:10] %}
+            <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}" class="mono" style="text-decoration: none; color: #000; font-size: 1.25rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; display: flex; align-items: center; gap: 12px;">
+                <span>{{ recipe.name }}</span>
+                <span style="color: #aaa;">/</span>
+            </a>
+            {% endfor %}
+        </div>
     </div>
 </div>
 
-<div class="recipe-container">
-    <nav class="alphabet-nav" role="navigation" aria-label="Alphabetical navigation">
-        {% for letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %}
-        <a href="#letter-{{ letter }}" class="letter-link" data-letter="{{ letter }}">{{ letter }}</a>
-        {% endfor %}
-    </nav>
-
-    <div class="recipe-list-container">
-        <div class="no-results" id="no-results">
-            No recipes found matching your search.
-        </div>
-
-        {% set recipes_by_letter = {} %} {% for recipe in recipes %} {% set
-        first_letter = recipe.name[0]|upper %} {% if first_letter not in
-        recipes_by_letter %} {% set _ = recipes_by_letter.update({first_letter:
-        []}) %} {% endif %} {% set _ =
-        recipes_by_letter[first_letter].append(recipe) %} {% endfor %} {% for
-        letter in 'ABCDEFGHIJKLMNOPQRSTUVWXYZ' %} {% if letter in
-        recipes_by_letter %}
-        <div class="letter-section" id="letter-{{ letter }}">
-            <h2 class="letter-header">{{ letter }}</h2>
-            <ul class="recipe-list">
-                {% for recipe in recipes_by_letter[letter] %}
-                <li data-recipe-name="{{ recipe.name|lower }}" data-letter="{{ letter }}">
-                    <a href="{{ url_for('recipes.show_recipe', filename=recipe.filename) }}">{{ recipe.name }}</a>
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
-        {% endif %} {% endfor %}
-    </div>
-</div>
-
-<script>
-    const searchBox = document.getElementById("search-box");
-    const recipeItems = document.querySelectorAll(".recipe-list li");
-    const noResults = document.getElementById("no-results");
-    const visibleCount = document.getElementById("visible-count");
-    const totalCount = recipeItems.length;
-    const letterLinks = document.querySelectorAll(".letter-link");
-    const letterSections = document.querySelectorAll(".letter-section");
-
-    // Update letter link states based on available sections
-    function updateLetterLinks() {
-        const availableLetters = new Set();
-        letterSections.forEach((section) => {
-            const letter = section.id.replace("letter-", "");
-            const visibleRecipes = section.querySelectorAll("li:not(.hidden)");
-            if (visibleRecipes.length > 0) {
-                availableLetters.add(letter);
-            }
-        });
-
-        letterLinks.forEach((link) => {
-            const letter = link.dataset.letter;
-            if (availableLetters.has(letter)) {
-                link.classList.remove("disabled");
-            } else {
-                link.classList.add("disabled");
-            }
-        });
-    }
-
-    // Search functionality
-    searchBox.addEventListener("input", function () {
-        const searchTerm = this.value.toLowerCase().trim();
-        let visibleRecipes = 0;
-
-        recipeItems.forEach((item) => {
-            const recipeName = item.dataset.recipeName;
-            const matches = recipeName.includes(searchTerm);
-
-            if (matches) {
-                item.classList.remove("hidden");
-                visibleRecipes++;
-            } else {
-                item.classList.add("hidden");
-            }
-        });
-
-        // Update visible count
-        visibleCount.textContent = visibleRecipes;
-
-        // Show/hide no results message
-        if (visibleRecipes === 0) {
-            noResults.style.display = "block";
-        } else {
-            noResults.style.display = "none";
-        }
-
-        // Hide empty letter sections
-        letterSections.forEach((section) => {
-            const visibleInSection =
-                section.querySelectorAll("li:not(.hidden)").length;
-            if (visibleInSection === 0) {
-                section.style.display = "none";
-            } else {
-                section.style.display = "block";
-            }
-        });
-
-        // Update letter link states
-        updateLetterLinks();
-    });
-
-    // Smooth scroll for letter navigation
-    letterLinks.forEach((link) => {
-        link.addEventListener("click", function (e) {
-            e.preventDefault();
-            const letter = this.dataset.letter;
-            const target = document.getElementById("letter-" + letter);
-            if (target && !this.classList.contains("disabled")) {
-                target.scrollIntoView({ behavior: "smooth", block: "start" });
-                // Clear search when navigating by letter
-                searchBox.value = "";
-                searchBox.dispatchEvent(new Event("input"));
-            }
-        });
-    });
-
-    // Initial setup
-    updateLetterLinks();
-
-    // Focus search box on "/" key
-    document.addEventListener("keydown", function (e) {
-        if (e.key === "/" && !searchBox.matches(":focus")) {
-            e.preventDefault();
-            searchBox.focus();
-        }
-    });
-</script>
+<style>
+@keyframes scroll {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-50%); }
+}
+</style>
 {% endblock %}

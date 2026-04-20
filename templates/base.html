@@ -1,43 +1,66 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-    <head>
-        <meta charset="UTF-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>{% block title %}TastesLikeGood.com{% endblock %}</title>
-        <link
-            rel="icon"
-            href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥗</text></svg>"
-        />
-        <link
-            rel="stylesheet"
-            href="{{ url_for('static', filename='css/style.css') }}"
-        />
-        {% block head %}{% endblock %}
-    </head>
-    <body>
-        <nav class="top-nav">
-            <a href="{{ url_for('recipes.index') }}">Home</a> |
-            <a href="{{ url_for('generation.generate_recipe') }}"
-                >Generate Recipe</a
-            >
-            {% if session.get('credentials') %} |
-            <a href="{{ url_for('auth.profile') }}">Profile</a> |
-            <a href="{{ url_for('auth.logout') }}"
-                >Logout ({{ session['user_info'].get('name', 'User') }})</a
-            >
-            {% else %} | <a href="{{ url_for('auth.login') }}">Login</a>
-            {% endif %}
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}VeganGenius Chef{% endblock %}</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥗</text></svg>">
+    
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/recipe-site.css') }}">
+    
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <header class="ar-border-b site-header" style="padding: 0 4rem; display: flex; align-items: center; justify-content: space-between; height: 60px; background: #fff; position: sticky; top: 0; z-index: 1000;">
+        <a href="{{ url_for('recipes.browse_public_recipes') }}" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 10px;">
+            <span style="font-family: var(--font-display); font-weight: 700; fontSize: 1rem; letter-spacing: -0.01em; color: #000;">
+                VeganGenius Chef
+            </span>
+        </a>
+        <nav style="display: flex; gap: 0;">
+            <a href="{{ url_for('recipes.browse_public_recipes') }}" 
+               class="ar-border" 
+               style="text-decoration: none; background: #fff; color: #000; border: 1px solid #000; padding: 8px 20px; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase; margin-right: -1px;">
+                Browse
+            </a>
+            <a href="/dashboard" 
+               class="ar-border"
+               style="text-decoration: none; background: #fff; color: #000; border: 1px solid #000; padding: 8px 20px; cursor: pointer; font-family: var(--font-body); font-weight: 700; font-size: 0.7rem; letter-spacing: 0.1em; text-transform: uppercase;">
+                My Kitchen ↗
+            </a>
         </nav>
-        <hr />
+    </header>
 
-        <div class="content">{% block content %}{% endblock %}</div>
+    <main class="content">
+        {% block content %}{% endblock %}
+    </main>
 
-        <hr />
-        <nav class="bottom-nav">
-            <a href="{{ url_for('recipes.index') }}">Home</a> |
-            <a href="{{ url_for('generation.generate_recipe') }}"
-                >Generate Recipe</a
-            >
-        </nav>
-    </body>
+    <footer class="ar-border-t footer-bar" style="padding: 2rem 4rem; text-align: center; background: #fff;">
+        <p class="mono" style="font-size: 0.75rem; color: #777;">&copy; 2026 VeganGenius Chef. All rights reserved.</p>
+    </footer>
+
+    <!-- SPA Modal Placeholder -->
+    <div id="spa-modal" style="display: none;">
+        <div class="modal-content fade-up">
+            <h2 style="margin-bottom: 1rem;">Your Kitchen Awaits</h2>
+            <p style="margin-bottom: 2rem;">Save this recipe to your personalized cookbook and access it anywhere.</p>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+                <button onclick="closeModal()" class="save-cta saved" style="background: #fff; color: #000;">Later</button>
+                <a href="/dashboard" class="save-cta" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">Enter Kitchen</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showModal() {
+            document.getElementById('spa-modal').style.display = 'flex';
+        }
+        function closeModal() {
+            document.getElementById('spa-modal').style.display = 'none';
+        }
+    </script>
+
+    {% block scripts %}{% endblock %}
+</body>
 </html>

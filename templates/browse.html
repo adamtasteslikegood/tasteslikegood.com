@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Recipes — VeganGenius Chef{% endblock %}
+
+{% block content %}
+<div class="fade-in">
+    <!-- Page header -->
+    <div class="ar-border-b" style="padding: 3rem 4rem; display: flex; justify-content: space-between; align-items: flex-end;">
+        <div>
+            <div class="ar-label" style="color: #777; margin-bottom: 12px;">Public Recipes</div>
+            <h1 style="font-family: var(--font-display); font-weight: 700; font-size: clamp(2rem, 4vw, 3rem); line-height: 1.1;">
+                Browse Recipes
+            </h1>
+        </div>
+        <span class="mono" style="font-size: 0.82rem; color: #555;">{{ pagination.total }} recipes</span>
+    </div>
+
+    <!-- Grid -->
+    <div style="padding: 4rem; display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 0; border: 1px solid #000; border-bottom: none; margin: 0;">
+        {% for recipe in pagination.items %}
+        <a href="{{ url_for('recipes.show_public_recipe', slug=recipe.slug) }}" class="browse-card ar-border" style="text-decoration: none; color: inherit; border-top: none; border-left: 1px solid #000; overflow: hidden; border-right: none; border-bottom: 1px solid #000; margin: -1px;">
+            <div style="overflow: hidden; aspect-ratio: 4/3; position: relative;">
+                <img src="{{ recipe.data.ai_image_url or recipe.data.stock_image_url or 'https://placehold.co/800x600?text=No+Image' }}" alt="{{ recipe.name }}" style="width: 100%; height: 100%; object-fit: cover;">
+            </div>
+            <div style="padding: 20px 24px; border-top: 1px solid #000; background: #fff;">
+                <h3 style="font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; line-height: 1.25; margin-bottom: 10px; color: #000;">
+                    {{ recipe.name }}
+                </h3>
+                <div style="display: flex; gap: 16px;">
+                    <span class="mono" style="font-size: 0.72rem; color: #555;">Prep {{ recipe.data.prepTime }} min</span>
+                    <span class="mono" style="font-size: 0.72rem; color: #555;">Cook {{ recipe.data.cookTime }} min</span>
+                </div>
+                {% if recipe.data.tags %}
+                <div style="margin-top: 10px; display: flex; gap: 6, flex-wrap: wrap;">
+                    {% for tag in recipe.data.tags[:3] %}
+                    <span class="mono" style="font-size: 0.68rem; color: #777;">#{{ tag }}</span>
+                    {% endfor %}
+                </div>
+                {% endif %}
+            </div>
+        </a>
+        {% else %}
+        <div style="grid-column: 1 / -1; padding: 4rem; text-align: center;">
+            <p class="mono">No public recipes found yet. Come back soon!</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+    <div class="ar-border-b" style="padding: 2rem 4rem; display: flex; justify-content: center; gap: 10px;">
+        {% for p in pagination.iter_pages() %}
+            {% if p %}
+                <a href="{{ url_for('recipes.browse_public_recipes', page=p) }}" 
+                   class="ar-border" 
+                   style="text-decoration: none; background: {{ '#000' if p == pagination.page else '#fff' }}; color: {{ '#fff' if p == pagination.page else '#000' }}; padding: 8px 16px; font-family: var(--font-body); font-weight: 700; font-size: 0.75rem;">
+                   {{ p }}
+                </a>
+            {% else %}
+                <span style="padding: 8px 16px;">...</span>
+            {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

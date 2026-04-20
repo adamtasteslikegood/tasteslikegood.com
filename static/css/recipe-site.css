@@ -1,0 +1,136 @@
+/*
+  TastesLikeGood / Anti-Recipe Site v0.2
+  recipe-site.css
+  ───────────────────────────────────────
+  Structural CSS for the public SSR routes.
+*/
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+/* Anti-Recipe base — true black/white, no radius, no shadow */
+body {
+  font-family: var(--font-body);
+  background: var(--ar-white);
+  color: var(--ar-black);
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+}
+
+/* Typography Overrides */
+h1, h2, h3, h4 { font-family: var(--font-display); }
+
+/* Monospace for ingredients & steps */
+.mono { font-family: var(--font-mono); }
+
+/* Anti-recipe structural borders */
+.ar-border { border: var(--ar-border); }
+.ar-border-b { border-bottom: var(--ar-border); }
+.ar-border-t { border-top: var(--ar-border); }
+.ar-border-r { border-right: var(--ar-border); }
+.ar-border-l { border-left: var(--ar-border); }
+
+/* Label style */
+.ar-label {
+  font-family: var(--font-body);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Animations */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.fade-up { animation: fadeUp 0.5s ease-out both; }
+.fade-in { animation: fadeIn 0.4s ease-out both; }
+
+/* Save toast */
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.toast {
+  position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%);
+  background: var(--ar-black); color: var(--ar-white);
+  font-family: var(--font-body); font-size: 13px; font-weight: 700;
+  letter-spacing: 0.05em; padding: 12px 24px;
+  animation: toastIn 0.3s ease-out both;
+  z-index: 9999; pointer-events: none;
+}
+
+/* CTA button */
+.save-cta {
+  background: var(--ar-black); color: var(--ar-white);
+  font-family: var(--font-body); font-weight: 700;
+  font-size: 0.8rem; letter-spacing: 0.08em; text-transform: uppercase;
+  border: var(--ar-border); padding: 14px 28px;
+  cursor: pointer; transition: background 0.15s, color 0.15s;
+  min-height: 44px;
+}
+.save-cta:hover { background: var(--ar-white); color: var(--ar-black); }
+.save-cta.saved { background: var(--ar-white); color: var(--ar-black); }
+
+/* Recipe step hover */
+.recipe-step { transition: background 0.15s; }
+.recipe-step:hover { background: var(--stone-50); }
+
+/* Browse grid card hover */
+.browse-card img { transition: transform 0.5s ease; display: block; width: 100%; }
+.browse-card:hover img { transform: scale(1.03); }
+.browse-card { cursor: pointer; overflow: hidden; }
+
+/* Tag */
+.ar-tag {
+  font-family: var(--font-mono);
+  font-size: 0.78rem; color: var(--ar-black);
+  border: var(--ar-border); padding: 3px 8px;
+  display: inline-block;
+}
+
+/* Ingredient row */
+.ing-row { border-bottom: 1px solid var(--stone-200); padding: 10px 0; display: flex; gap: 16px; }
+.ing-row:last-child { border-bottom: none; }
+
+/* Modal Shell */
+#spa-modal {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px); z-index: 10000;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.modal-content {
+  background: #fff; border: 1px solid #000; padding: 40px;
+  max-width: 500px; width: 100%; position: relative;
+  text-align: center;
+}
+
+@media print {
+  .top-nav, .save-cta, .toast, .image-controls, .site-header, .footer-bar { display: none !important; }
+  body { background: #fff !important; color: #000 !important; }
+  .ar-border, .ar-border-b, .ar-border-r { border-color: #000 !important; }
+}
+
+@media (max-width: 768px) {
+  .site-header { padding: 0 1.5rem !important; }
+  .hero-container { padding: 2rem 1.5rem !important; }
+  .grid-2col { grid-template-columns: 1fr !important; }
+  .meta-bar { 
+    padding: 1rem 1.5rem !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 20px !important;
+  }
+  .save-cta {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    z-index: 100;
+    border-top: 1px solid #000;
+    border-left: none;
+    border-right: none;
+  }
+  .content-section { padding: 2rem 1.5rem !important; }
+  .footer-bar { padding-bottom: 80px !important; } /* Extra space for sticky CTA */
+}

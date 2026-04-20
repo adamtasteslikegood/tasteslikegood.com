@@ -250,7 +250,7 @@ def serve_recipe_image(recipe_id):
     Serve a recipe's AI-generated image.
     Tries in order: Valkey cache → GCS bucket → legacy base64 in DB.
     Cached in Valkey for 24 hours.
-    Only serves the image if the recipe belongs to the current user/guest session.
+    Allows access if the recipe is public or owned by the requester.
     """
     # Check Valkey cache first (stores raw bytes)
     ck = recipe_image_key(recipe_id)
@@ -262,11 +262,22 @@ def serve_recipe_image(recipe_id):
             headers={"Cache-Control": "public, max-age=86400"},
         )
 
-    user_id = _current_user_id()
-    guest_session_id = _current_guest_session_id()
-    recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
+    # Load recipe from DB without user filtering first to check public status
+    from models import Recipe
+
+    recipe = Recipe.query.filter_by(id=recipe_id).first()
     if not recipe:
         return jsonify({"error": "Recipe not found"}), 404
+
+    # Check access permission
+    user_id = _current_user_id()
+    guest_session_id = _current_guest_session_id()
+    is_owned = (user_id is not None and recipe.user_id == user_id) or (
+        user_id is None and recipe.user_id is None and recipe.guest_session_id == guest_session_id
+    )
+
+    if not recipe.is_public and not is_owned:
+        return jsonify({"error": "Unauthorized"}), 403
 
     recipe_data = recipe.data or {}
     image_bytes = None
