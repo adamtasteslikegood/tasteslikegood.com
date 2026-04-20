@@ -1,0 +1,60 @@
+name: Backend CI - Maximized Baseline
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Matrix Testing: Ensures code runs on multiple supported python versions
+  test-matrix:
+    name: Python Matrix Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Setup UV (Fast Package Manager)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync Dependencies
+        run: uv sync --dev
+      - name: Run Tests
+        run: uv run pytest
+
+  # Code Quality & Security (Single Job)
+  quality-and-security:
+    name: Lint, Type Check & Vulnerability Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Sync Dependencies
+        run: uv sync --dev
+      - name: Formatting (Black)
+        run: uv run black --check .
+      - name: Linting (Ruff / Flake8)
+        run: uv run ruff check . || uv run flake8 .
+      - name: Type Checking (Mypy)
+        run: uv run mypy . --ignore-missing-imports
+      - name: Security Scan (Safety)
+        run: uv run safety check
+        continue-on-error: true # Warning only
