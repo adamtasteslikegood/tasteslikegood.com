@@ -21,11 +21,6 @@
       "supported_generation_methods": []
     },
     {
-      "name": "models/gemini-2.0-flash-exp-image-generation",
-      "display_name": "Gemini 2.0 Flash (Image Generation) Experimental",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-2.0-flash-lite-001",
       "display_name": "Gemini 2.0 Flash-Lite 001",
       "supported_generation_methods": []
@@ -76,6 +71,16 @@
       "supported_generation_methods": []
     },
     {
+      "name": "models/gemma-4-26b-a4b-it",
+      "display_name": "Gemma 4 26B A4B IT",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemma-4-31b-it",
+      "display_name": "Gemma 4 31B IT",
+      "supported_generation_methods": []
+    },
+    {
       "name": "models/gemini-flash-latest",
       "display_name": "Gemini Flash Latest",
       "supported_generation_methods": []
@@ -101,11 +106,6 @@
       "supported_generation_methods": []
     },
     {
-      "name": "models/gemini-2.5-flash-lite-preview-09-2025",
-      "display_name": "Gemini 2.5 Flash-Lite Preview Sep 2025",
-      "supported_generation_methods": []
-    },
-    {
       "name": "models/gemini-3-pro-preview",
       "display_name": "Gemini 3 Pro Preview",
       "supported_generation_methods": []
@@ -126,6 +126,11 @@
       "supported_generation_methods": []
     },
     {
+      "name": "models/gemini-3.1-flash-lite-preview",
+      "display_name": "Gemini 3.1 Flash Lite Preview",
+      "supported_generation_methods": []
+    },
+    {
       "name": "models/gemini-3-pro-image-preview",
       "display_name": "Nano Banana Pro",
       "supported_generation_methods": []
@@ -141,8 +146,28 @@
       "supported_generation_methods": []
     },
     {
+      "name": "models/lyria-3-clip-preview",
+      "display_name": "Lyria 3 Clip Preview",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/lyria-3-pro-preview",
+      "display_name": "Lyria 3 Pro Preview",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-3.1-flash-tts-preview",
+      "display_name": "Gemini 3.1 Flash TTS Preview",
+      "supported_generation_methods": []
+    },
+    {
       "name": "models/gemini-robotics-er-1.5-preview",
       "display_name": "Gemini Robotics-ER 1.5 Preview",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-robotics-er-1.6-preview",
+      "display_name": "Gemini Robotics-ER 1.6 Preview",
       "supported_generation_methods": []
     },
     {
@@ -158,6 +183,11 @@
     {
       "name": "models/gemini-embedding-001",
       "display_name": "Gemini Embedding 001",
+      "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-embedding-2-preview",
+      "display_name": "Gemini Embedding 2 Preview",
       "supported_generation_methods": []
     },
     {
@@ -206,6 +236,11 @@
       "supported_generation_methods": []
     },
     {
+      "name": "models/veo-3.1-lite-generate-preview",
+      "display_name": "Veo 3.1 lite",
+      "supported_generation_methods": []
+    },
+    {
       "name": "models/gemini-2.5-flash-native-audio-latest",
       "display_name": "Gemini 2.5 Flash Native Audio Latest",
       "supported_generation_methods": []
@@ -219,7 +254,12 @@
       "name": "models/gemini-2.5-flash-native-audio-preview-12-2025",
       "display_name": "Gemini 2.5 Flash Native Audio Preview 12-2025",
       "supported_generation_methods": []
+    },
+    {
+      "name": "models/gemini-3.1-flash-live-preview",
+      "display_name": "Gemini 3.1 Flash Live Preview",
+      "supported_generation_methods": []
     }
   ],
-  "updated_at": "2026-03-03T06:17:17Z"
+  "updated_at": "2026-04-20T16:27:19Z"
 }

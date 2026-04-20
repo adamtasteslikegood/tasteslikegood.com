@@ -1,0 +1,199 @@
+{
+  "name": "Vegan Homemade Ravioli with Meatballs and Parmesan",
+  "description": "A comforting, fully plant-based Italian feast featuring tender homemade vegan ravioli stuffed with dairy-free ricotta and spinach. Served alongside hearty lentil meatballs, rich marinara sauce, and topped with a savory cashew parmesan.",
+  "prepTime": 60,
+  "cookTime": 40,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Warm water",
+        "amount": 0.75,
+        "units": "cup",
+        "notes": "For the pasta dough"
+      },
+      {
+        "name": "Olive oil",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "For the pasta dough"
+      },
+      {
+        "name": "Vegan ricotta cheese",
+        "amount": 1,
+        "units": "cup",
+        "notes": "Store-bought or homemade from tofu"
+      },
+      {
+        "name": "Fresh spinach",
+        "amount": 2,
+        "units": "cup",
+        "notes": "Finely chopped"
+      },
+      {
+        "name": "Cooked brown lentils",
+        "amount": 1.5,
+        "units": "cup",
+        "notes": "Well-drained"
+      },
+      {
+        "name": "Fresh parsley",
+        "amount": 0.25,
+        "units": "cup",
+        "notes": "Finely chopped"
+      },
+      {
+        "name": "Prepared flax egg",
+        "amount": 1,
+        "units": "batch",
+        "notes": "1 tbsp ground flaxseed mixed with 3 tbsp water, rested for 5 mins"
+      },
+      {
+        "name": "Vegan marinara sauce",
+        "amount": 3,
+        "units": "cup",
+        "notes": "Warmed"
+      }
+    ],
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 2,
+        "units": "cup",
+        "notes": "Plus extra for dusting"
+      },
+      {
+        "name": "Salt",
+        "amount": 1.5,
+        "units": "tsp",
+        "notes": "Divided (for dough, parmesan, and filling)"
+      },
+      {
+        "name": "Nutritional yeast",
+        "amount": 6,
+        "units": "Tbsp",
+        "notes": "Divided (4 tbsp for filling, 2 tbsp for parmesan)"
+      },
+      {
+        "name": "Vegan breadcrumbs",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "Panko or standard"
+      },
+      {
+        "name": "Garlic powder",
+        "amount": 1.25,
+        "units": "tsp",
+        "notes": "Divided (1 tsp for meatballs, 0.25 tsp for parmesan)"
+      },
+      {
+        "name": "Onion powder",
+        "amount": 1,
+        "units": "tsp",
+        "notes": "For the meatballs"
+      },
+      {
+        "name": "Raw cashews",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "For the vegan parmesan"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Make the vegan parmesan: In a small food processor, pulse the raw cashews, 2 tablespoons of nutritional yeast, 0.5 teaspoon of salt, and 0.25 teaspoon of garlic powder until it resembles a fine, grated parmesan texture. Set aside."
+    },
+    {
+      "step": 2,
+      "description": "Make the meatball mixture: In a food processor, combine the cooked lentils, breadcrumbs, fresh parsley, flax egg, 1 teaspoon of garlic powder, and 1 teaspoon of onion powder. Pulse until the mixture holds together when pressed, but retains some texture. Form into 1-inch balls."
+    },
+    {
+      "step": 3,
+      "description": "Bake the meatballs: Preheat oven to 375\u00b0F (190\u00b0C). Place the formed meatballs on a parchment-lined baking sheet and bake for 25 minutes, flipping halfway through, until golden and firm. Set aside."
+    },
+    {
+      "step": 4,
+      "description": "Prepare the pasta dough: In a large bowl, whisk together the all-purpose flour and 0.5 teaspoon of salt. Create a well in the center and pour in the warm water and olive oil. Mix until a dough forms, then knead on a floured surface for 5-8 minutes until smooth and elastic. Cover with a damp towel and let rest for 30 minutes."
+    },
+    {
+      "step": 5,
+      "description": "Prepare the ravioli filling: In a medium bowl, mix the vegan ricotta, chopped spinach, 4 tablespoons of nutritional yeast, and a pinch of salt and pepper. Stir until well combined."
+    },
+    {
+      "step": 6,
+      "description": "Assemble the ravioli: Divide the rested dough in half. Roll each half out on a floured surface until very thin (about 1/16 inch thick). Place 1-tablespoon dollops of the ricotta filling about 2 inches apart on one dough sheet. Lightly brush water around each dollop, carefully place the second sheet of dough on top, press down around the filling to remove air bubbles and seal, then cut into squares using a knife or ravioli cutter."
+    },
+    {
+      "step": 7,
+      "description": "Cook the ravioli: Bring a large pot of salted water to a gentle boil. Carefully drop the ravioli into the water in batches. Cook for 3-4 minutes, or until they float to the surface. Remove with a slotted spoon and drain."
+    },
+    {
+      "step": 8,
+      "description": "Serve: Warm the marinara sauce in a large skillet. Add the baked lentil meatballs and gently fold in the cooked ravioli. Divide among plates and top generously with the homemade cashew parmesan."
+    }
+  ],
+  "notes": "For an even richer ravioli filling, add a pinch of nutmeg and a squeeze of fresh lemon juice to the vegan ricotta mixture. If you have a pasta machine, you can roll the dough to setting 6 or 7 for perfectly even, thin sheets.",
+  "tags": [
+    "vegan",
+    "italian",
+    "ravioli",
+    "meatballs",
+    "parmesan",
+    "pasta",
+    "dinner",
+    "plant-based",
+    "from-scratch"
+  ],
+  "image_keywords": [
+    "vegan ravioli pasta",
+    "plant-based meatballs",
+    "vegan italian dinner",
+    "homemade pasta dish",
+    "cashew parmesan"
+  ],
+  "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+  "ai_metadata": {
+    "recipe_generation": {
+      "model": "models/gemini-3-pro-preview",
+      "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "prompt": "homemade raviolis with meatballs and pamazaian",
+      "timestamp": "2026-04-20T09:29:32.909640",
+      "success": true
+    },
+    "image_generation": null,
+    "stock_image_generation": {
+      "source": "unsplash",
+      "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "search_query": "vegan ravioli pasta plant-based meatballs vegan italian dinner",
+      "timestamp": "2026-04-20T09:29:32.931946",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false,
+      "attribution": {
+        "photographer_name": "Gina's Auckland",
+        "photographer_url": "https://unsplash.com/@ginasauckland?utm_source=tasteslikegood&utm_medium=referral",
+        "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+        "html": "Photo by <a href=\"https://unsplash.com/@ginasauckland?utm_source=tasteslikegood&utm_medium=referral\">Gina's Auckland</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+      }
+    },
+    "model": "models/gemini-3-pro-preview",
+    "timestamp": "2026-04-20T09:29:32.909640",
+    "prompt": "homemade raviolis with meatballs and pamazaian",
+    "images_working": true
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1724116382275-b923bebe77e8?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDYyOTZ8MHwxfHNlYXJjaHwxfHx2ZWdhbiUyMHJhdmlvbGklMjBwYXN0YSUyMHBsYW50LWJhc2VkJTIwbWVhdGJhbGxzJTIwdmVnYW4lMjBpdGFsaWFuJTIwZGlubmVyfGVufDF8MHx8fDE3NzY3MDI1NzN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+  "stock_image_attribution": {
+    "photographer_name": "Gina's Auckland",
+    "photographer_url": "https://unsplash.com/@ginasauckland?utm_source=tasteslikegood&utm_medium=referral",
+    "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+    "html": "Photo by <a href=\"https://unsplash.com/@ginasauckland?utm_source=tasteslikegood&utm_medium=referral\">Gina's Auckland</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+  }
+}

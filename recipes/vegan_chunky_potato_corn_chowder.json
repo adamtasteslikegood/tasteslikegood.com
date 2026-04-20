@@ -1,0 +1,190 @@
+{
+  "name": "Vegan Chunky Potato & Corn Chowder",
+  "description": "A rich, hearty, and comforting cream-based soup loaded with chunky potatoes, sweet corn, and smoky flavors. Completely dairy-free and perfect for warming up on cold winter days.",
+  "prepTime": 15,
+  "cookTime": 30,
+  "servings": 6,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Olive oil",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Vegetable broth",
+        "amount": 4,
+        "units": "cup"
+      },
+      {
+        "name": "Full-fat coconut milk",
+        "amount": 15,
+        "units": "oz",
+        "notes": "1 standard can"
+      },
+      {
+        "name": "Tamari or soy sauce",
+        "amount": 1,
+        "units": "Tbsp"
+      }
+    ],
+    "dry": [
+      {
+        "name": "Yellow onion",
+        "amount": 1,
+        "units": "unit",
+        "notes": "diced"
+      },
+      {
+        "name": "Carrots",
+        "amount": 2,
+        "units": "unit",
+        "notes": "diced"
+      },
+      {
+        "name": "Celery stalks",
+        "amount": 2,
+        "units": "unit",
+        "notes": "diced"
+      },
+      {
+        "name": "Garlic",
+        "amount": 4,
+        "units": "cloves",
+        "notes": "minced"
+      },
+      {
+        "name": "Russet potatoes",
+        "amount": 4,
+        "units": "unit",
+        "notes": "peeled and diced into large chunks"
+      },
+      {
+        "name": "Frozen sweet corn",
+        "amount": 2,
+        "units": "cup"
+      },
+      {
+        "name": "Nutritional yeast",
+        "amount": 0.25,
+        "units": "cup"
+      },
+      {
+        "name": "Smoked paprika",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Dried thyme",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 1.5,
+        "units": "tsp"
+      },
+      {
+        "name": "Black pepper",
+        "amount": 0.5,
+        "units": "tsp"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "Heat the olive oil in a large heavy-bottomed pot or Dutch oven over medium heat."
+    },
+    {
+      "step": 2,
+      "description": "Add the diced onion, carrots, and celery. Saut\u00e9 for 5-7 minutes until the onions are translucent and the vegetables begin to soften."
+    },
+    {
+      "step": 3,
+      "description": "Stir in the minced garlic, smoked paprika, and dried thyme. Cook for 1 minute, stirring constantly, until fragrant."
+    },
+    {
+      "step": 4,
+      "description": "Add the chunky diced potatoes, vegetable broth, and tamari. Bring the soup to a gentle boil."
+    },
+    {
+      "step": 5,
+      "description": "Reduce the heat to a simmer, cover the pot, and cook for 15-20 minutes, or until the potatoes are fork-tender."
+    },
+    {
+      "step": 6,
+      "description": "To create a creamy base while retaining the chunky texture, use an immersion blender to pulse the soup 4-5 times. Alternatively, carefully transfer 2 cups of the soup to a stand blender, blend until completely smooth, and stir it back into the pot."
+    },
+    {
+      "step": 7,
+      "description": "Pour in the coconut milk, frozen corn, and nutritional yeast. Stir well and simmer for another 5 minutes until the corn is heated through and the soup thickens."
+    },
+    {
+      "step": 8,
+      "description": "Taste and adjust the seasoning with salt and black pepper. Serve hot, garnished with fresh herbs, green onions, or vegan bacon bits if desired."
+    }
+  ],
+  "notes": "For a nuttier flavor, you can substitute the coconut milk with cashew cream (blend 1 cup of soaked raw cashews with 1 cup of water until completely smooth). Serve with a side of warm, crusty sourdough bread for dipping.",
+  "tags": [
+    "vegan",
+    "soup",
+    "chowder",
+    "comfort food",
+    "winter",
+    "creamy",
+    "potato",
+    "corn",
+    "dairy-free"
+  ],
+  "image_keywords": [
+    "creamy vegan soup in a bowl",
+    "chunky potato corn chowder",
+    "comforting winter soup",
+    "rustic soup bowl with crusty bread",
+    "dairy free cream soup"
+  ],
+  "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+  "ai_metadata": {
+    "recipe_generation": {
+      "model": "models/gemini-pro-latest",
+      "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "prompt": "chuncy style cream based soup for cold days",
+      "timestamp": "2026-04-20T09:26:35.170021",
+      "success": true
+    },
+    "image_generation": null,
+    "stock_image_generation": {
+      "source": "unsplash",
+      "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "search_query": "creamy vegan soup in a bowl chunky potato corn chowder comforting winter soup",
+      "timestamp": "2026-04-20T09:26:35.193561",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false,
+      "attribution": {
+        "photographer_name": "Dextar Vision",
+        "photographer_url": "https://unsplash.com/@photographer_esmihel?utm_source=tasteslikegood&utm_medium=referral",
+        "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+        "html": "Photo by <a href=\"https://unsplash.com/@photographer_esmihel?utm_source=tasteslikegood&utm_medium=referral\">Dextar Vision</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+      }
+    },
+    "model": "models/gemini-pro-latest",
+    "timestamp": "2026-04-20T09:26:35.170021",
+    "prompt": "chuncy style cream based soup for cold days",
+    "images_working": true
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1678007698628-0c214c4ef18e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDYyOTZ8MHwxfHNlYXJjaHwxfHxjcmVhbXklMjB2ZWdhbiUyMHNvdXAlMjBpbiUyMGElMjBib3dsJTIwY2h1bmt5JTIwcG90YXRvJTIwY29ybiUyMGNob3dkZXIlMjBjb21mb3J0aW5nJTIwd2ludGVyJTIwc291cHxlbnwxfDB8fHwxNzc2NzAyMzk1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+  "stock_image_attribution": {
+    "photographer_name": "Dextar Vision",
+    "photographer_url": "https://unsplash.com/@photographer_esmihel?utm_source=tasteslikegood&utm_medium=referral",
+    "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+    "html": "Photo by <a href=\"https://unsplash.com/@photographer_esmihel?utm_source=tasteslikegood&utm_medium=referral\">Dextar Vision</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+  }
+}

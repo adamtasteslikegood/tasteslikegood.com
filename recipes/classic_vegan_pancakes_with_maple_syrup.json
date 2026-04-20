@@ -1,0 +1,164 @@
+{
+  "name": "Classic Vegan Pancakes with Maple Syrup",
+  "description": "Light, fluffy, and perfectly golden vegan pancakes, served with a generous drizzle of rich maple syrup.",
+  "prepTime": 10,
+  "cookTime": 15,
+  "servings": 4,
+  "ingredients": {
+    "wet": [
+      {
+        "name": "Plant milk (almond, soy, or oat)",
+        "amount": 1.5,
+        "units": "cup",
+        "notes": "room temperature"
+      },
+      {
+        "name": "Apple cider vinegar",
+        "amount": 1,
+        "units": "Tbsp",
+        "notes": "to curdle the milk"
+      },
+      {
+        "name": "Maple syrup",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "for the batter"
+      },
+      {
+        "name": "Vanilla extract",
+        "amount": 1,
+        "units": "tsp"
+      },
+      {
+        "name": "Coconut oil",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "melted"
+      }
+    ],
+    "dry": [
+      {
+        "name": "All-purpose flour",
+        "amount": 1.5,
+        "units": "cup"
+      },
+      {
+        "name": "Baking powder",
+        "amount": 1,
+        "units": "Tbsp"
+      },
+      {
+        "name": "Salt",
+        "amount": 0.25,
+        "units": "tsp"
+      }
+    ],
+    "other": [
+      {
+        "name": "Maple syrup",
+        "amount": 0.5,
+        "units": "cup",
+        "notes": "for serving"
+      },
+      {
+        "name": "Vegan butter",
+        "amount": 2,
+        "units": "Tbsp",
+        "notes": "optional, for serving"
+      }
+    ]
+  },
+  "instructions": [
+    {
+      "step": 1,
+      "description": "In a medium bowl, whisk together the plant milk and apple cider vinegar. Let it sit for 5 minutes to curdle and form vegan buttermilk."
+    },
+    {
+      "step": 2,
+      "description": "Whisk the melted coconut oil, maple syrup, and vanilla extract into the buttermilk mixture."
+    },
+    {
+      "step": 3,
+      "description": "In a large mixing bowl, sift together the all-purpose flour, baking powder, and salt."
+    },
+    {
+      "step": 4,
+      "description": "Pour the wet ingredients into the dry ingredients. Stir gently until just combined. Do not overmix; a few lumps are perfectly fine. Let the batter rest for 5 minutes."
+    },
+    {
+      "step": 5,
+      "description": "Heat a non-stick skillet or griddle over medium heat. Lightly grease with a little coconut oil or vegan butter."
+    },
+    {
+      "step": 6,
+      "description": "Pour about 1/4 cup of batter onto the skillet for each pancake. Cook for 2-3 minutes until bubbles form on the surface and the edges look set."
+    },
+    {
+      "step": 7,
+      "description": "Flip carefully and cook for another 1-2 minutes until golden brown on the bottom."
+    },
+    {
+      "step": 8,
+      "description": "Serve warm, topped with a pat of vegan butter and a generous drizzle of maple syrup."
+    }
+  ],
+  "notes": "For extra fluffy pancakes, make sure not to overmix the batter. You can also fold in vegan chocolate chips or fresh blueberries right before cooking.",
+  "tags": [
+    "vegan",
+    "breakfast",
+    "pancakes",
+    "maple syrup",
+    "brunch",
+    "dairy-free",
+    "egg-free"
+  ],
+  "image_keywords": [
+    "vegan pancakes stack",
+    "fluffy pancakes with maple syrup",
+    "breakfast pancakes pouring syrup",
+    "golden vegan flapjacks"
+  ],
+  "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+  "ai_metadata": {
+    "recipe_generation": {
+      "model": "models/gemini-pro-latest",
+      "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "prompt": "pancakeswith maple syrup",
+      "timestamp": "2026-04-20T09:23:53.093730",
+      "success": true
+    },
+    "image_generation": null,
+    "stock_image_generation": {
+      "source": "unsplash",
+      "user_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "user_display_name": "Anonymous",
+      "is_authenticated": false,
+      "session_id": "session_8b30dc92a5b54fbcb05cde2b497a2bd7",
+      "search_query": "vegan pancakes stack fluffy pancakes with maple syrup breakfast pancakes pouring syrup",
+      "timestamp": "2026-04-20T09:23:53.123843",
+      "success": true,
+      "url_validated": true,
+      "fallback_used": false,
+      "attribution": {
+        "photographer_name": "Joanna Kosinska",
+        "photographer_url": "https://unsplash.com/@joannakosinska?utm_source=tasteslikegood&utm_medium=referral",
+        "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+        "html": "Photo by <a href=\"https://unsplash.com/@joannakosinska?utm_source=tasteslikegood&utm_medium=referral\">Joanna Kosinska</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+      }
+    },
+    "model": "models/gemini-pro-latest",
+    "timestamp": "2026-04-20T09:23:53.093730",
+    "prompt": "pancakeswith maple syrup",
+    "images_working": true
+  },
+  "stock_image_url": "https://images.unsplash.com/photo-1518449139872-3004c5a597f5?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDYyOTZ8MHwxfHNlYXJjaHwxfHx2ZWdhbiUyMHBhbmNha2VzJTIwc3RhY2slMjBmbHVmZnklMjBwYW5jYWtlcyUyMHdpdGglMjBtYXBsZSUyMHN5cnVwJTIwYnJlYWtmYXN0JTIwcGFuY2FrZXMlMjBwb3VyaW5nJTIwc3lydXB8ZW58MXwwfHx8MTc3NjcwMjIzM3ww&ixlib=rb-4.1.0&q=80&w=1080",
+  "stock_image_attribution": {
+    "photographer_name": "Joanna Kosinska",
+    "photographer_url": "https://unsplash.com/@joannakosinska?utm_source=tasteslikegood&utm_medium=referral",
+    "unsplash_url": "https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral",
+    "html": "Photo by <a href=\"https://unsplash.com/@joannakosinska?utm_source=tasteslikegood&utm_medium=referral\">Joanna Kosinska</a> on <a href=\"https://unsplash.com?utm_source=tasteslikegood&utm_medium=referral\">Unsplash</a>"
+  }
+}
