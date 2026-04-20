@@ -53,7 +53,7 @@ def require_auth(f):
 
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "credentials" not in session or "user_info" not in session:
+        if "user_id" not in session or "user_info" not in session:
             return jsonify({"error": "Unauthorized"}), 401
         return f(*args, **kwargs)
 
@@ -146,12 +146,10 @@ def api_callback():  # noqa: C901
         authorization_response = request.url
         flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
-        session["credentials"] = credentials_to_dict(credentials)
 
         # Get user info from Google
         userinfo_service = googleapiclient.discovery.build("oauth2", "v2", credentials=credentials)
         user_info = userinfo_service.userinfo().get().execute()
-        session["user_info"] = user_info
 
         # Persist user to database (Phase 3)
         from extensions import db
@@ -193,6 +191,10 @@ def api_callback():  # noqa: C901
             logger.error(f"Database error during user creation: {e}")
             return jsonify({"error": "Failed to save user data"}), 500
 
+        # Regenerate session to prevent session fixation
+        session.clear()
+        session["user_info"] = user_info
+
         # Store database user ID in session (not just email)
         session["user_id"] = user.id
         session["db_user"] = user.to_dict()  # Cache user info
@@ -225,8 +227,9 @@ def api_callback():  # noqa: C901
 
         # Redirect to frontend (Angular)
         # In production, redirect to your actual frontend URL
+        from flask import redirect
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-        return f'<script>window.location.href = "{frontend_url}?auth=success";</script>'
+        return redirect(f"{frontend_url}?auth=success")
 
     except Exception as e:
         logger.exception("OAuth callback failed: %s", e)
@@ -309,7 +312,7 @@ def api_check():
     Returns:
         JSON with authentication status and user info (if authenticated)
     """
-    if "credentials" in session and "user_info" in session:
+    if "user_id" in session and "user_info" in session:
         user_info = session.get("user_info", {})
         return (
             jsonify(

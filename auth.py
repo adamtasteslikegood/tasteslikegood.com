@@ -26,7 +26,7 @@ SCOPES = [
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if "credentials" not in session:
+        if "user_id" not in session:
             return redirect(url_for("auth.login"))
         return f(*args, **kwargs)
 
@@ -88,11 +88,15 @@ def callback():
         authorization_response = request.url
         flow.fetch_token(authorization_response=authorization_response)
         credentials = flow.credentials
-        session["credentials"] = credentials_to_dict(credentials)
 
         # Get user info
         userinfo_service = googleapiclient.discovery.build("oauth2", "v2", credentials=credentials)
         user_info = userinfo_service.userinfo().get().execute()
+        
+        # Regenerate session to prevent session fixation
+        old_state = session.get("state")
+        session.clear()
+        session["state"] = old_state
         session["user_info"] = user_info
 
         # Store user_id for easy access (prefer email, fallback to Google ID)

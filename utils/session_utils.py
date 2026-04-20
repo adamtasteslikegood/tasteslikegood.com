@@ -80,7 +80,7 @@ def is_authenticated():
     Returns:
         bool: True if authenticated via Google OAuth, False otherwise
     """
-    return "credentials" in session and "user_info" in session
+    return "user_id" in session and "user_info" in session
 
 
 def get_user_metadata():
