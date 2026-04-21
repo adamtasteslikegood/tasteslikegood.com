@@ -26,6 +26,7 @@ from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
 from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
+from blueprints.public_bp import public_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
 from utils.logging_config import setup_logging
@@ -175,6 +176,7 @@ def create_app():
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(auth_api_bp)  # /api/auth/* endpoints
+    app.register_blueprint(public_bp)  # No prefix - includes '/r/<slug>' and '/browse'
     app.register_blueprint(recipes_bp)  # No prefix - includes '/' and '/recipe/*'
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
     app.register_blueprint(generation_api_bp)  # Prefix '/api' - Angular JSON endpoints
