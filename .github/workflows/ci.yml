@@ -5,13 +5,17 @@ permissions:
 
 on:
   push:
-    branches: [main, dev/backend_sub222, develop]
+    branches: [main, dev/backend_sub222, develop, dev, 'dev/**']
   pull_request:
-    branches: [main, dev/backend_sub222, develop]
+    branches: [main, dev/backend_sub222, develop, dev, 'dev/**']
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint (Black + Flake8)
+  quality:
+    name: Lint, Type Check & Security
     runs-on: ubuntu-latest
 
     steps:
@@ -38,34 +42,22 @@ jobs:
         run: |
           uv run flake8 . --count --show-source --statistics
 
-  type-check:
-    name: Type Check (mypy)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.13
-
-      - name: Install dependencies
-        run: |
-          uv sync --dev
-
       - name: Type check with mypy
         run: |
           uv run mypy . --ignore-missing-imports
 
+      - name: Run safety check
+        run: |
+          uv pip install safety
+          uv run safety check --json || true
+        continue-on-error: true
+
   test:
     name: Test (pytest)
     runs-on: ubuntu-latest
-
+    strategy:
+      matrix:
+        python-version: ['3.11', '3.12', '3.13']
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -75,8 +67,8 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Set up Python
-        run: uv python install 3.13
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
 
       - name: Install dependencies
         run: |
@@ -94,32 +86,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-report-py${{ matrix.python-version }}
           path: coverage.xml
           retention-days: 7
-
-  security:
-    name: Security Scan (Safety)
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Set up Python
-        run: uv python install 3.13
-
-      - name: Install dependencies
-        run: |
-          uv sync --dev
-
-      - name: Run safety check
-        run: |
-          uv pip install safety
-          uv run safety check --json || true
-        continue-on-error: true
