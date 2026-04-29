@@ -28,6 +28,7 @@ from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
+from blueprints.worker_api_bp import worker_api_bp
 from utils.logging_config import setup_logging
 
 # Import session utilities
@@ -181,6 +182,7 @@ def create_app():
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
+    app.register_blueprint(worker_api_bp)  # Prefix '/api/worker' set in blueprint
 
     # Error handlers
     @app.errorhandler(404)
