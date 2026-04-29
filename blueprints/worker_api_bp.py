@@ -2,7 +2,12 @@ import json
 import logging
 import datetime
 import base64
-from flask import Blueprint, request, jsonify
+import os
+from functools import wraps
+from flask import Blueprint, request, jsonify, abort
+
+from google.auth.transport import requests as g_requests
+from google.oauth2 import id_token
 
 from config import GCS_BUCKET_NAME
 from repositories import db_recipe_repository
@@ -14,7 +19,41 @@ logger = logging.getLogger(__name__)
 
 worker_api_bp = Blueprint('worker_api_bp', __name__, url_prefix='/api/worker')
 
+# OIDC token verification for Pub/Sub push messages.
+# Pub/Sub signs each push with a JWT issued for the configured push service
+# account. We verify the signature and the email claim so that only Google
+# Pub/Sub (acting as that SA) can invoke these endpoints. Without this,
+# /api/worker/* would be open to any unauthenticated POST on the public Cloud
+# Run URL.
+PUBSUB_INVOKER_SA = os.environ.get("PUBSUB_INVOKER_SA")
+PUBSUB_AUTH_OPTIONAL = os.environ.get("PUBSUB_AUTH_OPTIONAL", "0") == "1"
+
+def require_pubsub_oidc(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if PUBSUB_AUTH_OPTIONAL:
+            return fn(*args, **kwargs)
+        if not PUBSUB_INVOKER_SA:
+            logger.error("PUBSUB_INVOKER_SA not set; refusing push request")
+            abort(503)
+        auth_header = request.headers.get("Authorization", "")
+        if not auth_header.startswith("Bearer "):
+            logger.warning("Pub/Sub push missing Bearer token")
+            abort(401)
+        token = auth_header.split(None, 1)[1].strip()
+        try:
+            claims = id_token.verify_oauth2_token(token, g_requests.Request())
+        except ValueError as e:
+            logger.warning(f"Pub/Sub OIDC verification failed: {e}")
+            abort(401)
+        if claims.get("email") != PUBSUB_INVOKER_SA or not claims.get("email_verified"):
+            logger.warning(f"Pub/Sub OIDC email mismatch: {claims.get('email')}")
+            abort(403)
+        return fn(*args, **kwargs)
+    return wrapper
+
 @worker_api_bp.route('/recipe', methods=['POST'])
+@require_pubsub_oidc
 def process_recipe():
     envelope = request.get_json()
     if not envelope:
@@ -97,6 +136,7 @@ def process_recipe():
     return jsonify({"status": "ok"}), 200
 
 @worker_api_bp.route('/image', methods=['POST'])
+@require_pubsub_oidc
 def process_image():
     envelope = request.get_json()
     if not envelope:
