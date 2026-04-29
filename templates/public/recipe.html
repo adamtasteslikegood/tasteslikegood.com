@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% set data = recipe.data or {} %}
+
+{% block title %}{{ recipe.name }} · TastesLikeGood{% endblock %}
+
+{% block head %}
+<meta name="description" content="{{ data.description or 'A vegan recipe from TastesLikeGood.' }}">
+<link rel="canonical" href="{{ url_for('public.show_public_recipe', slug=recipe.slug, _external=True) }}">
+{% endblock %}
+
+{% block content %}
+<article class="public-recipe">
+    <header class="public-recipe-header">
+        <p class="eyebrow"><a href="{{ url_for('public.browse_public_recipes') }}">← Browse all recipes</a></p>
+        <h1>{{ recipe.name }}</h1>
+        {% if data.description %}
+        <p class="public-recipe-description">{{ data.description }}</p>
+        {% endif %}
+        <ul class="public-recipe-meta">
+            {% if data.prepTime is not none %}<li><strong>Prep:</strong> {{ data.prepTime }} min</li>{% endif %}
+            {% if data.cookTime is not none %}<li><strong>Cook:</strong> {{ data.cookTime }} min</li>{% endif %}
+            {% if data.servings is not none %}<li><strong>Servings:</strong> {{ data.servings }}</li>{% endif %}
+            {% if recipe.user and recipe.user.name %}
+            <li><strong>By:</strong> {{ recipe.user.name }}</li>
+            {% endif %}
+        </ul>
+    </header>
+
+    {% if data.ai_image_url or data.stock_image_url %}
+    <figure class="public-recipe-image">
+        <img
+            src="{{ data.ai_image_url or data.stock_image_url }}"
+            alt="{{ recipe.name }}"
+            loading="lazy"
+        >
+    </figure>
+    {% endif %}
+
+    {% if data.ingredients %}
+    <section class="public-recipe-ingredients">
+        <h2>Ingredients</h2>
+        {% for group_name, group in data.ingredients.items() %}
+        <h3>{{ group_name | capitalize }}</h3>
+        <ul>
+            {% for ing in group %}
+            <li>
+                {% if ing.amount is iterable and ing.amount is not string %}
+                {{ ing.amount[0] }}–{{ ing.amount[1] }}
+                {% else %}
+                {{ ing.amount }}
+                {% endif %}
+                {{ ing.units }} {{ ing.name }}{% if ing.notes %} <em>({{ ing.notes }})</em>{% endif %}
+            </li>
+            {% endfor %}
+        </ul>
+        {% endfor %}
+    </section>
+    {% endif %}
+
+    {% if data.instructions %}
+    <section class="public-recipe-instructions">
+        <h2>Instructions</h2>
+        <ol>
+            {% for step in data.instructions %}
+            {% if step is mapping %}
+            <li>{{ step.description }}</li>
+            {% else %}
+            <li>{{ step }}</li>
+            {% endif %}
+            {% endfor %}
+        </ol>
+    </section>
+    {% endif %}
+
+    {% if data.notes %}
+    <section class="public-recipe-notes">
+        <h2>Notes</h2>
+        <p>{{ data.notes }}</p>
+    </section>
+    {% endif %}
+</article>
+{% endblock %}

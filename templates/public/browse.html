@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Browse Vegan Recipes · TastesLikeGood{% endblock %}
+
+{% block head %}
+<meta name="description" content="Browse published vegan recipes from the TastesLikeGood community.">
+<link rel="canonical" href="{{ url_for('public.browse_public_recipes', _external=True) }}">
+{% endblock %}
+
+{% block content %}
+<section class="public-browse">
+    <header class="public-browse-header">
+        <h1>Browse Vegan Recipes</h1>
+        <p>Showing {{ recipes|length }} of {{ total }} published recipes.</p>
+    </header>
+
+    {% if recipes %}
+    <ul class="public-browse-list">
+        {% for recipe in recipes %}
+        {% set data = recipe.data or {} %}
+        <li class="public-browse-item">
+            <a href="{{ url_for('public.show_public_recipe', slug=recipe.slug) }}">
+                {% if data.ai_image_url or data.stock_image_url %}
+                <img
+                    src="{{ data.ai_image_url or data.stock_image_url }}"
+                    alt="{{ recipe.name }}"
+                    loading="lazy"
+                >
+                {% endif %}
+                <h2>{{ recipe.name }}</h2>
+            </a>
+            {% if data.description %}
+            <p>{{ data.description }}</p>
+            {% endif %}
+            <p class="public-browse-byline">
+                {% if recipe.user and recipe.user.name %}By {{ recipe.user.name }}{% endif %}
+            </p>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="public-browse-empty">No public recipes yet. Check back soon.</p>
+    {% endif %}
+
+    {% if total_pages > 1 %}
+    <nav class="public-browse-pagination" aria-label="Pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('public.browse_public_recipes', page=page - 1) }}" rel="prev">← Previous</a>
+        {% endif %}
+        <span>Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ url_for('public.browse_public_recipes', page=page + 1) }}" rel="next">Next →</a>
+        {% endif %}
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}
