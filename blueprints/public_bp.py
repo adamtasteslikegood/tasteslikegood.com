@@ -56,9 +56,7 @@ def browse_public_recipes():
     except (TypeError, ValueError):
         page = 1
 
-    base_query = Recipe.query.filter(Recipe.is_public.is_(True)).options(
-        joinedload(Recipe.user)
-    )
+    base_query = Recipe.query.filter(Recipe.is_public.is_(True)).options(joinedload(Recipe.user))
 
     total = base_query.with_entities(Recipe.id).count()
     total_pages = max(1, ceil(total / BROWSE_PAGE_SIZE))

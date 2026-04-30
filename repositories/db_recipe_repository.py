@@ -194,7 +194,7 @@ def update_recipe_status(
         recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
         if not recipe:
             return False
-            
+
         recipe.status = status
         db.session.commit()
         return True

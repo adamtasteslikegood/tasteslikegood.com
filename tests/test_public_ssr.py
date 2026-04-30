@@ -128,9 +128,7 @@ def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
         db.session.add(owner)
         db.session.commit()
         for idx in range(5):
-            db.session.add(
-                _make_recipe(f"Owned {idx}", f"owned-{idx}", owner=owner)
-            )
+            db.session.add(_make_recipe(f"Owned {idx}", f"owned-{idx}", owner=owner))
         db.session.commit()
 
     select_count = 0

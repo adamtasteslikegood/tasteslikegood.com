@@ -30,6 +30,9 @@ Migrations live in `migrations/versions/`. Schema changes ship as auto-generated
 export FLASK_APP=app.py
 uv run flask db migrate -m "describe the change"
 uv run flask db upgrade
+# Alembic generates with single quotes + non-PEP8 spacing; run black before
+# committing or the Lint job will fail when this PR targets `main`.
+uv run black migrations/versions/
 ```
 
 ### Multi-PR head conflicts
@@ -40,7 +43,7 @@ Two PRs that both add a migration off the same parent revision will create **bra
 uv run flask db merge -m "merge <topic-a> and <topic-b> heads" <revA> <revB>
 ```
 
-Commit the resulting `*_merge_*.py` file alongside your PR. The merge migration's `upgrade()`/`downgrade()` are typically empty — it exists only to unify the DAG.
+Commit the resulting `*_merge_*.py` file alongside your PR. The merge migration's `upgrade()`/`downgrade()` are typically empty — it exists only to unify the DAG. Run `uv run black migrations/versions/` after generating it; Alembic's emitted style fails the Lint job on `main`.
 
 ### Production migration runs
 
