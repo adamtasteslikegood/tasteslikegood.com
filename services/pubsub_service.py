@@ -27,7 +27,7 @@ def publish_message(topic_name: str, data: dict) -> str:
     
     try:
         future = publisher.publish(topic_path, data=data_bytes)
-        message_id = future.result()
+        message_id: str = future.result()
         logger.info(f"Published message {message_id} to {topic_name}")
         return message_id
     except Exception as e:

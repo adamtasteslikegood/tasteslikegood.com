@@ -122,6 +122,13 @@ exclude = [
     "debug_generation\\.py",
     "migrations/",
     "workflow_runs/",
+    # `scripts/` is a top-level helpers folder without an __init__.py.
+    # Without exclusion, mypy walks `scripts/backfill_slugs.py` from two
+    # different roots and errors with "Source file found twice under
+    # different module names" because it can't decide whether to treat
+    # the file as `backfill_slugs` or `scripts.backfill_slugs`. The same
+    # exclusion already exists in `.flake8` for the same reason.
+    "scripts/",
 ]
 
 [tool.uv]
