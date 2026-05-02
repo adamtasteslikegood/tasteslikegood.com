@@ -1,7 +1,11 @@
+import os
 import sys
 from pathlib import Path
 import pytest
 from sqlalchemy.exc import IntegrityError
+
+# Set test database BEFORE any backend imports so config.py reads the right value
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
