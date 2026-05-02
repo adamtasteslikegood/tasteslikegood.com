@@ -23,7 +23,10 @@ def app():
     })
     
     with app.app_context():
-        db.create_all()
+        # Use migrations to ensure schema is current (db.create_all() can miss
+        # columns if the metadata is stale from a previous import).
+        from flask_migrate import upgrade
+        upgrade()
         yield app
         db.session.remove()
         db.drop_all()
