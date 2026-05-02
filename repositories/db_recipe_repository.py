@@ -113,6 +113,8 @@ def create_recipe(
                 return None
 
             existing.name = recipe_name
+            existing.slug = recipe_data_with_id.get("slug")
+            existing.is_public = recipe_data_with_id.get("is_public", False)
             existing.data = recipe_data_with_id
             existing.updated_at = datetime.utcnow()
             db.session.commit()
@@ -123,6 +125,8 @@ def create_recipe(
             user_id=user_id,
             guest_session_id=None if user_id is not None else guest_session_id,
             name=recipe_name,
+            slug=recipe_data_with_id.get("slug"),
+            is_public=recipe_data_with_id.get("is_public", False),
             data=recipe_data_with_id,
         )
 
@@ -299,7 +303,7 @@ def migrate_file_to_db(
             logger.warning(f"Recipe {recipe_id} already exists in database, skipping")
             return existing  # type: ignore[no-any-return]
 
-        recipe = Recipe(id=recipe_id, user_id=user_id, name=recipe_name, data=recipe_data)
+        recipe = Recipe(id=recipe_id, user_id=user_id, name=recipe_name, slug=recipe_data.get("slug"), is_public=recipe_data.get("is_public", False), data=recipe_data)
 
         db.session.add(recipe)
         db.session.commit()
