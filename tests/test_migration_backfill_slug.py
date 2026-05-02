@@ -1,11 +1,7 @@
-import os
 import sys
 from pathlib import Path
 import pytest
 from sqlalchemy.exc import IntegrityError
-
-# Set test database BEFORE any backend imports so config.py reads the right value
-os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -23,10 +19,7 @@ def app():
     })
     
     with app.app_context():
-        # Use migrations to ensure schema is current (db.create_all() can miss
-        # columns if the metadata is stale from a previous import).
-        from flask_migrate import upgrade
-        upgrade()
+        db.create_all()
         yield app
         db.session.remove()
         db.drop_all()
