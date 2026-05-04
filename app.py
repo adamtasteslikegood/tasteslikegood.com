@@ -39,9 +39,17 @@ from utils.session_utils import get_or_create_session_id
 logger = setup_logging()
 
 
-def create_app():
+def create_app(**config_overrides):
     """
     Application factory for creating the Flask app.
+
+    Args:
+        **config_overrides: Flask config values to apply after the default
+            environment-driven config has loaded but before extensions are
+            initialized. Tests use this to bind the SQLAlchemy engine to
+            ``sqlite:///:memory:`` from the start, avoiding a brief window
+            where the engine would otherwise pick up the file-based dev DB
+            from ``config.py`` (issue #118).
 
     Returns:
         Flask: Configured Flask application
@@ -83,6 +91,11 @@ def create_app():
 
     app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
+
+    # Apply caller-supplied overrides (e.g. test fixtures binding to
+    # sqlite:///:memory:) before extensions latch on to the URI.
+    if config_overrides:
+        app.config.update(config_overrides)
 
     # Initialize extensions
     from extensions import db, migrate
