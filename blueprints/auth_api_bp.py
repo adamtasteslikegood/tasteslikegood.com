@@ -21,13 +21,18 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Allow OAuth over HTTP for local development
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+# Allow OAuth over HTTP for local development only. In production the request
+# is HTTPS at the edge (Cloud Run) and ProxyFix forwards the scheme, so this
+# flag should never be needed. Use setdefault so an operator can still pin
+# the value explicitly via the runtime environment if needed.
+if os.environ.get("FLASK_ENV") != "production":
+    os.environ.setdefault("OAUTHLIB_INSECURE_TRANSPORT", "1")
 # Tolerate scope set/order differences in Google's token response. Google may
 # bundle previously-granted scopes (e.g. cloud-platform from an earlier consent)
 # into the response and reorder the list; oauthlib raises on any mismatch by
 # default, which fails the callback for returning users with stale grants.
-os.environ["OAUTHLIB_RELAX_TOKEN_SCOPE"] = "1"
+# setdefault preserves any explicit value an operator sets in the environment.
+os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 
 auth_api_bp = Blueprint("auth_api", __name__, url_prefix="/api/auth")
 
