@@ -2,8 +2,10 @@
 
 Covers:
 - /r/<slug> renders only published recipes, 404 for private / missing
+- /r/<slug> emits SEO metadata + Recipe JSON-LD for public recipe pages
 - /browse paginates and only lists is_public=True recipes
 - /browse uses eager loading (joinedload) to avoid N+1 on Recipe.user
+- /sitemap.xml lists only public routes
 - /api/recipes/<id>/image is readable without ownership when is_public=True
 """
 
@@ -66,6 +68,58 @@ def test_show_public_recipe_renders_html(app, client):
     assert "Thai Peanut Noodles description" in body
 
 
+def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
+    png_bytes = b"\x89PNG\r\n\x1a\nseo"
+    with app.app_context():
+        recipe = _make_recipe(
+            "Thai Peanut Noodles",
+            "thai-peanut-noodles",
+            data={
+                "name": "Thai Peanut Noodles",
+                "description": "Creamy noodles with a spicy peanut sauce.",
+                "prepTime": 15,
+                "cookTime": 20,
+                "servings": 4,
+                "tags": ["vegan", "noodles"],
+                "ingredients": {
+                    "dry": [
+                        {
+                            "name": "Rice noodles",
+                            "amount": 12,
+                            "units": "oz",
+                        }
+                    ]
+                },
+                "instructions": [
+                    {"step": 1, "description": "Boil the noodles."},
+                    {"step": 2, "description": "Whisk the sauce."},
+                ],
+                "ai_image_data": base64.b64encode(png_bytes).decode("ascii"),
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    resp = client.get("/r/thai-peanut-noodles")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
+    assert '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">' in body
+    assert (
+        f'<meta property="og:image" '
+        f'content="http://localhost/api/recipes/{recipe_id}/image">' in body
+    )
+    assert '<meta name="twitter:card" content="summary_large_image">' in body
+    assert 'type="application/ld+json"' in body
+    assert '"@type": "Recipe"' in body
+    assert '"prepTime": "PT15M"' in body
+    assert '"cookTime": "PT20M"' in body
+    assert '"totalTime": "PT35M"' in body
+    assert 'Save to your cookbook' in body
+    assert 'Save to Pinterest' in body
+
+
 def test_show_public_recipe_404_when_missing(client):
     resp = client.get("/r/does-not-exist")
     assert resp.status_code == 404
@@ -98,6 +152,7 @@ def test_browse_lists_only_public_recipes(app, client):
     assert "Public One" in body
     assert "Public Two" in body
     assert "Private" not in body
+    assert '<link rel="canonical" href="http://localhost/browse">' in body
 
 
 def test_browse_paginates(app, client):
@@ -116,6 +171,7 @@ def test_browse_paginates(app, client):
     assert second.status_code == 200
     second_body = second.get_data(as_text=True)
     assert "Page 2 of 2" in second_body
+    assert '<link rel="canonical" href="http://localhost/browse?page=2">' in second_body
 
 
 def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
@@ -147,6 +203,28 @@ def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
     # Expect a small, fixed number of SELECTs — count(*) + recipes+user join.
     # Anything above 5 means eager loading regressed and rows are loading users one-by-one.
     assert select_count <= 5, f"expected ≤5 SELECTs, got {select_count} (N+1 regression)"
+
+
+def test_sitemap_lists_only_public_routes(app, client):
+    with app.app_context():
+        db.session.add_all(
+            [
+                _make_recipe("Public One", "public-one"),
+                _make_recipe("Public Two", "public-two"),
+                _make_recipe("Private", "private", public=False),
+            ]
+        )
+        db.session.commit()
+
+    resp = client.get("/sitemap.xml")
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/xml"
+    body = resp.get_data(as_text=True)
+    assert "http://localhost/" in body
+    assert "http://localhost/browse" in body
+    assert "http://localhost/r/public-one" in body
+    assert "http://localhost/r/public-two" in body
+    assert "http://localhost/r/private" not in body
 
 
 def test_public_recipe_image_served_without_session(app, client):
