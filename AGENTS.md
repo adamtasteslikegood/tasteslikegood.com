@@ -129,6 +129,15 @@ uv run flask db merge -m "..." A B  # unify branched heads
 
 On feature branches, commit and push after every significant work-run so work is recoverable from the remote if the VM/session dies. Stage only intentional files, keep commits scoped, and push immediately after each local commit unless the user explicitly says not to.
 
+## Atlassian source of truth
+
+For repo coordination outside git, use:
+- **Jira KAN** for active execution state and branch/work ownership
+- **Jira RCP** for delivery planning, epics, sprints, and acceptance scope
+- **Confluence TLG** for durable planning/session narrative and documentation
+
+The cookbook repo owns the PM daemon and briefing scripts. Backend work should keep those Atlassian systems current so cross-agent sessions can see accurate project state without relying on local file context.
+
 ## Environment variables
 
 | Var | Purpose |
