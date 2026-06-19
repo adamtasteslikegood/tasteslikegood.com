@@ -8,7 +8,6 @@ Provides endpoints for the Angular frontend (via Express proxy):
 """
 
 import base64
-import datetime
 import logging
 import uuid
 
@@ -17,20 +16,16 @@ from flask import Blueprint, Response, jsonify, request, session
 from config import DEFAULT_MODEL, GCS_BUCKET_NAME
 from blueprints.generation_bp import (
     build_generation_prompt,
-    attempt_recipe_generation,
     validate_generation_input,
 )
 from repositories import db_recipe_repository
-from services.gemini_service import get_genai_client
 from utils.cache_utils import (
     recipe_image_key,
-    invalidate_recipe,
-    invalidate_recipe_image,
     safe_get,
     safe_set,
     TTL_IMAGE,
 )
-from utils.session_utils import get_or_create_session_id, get_user_metadata
+from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +68,7 @@ def generate_recipe_json():
     selected_model = data.get("model", DEFAULT_MODEL)
 
     # Build prompt with schema
-    full_prompt = build_generation_prompt(prompt)
+    build_generation_prompt(prompt)
 
     # Assign an ID
     recipe_id = str(uuid.uuid4())
@@ -81,12 +76,8 @@ def generate_recipe_json():
     guest_session_id = _current_guest_session_id()
 
     # Save a pending recipe to database
-    pending_data = {
-        "id": recipe_id,
-        "name": "Generating...",
-        "user_id": user_id
-    }
-    
+    pending_data = {"id": recipe_id, "name": "Generating...", "user_id": user_id}
+
     db_recipe = db_recipe_repository.create_recipe(pending_data, user_id, guest_session_id)
 
     if not db_recipe:
@@ -96,15 +87,15 @@ def generate_recipe_json():
 
     # Publish message to Pub/Sub
     from services.pubsub_service import publish_message
-    
+
     message_data = {
         "recipe_id": recipe_id,
         "prompt": prompt,
         "model": selected_model,
         "user_id": user_id,
-        "guest_session_id": guest_session_id
+        "guest_session_id": guest_session_id,
     }
-    
+
     try:
         publish_message("recipe-generation", message_data)
         logger.info(f"Queued recipe generation (id={recipe_id})")
@@ -156,14 +147,14 @@ def generate_image_for_recipe():
         return jsonify({"image_url": recipe_data["ai_image_url"]}), 200
 
     from services.pubsub_service import publish_message
-    
+
     message_data = {
         "recipe_id": recipe_id,
         "user_id": user_id,
         "guest_session_id": guest_session_id,
-        "force_regenerate": force_regenerate
+        "force_regenerate": force_regenerate,
     }
-    
+
     try:
         publish_message("image-generation", message_data)
         logger.info(f"Queued image generation for recipe (id={recipe_id})")
@@ -180,15 +171,12 @@ def get_recipe_status(recipe_id):
     """
     user_id = _current_user_id()
     guest_session_id = _current_guest_session_id()
-    
+
     recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
     if not recipe:
         return jsonify({"error": "Recipe not found"}), 404
-        
-    return jsonify({
-        "status": recipe.status,
-        "recipe": recipe.data
-    }), 200
+
+    return jsonify({"status": recipe.status, "recipe": recipe.data}), 200
 
 
 @generation_api_bp.route("/recipes/<recipe_id>/image", methods=["GET"])

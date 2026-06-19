@@ -198,7 +198,7 @@ def update_recipe_status(
         recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
         if not recipe:
             return False
-            
+
         recipe.status = status
         db.session.commit()
         return True
@@ -303,7 +303,14 @@ def migrate_file_to_db(
             logger.warning(f"Recipe {recipe_id} already exists in database, skipping")
             return existing  # type: ignore[no-any-return]
 
-        recipe = Recipe(id=recipe_id, user_id=user_id, name=recipe_name, slug=recipe_data.get("slug"), is_public=recipe_data.get("is_public", False), data=recipe_data)
+        recipe = Recipe(
+            id=recipe_id,
+            user_id=user_id,
+            name=recipe_name,
+            slug=recipe_data.get("slug"),
+            is_public=recipe_data.get("is_public", False),
+            data=recipe_data,
+        )
 
         db.session.add(recipe)
         db.session.commit()

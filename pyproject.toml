@@ -117,6 +117,7 @@ python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+explicit_package_bases = true
 exclude = [
     "migrate_recipes\\.py",
     "debug_generation\\.py",

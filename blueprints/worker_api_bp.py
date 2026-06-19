@@ -17,7 +17,7 @@ from services.gemini_service import get_genai_client
 
 logger = logging.getLogger(__name__)
 
-worker_api_bp = Blueprint('worker_api_bp', __name__, url_prefix='/api/worker')
+worker_api_bp = Blueprint("worker_api_bp", __name__, url_prefix="/api/worker")
 
 # OIDC token verification for Pub/Sub push messages.
 # Pub/Sub signs each push with a JWT issued for the configured push service
@@ -27,6 +27,7 @@ worker_api_bp = Blueprint('worker_api_bp', __name__, url_prefix='/api/worker')
 # Run URL.
 PUBSUB_INVOKER_SA = os.environ.get("PUBSUB_INVOKER_SA")
 PUBSUB_AUTH_OPTIONAL = os.environ.get("PUBSUB_AUTH_OPTIONAL", "0") == "1"
+
 
 def require_pubsub_oidc(fn):
     @wraps(fn)
@@ -50,9 +51,11 @@ def require_pubsub_oidc(fn):
             logger.warning(f"Pub/Sub OIDC email mismatch: {claims.get('email')}")
             abort(403)
         return fn(*args, **kwargs)
+
     return wrapper
 
-@worker_api_bp.route('/recipe', methods=['POST'])
+
+@worker_api_bp.route("/recipe", methods=["POST"])
 @require_pubsub_oidc
 def process_recipe():
     envelope = request.get_json()
@@ -112,19 +115,23 @@ def process_recipe():
 
         db_recipe_repository.update_recipe(recipe_id, recipe_data, user_id, guest_session_id)
         db_recipe_repository.update_recipe_status(recipe_id, "ready", user_id, guest_session_id)
-        
+
         invalidate_recipe(user_id, guest_session_id, recipe_id)
         logger.info(f"Successfully generated recipe {recipe_id}")
-        
+
         # Trigger image generation
         from services.pubsub_service import publish_message
+
         try:
-            publish_message("image-generation", {
-                "recipe_id": recipe_id,
-                "user_id": user_id,
-                "guest_session_id": guest_session_id,
-                "force_regenerate": False
-            })
+            publish_message(
+                "image-generation",
+                {
+                    "recipe_id": recipe_id,
+                    "user_id": user_id,
+                    "guest_session_id": guest_session_id,
+                    "force_regenerate": False,
+                },
+            )
             logger.info(f"Queued image generation for recipe {recipe_id}")
         except Exception as e:
             logger.error(f"Failed to queue image generation for {recipe_id}: {e}")
@@ -132,10 +139,11 @@ def process_recipe():
     except Exception as e:
         logger.error(f"Error processing recipe message: {e}")
         return jsonify({"status": "ok"}), 200
-        
+
     return jsonify({"status": "ok"}), 200
 
-@worker_api_bp.route('/image', methods=['POST'])
+
+@worker_api_bp.route("/image", methods=["POST"])
 @require_pubsub_oidc
 def process_image():
     envelope = request.get_json()
@@ -170,7 +178,7 @@ def process_image():
             return jsonify({"status": "ok"}), 200
 
         recipe_data = recipe.data or {}
-        
+
         # Check if image already exists
         has_real_image = bool(recipe_data.get("ai_image_data") or recipe_data.get("ai_image_gcs"))
         if not force_regenerate and has_real_image and recipe_data.get("ai_image_url"):
@@ -200,15 +208,16 @@ def process_image():
                 prompt=image_prompt,
                 config={"number_of_images": 1},
             )
-            
+
             if not response.generated_images:
                 raise Exception("No images generated")
-                
+
             image_bytes = response.generated_images[0].image.image_bytes
             image_url = f"/api/recipes/{recipe_id}/image"
 
             if GCS_BUCKET_NAME:
                 from services.gcs_service import upload_image
+
                 gcs_uri = upload_image(GCS_BUCKET_NAME, recipe_id, image_bytes)
                 if not gcs_uri:
                     raise Exception("Failed to upload image to storage")
@@ -247,7 +256,7 @@ def process_image():
             recipe_data["ai_metadata"]["image_generation"] = {
                 "success": False,
                 "error": str(e),
-                "timestamp": datetime.datetime.now().isoformat()
+                "timestamp": datetime.datetime.now().isoformat(),
             }
             db_recipe_repository.update_recipe(recipe_id, recipe_data, user_id, guest_session_id)
 
