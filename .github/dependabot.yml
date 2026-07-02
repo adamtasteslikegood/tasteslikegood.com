@@ -10,3 +10,14 @@ updates:
       - "dependencies"
       - "python"
     open-pull-requests-limit: 10
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    exclude-paths:
+      - "/.agent/skills/dependency-auditor/test-project/**"
+      - "/.claude/skills/dependency-auditor/test-project/**"
+      - "/.codex/skills/dependency-auditor/test-project/**"
+      - "/.github/skills/dependency-auditor/test-project/**"
+      - "/.zed/skills/dependency-auditor/test-project/**"
+    open-pull-requests-limit: 0
