@@ -20,4 +20,3 @@ updates:
       - "/.codex/skills/dependency-auditor/test-project/**"
       - "/.github/skills/dependency-auditor/test-project/**"
       - "/.zed/skills/dependency-auditor/test-project/**"
-    open-pull-requests-limit: 0
