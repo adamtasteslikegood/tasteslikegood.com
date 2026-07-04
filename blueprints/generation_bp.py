@@ -150,12 +150,15 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
                 # Validate against schema
                 if not validate_recipe_data(data):
                     print(f"Validation failed for {source_name}")
-                    return None, None
+                    raise ValueError("Generated recipe failed schema validation")
 
                 return data, text_response
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 print(f"JSON Decode Error for {source_name}: {text_response[:100]}...")
-                return None, None
+                raise ValueError(
+                    f"Model returned invalid JSON "
+                    f"(likely truncated, {len(text_response)} chars): {e}"
+                ) from e
 
         except Exception as e:
             print(f"Generation error with {source_name}: {e}")
