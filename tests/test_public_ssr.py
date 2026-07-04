@@ -267,3 +267,53 @@ def test_private_recipe_image_still_requires_ownership(app, client):
 
     resp = client.get(f"/api/recipes/{recipe_id}/image")
     assert resp.status_code == 404
+
+
+def test_public_recipe_json_returns_save_payload(app, client):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Thai Peanut Noodles",
+            "thai-peanut-noodles",
+            data={
+                "name": "Thai Peanut Noodles",
+                "description": "Creamy noodles",
+                "prepTime": 10,
+                "cookTime": 20,
+                "servings": 4,
+                "ingredients": {"wet": [], "dry": [], "other": []},
+                "instructions": ["Boil noodles"],
+                "tags": ["thai"],
+                "stock_image_url": "https://img.example/stock.jpg",
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/api/recipes/public/thai-peanut-noodles")
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/json"
+    payload = resp.get_json()
+    assert payload["name"] == "Thai Peanut Noodles"
+    assert payload["description"] == "Creamy noodles"
+    assert payload["instructions"] == ["Boil noodles"]
+    assert payload["stock_image_url"] == "https://img.example/stock.jpg"
+
+
+def test_public_recipe_json_404_for_private_or_missing(app, client):
+    with app.app_context():
+        db.session.add(_make_recipe("Secret Stew", "secret-stew", public=False))
+        db.session.commit()
+
+    assert client.get("/api/recipes/public/secret-stew").status_code == 404
+    assert client.get("/api/recipes/public/never-existed").status_code == 404
+
+
+def test_public_recipe_page_links_save_cta_to_spa_save_url(app, client):
+    with app.app_context():
+        recipe = _make_recipe("Thai Peanut Noodles", "thai-peanut-noodles")
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/thai-peanut-noodles")
+    body = resp.get_data(as_text=True)
+    assert "/?save=thai-peanut-noodles#kitchen" in body

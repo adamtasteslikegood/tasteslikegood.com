@@ -100,65 +100,17 @@
                     });
                 }
 
+                // The Save CTA is a plain anchor to /?save=<slug>#kitchen — the
+                // SPA performs the save through its session-aware flow. Add a
+                // small acknowledgement before the navigation happens.
                 const saveButton = document.querySelector('[data-save-recipe]');
-                if (!saveButton) return;
-
-                const recipeScript = document.getElementById('save-recipe-payload');
-                if (!recipeScript) return;
-
-                let recipe;
-                try {
-                    recipe = JSON.parse(recipeScript.textContent || '{}');
-                } catch (_error) {
-                    return;
+                if (saveButton && toast) {
+                    saveButton.addEventListener('click', () => {
+                        saveButton.classList.add('is-saved');
+                        toast.textContent = 'Opening your kitchen…';
+                        toast.hidden = false;
+                    });
                 }
-
-                const SESSION_KEY = 'vegan_genius_session';
-                const getSession = () => {
-                    try {
-                        return JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
-                    } catch (_error) {
-                        return null;
-                    }
-                };
-
-                const createGuest = () => ({
-                    id:
-                        globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
-                            ? globalThis.crypto.randomUUID()
-                            : `guest-${Date.now()}`,
-                    name: 'Guest Chef',
-                    isGuest: true,
-                    authProvider: 'guest',
-                    savedRecipes: [],
-                    cookbooks: [],
-                    deletedRecipes: [],
-                });
-
-                const showToast = (message) => {
-                    if (!toast) return;
-                    toast.textContent = message;
-                    toast.hidden = false;
-                    window.clearTimeout(showToast._timer);
-                    showToast._timer = window.setTimeout(() => {
-                        toast.hidden = true;
-                    }, 2500);
-                };
-
-                saveButton.addEventListener('click', () => {
-                    const session = getSession() || createGuest();
-                    const recipes = Array.isArray(session.savedRecipes) ? session.savedRecipes : [];
-                    const nextRecipes = recipes.filter((entry) => entry.id !== recipe.id);
-                    nextRecipes.push(recipe);
-                    session.savedRecipes = nextRecipes;
-                    if (!Array.isArray(session.cookbooks)) session.cookbooks = [];
-                    if (!Array.isArray(session.deletedRecipes)) session.deletedRecipes = [];
-                    localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-                    saveButton.classList.add('is-saved');
-                    saveButton.textContent = 'Saved — opening kitchen';
-                    showToast('Saved to your cookbook');
-                    window.setTimeout(openKitchen, 350);
-                });
             })();
         </script>
     </body>
