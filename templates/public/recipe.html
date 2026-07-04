@@ -28,7 +28,6 @@
 {% endif %}
 
 <script type="application/ld+json">{{ recipe_json_ld | tojson(indent=2) }}</script>
-<script type="application/json" id="save-recipe-payload">{{ save_recipe_payload | tojson }}</script>
 {% endblock %}
 
 {% block content %}
@@ -67,9 +66,12 @@
                 {% if recipe.user and recipe.user.name %}<li>By {{ recipe.user.name }}</li>{% endif %}
             </ul>
             <div class="public-recipe-actions">
-                <button type="button" class="public-save-cta" data-save-recipe>
+                {# Plain anchor: the SPA's ?save= flow fetches the recipe from
+                   /api/recipes/public/<slug> and saves it through the hardened
+                   session-aware path (fresh id, image fields, auth-race guard). #}
+                <a href="{{ spa_save_url }}" class="public-save-cta" data-save-recipe>
                     Save to your cookbook
-                </button>
+                </a>
                 <a href="{{ pinterest_share_url }}" target="_blank" rel="noopener noreferrer" class="public-recipe-action-link" aria-label="Share {{ recipe.name }} on Pinterest">
                     Save to Pinterest
                 </a>

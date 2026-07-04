@@ -19,7 +19,7 @@ from typing import Any
 from urllib.parse import urlencode
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from flask import Blueprint, Response, abort, render_template, request, url_for
+from flask import Blueprint, Response, abort, jsonify, render_template, request, url_for
 from sqlalchemy.orm import joinedload
 
 from models import Recipe
@@ -238,9 +238,21 @@ def show_public_recipe(slug):
         description=description,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=_pinterest_share_url(canonical_url, image_url, recipe.name),
-        save_recipe_payload=_save_recipe_payload(recipe, image_url),
+        spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
         save_to_cookbook_url=f"{_public_base_url()}/#kitchen",
     )
+
+
+@public_bp.route("/api/recipes/public/<slug>", methods=["GET"])
+def public_recipe_json(slug):
+    """JSON payload of a published recipe for the SPA's ?save=<slug> flow.
+
+    Returns 404 when no recipe matches the slug or the recipe is not public.
+    """
+    recipe = Recipe.query.filter(Recipe.slug == slug, Recipe.is_public.is_(True)).first()
+    if recipe is None:
+        abort(404)
+    return jsonify(_save_recipe_payload(recipe, _recipe_image_url(recipe)))
 
 
 @public_bp.route("/browse", methods=["GET"])
