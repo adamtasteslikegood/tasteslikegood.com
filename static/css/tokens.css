@@ -1,0 +1,107 @@
+/*
+  TastesLikeGood / VeganGenius Chef — Design System
+  Public SSR token subset for the anti-recipe site.
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400;700&display=swap');
+
+:root {
+  --stone-50: #fafaf9;
+  --stone-100: #f5f5f4;
+  --stone-200: #e7e5e4;
+  --stone-300: #d6d3d1;
+  --stone-400: #a8a29e;
+  --stone-500: #78716c;
+  --stone-700: #44403c;
+  --stone-800: #292524;
+
+  --green-700: #15803d;
+  --green-800: #166534;
+  --yellow-50: #fefce8;
+  --yellow-100: #fef9c3;
+  --yellow-800: #854d0e;
+  --yellow-900: #713f12;
+
+  --ar-black: #000000;
+  --ar-white: #ffffff;
+  --ar-border: 1px solid #000000;
+  --ar-radius: 0px;
+
+  --bg-page: var(--stone-50);
+  --bg-surface: #ffffff;
+  --bg-muted: var(--stone-100);
+  --fg-primary: var(--stone-800);
+  --fg-secondary: var(--stone-500);
+  --fg-inverted: #ffffff;
+
+  --color-primary: var(--green-700);
+  --color-primary-hover: var(--green-800);
+  --color-accent-bg: var(--yellow-50);
+  --color-accent-border: var(--yellow-100);
+  --color-accent-text: var(--yellow-800);
+  --color-accent-body: var(--yellow-900);
+
+  --font-display: 'Playfair Display', Georgia, 'Times New Roman', serif;
+  --font-body: 'Lato', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Courier New', 'Courier', ui-monospace, monospace;
+
+  --fw-light: 300;
+  --fw-regular: 400;
+  --fw-bold: 700;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+  --text-5xl: 3rem;
+
+  --leading-tight: 1.25;
+  --leading-snug: 1.375;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+
+  --tracking-tight: -0.015em;
+  --tracking-wide: 0.05em;
+  --tracking-wider: 0.1em;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--fg-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  text-wrap: pretty;
+}
+
+h1,
+h2,
+h3,
+h4,
+.serif {
+  font-family: var(--font-display);
+}
+
+.mono,
+code,
+pre {
+  font-family: var(--font-mono);
+}
