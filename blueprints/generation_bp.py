@@ -15,6 +15,7 @@ import time
 import google.oauth2.credentials  # noqa: F401
 from flask import Blueprint, redirect, render_template, request, session, url_for
 from google.genai import Client
+from jsonschema import ValidationError
 
 from config import (
     CONFIG,
@@ -147,10 +148,16 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
                 # Normalize data to handle typos and variations
                 data = normalize_recipe_data(data)
 
-                # Validate against schema
-                if not validate_recipe_data(data):
-                    print(f"Validation failed for {source_name}")
-                    raise ValueError("Generated recipe failed schema validation")
+                # Validate against schema — validate_recipe_data raises
+                # ValidationError (it never returns False), so surface it
+                # with a clear cause instead of a generic error label.
+                try:
+                    validate_recipe_data(data)
+                except ValidationError as e:
+                    print(f"Validation failed for {source_name}: {e}")
+                    raise ValueError(
+                        f"Generated recipe failed schema validation: {e}"
+                    ) from e
 
                 return data, text_response
             except json.JSONDecodeError as e:

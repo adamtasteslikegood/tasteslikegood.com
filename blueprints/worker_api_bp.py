@@ -31,7 +31,18 @@ PUBSUB_AUTH_OPTIONAL = os.environ.get("PUBSUB_AUTH_OPTIONAL", "0") == "1"
 # In-process retries for one push message. Each attempt is a fresh model call
 # (~10-25 s); 3 attempts stays well inside the Cloud Run request timeout and
 # the push subscription's ack deadline.
-GENERATION_MAX_ATTEMPTS = int(os.environ.get("GENERATION_MAX_ATTEMPTS", "3"))
+def _parse_max_attempts(raw, default=3):
+    """Parse the retry budget defensively: a misconfigured env var must not
+    break blueprint import, and anything below 1 would skip generation
+    entirely."""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        logger.warning(f"Invalid GENERATION_MAX_ATTEMPTS {raw!r}; using {default}")
+        return default
+    return max(1, value)
+
+GENERATION_MAX_ATTEMPTS = _parse_max_attempts(os.environ.get("GENERATION_MAX_ATTEMPTS", "3"))
 
 def require_pubsub_oidc(fn):
     @wraps(fn)

@@ -161,3 +161,55 @@ def test_invalid_json_sets_real_error_message(app):
     assert raw_json is None
     assert last_error != "Unknown error"
     assert "invalid JSON" in last_error
+
+
+def test_schema_validation_failure_sets_real_error_message(app):
+    """Schema failures must surface the ValidationError cause, not
+    'Unknown error' (validate_recipe_data raises; it never returns False)."""
+    from jsonschema import ValidationError
+
+    from blueprints import generation_bp
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            class FakeResponse:
+                text = json.dumps(VALID_RECIPE)
+
+            return FakeResponse()
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            self.models = FakeModels()
+
+    with app.test_request_context("/api/generate"), patch.object(
+        generation_bp, "Client", FakeClient
+    ), patch.object(generation_bp, "GOOGLE_API_KEY", "fake-key"), patch.object(
+        generation_bp,
+        "validate_recipe_data",
+        side_effect=ValidationError("'name' is a required property"),
+    ):
+        recipe_data, raw_json, last_error = generation_bp.attempt_recipe_generation(
+            "make peach salsa", "gemini-3.1-pro-preview"
+        )
+
+    assert recipe_data is None
+    assert last_error != "Unknown error"
+    assert "schema validation" in last_error
+    assert "required property" in last_error
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("3", 3),
+        ("5", 5),
+        ("0", 1),  # clamp: below 1 would skip generation entirely
+        ("-2", 1),
+        ("not-a-number", 3),  # bad env var must not break import
+        (None, 3),
+    ],
+)
+def test_parse_max_attempts_is_defensive(raw, expected):
+    from blueprints.worker_api_bp import _parse_max_attempts
+
+    assert _parse_max_attempts(raw) == expected
