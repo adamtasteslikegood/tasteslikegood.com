@@ -28,6 +28,22 @@ worker_api_bp = Blueprint('worker_api_bp', __name__, url_prefix='/api/worker')
 PUBSUB_INVOKER_SA = os.environ.get("PUBSUB_INVOKER_SA")
 PUBSUB_AUTH_OPTIONAL = os.environ.get("PUBSUB_AUTH_OPTIONAL", "0") == "1"
 
+# In-process retries for one push message. Each attempt is a fresh model call
+# (~10-25 s); 3 attempts stays well inside the Cloud Run request timeout and
+# the push subscription's ack deadline.
+def _parse_max_attempts(raw, default=3):
+    """Parse the retry budget defensively: a misconfigured env var must not
+    break blueprint import, and anything below 1 would skip generation
+    entirely."""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        logger.warning(f"Invalid GENERATION_MAX_ATTEMPTS {raw!r}; using {default}")
+        return default
+    return max(1, value)
+
+GENERATION_MAX_ATTEMPTS = _parse_max_attempts(os.environ.get("GENERATION_MAX_ATTEMPTS", "3"))
+
 def require_pubsub_oidc(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
@@ -83,9 +99,24 @@ def process_recipe():
 
     try:
         full_prompt = build_generation_prompt(prompt)
-        recipe_data, recipe_json_str, last_error = attempt_recipe_generation(
-            full_prompt, selected_model
-        )
+
+        # The model intermittently returns malformed/truncated JSON (a single
+        # bad sample at temperature 0.7); a fresh attempt usually succeeds, so
+        # retry in-process rather than surfacing an error status the user has
+        # to retry by hand.
+        recipe_data = None
+        recipe_json_str = None
+        last_error = None
+        for attempt in range(1, GENERATION_MAX_ATTEMPTS + 1):
+            recipe_data, recipe_json_str, last_error = attempt_recipe_generation(
+                full_prompt, selected_model
+            )
+            if recipe_data:
+                break
+            logger.warning(
+                f"Recipe generation attempt {attempt}/{GENERATION_MAX_ATTEMPTS} "
+                f"failed for {recipe_id}: {last_error}"
+            )
 
         if not recipe_data:
             logger.error(f"Recipe generation failed for {recipe_id}: {last_error}")
