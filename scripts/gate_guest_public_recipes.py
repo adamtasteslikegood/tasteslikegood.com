@@ -62,6 +62,11 @@ def run_gate(session, reassign_email: Optional[str] = None) -> Dict[str, int]:
     else:
         for row in rows:
             row.is_public = False
+            # Pre-gate rows carry is_public=true inside the JSON blob too;
+            # keep blob and column in agreement (same invariant as
+            # db_recipe_repository._gate_is_public).
+            if isinstance(row.data, dict) and row.data.get("is_public"):
+                row.data["is_public"] = False
         summary["unpublished"] = len(rows)
         logger.warning(
             "gate_guest_public_recipes: unpublished %d guest-owned rows "

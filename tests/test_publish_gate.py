@@ -140,7 +140,8 @@ def _add_row(recipe_id, slug, is_public, user_id=None, guest_session_id=None):
         name=slug,
         slug=slug,
         is_public=is_public,
-        data={"id": recipe_id, "name": slug},
+        # Pre-gate rows carried the flag inside the blob too.
+        data={"id": recipe_id, "name": slug, "is_public": is_public},
     )
     db.session.add(r)
     db.session.commit()
@@ -153,7 +154,9 @@ def test_gate_unpublishes_guest_rows_without_email(app, user):
 
     summary = run_gate(db.session, reassign_email=None)
 
-    assert Recipe.query.get("g-pub").is_public is False
+    gated = Recipe.query.get("g-pub")
+    assert gated.is_public is False
+    assert gated.data["is_public"] is False  # blob agrees with the column
     assert Recipe.query.get("u-pub").is_public is True  # untouched
     assert summary == {"found": 1, "reassigned": 0, "unpublished": 1}
 
