@@ -27,6 +27,23 @@ def _apply_recipe_scope(query, user_id: Optional[int], guest_session_id: Optiona
     return query.filter_by(user_id=None, guest_session_id=None)
 
 
+def _gate_is_public(recipe_data: Dict[str, Any], user_id: Optional[int]) -> Dict[str, Any]:
+    """Only authenticated users may publish: guests get is_public forced False.
+
+    A guest_session_id is a throwaway browser token — there is no accountable
+    owner to moderate or ban behind a guest-published /r/<slug> page. The flag
+    is normalized in the data blob itself so the JSON payload and the
+    is_public column can never disagree.
+    """
+    wants_public = bool(recipe_data.get("is_public", False))
+    if wants_public and user_id is None:
+        logger.warning(
+            "Guest attempted to publish recipe %s — forcing is_public=False",
+            recipe_data.get("id", "<no id>"),
+        )
+    return {**recipe_data, "is_public": wants_public if user_id is not None else False}
+
+
 def get_user_recipes(
     user_id: Optional[int], guest_session_id: Optional[str] = None
 ) -> List[Recipe]:
@@ -94,7 +111,7 @@ def create_recipe(
         recipe_name = recipe_data.get("name", "Unnamed Recipe")
 
         # Ensure the id in recipe_data matches the database record id
-        recipe_data_with_id = {**recipe_data, "id": recipe_id}
+        recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
 
         existing = Recipe.query.filter_by(id=recipe_id).first()  # type: ignore[no-any-return]
         if existing:
@@ -166,8 +183,10 @@ def update_recipe(
             logger.warning(f"Recipe {recipe_id} not found for user {user_id}")
             return None
 
-        # Ensure the id in recipe_data matches the database record id
-        recipe_data_with_id = {**recipe_data, "id": recipe_id}
+        # Ensure the id in recipe_data matches the database record id.
+        # PUT does not write the is_public column, but the blob must not
+        # carry a guest-smuggled is_public=true either.
+        recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
 
         # Update fields
         recipe.name = recipe_data.get("name", recipe.name)
