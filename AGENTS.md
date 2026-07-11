@@ -125,6 +125,10 @@ uv run flask db upgrade             # apply
 uv run flask db merge -m "..." A B  # unify branched heads
 ```
 
+## Commit and push cadence
+
+On feature branches, commit and push after every significant work-run so work is recoverable from the remote if the VM/session dies. Stage only intentional files, keep commits scoped, and push immediately after each local commit unless the user explicitly says not to.
+
 ## Environment variables
 
 | Var | Purpose |
