@@ -30,6 +30,7 @@ from utils.cache_utils import (
     safe_set,
     TTL_IMAGE,
 )
+from utils.admin_auth import require_admin
 from utils.session_utils import get_or_create_session_id, get_user_metadata
 
 logger = logging.getLogger(__name__)
@@ -254,22 +255,11 @@ def serve_recipe_image(recipe_id):
     )
 
 
-def _require_admin():
-    """Check for admin bearer token (ADMIN_API_TOKEN). Returns error response or None."""
-    import os
-
-    admin_key = os.environ.get("ADMIN_API_TOKEN", "")
-    auth_header = request.headers.get("Authorization", "")
-    if not admin_key or not auth_header.startswith("Bearer ") or auth_header[7:] != admin_key:
-        return jsonify({"error": "Unauthorized — admin token required"}), 403
-    return None
-
-
 @generation_api_bp.route("/admin/image-audit", methods=["GET"])
 def audit_recipe_images():
     """Diagnostic: show which recipes have/lack image data in the DB.
     Requires admin bearer token."""
-    err = _require_admin()
+    err = require_admin()
     if err:
         return err
 
@@ -326,7 +316,7 @@ def migrate_image_urls():
     Also fixes legacy URL patterns (data: URLs, /static/ paths).
     Returns summary of migrated recipes.
     """
-    auth_error = _require_admin()
+    auth_error = require_admin()
     if auth_error:
         return auth_error
     from models import Recipe

@@ -15,6 +15,7 @@ import logging
 import os
 
 from flask import Blueprint, jsonify, request, session
+from sqlalchemy import text
 
 from config import CONFIG, DEFAULT_MODEL, GOOGLE_API_KEY
 from repositories.recipe_repository import (
@@ -29,6 +30,7 @@ from services.model_service import (
     refresh_models_from_api,
 )
 from services.reporting_service import ReportingService
+from utils.admin_auth import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +172,7 @@ def api_status():
     try:
         from extensions import db
 
-        db.session.execute("SELECT 1")
+        db.session.execute(text("SELECT 1"))
         db_status = "connected"
     except Exception:
         db_status = "error"
@@ -190,7 +192,13 @@ def api_status():
 def run_migration():
     """
     Migrate all recipes in the recipes directory to the latest schema.
+
+    Requires admin bearer token (same gate as the /api/admin/* routes).
     """
+    auth_error = require_admin()
+    if auth_error:
+        return auth_error
+
     try:
         results = MigrationService.migrate_all_recipes()
         return jsonify(results)
