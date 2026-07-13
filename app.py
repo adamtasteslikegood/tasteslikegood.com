@@ -98,10 +98,15 @@ def create_app(**config_overrides):
         app.config.update(config_overrides)
 
     # Initialize extensions
-    from extensions import db, migrate
+    from extensions import db, init_cache, migrate
 
     db.init_app(app)
     migrate.init_app(app, db)
+
+    # Connect the response cache to Valkey (Memorystore) when configured.
+    # Falls back to a no-op cache if VALKEY_HOST is unset or unreachable,
+    # so local dev and tests run without a Valkey instance (issue #143).
+    init_cache()
 
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured

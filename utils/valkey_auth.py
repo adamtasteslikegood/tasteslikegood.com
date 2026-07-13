@@ -9,6 +9,7 @@ Ref: https://cloud.google.com/memorystore/docs/valkey/manage-iam-auth
 """
 
 import logging
+import os
 import threading
 import time
 
@@ -47,12 +48,29 @@ def _build_client(host: str, port: int) -> redis.StrictRedis:
         logger.info("Creating Valkey client with fresh IAM token (sa=%s)", email)
     else:
         logger.info("Creating Valkey client with fresh IAM token (user credentials)")
+
+    # Memorystore server certs chain to a Google-managed private CA that the
+    # system trust store cannot verify. VALKEY_CA_CERT carries that CA's PEM
+    # (same secret the Express service uses — see cookbook cloudbuild.yaml).
+    # Without it we still connect over TLS to the private VPC IP, but skip
+    # chain verification rather than fail and silently lose the cache.
+    ssl_kwargs: dict = {"ssl": True}
+    ca_cert = os.environ.get("VALKEY_CA_CERT")
+    if ca_cert:
+        ssl_kwargs["ssl_ca_data"] = ca_cert
+    else:
+        logger.warning(
+            "VALKEY_CA_CERT not set — connecting to Valkey with TLS but without "
+            "certificate verification. Wire the VALKEY_CA_CERT secret to enable it."
+        )
+        ssl_kwargs["ssl_cert_reqs"] = "none"
+
     return redis.StrictRedis(
         host=host,
         port=port,
         password=token,
-        ssl=True,
         decode_responses=False,
+        **ssl_kwargs,
     )
 
 
@@ -149,5 +167,5 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
 
         return client
     except Exception as e:
-        logger.error("Valkey IAM auth failed: %s — falling back to SQLAlchemy sessions", e)
+        logger.error("Valkey IAM auth failed: %s — caller falls back to its non-Valkey path", e)
         return None

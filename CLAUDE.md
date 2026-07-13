@@ -136,7 +136,8 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `FLASK_ENV` | `production` activates `OAUTHLIB_INSECURE_TRANSPORT` guard + secret-key fail-fast. |
 | `GCS_BUCKET_NAME` | Recipe image storage (`tasteslikegood-recipe-images` in prod) |
 | `GCP_PROJECT_ID`, `PUBSUB_INVOKER_SA` | Required for `worker_api_bp` to accept push messages |
-| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Set by cookbook deploy; backend currently does not use Valkey directly |
+| `VALKEY_HOST`, `VALKEY_PORT`, `VALKEY_AUTH_MODE` | Response cache (`extensions.cache`). Unset → caching disabled (no-op). `iam` mode uses Memorystore IAM tokens + TLS |
+| `VALKEY_CA_CERT` | PEM of Memorystore's Google-managed CA; enables TLS verification (same secret Express uses). Without it the client connects with TLS but skips chain verification |
 | `FRONTEND_URL`, `SESSION_COOKIE_DOMAIN` | OAuth redirects, cookie scoping |
 
 In production all secrets come from Google Secret Manager via Cloud Run `--set-secrets`.

@@ -178,12 +178,23 @@ def api_status():
         db_status = "error"
         db_error = "Database connection error"  # Do not expose exception details
 
+    # Report which cache backend is live so a regression back to the no-op
+    # cache is visible here instead of silently eating Gemini quota (#143)
+    from extensions import cache
+
+    cache_backend = cache.backend_name
+    try:
+        cache_status = "connected" if cache.ping() else "disabled"
+    except Exception:
+        cache_status = "error"
+
     return jsonify(
         {
             "status": "running",
             "api_key_loaded": bool(GOOGLE_API_KEY),
             "default_model": DEFAULT_MODEL,
             "database": {"status": db_status, "error": db_error},
+            "cache": {"backend": cache_backend, "status": cache_status},
         }
     )
 
