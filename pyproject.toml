@@ -76,6 +76,7 @@ dependencies = [
     "rsa==4.9.1",
     "flask-cors==6.0.0",
     "pandas>=3.0.1",
+    "ddtrace>=2.0.0",
 ]
 
 [project.optional-dependencies]
