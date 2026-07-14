@@ -46,7 +46,7 @@ dependencies = [
     # the production image lost half its runtime deps).
     "google-cloud-storage==3.10.1",
     "google-cloud-pubsub>=2.19.0",
-    "redis==7.4.0",
+    "redis==8.0.1",
     # Data Validation
     "jsonschema==4.25.1",
     "pydantic==2.12.5",
