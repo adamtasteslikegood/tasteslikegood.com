@@ -6,6 +6,7 @@ on:
   pull_request:
     branches: [main, dev]
   schedule:
+    # Offset from the hour to avoid peak Actions scheduling.
     - cron: "24 3 * * 1"
 
 permissions:
@@ -33,6 +34,7 @@ jobs:
         uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
+          # Both matrix languages are interpreted and require no build.
           build-mode: none
           config-file: ./.github/codeql/codeql-config.yml
 
