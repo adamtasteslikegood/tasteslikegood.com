@@ -30,7 +30,7 @@ dependencies = [
     # Database (Phase 3) - psycopg2 is optional, only needed for PostgreSQL
     "flask-sqlalchemy==3.1.1",
     "flask-migrate==4.0.5",
-    "sqlalchemy>=2.0.35",  # Use stable 2.0.x with Python 3.13 support
+    "sqlalchemy>=2.0.35", # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
     "google-genai==1.56.0",
     "google-generativeai==0.8.5",
@@ -76,6 +76,8 @@ dependencies = [
     "rsa==4.9.1",
     "flask-cors==6.0.0",
     "pandas>=3.0.1",
+    "ddtrace>=2.0.0",
+    "gunicorn>=26.0.0",
 ]
 
 [project.optional-dependencies]
