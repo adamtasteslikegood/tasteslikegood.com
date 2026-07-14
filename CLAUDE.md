@@ -149,6 +149,9 @@ In production all secrets come from Google Secret Manager via Cloud Run `--set-s
 - **Flask SQLite paths resolve under `instance/`** — `sqlite:///foo.db` writes to `instance/foo.db`, not the cwd.
 - **Gemini model names include `models/` prefix** (e.g., `models/gemini-3.1-pro-preview`); filter API responses by `'generateContent' in supported_generation_methods`.
 - **Tests must hit the right DB engine** — `tests/test_migration_backfill_slug.py::test_backfill_slugs_retry_loop` set `SQLALCHEMY_DATABASE_URI` after `create_app()` and ran `db.create_all()` against a stale engine. Compare against `tests/test_public_ssr.py` for the working pattern (issue #118).
+- **`requirements.txt` is generated, never hand-edited** — regenerate with `uv export --format requirements-txt --no-dev --extra postgres --no-hashes --no-emit-project -o requirements.txt`. CI's Lint job fails if it diverges from `uv.lock` (Dependabot's own regeneration drops packages/markers — that's why its uv PRs can't merge as-is; see `docs/ci/CI-AUDIT-REPORT.md` addendum).
+- **mypy config lives only in `pyproject.toml` `[tool.mypy]`** — a `setup.cfg` `[mypy]` section is silently shadowed by it (that shadowing shipped a config that crashed mypy for months; `setup.cfg` was deleted 2026-07-14). `explicit_package_bases = true` is required because `scripts/` has no `__init__.py`.
+- **Every `run-gemini-cli` job needs `GEMINI_CLI_TRUST_WORKSPACE: 'true'`** — current gemini-cli refuses to run in an untrusted directory even without a checkout. CI quality gates and the required-check list are documented in `docs/ci/refresh/` (SPEC-01/SPEC-02).
 
 ## Related docs
 

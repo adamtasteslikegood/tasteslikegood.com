@@ -96,9 +96,16 @@ Key choices, mapped to the failure lessons:
    sufficient for the restored jobs: any job that **checks out the repo**
    (review, invoke) must also set `GEMINI_CLI_TRUST_WORKSPACE: true` — the headless
    CLI refuses to operate on an untrusted checkout (job 86047077397 on 2026-07-09
-   exited before doing any work for exactly this reason). The scheduled triage never
-   checks out code, which is why it works without the setting and cannot serve as
-   the reference for this requirement.
+   exited before doing any work for exactly this reason).
+
+   > **Correction (2026-07-14, found during rollout):** the trust requirement has
+   > widened — current gemini-cli refuses to run in an untrusted directory on
+   > **every** invocation, even with no checkout at all (run 29353718769 failed in
+   > an empty workspace). Set `GEMINI_CLI_TRUST_WORKSPACE: 'true'` on *every*
+   > `run-gemini-cli` job. The scheduled triage's historical green runs were no
+   > counter-evidence: its Gemini step skips whenever there are no untriaged
+   > issues, so those runs never exercised the CLI (fixed alongside the standalone
+   > triage in #183).
 6. **Event model for review** (secrets vs forks): `gemini-review.yml` triggers on
    `pull_request` with `types: [labeled]` plus a guard that the head repo is this
    repo and the actor is not `dependabot[bot]`. Dependabot- and fork-triggered
