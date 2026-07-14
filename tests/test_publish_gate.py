@@ -63,9 +63,7 @@ def test_guest_create_cannot_publish(app):
 
 
 def test_user_create_can_publish(app, user):
-    recipe = db_recipe_repository.create_recipe(
-        _recipe_data(is_public=True), user_id=user.id
-    )
+    recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
     assert recipe is not None
     assert recipe.is_public is True
     assert recipe.data["is_public"] is True
@@ -87,18 +85,14 @@ def test_guest_upsert_cannot_flip_public(app):
 def test_user_upsert_can_flip_public(app, user):
     """REGRESSION: authenticated publish via the same upsert branch still works."""
     db_recipe_repository.create_recipe(_recipe_data(is_public=False), user_id=user.id)
-    recipe = db_recipe_repository.create_recipe(
-        _recipe_data(is_public=True), user_id=user.id
-    )
+    recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
     assert recipe is not None
     assert recipe.is_public is True
 
 
 def test_guest_create_without_flag_still_works(app):
     """REGRESSION: plain guest saves (no is_public key) are unaffected."""
-    recipe = db_recipe_repository.create_recipe(
-        _recipe_data(), user_id=None, guest_session_id="g1"
-    )
+    recipe = db_recipe_repository.create_recipe(_recipe_data(), user_id=None, guest_session_id="g1")
     assert recipe is not None
     assert recipe.is_public is False
     assert recipe.name == "Chili"
@@ -265,6 +259,80 @@ def test_put_publish_without_slug_returns_derived_slug(app, user):
     assert response.status_code == 200
     assert response.json["slug"] == "chili"
     assert response.json["is_public"] is True
+
+
+def test_post_publish_with_unusable_slug_returns_400(app, user):
+    """PR #152 review: the POST error mapping needs route-level coverage too,
+    not just the repository-level RecipeSlugError assertion."""
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = user.id
+
+    response = client.post(
+        "/api/recipes",
+        json=_recipe_data(name="!!!", slug="***", is_public=True),
+    )
+
+    assert response.status_code == 400
+    assert "slug" in response.json["error"].lower()
+    # Nothing was persisted.
+    assert db.session.get(Recipe, "r-1") is None
+
+
+def test_publish_slug_truncated_to_column_limit(app, user):
+    """PR #152 review: Recipe.slug is String(255); an unbounded payload slug
+    must be capped instead of blowing up at commit on PostgreSQL."""
+    recipe = db_recipe_repository.create_recipe(
+        _recipe_data(slug="x" * 300, is_public=True), user_id=user.id
+    )
+    assert recipe is not None
+    assert recipe.slug == "x" * 255
+
+
+def test_publish_slug_suffix_respects_column_limit(app, user):
+    """A collision suffix on a max-length base must not push past 255."""
+    db_recipe_repository.create_recipe(
+        _recipe_data(recipe_id="r-1", slug="x" * 300, is_public=True), user_id=user.id
+    )
+    second = db_recipe_repository.create_recipe(
+        _recipe_data(recipe_id="r-2", slug="x" * 300, is_public=True), user_id=user.id
+    )
+    assert second is not None
+    assert len(second.slug) == 255
+    assert second.slug == "x" * 253 + "-2"
+
+
+def test_publish_slug_race_retries_with_next_suffix(app, user, monkeypatch):
+    """PR #152 review: two concurrent publications can both probe a slug as
+    free; the loser's commit hits the unique index. The repository must retry
+    with the next suffix instead of surfacing a failed create."""
+    real_resolve = db_recipe_repository._resolve_public_slug
+    state = {"raced": False}
+
+    def racing_resolve(data, recipe_id, current_slug=None, skip=frozenset()):
+        slug = real_resolve(data, recipe_id, current_slug, skip=skip)
+        if not state["raced"]:
+            state["raced"] = True
+            # The "other writer" claims the probed slug before our commit.
+            db.session.add(
+                Recipe(
+                    id="racer",
+                    user_id=None,
+                    name="Racer",
+                    slug=slug,
+                    is_public=False,
+                    data={"id": "racer", "name": "Racer"},
+                )
+            )
+            db.session.commit()
+        return slug
+
+    monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", racing_resolve)
+
+    recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
+    assert recipe is not None
+    assert recipe.slug == "chili-2"
+    assert recipe.data["slug"] == "chili-2"
 
 
 def test_private_update_without_slug_unaffected(app, user):

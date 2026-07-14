@@ -123,8 +123,9 @@ def create_recipe(user_id, guest_session_id):
 
         return jsonify(recipe.to_dict()), 201
 
-    except db_recipe_repository.RecipeSlugError as e:
-        return jsonify({"error": str(e)}), 400
+    except db_recipe_repository.RecipeSlugError:
+        # Fixed message, not str(e): exception text must never reach clients.
+        return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
     except Exception as e:
         logger.error(f"Error creating recipe: {e}")
         return jsonify({"error": "Failed to create recipe"}), 500
@@ -179,8 +180,9 @@ def update_recipe(user_id, guest_session_id, recipe_id):
 
         return jsonify(recipe.to_dict()), 200
 
-    except db_recipe_repository.RecipeSlugError as e:
-        return jsonify({"error": str(e)}), 400
+    except db_recipe_repository.RecipeSlugError:
+        # Fixed message, not str(e): exception text must never reach clients.
+        return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
     except Exception as e:
         logger.error(f"Error updating recipe {recipe_id}: {e}")
         return jsonify({"error": "Failed to update recipe"}), 500
