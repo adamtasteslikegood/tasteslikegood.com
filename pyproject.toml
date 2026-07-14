@@ -88,7 +88,7 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
     "types-requests>=2.31.0",
-    "types-jsonschema>=4.21.0",
+    "types-jsonschema>=4.26.0.20260518",
 ]
 postgres = [
     # PostgreSQL support (for production deployments)
@@ -152,5 +152,5 @@ dev = [
     "flake8>=6.0.0",
     "mypy>=1.0.0",
     "types-requests>=2.31.0",
-    "types-jsonschema>=4.21.0",
+    "types-jsonschema>=4.26.0.20260518",
 ]
