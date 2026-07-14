@@ -2,7 +2,7 @@ name: '📋 Gemini Scheduled Issue Triage'
 
 on:
   schedule:
-    - cron: '0 * * * *' # Runs every hour
+    - cron: '0 */6 * * *' # Every 6 hours — hourly was over-provisioned for issue volume (SPEC-02 §3.4)
   pull_request:
     branches:
       - 'main'
@@ -210,4 +210,78 @@ jobs:
                 issue_number: issueNumber,
                 labels: labelsToSet,
               });
+            }
+
+  # A silently-failing scheduled workflow must page someone (SPEC-02 §3.3).
+  # This must be its own job: a step inside triage/label cannot see the other
+  # job's result, triage only has issues:read, and job-level continue-on-error
+  # anywhere in this workflow would report failed jobs as succeeded and keep
+  # failure() here from ever firing.
+  alert:
+    runs-on: 'ubuntu-latest'
+    needs:
+      - 'triage'
+      - 'label'
+    if: |-
+      failure() &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      issues: 'write'
+    steps:
+      - name: 'Open or update ci-health issue'
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
+        with:
+          script: |-
+            const title = '[ci-health] gemini-scheduled-triage is failing';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `Scheduled issue triage failed. Latest failing run: ${runUrl}\n\n` +
+              'One of the `triage`/`label` jobs concluded `failure`. Check API keys / WIF ' +
+              'configuration and the run logs. This issue is updated automatically by the ' +
+              '`alert` job in `gemini-scheduled-triage.yml`; close it once runs are green.';
+
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'ci-health',
+                color: 'B60205',
+                description: 'Automated alerts about CI / agent workflow health',
+              });
+            } catch (e) {
+              // Only tolerate "label already exists" (422 validation error);
+              // anything else (permissions, outage) must fail the alert job
+              // visibly rather than half-run.
+              const alreadyExists = e.status === 422 &&
+                (e.response?.data?.errors || []).some((err) => err.code === 'already_exists');
+              if (!alreadyExists) {
+                throw e;
+              }
+            }
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci-health',
+              per_page: 100,
+            });
+            const match = existing.data.find((issue) => issue.title === title);
+
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body: `Still failing: ${runUrl}`,
+              });
+              core.info(`Updated existing ci-health issue #${match.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['ci-health'],
+              });
+              core.info(`Opened ci-health issue #${created.data.number}`);
             }
