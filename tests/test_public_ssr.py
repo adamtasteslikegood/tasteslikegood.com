@@ -26,7 +26,11 @@ from models.user import User  # noqa: E402
 
 
 @pytest.fixture
-def app():
+def app(monkeypatch):
+    # _public_base_url() reads FRONTEND_URL per-request; a developer's .env
+    # (e.g. http://localhost:8080) must not leak into the canonical-URL and
+    # sitemap assertions. These tests pin the request-derived base.
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
     app = create_app(
         TESTING=True,
         SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",

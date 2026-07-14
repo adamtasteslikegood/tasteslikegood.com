@@ -1,14 +1,25 @@
 import json
 import logging
+from typing import Optional
+
 from google.cloud import pubsub_v1
 
 from config import GCP_PROJECT_ID
 
 logger = logging.getLogger(__name__)
 
-# Initialize publishers
-# If PUBSUB_EMULATOR_HOST is set, this client automatically uses it.
-publisher = pubsub_v1.PublisherClient()
+# The publisher client is created lazily: PublisherClient() needs Google
+# credentials, so constructing it at import time made merely importing (or
+# patching) this module raise DefaultCredentialsError anywhere without ADC.
+# If PUBSUB_EMULATOR_HOST is set, the client automatically uses it.
+_publisher: Optional[pubsub_v1.PublisherClient] = None
+
+
+def _get_publisher() -> pubsub_v1.PublisherClient:
+    global _publisher
+    if _publisher is None:
+        _publisher = pubsub_v1.PublisherClient()
+    return _publisher
 
 
 def publish_message(topic_name: str, data: dict) -> str:
@@ -22,6 +33,7 @@ def publish_message(topic_name: str, data: dict) -> str:
     Returns:
         The message ID as a string.
     """
+    publisher = _get_publisher()
     topic_path = publisher.topic_path(GCP_PROJECT_ID, topic_name)
     data_str = json.dumps(data)
     data_bytes = data_str.encode("utf-8")
