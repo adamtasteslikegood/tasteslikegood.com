@@ -12,6 +12,7 @@ rotted without gates.
 | [TODO.md](TODO.md) | Phase-by-phase execution checklist; every item carries its verify command |
 | [PROMPT.md](PROMPT.md) | Agent-harness / loop goal definition: task table with verifies, retry caps, escalation rules, close condition |
 | `diagram-*.svg` | Pre-rendered exports of the specs' Mermaid diagrams: [current state](diagram-current-state.svg) · [target pipeline](diagram-target-pipeline.svg) · [AI workflows](diagram-ai-workflows.svg) · [harness loop](diagram-harness-loop.svg) |
+| `diagram-*.md` | Mermaid source for each SVG, GitHub-renderable: [current state](diagram-current-state.md) · [target pipeline](diagram-target-pipeline.md) · [AI workflows](diagram-ai-workflows.md) · [harness loop](diagram-harness-loop.md) |
 
 Predecessor: [../CI-AUDIT-REPORT.md](../CI-AUDIT-REPORT.md) (April 2026 audit — its
 branch-protection recommendation was never implemented; SPEC-01 finishes the job).
