@@ -164,6 +164,119 @@ def test_guest_publish_attempt_is_logged(app, caplog):
     assert any("publish" in rec.message.lower() for rec in caplog.records)
 
 
+# ─── Publish slug gate: public rows must carry a usable slug ──────────────
+
+
+def test_publish_without_slug_derives_from_name(app, user):
+    """PR #152 review: PUT with is_public=true and no slug must not persist
+    a public row with slug=NULL (browsable but unlinkable via /r/<slug>)."""
+    data = _recipe_data(recipe_id="r-1", name="Spicy Chili!")
+    del data["slug"]
+    recipe = db_recipe_repository.create_recipe(data, user_id=user.id)
+    assert recipe is not None
+
+    updated = db_recipe_repository.update_recipe(
+        "r-1", {**data, "is_public": True}, user_id=user.id
+    )
+    assert updated is not None
+    assert updated.slug == "spicy-chili"
+    assert updated.data["slug"] == "spicy-chili"
+    assert updated.is_public is True
+
+
+def test_publish_create_without_slug_derives_from_name(app, user):
+    data = _recipe_data(recipe_id="r-1", name="Spicy Chili!", is_public=True)
+    del data["slug"]
+    recipe = db_recipe_repository.create_recipe(data, user_id=user.id)
+    assert recipe is not None
+    assert recipe.slug == "spicy-chili"
+    assert recipe.data["slug"] == "spicy-chili"
+
+
+def test_publish_update_without_slug_keeps_existing_slug(app, user):
+    db_recipe_repository.create_recipe(
+        _recipe_data(slug="chili-classic", is_public=True), user_id=user.id
+    )
+    data = _recipe_data(is_public=True)
+    del data["slug"]
+    updated = db_recipe_repository.update_recipe("r-1", data, user_id=user.id)
+    assert updated is not None
+    assert updated.slug == "chili-classic"
+    assert updated.data["slug"] == "chili-classic"
+
+
+def test_publish_slug_collision_gets_suffix(app, user):
+    db_recipe_repository.create_recipe(
+        _recipe_data(recipe_id="r-1", is_public=True), user_id=user.id
+    )
+    data = _recipe_data(recipe_id="r-2", is_public=True)
+    del data["slug"]
+    second = db_recipe_repository.create_recipe(data, user_id=user.id)
+    assert second is not None
+    assert second.slug == "chili-2"
+
+
+def test_publish_provided_slug_is_sanitized(app, user):
+    recipe = db_recipe_repository.create_recipe(
+        _recipe_data(slug="Chili Con Carne!", is_public=True), user_id=user.id
+    )
+    assert recipe is not None
+    assert recipe.slug == "chili-con-carne"
+    assert recipe.data["slug"] == "chili-con-carne"
+
+
+def test_publish_with_unusable_slug_and_name_raises(app, user):
+    with pytest.raises(db_recipe_repository.RecipeSlugError):
+        db_recipe_repository.create_recipe(
+            _recipe_data(name="!!!", slug="***", is_public=True), user_id=user.id
+        )
+
+
+def test_put_publish_with_unusable_slug_returns_400(app, user):
+    slugless = _recipe_data(name="Chili")
+    del slugless["slug"]
+    db_recipe_repository.create_recipe(slugless, user_id=user.id)
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = user.id
+
+    response = client.put(
+        "/api/recipes/r-1",
+        json=_recipe_data(name="!!!", slug="***", is_public=True),
+    )
+
+    assert response.status_code == 400
+    assert "slug" in response.json["error"].lower()
+    # Nothing was persisted: the row is still private.
+    recipe = db.session.get(Recipe, "r-1")
+    assert recipe.is_public is False
+
+
+def test_put_publish_without_slug_returns_derived_slug(app, user):
+    db_recipe_repository.create_recipe(_recipe_data(name="Chili"), user_id=user.id)
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = user.id
+
+    payload = _recipe_data(name="Chili", is_public=True)
+    del payload["slug"]
+    response = client.put("/api/recipes/r-1", json=payload)
+
+    assert response.status_code == 200
+    assert response.json["slug"] == "chili"
+    assert response.json["is_public"] is True
+
+
+def test_private_update_without_slug_unaffected(app, user):
+    """Private rows never trip the slug gate (guest saves send no slug)."""
+    db_recipe_repository.create_recipe(_recipe_data(name="Chili"), user_id=user.id)
+    data = _recipe_data(name="Chili v2")
+    del data["slug"]
+    updated = db_recipe_repository.update_recipe("r-1", data, user_id=user.id)
+    assert updated is not None
+    assert updated.is_public is False
+
+
 # ─── Data migration logic (scripts/gate_guest_public_recipes.py) ─────────
 
 

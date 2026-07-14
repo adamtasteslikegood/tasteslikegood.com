@@ -8,6 +8,7 @@ Handles recipe CRUD operations with SQLAlchemy ORM:
 """
 
 import logging
+import re
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -16,6 +17,49 @@ from extensions import db
 from models import Recipe, User  # noqa: F401
 
 logger = logging.getLogger(__name__)
+
+
+class RecipeSlugError(ValueError):
+    """A recipe cannot be published without a usable /r/<slug> address."""
+
+
+def _slugify(text: str) -> str:
+    """Normalize text to a route-safe slug (same rules as scripts/backfill_slugs.py)."""
+    text = text.lower().strip()
+    text = re.sub(r"[^\w\s-]", "", text)
+    text = re.sub(r"[\s_-]+", "-", text)
+    return re.sub(r"^-+|-+$", "", text)
+
+
+def _resolve_public_slug(
+    recipe_data: Dict[str, Any], recipe_id: str, current_slug: Optional[str] = None
+) -> str:
+    """Pick a non-empty, route-safe, unique slug for a recipe being published.
+
+    Public rows with slug=NULL would appear in /browse and the sitemap yet no
+    /r/<slug> URL could resolve them, so publication requires a usable slug:
+    the payload's slug if salvageable, else the row's existing slug, else one
+    derived from the name. Uniqueness collisions get a numeric suffix; the DB
+    unique constraint on Recipe.slug remains the final arbiter under races.
+    """
+    for source in (recipe_data.get("slug"), current_slug, recipe_data.get("name")):
+        candidate = _slugify(str(source)) if source else ""
+        if candidate:
+            break
+    else:
+        raise RecipeSlugError(
+            "A public recipe needs a slug, and neither the provided slug nor "
+            "the recipe name yields a usable one."
+        )
+
+    base, suffix = candidate, 1
+    while (
+        Recipe.query.filter(Recipe.slug == candidate, Recipe.id != recipe_id).first()
+        is not None
+    ):
+        suffix += 1
+        candidate = f"{base}-{suffix}"
+    return candidate
 
 
 def _apply_recipe_scope(query, user_id: Optional[int], guest_session_id: Optional[str]):
@@ -129,6 +173,11 @@ def create_recipe(
                 )
                 return None
 
+            if recipe_data_with_id["is_public"]:
+                recipe_data_with_id["slug"] = _resolve_public_slug(
+                    recipe_data_with_id, recipe_id, existing.slug
+                )
+
             existing.name = recipe_name
             existing.slug = recipe_data_with_id.get("slug")
             existing.is_public = recipe_data_with_id.get("is_public", False)
@@ -136,6 +185,9 @@ def create_recipe(
             existing.updated_at = datetime.utcnow()
             db.session.commit()
             return existing  # type: ignore[no-any-return]
+
+        if recipe_data_with_id["is_public"]:
+            recipe_data_with_id["slug"] = _resolve_public_slug(recipe_data_with_id, recipe_id)
 
         recipe = Recipe(
             id=recipe_id,
@@ -153,6 +205,8 @@ def create_recipe(
         logger.info(f"Created recipe {recipe_id} for user {user_id}")
         return recipe
 
+    except RecipeSlugError:
+        raise
     except Exception as e:
         logger.error(f"Error creating recipe: {e}")
         db.session.rollback()
@@ -186,6 +240,11 @@ def update_recipe(
         # Ensure the id in recipe_data matches the database record id.
         recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
 
+        if recipe_data_with_id["is_public"]:
+            recipe_data_with_id["slug"] = _resolve_public_slug(
+                recipe_data_with_id, recipe_id, recipe.slug
+            )
+
         # Update fields
         recipe.name = recipe_data.get("name", recipe.name)
         recipe.slug = recipe_data_with_id.get("slug")
@@ -198,6 +257,8 @@ def update_recipe(
         logger.info(f"Updated recipe {recipe_id}")
         return recipe
 
+    except RecipeSlugError:
+        raise
     except Exception as e:
         logger.error(f"Error updating recipe {recipe_id}: {e}")
         db.session.rollback()
