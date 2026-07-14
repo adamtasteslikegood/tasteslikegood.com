@@ -328,8 +328,13 @@ def update_recipe(
             logger.warning(f"Recipe {recipe_id} not found for user {user_id}")
             return None
 
-        # Ensure the id in recipe_data matches the database record id.
-        recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
+        # Merge the payload into the persisted blob (and pin the id): PUT
+        # accepts partial payloads such as {"is_public": true}, and replacing
+        # the blob wholesale would delete ingredients/instructions at the
+        # moment of publishing. Keys the payload does supply always win.
+        recipe_data_with_id = _gate_is_public(
+            {**(recipe.data or {}), **recipe_data, "id": recipe_id}, user_id
+        )
 
         if "name" not in recipe_data_with_id and recipe.name:
             # Publish-only partial updates keep the persisted name (see

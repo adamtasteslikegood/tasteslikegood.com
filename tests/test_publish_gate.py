@@ -391,6 +391,27 @@ def test_put_publish_only_payload_derives_slug_from_persisted_name(app, user):
     assert recipe.data["slug"] == "spicy-chili"
 
 
+def test_put_publish_only_payload_preserves_recipe_content(app, user):
+    """PR #152 review: a publish-only PUT must not wipe the blob — the
+    partial payload merges into the persisted recipe, so ingredients and
+    instructions survive the moment of publishing."""
+    data = _recipe_data(name="Chili", ingredients=["beans"], instructions=["cook the beans"])
+    del data["slug"]
+    db_recipe_repository.create_recipe(data, user_id=user.id)
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = user.id
+
+    response = client.put("/api/recipes/r-1", json={"is_public": True})
+
+    assert response.status_code == 200
+    recipe = db.session.get(Recipe, "r-1")
+    assert recipe.is_public is True
+    assert recipe.data["ingredients"] == ["beans"]
+    assert recipe.data["instructions"] == ["cook the beans"]
+    assert recipe.data["name"] == "Chili"
+
+
 def test_update_explicit_falsy_name_is_not_inherited(app, user):
     """PR #152 review: only key absence makes an update partial. An explicit
     falsy name is the caller's value — it must reach both blob and column,

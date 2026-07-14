@@ -133,6 +133,8 @@ grpcio-status==1.71.2
     # via
     #   google-api-core
     #   google-cloud-pubsub
+gunicorn==26.0.0
+    # via tasteslikegood-com
 h11==0.16.0
     # via httpcore
 httpcore==1.0.9
@@ -187,6 +189,8 @@ opentelemetry-sdk==1.43.0
     # via google-cloud-pubsub
 opentelemetry-semantic-conventions==0.64b0
     # via opentelemetry-sdk
+packaging==26.0
+    # via gunicorn
 pandas==3.0.1
     # via tasteslikegood-com
 proto-plus==1.27.1

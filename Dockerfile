@@ -28,4 +28,7 @@ EXPOSE 5000
 # serverless-init needs DD_API_KEY at runtime or telemetry silently goes nowhere;
 # production injects it via --set-secrets in the cookbook repo's cloudbuild.yaml.
 ENTRYPOINT ["/app/datadog-init"]
-CMD ["ddtrace-run", "python", "app.py"]
+# Gunicorn, never `python app.py`: the __main__ path runs Werkzeug's debug
+# server (app.run(debug=True)), which must not serve production traffic.
+# Cloud Run injects PORT; 5000 matches the old local-run default.
+CMD ["sh", "-c", "exec ddtrace-run gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 8 --timeout 0 app:app"]
