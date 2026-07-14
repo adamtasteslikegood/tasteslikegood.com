@@ -118,6 +118,20 @@ jobs:
           path: coverage.xml
           retention-days: 7
 
+  build:
+    name: Build (docker)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Validates the image the release pipeline actually ships: the
+      # Dockerfile installs from requirements.txt, which uv sync never
+      # exercises. No push, no registry credentials.
+      - name: Build Docker image
+        run: docker build -f Dockerfile .
+
   security:
     name: Security Scan (pip-audit)
     runs-on: ubuntu-latest
