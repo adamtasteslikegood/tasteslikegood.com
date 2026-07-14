@@ -1,12 +1,62 @@
 version: 2
 
 updates:
+  # -------------------------
+  # GitHub Actions
+  # -------------------------
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions-all:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+
+  # -------------------------
+  # Python (uv)
+  # -------------------------
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
       interval: "weekly"
-    target-branch: "dev/backend_sub222"
+    target-branch: "dev"
     labels:
       - "dependencies"
       - "python"
-    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      python-production:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      python-development:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 15
+
+  # -------------------------
+  # Docker
+  # -------------------------
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+    labels:
+      - "dependencies"
+      - "docker"
+    commit-message:
+      prefix: "build(docker)"
+    open-pull-requests-limit: 5
