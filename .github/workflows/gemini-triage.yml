@@ -44,22 +44,34 @@ jobs:
       - name: 'Resolve issue'
         id: 'issue'
         env:
-          GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN || github.token }}'
           EVENT_ISSUE_NUMBER: '${{ github.event.issue.number }}'
           INPUT_ISSUE_NUMBER: '${{ inputs.issue_number }}'
-          GITHUB_REPOSITORY: '${{ github.repository }}'
-        run: |-
-          NUMBER="${EVENT_ISSUE_NUMBER:-${INPUT_ISSUE_NUMBER}}"
-          echo "number=${NUMBER}" >> "${GITHUB_OUTPUT}"
-          ISSUE="$(gh issue view "${NUMBER}" --json title,body --repo "${GITHUB_REPOSITORY}")"
-          {
-            echo "title<<TLG_EOF"
-            echo "${ISSUE}" | jq -r '.title'
-            echo "TLG_EOF"
-            echo "body<<TLG_EOF"
-            echo "${ISSUE}" | jq -r '.body'
-            echo "TLG_EOF"
-          } >> "${GITHUB_OUTPUT}"
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
+        with:
+          # github-script's core.setOutput escapes multiline values with
+          # randomized delimiters, so untrusted issue titles/bodies cannot
+          # inject additional step outputs (unlike a fixed bash heredoc).
+          script: |-
+            const raw = (process.env.EVENT_ISSUE_NUMBER || process.env.INPUT_ISSUE_NUMBER || '').trim();
+            const issueNumber = Number.parseInt(raw, 10);
+            if (!Number.isInteger(issueNumber) || issueNumber <= 0 || String(issueNumber) !== raw) {
+              core.setFailed(`Invalid issue number: ${JSON.stringify(raw)}`);
+              return;
+            }
+
+            const { data: issue } = await github.rest.issues.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issueNumber,
+            });
+            if (issue.pull_request) {
+              core.setFailed(`#${issueNumber} is a pull request, not an issue.`);
+              return;
+            }
+
+            core.setOutput('number', String(issueNumber));
+            core.setOutput('title', issue.title || '');
+            core.setOutput('body', issue.body || '');
 
       - name: 'Get repository labels'
         id: 'get_labels'
@@ -174,8 +186,15 @@ jobs:
               .filter((label) => availableLabels.includes(label))
               .sort()
 
-            // Set the labels
-            const issueNumber = process.env.ISSUE_NUMBER;
+            // Validate the issue number before touching the API so a partial
+            // triage failure fails with a clear message instead of throwing
+            // mid-call.
+            const issueNumber = Number.parseInt(process.env.ISSUE_NUMBER || '', 10);
+            if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+              core.setFailed(`Invalid or missing ISSUE_NUMBER: ${JSON.stringify(process.env.ISSUE_NUMBER)}`);
+              return;
+            }
+
             if (selectedLabels && selectedLabels.length > 0) {
               await github.rest.issues.setLabels({
                 owner: context.repo.owner,
