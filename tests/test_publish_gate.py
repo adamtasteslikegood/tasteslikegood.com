@@ -121,6 +121,41 @@ def test_guest_update_blob_sanitized(app):
     assert recipe.data["is_public"] is False
 
 
+def test_user_put_updates_publish_columns(app, user):
+    db_recipe_repository.create_recipe(_recipe_data(is_public=False), user_id=user.id)
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = user.id
+
+    response = client.put(
+        "/api/recipes/r-1",
+        json=_recipe_data(slug="published-chili", is_public=True),
+    )
+
+    assert response.status_code == 200
+    assert response.json["slug"] == "published-chili"
+    assert response.json["is_public"] is True
+    recipe = db.session.get(Recipe, "r-1")
+    assert recipe.slug == "published-chili"
+    assert recipe.is_public is True
+    assert recipe.data["slug"] == "published-chili"
+    assert recipe.data["is_public"] is True
+
+    response = client.put(
+        "/api/recipes/r-1",
+        json=_recipe_data(slug="private-chili", is_public=False),
+    )
+
+    assert response.status_code == 200
+    assert response.json["slug"] == "private-chili"
+    assert response.json["is_public"] is False
+    db.session.refresh(recipe)
+    assert recipe.slug == "private-chili"
+    assert recipe.is_public is False
+    assert recipe.data["slug"] == "private-chili"
+    assert recipe.data["is_public"] is False
+
+
 def test_guest_publish_attempt_is_logged(app, caplog):
     with caplog.at_level("WARNING"):
         db_recipe_repository.create_recipe(
