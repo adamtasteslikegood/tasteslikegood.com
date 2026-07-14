@@ -110,10 +110,11 @@ def create_app(**config_overrides):
 
     # Production should continue using Flask-Migrate/Alembic as the primary path.
 
-    # ####### DEVELOPMENT NOTE: If you want to quickly create tables without running migrations #######
+    # ####### DEVELOPMENT NOTE: creating tables quickly without migrations #######
     # # ***** (for example, for local development or testing), you can use db.create_all().  *****
-    # # For local development or quick testing, you can use db.create_all() to create tables without running migrations.
-    # # Uncomment the following lines if you want to use create_all() for quick local development without migrations.
+    # # For local development or quick testing, db.create_all() creates tables
+    # # without running migrations. Uncomment the following lines to use
+    # # create_all() for quick local development without migrations.
     #
     # def create_tables_with_retry(app, db, attempts=5, delay_seconds=2):
     #     """
@@ -135,9 +136,11 @@ def create_app(**config_overrides):
     #                 time.sleep(delay_seconds)
     #             else:
     #                 app.logger.error(f"db.create_all() gave up after {attempts} attempts")
-    # # Uncomment the following line if you want to use create_all() for quick local development without migrations.
+    # # Uncomment the following line to use create_all() for quick local
+    # # development without migrations.
     # create_tables_with_retry(app, db)
-    # # Note: In production, rely on proper migrations instead of create_all() to manage schema changes.
+    # # Note: In production, rely on proper migrations instead of create_all()
+    # # to manage schema changes.
 
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins

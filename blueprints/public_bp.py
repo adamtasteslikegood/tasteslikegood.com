@@ -148,7 +148,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         "@context": "https://schema.org",
         "@type": "Recipe",
         "name": recipe.name,
-        "description": data.get("description") or f"A vegan recipe from TastesLikeGood.",
+        "description": data.get("description") or "A vegan recipe from TastesLikeGood.",
         "url": canonical_url,
         "mainEntityOfPage": canonical_url,
         "image": [image_url] if image_url else None,
@@ -226,7 +226,7 @@ def show_public_recipe(slug):
     data = recipe.data or {}
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
     image_url = _recipe_image_url(recipe)
-    description = data.get("description") or f"A vegan recipe from TastesLikeGood."
+    description = data.get("description") or "A vegan recipe from TastesLikeGood."
 
     return render_template(
         "public/recipe.html",

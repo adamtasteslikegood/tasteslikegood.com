@@ -458,7 +458,8 @@ def get_all_recipes(limit: int = 100) -> List[Recipe]:
         List of Recipe objects
     """
     try:
-        return Recipe.query.order_by(Recipe.created_at.desc()).limit(limit).all()  # type: ignore[no-any-return]
+        query = Recipe.query.order_by(Recipe.created_at.desc())
+        return query.limit(limit).all()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Error fetching all recipes: {e}")
         return []
@@ -475,7 +476,8 @@ def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] =
         Number of recipes
     """
     try:
-        return _apply_recipe_scope(Recipe.query, user_id, guest_session_id).count()  # type: ignore[no-any-return]
+        scoped = _apply_recipe_scope(Recipe.query, user_id, guest_session_id)
+        return scoped.count()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(f"Error counting recipes for user {user_id}: {e}")
         return 0

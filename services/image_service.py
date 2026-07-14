@@ -87,7 +87,10 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
         _ = user_metadata["user_id"]  # noqa: F841
 
         model_to_use = "imagen-4.0-generate-001"
-        image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
+        image_prompt = (
+            f"A delicious, high-quality food photography shot of "
+            f"{recipe_data.get('name')}. Professional lighting, appetizing."
+        )
         generation_timestamp = datetime.datetime.now().isoformat()
 
         action = "Regenerating" if force_regenerate else "Generating"

@@ -8,30 +8,22 @@ Provides endpoints for the Angular frontend (via Express proxy):
 """
 
 import base64
-import datetime
 import logging
 import uuid
 
 from flask import Blueprint, Response, jsonify, request, session
 
 from config import DEFAULT_MODEL, GCS_BUCKET_NAME
-from blueprints.generation_bp import (
-    build_generation_prompt,
-    attempt_recipe_generation,
-    validate_generation_input,
-)
+from blueprints.generation_bp import validate_generation_input
 from repositories import db_recipe_repository
-from services.gemini_service import get_genai_client
 from utils.cache_utils import (
     recipe_image_key,
-    invalidate_recipe,
-    invalidate_recipe_image,
     safe_get,
     safe_set,
     TTL_IMAGE,
 )
 from utils.admin_auth import require_admin
-from utils.session_utils import get_or_create_session_id, get_user_metadata
+from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -73,8 +65,8 @@ def generate_recipe_json():
 
     selected_model = data.get("model", DEFAULT_MODEL)
 
-    # Build prompt with schema
-    full_prompt = build_generation_prompt(prompt)
+    # The Pub/Sub worker rebuilds the full schema prompt from the raw prompt
+    # (worker_api_bp), so only the raw prompt is published here.
 
     # Assign an ID
     recipe_id = str(uuid.uuid4())

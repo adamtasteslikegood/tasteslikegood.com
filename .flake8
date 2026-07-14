@@ -1,6 +1,8 @@
 [flake8]
 max-line-length = 100
-extend-ignore = E203, E266, E501, W503
+# E203/W503 conflict with Black; everything else is enforced (E266 and E501
+# were previously ignored — the tree is now clean without them).
+extend-ignore = E203, W503
 exclude =
     .git,
     __pycache__,
