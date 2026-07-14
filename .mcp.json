@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "pm-daemon": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "exec \"$(git rev-parse --show-toplevel)/scripts/mcp/run_parent_mcp.sh\" pm-daemon"
+      ],
+      "env": {}
+    },
+    "gcp-monitor": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "exec \"$(git rev-parse --show-toplevel)/scripts/mcp/run_parent_mcp.sh\" gcp-monitor"
+      ],
+      "env": {}
+    }
+  }
+}

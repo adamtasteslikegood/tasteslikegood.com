@@ -150,6 +150,30 @@ In production all secrets come from Google Secret Manager via Cloud Run `--set-s
 - **Gemini model names include `models/` prefix** (e.g., `models/gemini-3.1-pro-preview`); filter API responses by `'generateContent' in supported_generation_methods`.
 - **Tests must hit the right DB engine** — `tests/test_migration_backfill_slug.py::test_backfill_slugs_retry_loop` set `SQLALCHEMY_DATABASE_URI` after `create_app()` and ran `db.create_all()` against a stale engine. Compare against `tests/test_public_ssr.py` for the working pattern (issue #118).
 
+## MCP servers (agent sessions)
+
+`.mcp.json` registers the cookbook superproject's two MCP servers so agent
+sessions started inside this repo get the same tooling as sessions started in
+the cookbook repo:
+
+- `pm-daemon` — PM tools (`get_project_status`, `sync_pm_documents`,
+  `refresh_project_briefing`, `create_epic_from_roadmap`, `log_agent_session`)
+  plus the Confluence file watcher (singleton via `flock`; extra daemons are
+  expected, one per session).
+- `gcp-monitor` — read-only Cloud Monitoring tools (`check_system_health`,
+  `list_available_metrics`, `query_metric`) for the production stack.
+
+Both entries go through `scripts/mcp/run_parent_mcp.sh`, which locates the
+cookbook checkout (via `git rev-parse --show-superproject-working-tree`, or by
+walking up parent directories for linked worktrees) and exec's the real
+launchers there (`scripts/pm/run_pm_daemon.sh`,
+`scripts/monitoring/run_gcp_monitor.sh`). The launchers cd to the cookbook
+root, so credentials still come from the cookbook `.env`
+(`ATLASSIAN_EMAIL`/`ATLASSIAN_API_TOKEN` for pm-daemon,
+`GOOGLE_APPLICATION_CREDENTIALS` for gcp-monitor) — see the cookbook
+`CLAUDE.md` § Startup. In a standalone checkout (no cookbook superproject) the
+wrapper exits with a clear error and the servers are simply unavailable.
+
 ## Related docs
 
 - `API.md` — endpoint reference
