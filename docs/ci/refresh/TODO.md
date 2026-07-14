@@ -69,18 +69,27 @@ Baseline measured 2026-07-14 on `dev`: black ❌ 15 files · flake8 ❌ 38 · my
 - [ ] Retune `gemini-scheduled-triage.yml` cron hourly → every 6h; add a dedicated
       alert job (`needs: [triage, label]`, `if: failure()`, own `issues: write`
       permission) that opens/updates a `ci-health` issue — a step inside one job
-      can't see the other job's failure, and the `triage` job only has `issues: read`
+      can't see the other job's failure, and the `triage` job only has `issues: read`.
+      Do NOT add job-level `continue-on-error` to this workflow — it reports failed
+      jobs as succeeded and the alert job would never fire
       — verify: green scheduled run; forced failure in either job opens the issue
 - [ ] Standalone `gemini-triage.yml` on `issues: opened`, reusing
       `.github/commands/gemini-triage.toml`; guardrails: `timeout-minutes: 10`,
       concurrency, `continue-on-error: true`, pinned action SHA
       — verify: test issue gets labeled
 - [ ] Standalone `gemini-review.yml` triggered by `gemini-review` label +
-      `workflow_dispatch`
-      — verify: labeled PR receives review comments; check is not required anywhere
+      `workflow_dispatch`; `pull_request` event with same-repo + not-Dependabot guard
+      (Dependabot/fork runs get no secrets — skip cleanly, never fail); set
+      `GEMINI_CLI_TRUST_WORKSPACE: true` on the checkout job
+      — verify: labeled **internal** PR receives review comments; labeling a
+      Dependabot PR produces a clean skip; check is not required anywhere
 - [ ] Standalone `gemini-invoke.yml` on `@gemini-cli` comments, **author-association
-      allowlist (OWNER/MEMBER/COLLABORATOR) enforced**
-      — verify: collaborator comment works; non-collaborator comment is ignored
+      allowlist (OWNER/MEMBER/COLLABORATOR) enforced deterministically on BOTH the
+      trigger comment and the `/approve` approval comment** (the invoke TOML's
+      model-side approval poll is not a security boundary); set
+      `GEMINI_CLI_TRUST_WORKSPACE: true` on the checkout job
+      — verify: collaborator trigger + approval works; non-collaborator trigger is
+      ignored; non-collaborator `/approve` on a pending plan leaves the run halted
 
 ## Phase 7 — Documentation & close-out
 

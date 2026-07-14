@@ -70,8 +70,8 @@ Execute strictly in order; each task = branch → change → local verify → PR
 | T8 | Drain Dependabot queue (`@dependabot rebase`, merge through gates) | `gh pr list --state open --author app/dependabot` → each green-merged or closed with reason | 2/PR |
 | T9 | Scheduled triage: 6h cron + failure→`ci-health` issue | green scheduled run; forced-failure test opens issue | 2 |
 | T10 | Standalone `gemini-triage.yml` | test issue auto-labeled; `actionlint` clean | 2 |
-| T11 | Standalone `gemini-review.yml` (label-gated) | labeled PR gets review; check absent from required contexts | 2 |
-| T12 | Standalone `gemini-invoke.yml` (association-gated) | collaborator comment acted on; outsider comment ignored | 2 |
+| T11 | Standalone `gemini-review.yml` (label-gated, same-repo/non-Dependabot guard, `GEMINI_CLI_TRUST_WORKSPACE=true`) | labeled internal PR gets review; labeled Dependabot PR skips cleanly; check absent from required contexts | 2 |
+| T12 | Standalone `gemini-invoke.yml` (association allowlist enforced outside the model on trigger AND `/approve` comments; `GEMINI_CLI_TRUST_WORKSPACE=true`) | collaborator trigger + approval acted on; outsider trigger ignored; outsider `/approve` leaves run halted | 2 |
 | T13 | Docs close-out: audit addendum, CLAUDE.md commands, cookbook submodule bump PR | files updated; cookbook PR open | 1 |
 
 ## Loop protocol
