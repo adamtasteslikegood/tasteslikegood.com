@@ -58,8 +58,9 @@ def _resolve_public_slug(
 ) -> str:
     """Pick a non-empty, route-safe, unique slug for a recipe being published.
 
-    Public rows with slug=NULL would appear in /browse and the sitemap yet no
-    /r/<slug> URL could resolve them, so publication requires a usable slug:
+    Public rows with slug=NULL would appear in /browse (the sitemap already
+    filters them out) yet no /r/<slug> URL could resolve them, so
+    publication requires a usable slug:
     the payload's slug if salvageable, else the row's existing slug, else one
     derived from the name. Uniqueness collisions get a numeric suffix; the DB
     unique constraint on Recipe.slug remains the final arbiter under races.
@@ -337,9 +338,15 @@ def update_recipe(
         # accepts partial payloads such as {"is_public": true}, and replacing
         # the blob wholesale would delete ingredients/instructions at the
         # moment of publishing. Keys the payload does supply always win.
-        recipe_data_with_id = _gate_is_public(
-            {**(recipe.data or {}), **recipe_data, "id": recipe_id}, user_id
-        )
+        merged = {**(recipe.data or {}), **recipe_data, "id": recipe_id}
+
+        if "is_public" not in recipe_data:
+            # The is_public column is authoritative, like slug below: a
+            # partial PUT must not publish or unpublish a recipe off a
+            # stale blob value.
+            merged["is_public"] = recipe.is_public
+
+        recipe_data_with_id = _gate_is_public(merged, user_id)
 
         if "name" not in recipe_data_with_id and recipe.name:
             # Publish-only partial updates keep the persisted name (see

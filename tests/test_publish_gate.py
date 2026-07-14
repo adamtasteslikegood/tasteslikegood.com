@@ -433,6 +433,23 @@ def test_partial_update_prefers_column_slug_over_stale_blob(app, user):
     assert updated.data["slug"] == "new-slug"  # blob resynced to the column
 
 
+def test_partial_update_prefers_column_is_public_over_stale_blob(app, user):
+    """PR #152 review: like slug, the is_public column is authoritative. A
+    partial PUT that omits the flag must not publish a private recipe (or
+    unpublish a public one) off a stale blob value."""
+    db_recipe_repository.create_recipe(_recipe_data(is_public=False), user_id=user.id)
+    # Simulate a stale blob claiming the recipe is public.
+    recipe = db.session.get(Recipe, "r-1")
+    recipe.data = {**recipe.data, "is_public": True}
+    db.session.commit()
+
+    updated = db_recipe_repository.update_recipe("r-1", {"name": "Chili v2"}, user_id=user.id)
+
+    assert updated is not None
+    assert updated.is_public is False  # column preserved, not blob-published
+    assert updated.data["is_public"] is False  # blob resynced to the column
+
+
 def test_update_explicit_falsy_name_is_not_inherited(app, user):
     """PR #152 review: only key absence makes an update partial. An explicit
     falsy name is the caller's value — it must reach both blob and column,
