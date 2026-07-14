@@ -38,7 +38,12 @@ class RecipeSlugError(ValueError):
 
 
 def _slugify(text: str) -> str:
-    """Normalize text to a route-safe slug (same rules as scripts/backfill_slugs.py)."""
+    """Normalize text to a route-safe slug.
+
+    Same normalization as scripts/backfill_slugs.py:generate_slug, except
+    that this returns "" for unusable input (the publish gate rejects it
+    with RecipeSlugError) where the backfill falls back to "recipe".
+    """
     text = text.lower().strip()
     text = re.sub(r"[^\w\s-]", "", text)
     text = re.sub(r"[\s_-]+", "-", text)
@@ -344,6 +349,16 @@ def update_recipe(
             # Key presence, not truthiness: an explicit falsy name is the
             # caller's value and goes to both blob and column unchanged.
             recipe_data_with_id["name"] = recipe.name
+
+        if "slug" not in recipe_data:
+            # The slug column is authoritative — scripts/backfill_slugs.py
+            # rewrites it without touching the blob — so a partial PUT that
+            # omits slug must not revert the column to a stale blob value.
+            # Syncing the merged dict also realigns the blob with the column.
+            if recipe.slug is not None:
+                recipe_data_with_id["slug"] = recipe.slug
+            else:
+                recipe_data_with_id.pop("slug", None)
 
         def stage_update(data: Dict[str, Any]) -> Recipe:
             recipe.name = recipe_data.get("name", recipe.name)

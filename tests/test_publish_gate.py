@@ -412,6 +412,27 @@ def test_put_publish_only_payload_preserves_recipe_content(app, user):
     assert recipe.data["name"] == "Chili"
 
 
+def test_partial_update_prefers_column_slug_over_stale_blob(app, user):
+    """PR #152 review: backfill scripts rewrite the slug column without
+    touching the blob. A partial PUT that omits slug must keep the column
+    value, not revert it to the stale blob one."""
+    db_recipe_repository.create_recipe(
+        _recipe_data(slug="old-slug", is_public=True), user_id=user.id
+    )
+    # Simulate a backfill that fixed the column but not the blob.
+    recipe = db.session.get(Recipe, "r-1")
+    recipe.slug = "new-slug"
+    db.session.commit()
+
+    updated = db_recipe_repository.update_recipe(
+        "r-1", {"name": "Chili", "is_public": True}, user_id=user.id
+    )
+
+    assert updated is not None
+    assert updated.slug == "new-slug"  # column kept, not reverted
+    assert updated.data["slug"] == "new-slug"  # blob resynced to the column
+
+
 def test_update_explicit_falsy_name_is_not_inherited(app, user):
     """PR #152 review: only key absence makes an update partial. An explicit
     falsy name is the caller's value — it must reach both blob and column,
