@@ -11,7 +11,7 @@ updates:
     target-branch: "dev"
     labels:
       - "dependencies"
-      - "github-actions"
+      - "CI/CD"
     commit-message:
       prefix: "ci"
     groups:
@@ -56,7 +56,6 @@ updates:
     target-branch: "dev"
     labels:
       - "dependencies"
-      - "docker"
     commit-message:
       prefix: "build(docker)"
     open-pull-requests-limit: 5
