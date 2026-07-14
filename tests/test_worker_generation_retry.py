@@ -98,12 +98,14 @@ def test_worker_retries_transient_generation_failure(app, client):
         (None, None, "Model returned invalid JSON (likely truncated)"),
         (VALID_RECIPE, json.dumps(VALID_RECIPE), None),
     ]
-    with patch(
-        "blueprints.worker_api_bp.attempt_recipe_generation",
-        side_effect=attempts,
-    ) as mock_attempt, patch(
-        "blueprints.worker_api_bp.invalidate_recipe"
-    ), patch("services.pubsub_service.publish_message"):
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            side_effect=attempts,
+        ) as mock_attempt,
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("services.pubsub_service.publish_message"),
+    ):
         resp = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
 
     assert resp.status_code == 200
@@ -119,11 +121,12 @@ def test_worker_marks_error_after_all_attempts_fail(app, client):
     with app.app_context():
         _make_pending_recipe(recipe_id)
 
-    with patch(
-        "blueprints.worker_api_bp.attempt_recipe_generation",
-        return_value=(None, None, "Model returned invalid JSON"),
-    ) as mock_attempt, patch(
-        "blueprints.worker_api_bp.GENERATION_MAX_ATTEMPTS", 3
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            return_value=(None, None, "Model returned invalid JSON"),
+        ) as mock_attempt,
+        patch("blueprints.worker_api_bp.GENERATION_MAX_ATTEMPTS", 3),
     ):
         resp = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
 
@@ -150,9 +153,11 @@ def test_invalid_json_sets_real_error_message(app):
         def __init__(self, **kwargs):
             self.models = FakeModels()
 
-    with app.test_request_context("/api/generate"), patch.object(
-        generation_bp, "Client", FakeClient
-    ), patch.object(generation_bp, "GOOGLE_API_KEY", "fake-key"):
+    with (
+        app.test_request_context("/api/generate"),
+        patch.object(generation_bp, "Client", FakeClient),
+        patch.object(generation_bp, "GOOGLE_API_KEY", "fake-key"),
+    ):
         recipe_data, raw_json, last_error = generation_bp.attempt_recipe_generation(
             "make peach salsa", "gemini-3.1-pro-preview"
         )
@@ -181,12 +186,15 @@ def test_schema_validation_failure_sets_real_error_message(app):
         def __init__(self, **kwargs):
             self.models = FakeModels()
 
-    with app.test_request_context("/api/generate"), patch.object(
-        generation_bp, "Client", FakeClient
-    ), patch.object(generation_bp, "GOOGLE_API_KEY", "fake-key"), patch.object(
-        generation_bp,
-        "validate_recipe_data",
-        side_effect=ValidationError("'name' is a required property"),
+    with (
+        app.test_request_context("/api/generate"),
+        patch.object(generation_bp, "Client", FakeClient),
+        patch.object(generation_bp, "GOOGLE_API_KEY", "fake-key"),
+        patch.object(
+            generation_bp,
+            "validate_recipe_data",
+            side_effect=ValidationError("'name' is a required property"),
+        ),
     ):
         recipe_data, raw_json, last_error = generation_bp.attempt_recipe_generation(
             "make peach salsa", "gemini-3.1-pro-preview"

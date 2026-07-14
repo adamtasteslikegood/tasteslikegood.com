@@ -27,11 +27,7 @@ logger = logging.getLogger(__name__)
 
 def run_gate(session, reassign_email: Optional[str] = None) -> Dict[str, int]:
     """Apply the gate to pre-existing rows. Returns a summary dict."""
-    rows = (
-        session.query(Recipe)
-        .filter(Recipe.is_public.is_(True), Recipe.user_id.is_(None))
-        .all()
-    )
+    rows = session.query(Recipe).filter(Recipe.is_public.is_(True), Recipe.user_id.is_(None)).all()
     summary = {"found": len(rows), "reassigned": 0, "unpublished": 0}
     if not rows:
         logger.info("gate_guest_public_recipes: no guest-owned public rows")

@@ -13,7 +13,7 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
     name = db.Column(db.String(200), nullable=False)
     status = db.Column(db.String(20), nullable=False, default="ready")
     slug = db.Column(db.String(255), unique=True, index=True, nullable=True)
-    is_public = db.Column(db.Boolean, default=False, nullable=False, server_default='0')
+    is_public = db.Column(db.Boolean, default=False, nullable=False, server_default="0")
     # MutableDict ensures in-place JSON updates are tracked (important for SQLite dev).
     data = db.Column(MutableDict.as_mutable(GenericJSON), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)

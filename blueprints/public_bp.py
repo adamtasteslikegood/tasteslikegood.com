@@ -163,9 +163,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         "cookTime": _minutes_to_iso_duration(cook_minutes),
         "totalTime": _minutes_to_iso_duration(total_minutes) if total_minutes else None,
         "recipeYield": (
-            str(data.get("servings"))
-            if data.get("servings") not in (None, "")
-            else None
+            str(data.get("servings")) if data.get("servings") not in (None, "") else None
         ),
         "recipeIngredient": ingredient_lines or None,
         "recipeInstructions": [
@@ -267,9 +265,7 @@ def browse_public_recipes():
     except (TypeError, ValueError):
         page = 1
 
-    base_query = Recipe.query.filter(Recipe.is_public.is_(True)).options(
-        joinedload(Recipe.user)
-    )
+    base_query = Recipe.query.filter(Recipe.is_public.is_(True)).options(joinedload(Recipe.user))
 
     total = base_query.with_entities(Recipe.id).count()
     total_pages = max(1, ceil(total / BROWSE_PAGE_SIZE))

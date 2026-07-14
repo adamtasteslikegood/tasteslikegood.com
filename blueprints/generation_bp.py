@@ -155,9 +155,7 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
                     validate_recipe_data(data)
                 except ValidationError as e:
                     print(f"Validation failed for {source_name}: {e}")
-                    raise ValueError(
-                        f"Generated recipe failed schema validation: {e}"
-                    ) from e
+                    raise ValueError(f"Generated recipe failed schema validation: {e}") from e
 
                 return data, text_response
             except json.JSONDecodeError as e:
