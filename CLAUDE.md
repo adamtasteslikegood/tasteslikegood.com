@@ -138,6 +138,7 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `GCP_PROJECT_ID`, `PUBSUB_INVOKER_SA` | Required for `worker_api_bp` to accept push messages |
 | `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Set by cookbook deploy; backend currently does not use Valkey directly |
 | `FRONTEND_URL`, `SESSION_COOKIE_DOMAIN` | OAuth redirects, cookie scoping |
+| `DD_API_KEY` | **Required in prod** for the Docker image's Datadog `serverless-init` entrypoint — without it traces/profiles/logs/AppSec events are dropped (app still serves). Injected via `--set-secrets` in the cookbook `cloudbuild.yaml`; not needed for local `python app.py`. |
 
 In production all secrets come from Google Secret Manager via Cloud Run `--set-secrets`.
 

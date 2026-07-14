@@ -1,39 +1,34 @@
-# Use an official Python runtime as a parent image
 FROM python:3.12-slim
+COPY --from=datadog/serverless-init:1 /datadog-init /app/datadog-init
 
-# Set environment variables
-# PYTHONDONTWRITEBYTECODE: Prevents Python from writing pyc files to disc
-# PYTHONUNBUFFERED: Prevents Python from buffering stdout and stderr
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
+ENV DD_SERVICE=flask-backend
+ENV DD_SITE=us5.datadoghq.com
+ENV DD_LOGS_ENABLED=true
+ENV DD_LOGS_INJECTION=true
+ENV DD_SOURCE=python
+ENV DD_PROFILING_ENABLED=true
+ENV DD_APPSEC_ENABLED=true
 
-# Set the working directory in the container
 WORKDIR /app
 
-# Install system dependencies
-# gcc and other tools might be needed for some python packages
 RUN apt-get update && apt-get install -y \
     gcc \
     libpq-dev \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the requirements file into the container at /app
 COPY requirements.txt /app/
-
-# Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the application code
 COPY . /app/
 
-# Make port 5000 available to the world outside this container
 EXPOSE 5000
-
-# Run app.py when the container launches
-# Using gunicorn for production is better than the flask dev server
-# But for now, adhering to the "mimic existing structure" and simpler setup if gunicorn isn't in requirements.
-# However, "production grade" usually implies a WSGI server.
-# Checking requirements.txt again... gunicorn is NOT there.
-# I will use the flask run command for now but add a comment about gunicorn.
-# Or better, I will use python app.py since that's how it's currently run.
-CMD ["python", "app.py"]
+# serverless-init needs DD_API_KEY at runtime or telemetry silently goes nowhere;
+# production injects it via --set-secrets in the cookbook repo's cloudbuild.yaml.
+ENTRYPOINT ["/app/datadog-init"]
+# Gunicorn, never `python app.py`: the __main__ path runs Werkzeug's debug
+# server (app.run(debug=True)), which must not serve production traffic.
+# Cloud Run injects PORT; 5000 matches the old local-run default.
+CMD ["sh", "-c", "exec ddtrace-run gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 8 --timeout 0 app:app"]
