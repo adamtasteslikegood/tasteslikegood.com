@@ -391,6 +391,36 @@ def test_put_publish_only_payload_derives_slug_from_persisted_name(app, user):
     assert recipe.data["slug"] == "spicy-chili"
 
 
+def test_update_explicit_falsy_name_is_not_inherited(app, user):
+    """PR #152 review: only key absence makes an update partial. An explicit
+    falsy name is the caller's value — it must reach both blob and column,
+    never be silently replaced by the persisted name."""
+    db_recipe_repository.create_recipe(_recipe_data(name="Chili"), user_id=user.id)
+
+    updated = db_recipe_repository.update_recipe("r-1", {"name": ""}, user_id=user.id)
+
+    assert updated is not None
+    assert updated.name == ""  # column keeps the explicit value
+    assert updated.data["name"] == ""  # blob agrees with the column
+
+
+def test_put_publish_with_explicit_empty_name_and_no_slug_returns_400(app, user):
+    """An explicit empty name offers the resolver nothing to derive from —
+    the publish is rejected rather than borrowing the persisted name."""
+    slugless = _recipe_data(name="Chili")
+    del slugless["slug"]
+    db_recipe_repository.create_recipe(slugless, user_id=user.id)
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = user.id
+
+    response = client.put("/api/recipes/r-1", json={"name": "", "is_public": True})
+
+    assert response.status_code == 400
+    recipe = db.session.get(Recipe, "r-1")
+    assert recipe.is_public is False  # nothing was persisted
+
+
 def test_non_slug_integrity_error_is_not_retried(app, user, monkeypatch):
     """PR #152 review: only confirmed slug races retry. Any other integrity
     failure (PK/not-null, unrelated staged objects) must re-raise on the

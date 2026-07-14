@@ -331,11 +331,13 @@ def update_recipe(
         # Ensure the id in recipe_data matches the database record id.
         recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
 
-        if not recipe_data_with_id.get("name") and recipe.name:
+        if "name" not in recipe_data_with_id and recipe.name:
             # Publish-only partial updates keep the persisted name (see
             # stage_update), so slug derivation must see it too — otherwise
             # {"is_public": true} on a slug-less row is wrongly rejected.
             # Writing it into the blob also keeps blob and column agreeing.
+            # Key presence, not truthiness: an explicit falsy name is the
+            # caller's value and goes to both blob and column unchanged.
             recipe_data_with_id["name"] = recipe.name
 
         def stage_update(data: Dict[str, Any]) -> Recipe:
