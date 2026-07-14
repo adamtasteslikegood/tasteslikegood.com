@@ -184,12 +184,12 @@ def update_recipe(
             return None
 
         # Ensure the id in recipe_data matches the database record id.
-        # PUT does not write the is_public column, but the blob must not
-        # carry a guest-smuggled is_public=true either.
         recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
 
         # Update fields
         recipe.name = recipe_data.get("name", recipe.name)
+        recipe.slug = recipe_data_with_id.get("slug")
+        recipe.is_public = recipe_data_with_id["is_public"]
         recipe.data = recipe_data_with_id
         recipe.updated_at = datetime.utcnow()
 
