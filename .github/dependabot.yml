@@ -1,22 +1,76 @@
 version: 2
 
 updates:
-  - package-ecosystem: "pip"
+  # -------------------------
+  # GitHub Actions
+  # -------------------------
+  - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
-    target-branch: "dev/backend_sub222"
+    target-branch: "dev"
+    labels:
+      - "dependencies"
+      - "CI/CD"
+    commit-message:
+      prefix: "ci"
+    groups:
+      actions-all:
+        patterns:
+          - "*"
+    open-pull-requests-limit: 10
+
+  # -------------------------
+  # Python (uv)
+  # -------------------------
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
     labels:
       - "dependencies"
       - "python"
-    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build(deps)"
+    groups:
+      python-production:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      python-development:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+    open-pull-requests-limit: 15
+
+  # -------------------------
+  # npm
+  # -------------------------
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
       interval: "weekly"
+    target-branch: "dev"
     exclude-paths:
-      - "/.agent/skills/dependency-auditor/test-project/**"
-      - "/.claude/skills/dependency-auditor/test-project/**"
-      - "/.codex/skills/dependency-auditor/test-project/**"
-      - "/.github/skills/dependency-auditor/test-project/**"
-      - "/.zed/skills/dependency-auditor/test-project/**"
+      - ".agent/skills/dependency-auditor/test-project/**"
+      - ".claude/skills/dependency-auditor/test-project/**"
+      - ".codex/skills/dependency-auditor/test-project/**"
+      - ".github/skills/dependency-auditor/test-project/**"
+      - ".zed/skills/dependency-auditor/test-project/**"
+
+  # -------------------------
+  # Docker
+  # -------------------------
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "dev"
+    labels:
+      - "dependencies"
+    commit-message:
+      prefix: "build(docker)"
+    open-pull-requests-limit: 5
