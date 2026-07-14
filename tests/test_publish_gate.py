@@ -335,6 +335,39 @@ def test_publish_slug_race_retries_with_next_suffix(app, user, monkeypatch):
     assert recipe.data["slug"] == "chili-2"
 
 
+def test_publish_slug_double_race_uses_next_suffix(app, user, monkeypatch):
+    """PR #152 review: losing two races in a row must yield chili-3, not
+    chili-2-2 — each retry resolves from the original payload, not from the
+    previous attempt's already-suffixed slug."""
+    real_resolve = db_recipe_repository._resolve_public_slug
+    state = {"races": 0}
+
+    def racing_resolve(data, recipe_id, current_slug=None, skip=frozenset()):
+        slug = real_resolve(data, recipe_id, current_slug, skip=skip)
+        if state["races"] < 2:
+            state["races"] += 1
+            # The "other writer" claims the probed slug before our commit.
+            db.session.add(
+                Recipe(
+                    id=f"racer-{state['races']}",
+                    user_id=None,
+                    name="Racer",
+                    slug=slug,
+                    is_public=False,
+                    data={"id": f"racer-{state['races']}", "name": "Racer"},
+                )
+            )
+            db.session.commit()
+        return slug
+
+    monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", racing_resolve)
+
+    recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
+    assert recipe is not None
+    assert recipe.slug == "chili-3"
+    assert recipe.data["slug"] == "chili-3"
+
+
 def test_private_update_without_slug_unaffected(app, user):
     """Private rows never trip the slug gate (guest saves send no slug)."""
     db_recipe_repository.create_recipe(_recipe_data(name="Chili"), user_id=user.id)

@@ -97,13 +97,18 @@ def _commit_publish_retrying(
     losing slug, and re-stage with the next suffix. ``stage(data)`` applies
     ``data`` to the ORM (building or mutating the row) and returns the row —
     it is re-invoked on every attempt because rollback discards staged state.
+
+    Resolution always starts from the caller's original payload, not the
+    previous attempt's result: resolving from a once-suffixed slug would
+    compound the suffix (chili-2-2 after two races instead of chili-3).
     """
+    resolver_input = dict(recipe_data)
     skip: set = set()
     attempts = 0
     while True:
         if recipe_data["is_public"]:
             recipe_data["slug"] = _resolve_public_slug(
-                recipe_data, recipe_id, current_slug, skip=frozenset(skip)
+                resolver_input, recipe_id, current_slug, skip=frozenset(skip)
             )
         recipe = stage(recipe_data)
         try:
