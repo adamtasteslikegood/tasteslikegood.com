@@ -93,12 +93,17 @@ Key choices, mapped to the failure lessons:
 5. **Secrets/auth**: reuse whatever `gemini-scheduled-triage.yml` uses today
    (`GEMINI_API_KEY` / Vertex WIF) — it is the working reference implementation.
    Pin `google-github-actions/run-gemini-cli` to a commit SHA. Auth alone is not
-   sufficient for the restored jobs: any job that **checks out the repo**
-   (review, invoke) must also set `GEMINI_CLI_TRUST_WORKSPACE: true` — the headless
-   CLI refuses to operate on an untrusted checkout (job 86047077397 on 2026-07-09
-   exited before doing any work for exactly this reason). The scheduled triage never
-   checks out code, which is why it works without the setting and cannot serve as
-   the reference for this requirement.
+   sufficient: **every** job that invokes `run-gemini-cli` must set
+   `GEMINI_CLI_TRUST_WORKSPACE: 'true'` — the headless CLI refuses to run in an
+   untrusted directory whether or not the job checks out code (checkout case:
+   job 86047077397 on 2026-07-09 exited before doing any work; no-checkout case:
+   run 29353718769 failed the same way in an empty workspace).
+
+   > **History (2026-07-14):** this spec originally scoped the requirement to
+   > checkout jobs only, citing the scheduled triage's green runs as evidence it
+   > was unnecessary elsewhere. Those greens were vacuous — the scheduled Gemini
+   > step skips whenever there are no untriaged issues, so it never exercised the
+   > CLI. Corrected during rollout (#183).
 6. **Event model for review** (secrets vs forks): `gemini-review.yml` triggers on
    `pull_request` with `types: [labeled]` plus a guard that the head repo is this
    repo and the actor is not `dependabot[bot]`. Dependabot- and fork-triggered
