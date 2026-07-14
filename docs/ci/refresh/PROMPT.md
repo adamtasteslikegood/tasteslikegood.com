@@ -20,8 +20,12 @@ Restore and harden CI/CD quality gates in `adamtasteslikegood/tasteslikegood.com
 1. Branch off `dev`, PR into `dev`. **Never** commit to `dev` or `main` directly.
    Branch names: `chore/ci-<topic>` or `fix/<topic>`.
 2. One concern per PR, matching the TODO's PR boundaries. No omnibus PRs.
-3. Session-start sync per repo `CLAUDE.md` (fetch, divergence check, in-flight PR
-   scan) before creating each branch — Dependabot and other agents are active here.
+3. Sync before creating each branch — Dependabot and other agents are active in this
+   repo, so stale bases and duplicate work are real risks. Concretely:
+   `git fetch origin --prune`; branch from `origin/dev` (never the local `dev`);
+   scan in-flight work with `gh pr list --state open` and
+   `git branch -r --sort=-committerdate | head`; if an open PR already covers the
+   task, build on it instead of duplicating.
 4. Never lower a quality bar to force green: no blanket `# noqa`, no
    `--ignore-missing-imports` additions beyond what exists, no `pytest.mark.skip`,
    no deleting tests. Narrow, justified suppressions only — each needs a code comment
@@ -29,8 +33,11 @@ Restore and harden CI/CD quality gates in `adamtasteslikegood/tasteslikegood.com
 5. AI/Gemini workflow checks must never be added to required status checks.
 6. Branch-protection changes (Phase 4) and any force-type operation → **escalate,
    human approves** before applying.
-7. Follow the PR lifecycle in `CLAUDE.md`: monitor checks and review comments on every
-   PR you open; answer or fix each comment; a PR with unaddressed feedback is not done.
+7. Own every PR you open until it merges: monitor checks and review comments
+   (`gh pr checks <n>`, `gh pr view <n> --comments`,
+   `gh api repos/{owner}/{repo}/pulls/<n>/comments`); for each piece of feedback,
+   either push a fix and reply confirming what changed, or reply with a concrete
+   technical rebuttal. A PR with unaddressed feedback or failing checks is not done.
 
 ## Global verification suite (run after every task; all must pass at close)
 
@@ -59,7 +66,7 @@ Execute strictly in order; each task = branch → change → local verify → PR
 | T4 | mypy unbroken + errors resolved/tracked | `uv run mypy . --ignore-missing-imports` exits 0 | 3 |
 | T5 | Root-cause 4 `test_public_ssr.py` failures; fix code or tests per the SSR contract | full pytest → `164 passed` | 3 |
 | T6 | Docker build job in `ci.yml` | build job green on PR; red-test on scratch branch with broken `requirements.txt`, then reverted | 2 |
-| T7 | Branch protection on `dev` + `main` (**escalate first**) | `gh api .../branches/dev/protection --jq '.required_status_checks.contexts'` lists the 5 checks | 1 |
+| T7 | Branch protection on `dev` + `main` (**escalate first**) | `gh api .../branches/dev/protection --jq '.required_status_checks.contexts'` returns exactly the contexts enumerated in SPEC-01 §4.3 (per-language `Analyze (...)` contexts, never a `CodeQL` workflow-name context) | 1 |
 | T8 | Drain Dependabot queue (`@dependabot rebase`, merge through gates) | `gh pr list --state open --author app/dependabot` → each green-merged or closed with reason | 2/PR |
 | T9 | Scheduled triage: 6h cron + failure→`ci-health` issue | green scheduled run; forced-failure test opens issue | 2 |
 | T10 | Standalone `gemini-triage.yml` | test issue auto-labeled; `actionlint` clean | 2 |

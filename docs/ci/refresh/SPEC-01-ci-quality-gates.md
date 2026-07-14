@@ -74,15 +74,14 @@ flowchart LR
     subgraph TARGET["Target (after this spec)"]
         direction TB
         PR2[PR into dev / main] --> T0["changes filter<br/>(skip docs-only)"]
-        T0 --> T1["Lint<br/>black --check + flake8"]
+        T0 --> T1["Lint<br/>black --check + flake8<br/>+ requirements.txt ⇄ uv.lock"]
         T0 --> T2["Type Check<br/>mypy (fixed config)"]
         T0 --> T3["Test<br/>pytest + coverage"]
-        T0 --> T4["Deps<br/>requirements.txt ⇄ uv.lock"]
         T0 --> T5["Build<br/>docker build (validate image)"]
         PR2 --> T6["Security<br/>pip-audit (advisory)"]
-        PR2 --> T7["CodeQL ✅ (unchanged)"]
+        PR2 --> T7["CodeQL: Analyze (actions | python |<br/>javascript-typescript) ✅ (unchanged)"]
         PR2 --> T8["Non-ASCII ✅ (unchanged)"]
-        T1 & T2 & T3 & T4 & T5 --> G{{"Branch protection:<br/>required checks"}}
+        T1 & T2 & T3 & T5 --> G{{"Branch protection:<br/>required checks"}}
         G -->|all green| MERGE([Merge])
     end
     style G fill:#2d6a4f,color:#fff
@@ -109,7 +108,8 @@ concurrency:
 - **Keep** the four jobs (lint, type-check, test, security) and the
   `requirements.txt ⇄ uv.lock` diff step — that check exists because a Dependabot bump
   once shipped a broken `requirements.txt` and killed the v0.3.0 deploy in the migrate
-  Job. It stays.
+  Job. It stays **as a step inside the lint job** (not a separate job/status context —
+  one fewer required check to manage; a sync failure fails `Lint (Black + Flake8)`).
 - **Add `concurrency`** so force-pushes don't stack runs.
 - **Add a `build` job**: `docker build -f Dockerfile .` (no push). The Dockerfile
   installs from `requirements.txt`, so this catches image-level breakage that
@@ -117,9 +117,11 @@ concurrency:
 - **Replace `safety check`** (deprecated CLI, `|| true` today — pure noise) with
   `pip-audit`, still `continue-on-error: true` initially. Promote to blocking only
   after a clean week.
-- Optional but cheap: a `docs-only` paths filter so markdown-only PRs skip the heavy
-  jobs while still reporting required-check success (use
-  `paths-ignore` + a no-op success job, or `dorny/paths-filter`).
+- Optional but cheap: skip heavy work on docs-only PRs with **in-job path detection**
+  (e.g. `dorny/paths-filter` as a first step, subsequent steps conditioned on its
+  output). Do **not** use workflow-level `paths`/`paths-ignore` for this: a skipped
+  workflow never reports its status contexts, so once those checks are required,
+  docs-only PRs would hang forever waiting on them.
 
 ### 4.2 Fix the tree (make the gates pass honestly)
 
@@ -135,9 +137,16 @@ concurrency:
 After the tree is green, configure on **`dev`** and **`main`** (repo Settings →
 Branches, or `gh api`):
 
-- Required status checks: `Lint (Black + Flake8)`, `Type Check (mypy)`,
-  `Test (pytest)`, `Build (docker)`, `Check for Non-ASCII Characters in Filenames`,
-  `CodeQL`.
+- Required status checks (exact context names as emitted by the workflows):
+  - `Lint (Black + Flake8)`
+  - `Type Check (mypy)`
+  - `Test (pytest)`
+  - `Build (docker)`
+  - `Check for Non-ASCII Characters in Filenames`
+  - `Analyze (actions)`, `Analyze (python)`, `Analyze (javascript-typescript)` —
+    `codeql.yml` is a matrix; the status contexts are the per-language job names,
+    **not** the workflow name `CodeQL`. Requiring a context named `CodeQL` would
+    block every PR forever on a check that never reports.
 - Require branches to be up to date before merging: **off** (Dependabot volume makes
   this painful; the merge queue can come later if needed).
 - Dependabot auto-merge then only fires when required checks pass — restoring the
@@ -156,7 +165,6 @@ flowchart TD
     P4["Phase 4<br/>Branch protection: make checks required on dev + main"]
     P5["Phase 5<br/>Drain the Dependabot queue through the new gates"]
     P1 --> P2 --> P3 --> P4 --> P5
-    P2 -->|tree green| P4
 ```
 
 Phase 1 before Phase 2 is deliberate: turning CI on first gives every subsequent fix
@@ -166,10 +174,12 @@ pre-existing rot.
 
 ## 5. Acceptance criteria
 
-1. A trivial PR into `dev` shows Lint/Type-Check/Test/Deps/Build checks running.
-2. `uv run black --check . && uv run flake8 . --count && uv run mypy . && uv run pytest`
-   all exit 0 on `dev`.
-3. `gh api repos/{owner}/{repo}/branches/dev/protection` lists the five required checks.
+1. A trivial PR into `dev` shows Lint/Type-Check/Test/Build checks running (the
+   requirements-sync check runs as a step inside Lint).
+2. `uv run black --check . && uv run flake8 . --count && uv run mypy . --ignore-missing-imports && uv run pytest`
+   all exit 0 on `dev` (same mypy invocation as CI and the harness — keep them identical).
+3. `gh api repos/{owner}/{repo}/branches/dev/protection --jq '.required_status_checks.contexts'`
+   returns exactly the contexts enumerated in §4.3 — no more, no fewer.
 4. A PR that deliberately breaks a test cannot be merged (verified once, then reverted).
 5. Dependabot PRs merge only after required checks pass.
 

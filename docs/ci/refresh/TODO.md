@@ -46,9 +46,11 @@ Baseline measured 2026-07-14 on `dev`: black ❌ 15 files · flake8 ❌ 38 · my
 
 ## Phase 4 — Branch protection
 
-- [ ] Configure required status checks on `dev`: `Lint (Black + Flake8)`,
-      `Type Check (mypy)`, `Test (pytest)`, `Build (docker)`,
-      `Check for Non-ASCII Characters in Filenames`, `CodeQL`
+- [ ] Configure required status checks on `dev` (exact context names — CodeQL is a
+      matrix, so its contexts are the per-language job names, never the workflow name):
+      `Lint (Black + Flake8)`, `Type Check (mypy)`, `Test (pytest)`, `Build (docker)`,
+      `Check for Non-ASCII Characters in Filenames`, `Analyze (actions)`,
+      `Analyze (python)`, `Analyze (javascript-typescript)`
       — verify: `gh api repos/adamtasteslikegood/tasteslikegood.com/branches/dev/protection --jq '.required_status_checks.contexts'`
 - [ ] Same for `main`
 - [ ] Negative test: PR with a deliberately failing test cannot merge; revert
@@ -64,9 +66,11 @@ Baseline measured 2026-07-14 on `dev`: black ❌ 15 files · flake8 ❌ 38 · my
 
 ## Phase 6 — AI triage & review (SPEC-02, each its own PR)
 
-- [ ] Retune `gemini-scheduled-triage.yml` cron hourly → every 6h; add on-failure step
-      that opens/updates a `ci-health` issue
-      — verify: green scheduled run; forced-failure test opens the issue
+- [ ] Retune `gemini-scheduled-triage.yml` cron hourly → every 6h; add a dedicated
+      alert job (`needs: [triage, label]`, `if: failure()`, own `issues: write`
+      permission) that opens/updates a `ci-health` issue — a step inside one job
+      can't see the other job's failure, and the `triage` job only has `issues: read`
+      — verify: green scheduled run; forced failure in either job opens the issue
 - [ ] Standalone `gemini-triage.yml` on `issues: opened`, reusing
       `.github/commands/gemini-triage.toml`; guardrails: `timeout-minutes: 10`,
       concurrency, `continue-on-error: true`, pinned action SHA
