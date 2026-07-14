@@ -36,6 +36,13 @@ jobs:
       contents: 'read'
       id-token: 'write'
       issues: 'read'
+    env:
+      # Current gemini-cli refuses to run in an untrusted directory even
+      # with no checkout (run 29353718769 exited: "Gemini CLI is not
+      # running in a trusted directory"). The workspace here is empty, so
+      # trusting it is safe. SPEC-02 §3.5 assumed only checkout jobs need
+      # this — the requirement has since widened to every run-gemini-cli job.
+      GEMINI_CLI_TRUST_WORKSPACE: 'true'
     outputs:
       available_labels: '${{ steps.get_labels.outputs.available_labels }}'
       selected_labels: '${{ env.SELECTED_LABELS }}'
