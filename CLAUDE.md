@@ -165,7 +165,7 @@ the cookbook repo:
 
 Both entries go through `scripts/mcp/run_parent_mcp.sh`, which locates the
 cookbook checkout (via `git rev-parse --show-superproject-working-tree`, or by
-walking up parent directories for linked worktrees) and exec's the real
+walking up parent directories for linked worktrees) and `exec`s the real
 launchers there (`scripts/pm/run_pm_daemon.sh`,
 `scripts/monitoring/run_gcp_monitor.sh`). The launchers cd to the cookbook
 root, so credentials still come from the cookbook `.env`
