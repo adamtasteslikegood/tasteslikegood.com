@@ -368,6 +368,29 @@ def test_publish_slug_double_race_uses_next_suffix(app, user, monkeypatch):
     assert recipe.data["slug"] == "chili-3"
 
 
+def test_put_publish_only_payload_derives_slug_from_persisted_name(app, user):
+    """PR #152 review: a publish-only partial update ({"is_public": true},
+    no name or slug) on a private slug-less row must derive the slug from
+    the persisted name instead of raising RecipeSlugError."""
+    slugless = _recipe_data(name="Spicy Chili!")
+    del slugless["slug"]
+    db_recipe_repository.create_recipe(slugless, user_id=user.id)
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["user_id"] = user.id
+
+    response = client.put("/api/recipes/r-1", json={"is_public": True})
+
+    assert response.status_code == 200
+    assert response.json["slug"] == "spicy-chili"
+    assert response.json["is_public"] is True
+    recipe = db.session.get(Recipe, "r-1")
+    assert recipe.name == "Spicy Chili!"  # persisted name untouched
+    assert recipe.slug == "spicy-chili"
+    assert recipe.data["name"] == "Spicy Chili!"  # blob agrees with column
+    assert recipe.data["slug"] == "spicy-chili"
+
+
 def test_non_slug_integrity_error_is_not_retried(app, user, monkeypatch):
     """PR #152 review: only confirmed slug races retry. Any other integrity
     failure (PK/not-null, unrelated staged objects) must re-raise on the
