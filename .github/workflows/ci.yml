@@ -5,9 +5,13 @@ permissions:
 
 on:
   push:
-    branches: [main, dev/backend_sub222, develop]
+    branches: [main, dev]
   pull_request:
-    branches: [main, dev/backend_sub222, develop]
+    branches: [main, dev]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   lint:
@@ -115,7 +119,7 @@ jobs:
           retention-days: 7
 
   security:
-    name: Security Scan (Safety)
+    name: Security Scan (pip-audit)
     runs-on: ubuntu-latest
 
     steps:
@@ -130,12 +134,9 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
-      - name: Install dependencies
+      # Audits the pinned production set the Docker image actually installs.
+      # Advisory for now (SPEC-01 §4.1) — promote to blocking after a clean week.
+      - name: Run pip-audit (advisory)
         run: |
-          uv sync --dev
-
-      - name: Run safety check
-        run: |
-          uv pip install safety
-          uv run safety check --json || true
+          uvx pip-audit -r requirements.txt
         continue-on-error: true
