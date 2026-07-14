@@ -41,9 +41,7 @@ def upgrade():
     from scripts.gate_guest_public_recipes import run_gate
 
     session = Session(bind=op.get_bind())
-    summary = run_gate(
-        session, reassign_email=os.environ.get("GUEST_PUBLIC_REASSIGN_EMAIL")
-    )
+    summary = run_gate(session, reassign_email=os.environ.get("GUEST_PUBLIC_REASSIGN_EMAIL"))
     logger.info("gate_guest_published_recipes: %s", summary)
 
 

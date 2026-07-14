@@ -82,12 +82,8 @@ def generate_recipe_json():
     guest_session_id = _current_guest_session_id()
 
     # Save a pending recipe to database
-    pending_data = {
-        "id": recipe_id,
-        "name": "Generating...",
-        "user_id": user_id
-    }
-    
+    pending_data = {"id": recipe_id, "name": "Generating...", "user_id": user_id}
+
     db_recipe = db_recipe_repository.create_recipe(pending_data, user_id, guest_session_id)
 
     if not db_recipe:
@@ -97,15 +93,15 @@ def generate_recipe_json():
 
     # Publish message to Pub/Sub
     from services.pubsub_service import publish_message
-    
+
     message_data = {
         "recipe_id": recipe_id,
         "prompt": prompt,
         "model": selected_model,
         "user_id": user_id,
-        "guest_session_id": guest_session_id
+        "guest_session_id": guest_session_id,
     }
-    
+
     try:
         publish_message("recipe-generation", message_data)
         logger.info(f"Queued recipe generation (id={recipe_id})")
@@ -157,14 +153,14 @@ def generate_image_for_recipe():
         return jsonify({"image_url": recipe_data["ai_image_url"]}), 200
 
     from services.pubsub_service import publish_message
-    
+
     message_data = {
         "recipe_id": recipe_id,
         "user_id": user_id,
         "guest_session_id": guest_session_id,
-        "force_regenerate": force_regenerate
+        "force_regenerate": force_regenerate,
     }
-    
+
     try:
         publish_message("image-generation", message_data)
         logger.info(f"Queued image generation for recipe (id={recipe_id})")
@@ -181,15 +177,12 @@ def get_recipe_status(recipe_id):
     """
     user_id = _current_user_id()
     guest_session_id = _current_guest_session_id()
-    
+
     recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
     if not recipe:
         return jsonify({"error": "Recipe not found"}), 404
-        
-    return jsonify({
-        "status": recipe.status,
-        "recipe": recipe.data
-    }), 200
+
+    return jsonify({"status": recipe.status, "recipe": recipe.data}), 200
 
 
 @generation_api_bp.route("/recipes/<recipe_id>/image", methods=["GET"])

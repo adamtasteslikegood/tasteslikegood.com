@@ -116,8 +116,8 @@ def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     assert '"prepTime": "PT15M"' in body
     assert '"cookTime": "PT20M"' in body
     assert '"totalTime": "PT35M"' in body
-    assert 'Save to your cookbook' in body
-    assert 'Save to Pinterest' in body
+    assert "Save to your cookbook" in body
+    assert "Save to Pinterest" in body
 
 
 def test_show_public_recipe_404_when_missing(client):
@@ -181,9 +181,7 @@ def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
         db.session.add(owner)
         db.session.commit()
         for idx in range(5):
-            db.session.add(
-                _make_recipe(f"Owned {idx}", f"owned-{idx}", owner=owner)
-            )
+            db.session.add(_make_recipe(f"Owned {idx}", f"owned-{idx}", owner=owner))
         db.session.commit()
 
     select_count = 0
