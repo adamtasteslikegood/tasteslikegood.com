@@ -174,7 +174,8 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         "keywords": ", ".join(data.get("tags", [])) if isinstance(data.get("tags"), list) else None,
         "recipeCategory": "Vegan",
     }
-    return _clean_json(json_ld)
+    cleaned: dict[str, Any] = _clean_json(json_ld)
+    return cleaned
 
 
 def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
