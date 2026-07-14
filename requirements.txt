@@ -4,7 +4,7 @@ alembic==1.18.4
     # via flask-migrate
 annotated-types==0.7.0
     # via pydantic
-anyio==4.11.0
+anyio==4.14.2
     # via
     #   google-genai
     #   httpx
@@ -19,9 +19,9 @@ blinker==1.9.0
     #   tasteslikegood-com
 bytecode==0.18.1
     # via ddtrace
-cachetools==5.5.2
+cachetools==7.1.4
     # via tasteslikegood-com
-certifi==2025.11.12
+certifi==2026.6.17
     # via
     #   httpcore
     #   httpx
@@ -29,7 +29,7 @@ certifi==2025.11.12
     #   tasteslikegood-com
 cffi==2.0.0 ; platform_python_implementation != 'PyPy'
     # via cryptography
-charset-normalizer==3.4.4
+charset-normalizer==3.4.9
     # via
     #   requests
     #   tasteslikegood-com
@@ -55,9 +55,9 @@ flask==3.1.3
     #   flask-migrate
     #   flask-sqlalchemy
     #   tasteslikegood-com
-flask-cors==6.0.0
+flask-cors==6.0.5
     # via tasteslikegood-com
-flask-migrate==4.0.5
+flask-migrate==4.1.0
     # via tasteslikegood-com
 flask-sqlalchemy==3.1.1
     # via
@@ -75,11 +75,11 @@ google-api-core==2.31.0
     #   google-cloud-pubsub
     #   google-cloud-storage
     #   google-generativeai
-google-api-python-client==2.182.0
+google-api-python-client==2.198.0
     # via
     #   google-generativeai
     #   tasteslikegood-com
-google-auth==2.49.1
+google-auth==2.56.0
     # via
     #   google-ai-generativelanguage
     #   google-api-core
@@ -94,25 +94,25 @@ google-auth==2.49.1
     #   tasteslikegood-com
 google-auth-httplib2==0.3.0
     # via google-api-python-client
-google-auth-oauthlib==1.3.0
+google-auth-oauthlib==1.4.0
     # via tasteslikegood-com
 google-cloud-core==2.6.0
     # via google-cloud-storage
 google-cloud-pubsub==2.39.0
     # via tasteslikegood-com
-google-cloud-storage==3.10.1
+google-cloud-storage==3.13.0
     # via tasteslikegood-com
 google-crc32c==1.8.0
     # via
     #   google-cloud-storage
     #   google-resumable-media
-google-genai==1.56.0
+google-genai==2.11.0
     # via tasteslikegood-com
-google-generativeai==0.8.5
+google-generativeai==0.8.6
     # via tasteslikegood-com
 google-resumable-media==2.10.0
     # via google-cloud-storage
-googleapis-common-protos==1.70.0
+googleapis-common-protos==1.75.0
     # via
     #   google-api-core
     #   grpc-google-iam-v1
@@ -149,7 +149,7 @@ httpx==0.28.1
     # via
     #   google-genai
     #   tasteslikegood-com
-idna==3.15
+idna==3.18
     # via
     #   anyio
     #   httpx
@@ -163,7 +163,7 @@ jinja2==3.1.6
     # via
     #   flask
     #   tasteslikegood-com
-jsonschema==4.25.1
+jsonschema==4.26.0
     # via tasteslikegood-com
 jsonschema-specifications==2025.9.1
     # via jsonschema
@@ -191,7 +191,7 @@ opentelemetry-semantic-conventions==0.64b0
     # via opentelemetry-sdk
 packaging==26.0
     # via gunicorn
-pandas==3.0.1
+pandas==3.0.3
     # via tasteslikegood-com
 proto-plus==1.27.1
     # via
@@ -208,9 +208,9 @@ protobuf==5.29.6
     #   grpc-google-iam-v1
     #   grpcio-status
     #   proto-plus
-psycopg2-binary==2.9.11
+psycopg2-binary==2.9.12
     # via tasteslikegood-com
-pyasn1==0.6.3
+pyasn1==0.6.4
     # via
     #   pyasn1-modules
     #   rsa
@@ -236,15 +236,15 @@ python-dateutil==2.9.0.post0
     # via pandas
 python-dotenv==1.2.2
     # via tasteslikegood-com
-python-multipart==0.0.31
+python-multipart==0.0.32
     # via tasteslikegood-com
-redis==7.4.0
+redis==8.0.1
     # via tasteslikegood-com
 referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
-requests==2.33.1
+requests==2.34.2
     # via
     #   google-api-core
     #   google-auth
@@ -266,21 +266,20 @@ six==1.17.0
     # via python-dateutil
 sniffio==1.3.1
     # via
-    #   anyio
     #   google-genai
     #   tasteslikegood-com
-sqlalchemy==2.0.48
+sqlalchemy==2.0.51
     # via
     #   alembic
     #   flask-sqlalchemy
     #   tasteslikegood-com
-tenacity==9.1.2
+tenacity==9.1.4
     # via
     #   google-genai
     #   tasteslikegood-com
 tqdm==4.67.3
     # via google-generativeai
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   alembic
     #   google-genai
@@ -308,7 +307,7 @@ websockets==15.0.1
     # via
     #   google-genai
     #   tasteslikegood-com
-werkzeug==3.1.6
+werkzeug==3.1.8
     # via
     #   flask
     #   flask-cors
