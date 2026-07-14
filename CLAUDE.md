@@ -153,6 +153,30 @@ In production all secrets come from Google Secret Manager via Cloud Run `--set-s
 - **mypy config lives only in `pyproject.toml` `[tool.mypy]`** — a `setup.cfg` `[mypy]` section is silently shadowed by it (that shadowing shipped a config that crashed mypy for months; `setup.cfg` was deleted 2026-07-14). `explicit_package_bases = true` is required because `scripts/` has no `__init__.py`.
 - **Every `run-gemini-cli` job needs `GEMINI_CLI_TRUST_WORKSPACE: 'true'`** — current gemini-cli refuses to run in an untrusted directory even without a checkout. CI quality gates and the required-check list are documented in `docs/ci/refresh/` (SPEC-01/SPEC-02).
 
+## MCP servers (agent sessions)
+
+`.mcp.json` registers the cookbook superproject's two MCP servers so agent
+sessions started inside this repo get the same tooling as sessions started in
+the cookbook repo:
+
+- `pm-daemon` — PM tools (`get_project_status`, `sync_pm_documents`,
+  `refresh_project_briefing`, `create_epic_from_roadmap`, `log_agent_session`)
+  plus the Confluence file watcher (singleton via `flock`; extra daemons are
+  expected, one per session).
+- `gcp-monitor` — read-only Cloud Monitoring tools (`check_system_health`,
+  `list_available_metrics`, `query_metric`) for the production stack.
+
+Both entries go through `scripts/mcp/run_parent_mcp.sh`, which locates the
+cookbook checkout (via `git rev-parse --show-superproject-working-tree`, or by
+walking up parent directories for linked worktrees) and `exec`s the real
+launchers there (`scripts/pm/run_pm_daemon.sh`,
+`scripts/monitoring/run_gcp_monitor.sh`). The launchers cd to the cookbook
+root, so credentials still come from the cookbook `.env`
+(`ATLASSIAN_EMAIL`/`ATLASSIAN_API_TOKEN` for pm-daemon,
+`GOOGLE_APPLICATION_CREDENTIALS` for gcp-monitor) — see the cookbook
+`CLAUDE.md` § Startup. In a standalone checkout (no cookbook superproject) the
+wrapper exits with a clear error and the servers are simply unavailable.
+
 ## Related docs
 
 - `API.md` — endpoint reference
