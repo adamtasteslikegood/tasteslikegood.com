@@ -34,6 +34,14 @@ jobs:
       id-token: 'write'
       issues: 'read'
       pull-requests: 'read'
+    env:
+      # Current gemini-cli refuses to run in an untrusted directory even
+      # without a checkout (see fix for the standalone triage, run
+      # 29353718769). This job's Gemini step is skipped whenever there are
+      # no untriaged issues, so historical green runs never exercised it —
+      # the next real batch would have hit the trust error and paged via
+      # the alert job. The workspace is empty; trusting it is safe.
+      GEMINI_CLI_TRUST_WORKSPACE: 'true'
     outputs:
       available_labels: '${{ steps.get_labels.outputs.available_labels }}'
       triaged_issues: '${{ env.TRIAGED_ISSUES }}'
