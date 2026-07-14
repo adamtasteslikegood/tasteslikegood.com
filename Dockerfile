@@ -25,5 +25,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . /app/
 
 EXPOSE 5000
+# serverless-init needs DD_API_KEY at runtime or telemetry silently goes nowhere;
+# production injects it via --set-secrets in the cookbook repo's cloudbuild.yaml.
 ENTRYPOINT ["/app/datadog-init"]
 CMD ["ddtrace-run", "python", "app.py"]
