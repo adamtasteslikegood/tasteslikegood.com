@@ -62,6 +62,11 @@ def _resolve_public_slug(
     Every result fits the 255-char slug column: the base is truncated and
     each collision suffix reserves its own room. ``skip`` holds slugs that
     already lost a commit race and must not be offered again.
+
+    Slugs occupying the base are fetched in one LIKE query and the suffix is
+    chosen in Python, so publishing the nth "Chili" costs one round trip, not
+    n. The prefix over-matches (chili% also hits chili-con-carne); harmless,
+    since candidates are tested by exact membership.
     """
     for source in (recipe_data.get("slug"), current_slug, recipe_data.get("name")):
         candidate = _slugify(str(source)) if source else ""
@@ -71,11 +76,17 @@ def _resolve_public_slug(
         raise RecipeSlugError(PUBLIC_SLUG_REQUIRED_ERROR)
 
     base = candidate[:_SLUG_MAX_LENGTH].rstrip("-")
+    # Short enough that every truncated-for-suffix variant still matches.
+    # _slugify output has no LIKE metacharacters (%, _).
+    prefix = base[: _SLUG_MAX_LENGTH - 12].rstrip("-")
+    occupied = set(skip) | {
+        slug
+        for (slug,) in db.session.query(Recipe.slug).filter(
+            Recipe.id != recipe_id, Recipe.slug.like(f"{prefix}%")
+        )
+    }
     candidate, suffix = base, 1
-    while (
-        candidate in skip
-        or Recipe.query.filter(Recipe.slug == candidate, Recipe.id != recipe_id).first() is not None
-    ):
+    while candidate in occupied:
         suffix += 1
         tail = f"-{suffix}"
         candidate = f"{base[: _SLUG_MAX_LENGTH - len(tail)].rstrip('-')}{tail}"
@@ -101,6 +112,14 @@ def _commit_publish_retrying(
     Resolution always starts from the caller's original payload, not the
     previous attempt's result: resolving from a once-suffixed slug would
     compound the suffix (chili-2-2 after two races instead of chili-3).
+
+    Only genuine slug races are retried: after rollback, a query must confirm
+    another recipe now owns the attempted slug. Constraint names in the
+    IntegrityError are backend-specific (SQLite vs PostgreSQL), so ownership
+    of the slug is the portable signal. Every other integrity failure —
+    PK/not-null violations, or errors from unrelated objects staged on the
+    shared session — re-raises immediately rather than being retried into a
+    commit that silently drops that other work.
     """
     resolver_input = dict(recipe_data)
     skip: set = set()
@@ -117,12 +136,21 @@ def _commit_publish_retrying(
         except IntegrityError:
             db.session.rollback()
             attempts += 1
-            if not recipe_data["is_public"] or attempts > _SLUG_COMMIT_RETRIES:
+            attempted_slug = recipe_data.get("slug")
+            lost_slug_race = (
+                recipe_data["is_public"]
+                and attempted_slug is not None
+                and Recipe.query.filter(
+                    Recipe.slug == attempted_slug, Recipe.id != recipe_id
+                ).first()
+                is not None
+            )
+            if not lost_slug_race or attempts > _SLUG_COMMIT_RETRIES:
                 raise
-            skip.add(recipe_data["slug"])
+            skip.add(attempted_slug)
             logger.warning(
                 "Slug %r for recipe %s lost a publication race; retrying",
-                recipe_data["slug"],
+                attempted_slug,
                 recipe_id,
             )
 

@@ -368,6 +368,27 @@ def test_publish_slug_double_race_uses_next_suffix(app, user, monkeypatch):
     assert recipe.data["slug"] == "chili-3"
 
 
+def test_non_slug_integrity_error_is_not_retried(app, user, monkeypatch):
+    """PR #152 review: only confirmed slug races retry. Any other integrity
+    failure (PK/not-null, unrelated staged objects) must re-raise on the
+    first attempt instead of being retried into a lossy commit."""
+    from sqlalchemy.exc import IntegrityError
+
+    calls = {"n": 0}
+
+    def failing_commit():
+        calls["n"] += 1
+        raise IntegrityError("INSERT ...", {}, Exception("NOT NULL constraint failed"))
+
+    monkeypatch.setattr(db.session, "commit", failing_commit)
+
+    # No other recipe owns the slug, so this is not a slug race.
+    result = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
+
+    assert result is None  # surfaced as a failed create, not a retried success
+    assert calls["n"] == 1  # no retry attempts
+
+
 def test_private_update_without_slug_unaffected(app, user):
     """Private rows never trip the slug gate (guest saves send no slug)."""
     db_recipe_repository.create_recipe(_recipe_data(name="Chili"), user_id=user.id)
