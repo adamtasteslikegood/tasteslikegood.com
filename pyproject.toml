@@ -127,6 +127,12 @@ python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false
+# scripts/ has no __init__.py, so without explicit package bases mypy maps
+# scripts/backfill_slugs.py to two module names and aborts the whole run.
+# (This lived in setup.cfg's [mypy] before, but pyproject's [tool.mypy]
+# shadows setup.cfg entirely — which is how the crash shipped.)
+explicit_package_bases = true
+ignore_missing_imports = true
 exclude = [
     "migrate_recipes\\.py",
     "debug_generation\\.py",
