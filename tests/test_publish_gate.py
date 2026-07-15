@@ -69,6 +69,18 @@ def test_user_create_can_publish(app, user):
     assert recipe.data["is_public"] is True
 
 
+@pytest.mark.parametrize("invalid_flag", ["true", "false", 1, 0, {}, []])
+def test_user_create_fails_closed_for_non_boolean_publish_flag(app, user, invalid_flag):
+    recipe = db_recipe_repository.create_recipe(
+        _recipe_data(is_public=invalid_flag),
+        user_id=user.id,
+    )
+
+    assert recipe is not None
+    assert recipe.is_public is False
+    assert recipe.data["is_public"] is False
+
+
 def test_guest_upsert_cannot_flip_public(app):
     """REGRESSION (upsert branch): the Angular toggle persists via POST upsert."""
     db_recipe_repository.create_recipe(
@@ -199,6 +211,76 @@ def test_publish_update_without_slug_keeps_existing_slug(app, user):
     assert updated.data["slug"] == "chili-classic"
 
 
+@pytest.mark.parametrize(
+    ("existing_slug", "expected_slug"),
+    [
+        ("", "spicy-chili"),
+        ("nested/chili", "nested-chili"),
+        ("nested\\chili", "nested-chili"),
+    ],
+)
+def test_publish_repairs_unusable_existing_private_slug(
+    app,
+    user,
+    existing_slug,
+    expected_slug,
+):
+    recipe = Recipe(
+        id="invalid-private-slug",
+        user_id=user.id,
+        name="Spicy Chili",
+        slug=existing_slug,
+        is_public=False,
+        data={
+            "id": "invalid-private-slug",
+            "name": "Spicy Chili",
+            "slug": existing_slug,
+            "is_public": False,
+        },
+    )
+    db.session.add(recipe)
+    db.session.commit()
+
+    updated = db_recipe_repository.update_recipe(
+        recipe.id,
+        {"is_public": True},
+        user_id=user.id,
+    )
+
+    assert updated is not None
+    assert updated.slug == expected_slug
+    assert updated.data["slug"] == expected_slug
+    assert updated.is_public is True
+
+
+def test_partial_update_preserves_existing_unicode_slug(app, user):
+    recipe = Recipe(
+        id="unicode-slug",
+        user_id=user.id,
+        name="Crème Brûlée",
+        slug="crème-brûlée",
+        is_public=True,
+        data={
+            "id": "unicode-slug",
+            "name": "Crème Brûlée",
+            "slug": "crème-brûlée",
+            "is_public": True,
+        },
+    )
+    db.session.add(recipe)
+    db.session.commit()
+
+    updated = db_recipe_repository.update_recipe(
+        "unicode-slug",
+        {"ingredients": []},
+        user_id=user.id,
+    )
+
+    assert updated is not None
+    assert updated.slug == "crème-brûlée"
+    assert updated.data["slug"] == "crème-brûlée"
+
+
 def test_publish_slug_collision_gets_suffix(app, user):
     db_recipe_repository.create_recipe(
         _recipe_data(recipe_id="r-1", is_public=True), user_id=user.id
@@ -212,11 +294,11 @@ def test_publish_slug_collision_gets_suffix(app, user):
 
 def test_publish_provided_slug_is_sanitized(app, user):
     recipe = db_recipe_repository.create_recipe(
-        _recipe_data(slug="Chili Con Carne!", is_public=True), user_id=user.id
+        _recipe_data(slug="Crème Brûlée!", is_public=True), user_id=user.id
     )
     assert recipe is not None
-    assert recipe.slug == "chili-con-carne"
-    assert recipe.data["slug"] == "chili-con-carne"
+    assert recipe.slug == "creme-brulee"
+    assert recipe.data["slug"] == "creme-brulee"
 
 
 def test_publish_with_unusable_slug_and_name_raises(app, user):

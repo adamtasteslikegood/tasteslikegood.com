@@ -60,9 +60,9 @@
 
         <div class="public-recipe-toolbar">
             <ul class="public-recipe-meta">
-                {% if data.prepTime is not none %}<li>Prep {{ data.prepTime }}m</li>{% endif %}
-                {% if data.cookTime is not none %}<li>Cook {{ data.cookTime }}m</li>{% endif %}
-                {% if data.servings is not none %}<li>Serves {{ data.servings }}</li>{% endif %}
+                {% if data.get('prepTime') is not none %}<li>Prep {{ data.prepTime }}m</li>{% endif %}
+                {% if data.get('cookTime') is not none %}<li>Cook {{ data.cookTime }}m</li>{% endif %}
+                {% if data.get('servings') is not none %}<li>Serves {{ data.servings }}</li>{% endif %}
                 {% if recipe.user and recipe.user.name %}<li>By {{ recipe.user.name }}</li>{% endif %}
             </ul>
             <div class="public-recipe-actions">
@@ -80,25 +80,30 @@
     </section>
 
     <section class="public-recipe-content">
-        {% if data.ingredients %}
+        {% if ingredient_groups %}
         <section class="public-recipe-panel public-recipe-ingredients">
             <header class="public-recipe-panel-header">
                 <h2>Ingredients</h2>
             </header>
             <div class="public-recipe-panel-body">
-                {% for group_name, group in data.ingredients.items() %}
+                {% for group_name, group in ingredient_groups %}
                 <section class="public-ingredient-group">
                     <h3>{{ group_name | capitalize }}</h3>
                     <ul>
                         {% for ing in group %}
+                        {% set amount = ing.get('amount') %}
                         <li class="public-ingredient-row">
                             <span class="public-ingredient-amount">
-                                {% if ing.amount is iterable and ing.amount is not string %}
-                                {{ ing.amount[0] }}–{{ ing.amount[1] }}
-                                {% else %}
-                                {{ ing.amount }}
+                                {% if amount is iterable and amount is not string %}
+                                    {% if amount | length >= 2 %}
+                                    {{ amount[0] }}–{{ amount[1] }}
+                                    {% elif amount | length == 1 %}
+                                    {{ amount[0] }}
+                                    {% endif %}
+                                {% elif amount is not none %}
+                                {{ amount }}
                                 {% endif %}
-                                {{ ing.units }}
+                                {{ ing.get('units', '') }}
                             </span>
                             <span class="public-ingredient-text"
                                 >{{ ing.name }}{% if ing.notes %} <em>({{ ing.notes }})</em>{% endif %}</span
@@ -112,23 +117,17 @@
         </section>
         {% endif %}
 
-        {% if data.instructions %}
+        {% if instructions %}
         <section class="public-recipe-panel public-recipe-instructions">
             <header class="public-recipe-panel-header">
                 <h2>Method</h2>
             </header>
             <div class="public-recipe-panel-body">
                 <ol class="public-recipe-steps">
-                    {% for step in data.instructions %}
+                    {% for step in instructions %}
                     <li class="public-recipe-step">
                         <span class="public-step-number">{{ loop.index }}.</span>
-                        <span class="public-step-text">
-                            {% if step is mapping %}
-                            {{ step.description }}
-                            {% else %}
-                            {{ step }}
-                            {% endif %}
-                        </span>
+                        <span class="public-step-text">{{ step }}</span>
                     </li>
                     {% endfor %}
                 </ol>
@@ -148,9 +147,9 @@
     </section>
     {% endif %}
 
-    {% if data.tags %}
+    {% if tags %}
     <section class="public-recipe-tags">
-        {% for tag in data.tags %}
+        {% for tag in tags %}
         <span class="public-tag">{{ tag }}</span>
         {% endfor %}
     </section>

@@ -14,6 +14,7 @@ JSON API) continues to flow through the existing blueprints.
 
 import logging
 import os
+from collections.abc import Mapping
 from math import ceil
 from typing import Any
 from urllib.parse import urlencode
@@ -59,7 +60,7 @@ def _safe_minutes(value: Any) -> int | None:
         return None
     try:
         minutes = int(float(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return minutes if minutes > 0 else None
 
@@ -81,10 +82,15 @@ def _recipe_image_url(recipe: Recipe) -> str | None:
     return _absolute_url(data.get("stock_image_url"))
 
 
-def _format_ingredient(ingredient: dict[str, Any]) -> str:
+def _format_ingredient(ingredient: Mapping[str, Any]) -> str:
     amount = ingredient.get("amount")
-    if isinstance(amount, (list, tuple)) and len(amount) >= 2:
-        amount_text = f"{amount[0]}–{amount[1]}"
+    if isinstance(amount, (list, tuple)):
+        if len(amount) >= 2:
+            amount_text = f"{amount[0]}–{amount[1]}"
+        elif len(amount) == 1:
+            amount_text = str(amount[0])
+        else:
+            amount_text = ""
     elif amount not in (None, ""):
         amount_text = str(amount)
     else:
@@ -101,16 +107,45 @@ def _format_ingredient(ingredient: dict[str, Any]) -> str:
     return text
 
 
+def _recipe_ingredient_groups(
+    data: dict[str, Any],
+) -> list[tuple[str, list[dict[str, Any]]]]:
+    raw_groups = data.get("ingredients")
+    if not isinstance(raw_groups, dict):
+        return []
+
+    groups: list[tuple[str, list[dict[str, Any]]]] = []
+    for group_name, raw_ingredients in raw_groups.items():
+        if not isinstance(raw_ingredients, list):
+            continue
+        ingredients = [ingredient for ingredient in raw_ingredients if isinstance(ingredient, dict)]
+        if ingredients:
+            groups.append((str(group_name), ingredients))
+    return groups
+
+
 def _recipe_instructions(data: dict[str, Any]) -> list[str]:
+    raw_instructions = data.get("instructions")
+    if not isinstance(raw_instructions, list):
+        return []
     instructions: list[str] = []
-    for step in data.get("instructions", []) or []:
+    for step in raw_instructions:
         if isinstance(step, dict):
             text = str(step.get("description", "") or "").strip()
-        else:
+        elif isinstance(step, str):
             text = str(step).strip()
+        else:
+            continue
         if text:
             instructions.append(text)
     return instructions
+
+
+def _recipe_tags(data: dict[str, Any]) -> list[str]:
+    raw_tags = data.get("tags")
+    if not isinstance(raw_tags, list):
+        return []
+    return [tag.strip() for tag in raw_tags if isinstance(tag, str) and tag.strip()]
 
 
 def _clean_json(value: Any) -> Any:
@@ -132,13 +167,12 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
     total_minutes = (prep_minutes or 0) + (cook_minutes or 0)
     instructions = _recipe_instructions(data)
 
-    ingredient_lines: list[str] = []
-    for group in (data.get("ingredients") or {}).values():
-        for ingredient in group or []:
-            if isinstance(ingredient, dict):
-                formatted = _format_ingredient(ingredient)
-                if formatted:
-                    ingredient_lines.append(formatted)
+    ingredient_lines = [
+        formatted
+        for _, group in _recipe_ingredient_groups(data)
+        for ingredient in group
+        if (formatted := _format_ingredient(ingredient))
+    ]
 
     author_name = None
     if recipe.user and recipe.user.name:
@@ -171,7 +205,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
             for index, text in enumerate(instructions)
         ]
         or None,
-        "keywords": ", ".join(data.get("tags", [])) if isinstance(data.get("tags"), list) else None,
+        "keywords": ", ".join(_recipe_tags(data)) or None,
         "recipeCategory": "Vegan",
     }
     cleaned: dict[str, Any] = _clean_json(json_ld)
@@ -198,9 +232,9 @@ def _save_recipe_payload(recipe: Recipe, image_url: str | None) -> dict[str, Any
         "cookTime": _safe_minutes(data.get("cookTime")) or 0,
         "servings": data.get("servings") or 0,
         "ingredients": data.get("ingredients") or {},
-        "instructions": data.get("instructions") or [],
+        "instructions": _recipe_instructions(data),
         "notes": data.get("notes"),
-        "tags": data.get("tags") or [],
+        "tags": _recipe_tags(data),
         "stock_image_url": data.get("stock_image_url"),
         "ai_image_url": image_url,
         "image": image_url,
@@ -228,6 +262,8 @@ def show_public_recipe(slug):
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
     image_url = _recipe_image_url(recipe)
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
+    instructions = _recipe_instructions(data)
+    tags = _recipe_tags(data)
 
     return render_template(
         "public/recipe.html",
@@ -235,6 +271,9 @@ def show_public_recipe(slug):
         canonical_url=canonical_url,
         image_url=image_url,
         description=description,
+        ingredient_groups=_recipe_ingredient_groups(data),
+        instructions=instructions,
+        tags=tags,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=_pinterest_share_url(canonical_url, image_url, recipe.name),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
@@ -300,7 +339,8 @@ def browse_public_recipes():
 def sitemap_xml():
     """Return an XML sitemap of the public recipe surface."""
     recipes = (
-        Recipe.query.filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
+        Recipe.query.with_entities(Recipe.slug, Recipe.updated_at, Recipe.created_at)
+        .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
         .order_by(Recipe.updated_at.desc(), Recipe.created_at.desc())
         .all()
     )

@@ -42,10 +42,10 @@
                 <div class="public-browse-card-copy">
                     <h2>{{ recipe.name }}</h2>
                     <ul class="public-browse-meta">
-                        {% if data.prepTime is not none %}
+                        {% if data.get('prepTime') is not none %}
                         <li>Prep {{ data.prepTime }}m</li>
                         {% endif %}
-                        {% if data.cookTime is not none %}
+                        {% if data.get('cookTime') is not none %}
                         <li>Cook {{ data.cookTime }}m</li>
                         {% endif %}
                         {% if recipe.user and recipe.user.name %}

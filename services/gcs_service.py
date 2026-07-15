@@ -40,12 +40,49 @@ def _init_gcs(bucket_name: str) -> bool:
         return False
 
 
-def _object_name(recipe_id: str) -> str:
+def _object_name(recipe_id: str, version: Optional[str] = None) -> str:
     """Build the GCS object name for a recipe image."""
+    if version:
+        return f"images/{recipe_id}/{version}.png"
     return f"images/{recipe_id}.png"
 
 
-def upload_image(bucket_name: str, recipe_id: str, image_bytes: bytes) -> Optional[str]:
+def _object_name_from_uri(bucket_name: str, recipe_id: str, gcs_uri: Optional[str]) -> str:
+    return _validated_object_name_from_uri(bucket_name, recipe_id, gcs_uri) or _object_name(
+        recipe_id
+    )
+
+
+def _validated_object_name_from_uri(
+    bucket_name: str,
+    recipe_id: str,
+    gcs_uri: Optional[str],
+) -> Optional[str]:
+    prefix = f"gs://{bucket_name}/"
+    if gcs_uri and gcs_uri.startswith(prefix):
+        candidate = gcs_uri[len(prefix) :]
+        legacy_name = _object_name(recipe_id)
+        versioned_prefix = f"images/{recipe_id}/"
+        versioned_name = candidate.removeprefix(versioned_prefix)
+        if candidate == legacy_name:
+            return candidate
+        if (
+            candidate.startswith(versioned_prefix)
+            and versioned_name.endswith(".png")
+            and "/" not in versioned_name
+            and versioned_name[:-4]
+            and all(character.isalnum() or character in "-_" for character in versioned_name[:-4])
+        ):
+            return candidate
+    return None
+
+
+def upload_image(
+    bucket_name: str,
+    recipe_id: str,
+    image_bytes: bytes,
+    version: Optional[str] = None,
+) -> Optional[str]:
     """
     Upload raw PNG bytes to GCS.
 
@@ -55,15 +92,16 @@ def upload_image(bucket_name: str, recipe_id: str, image_bytes: bytes) -> Option
         image_bytes: Raw PNG image bytes
 
     Returns:
-        GCS URI (gs://bucket/images/id.png) on success, None on failure
+        Versioned GCS URI on success, None on failure
     """
     if not _init_gcs(bucket_name):
         return None
     assert _bucket is not None
     try:
-        blob = _bucket.blob(_object_name(recipe_id))
+        object_name = _object_name(recipe_id, version)
+        blob = _bucket.blob(object_name)
         blob.upload_from_string(image_bytes, content_type="image/png")
-        gcs_uri = f"gs://{bucket_name}/{_object_name(recipe_id)}"
+        gcs_uri = f"gs://{bucket_name}/{object_name}"
         logger.info(f"Uploaded image for recipe {recipe_id}: {gcs_uri}")
         return gcs_uri
     except Exception as e:
@@ -71,7 +109,11 @@ def upload_image(bucket_name: str, recipe_id: str, image_bytes: bytes) -> Option
         return None
 
 
-def download_image(bucket_name: str, recipe_id: str) -> Optional[bytes]:
+def download_image(
+    bucket_name: str,
+    recipe_id: str,
+    gcs_uri: Optional[str] = None,
+) -> Optional[bytes]:
     """
     Download raw PNG bytes from GCS.
 
@@ -86,7 +128,7 @@ def download_image(bucket_name: str, recipe_id: str) -> Optional[bytes]:
         return None
     assert _bucket is not None
     try:
-        blob = _bucket.blob(_object_name(recipe_id))
+        blob = _bucket.blob(_object_name_from_uri(bucket_name, recipe_id, gcs_uri))
         if not blob.exists():
             return None
         return blob.download_as_bytes()  # type: ignore[no-any-return]
@@ -95,7 +137,11 @@ def download_image(bucket_name: str, recipe_id: str) -> Optional[bytes]:
         return None
 
 
-def delete_image(bucket_name: str, recipe_id: str) -> bool:
+def delete_image(
+    bucket_name: str,
+    recipe_id: str,
+    gcs_uri: Optional[str] = None,
+) -> bool:
     """
     Delete a recipe image from GCS.
 
@@ -110,7 +156,15 @@ def delete_image(bucket_name: str, recipe_id: str) -> bool:
         return False
     assert _bucket is not None
     try:
-        blob = _bucket.blob(_object_name(recipe_id))
+        object_name = (
+            _validated_object_name_from_uri(bucket_name, recipe_id, gcs_uri)
+            if gcs_uri
+            else _object_name(recipe_id)
+        )
+        if object_name is None:
+            logger.warning("Refusing to delete invalid GCS image URI for recipe %s", recipe_id)
+            return False
+        blob = _bucket.blob(object_name)
         if blob.exists():
             blob.delete()
             logger.info(f"Deleted image for recipe {recipe_id}")

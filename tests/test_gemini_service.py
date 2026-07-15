@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 # Ensure app can be imported
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from services.gemini_service import get_genai_client, attempt_generation
+from services.gemini_service import GENAI_HTTP_OPTIONS, attempt_generation, get_genai_client
 
 
 class TestGetGenaiClient(unittest.TestCase):
@@ -29,7 +29,10 @@ class TestGetGenaiClient(unittest.TestCase):
 
         # Assert — client_secret is now passed from GOOGLE_CLIENT_SECRET env var
         mock_creds.assert_called_once_with(token="fake-token", client_secret="test-secret")
-        mock_client.assert_called_once_with(credentials=mock_creds_instance)
+        mock_client.assert_called_once_with(
+            credentials=mock_creds_instance,
+            http_options=GENAI_HTTP_OPTIONS,
+        )
         self.assertEqual(client, mock_client_instance)
 
     @patch("services.gemini_service.Client")
@@ -44,7 +47,10 @@ class TestGetGenaiClient(unittest.TestCase):
         client = get_genai_client({"bad": "creds"})
 
         # Verify fallback occurred
-        mock_client.assert_called_with(api_key="fake-api-key")
+        mock_client.assert_called_with(
+            api_key="fake-api-key",
+            http_options=GENAI_HTTP_OPTIONS,
+        )
         self.assertEqual(client, mock_client_instance)
 
     @patch("services.gemini_service.Client")
@@ -56,7 +62,10 @@ class TestGetGenaiClient(unittest.TestCase):
 
         client = get_genai_client(None)
 
-        mock_client.assert_called_once_with(api_key="fake-api-key")
+        mock_client.assert_called_once_with(
+            api_key="fake-api-key",
+            http_options=GENAI_HTTP_OPTIONS,
+        )
         self.assertEqual(client, mock_client_instance)
 
     @patch("services.gemini_service.GOOGLE_API_KEY", None)

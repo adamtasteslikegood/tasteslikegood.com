@@ -9,6 +9,7 @@
 
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
@@ -17,6 +18,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app
 from extensions import db
+from utils import admin_auth
 
 
 @pytest.fixture
@@ -62,6 +64,25 @@ class TestMigrateAuth:
         monkeypatch.delenv("ADMIN_API_TOKEN", raising=False)
         resp = client.post("/api/migrate", headers={"Authorization": "Bearer anything"})
         assert resp.status_code == 403
+
+    def test_non_ascii_token_rejected(self, client, monkeypatch):
+        monkeypatch.setenv("ADMIN_API_TOKEN", "sekrit")
+        auth_header = "".join(["Bear", "er ", "s\u00e9krit"])
+        resp = client.post("/api/migrate", headers={"Authorization": auth_header})
+        assert resp.status_code == 403
+
+    def test_surrogate_token_rejected(self, app, monkeypatch):
+        monkeypatch.setenv("ADMIN_API_TOKEN", "sekrit")
+        monkeypatch.setattr(
+            admin_auth,
+            "request",
+            SimpleNamespace(headers={"Authorization": "Bearer \ud800"}),
+        )
+        with app.test_request_context():
+            response, status = admin_auth.require_admin()
+
+        assert status == 403
+        assert response.get_json() == {"error": "Unauthorized — admin token required"}
 
     def test_valid_token_runs_migration(self, client, monkeypatch):
         monkeypatch.setenv("ADMIN_API_TOKEN", "sekrit")

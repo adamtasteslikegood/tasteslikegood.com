@@ -23,6 +23,7 @@ from utils.cache_utils import (
     TTL_IMAGE,
 )
 from utils.admin_auth import require_admin
+from utils.log_sanitizer import sanitize_log_value
 from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ def generate_recipe_json():
         }
 
     Returns:
-        201: { "recipe": { ...recipe data... } }
+        202: { "recipe_id": "uuid-string", "status": "generating" }
         400: { "error": "..." }
         500: { "error": "..." }
     """
@@ -76,12 +77,15 @@ def generate_recipe_json():
     # Save a pending recipe to database
     pending_data = {"id": recipe_id, "name": "Generating...", "user_id": user_id}
 
-    db_recipe = db_recipe_repository.create_recipe(pending_data, user_id, guest_session_id)
+    db_recipe = db_recipe_repository.create_recipe(
+        pending_data,
+        user_id,
+        guest_session_id,
+        status="generating",
+    )
 
     if not db_recipe:
         return jsonify({"error": "Failed to save recipe to database"}), 500
-
-    db_recipe_repository.update_recipe_status(recipe_id, "generating", user_id, guest_session_id)
 
     # Publish message to Pub/Sub
     from services.pubsub_service import publish_message
@@ -96,10 +100,16 @@ def generate_recipe_json():
 
     try:
         publish_message("recipe-generation", message_data)
-        logger.info(f"Queued recipe generation (id={recipe_id})")
+        logger.info(
+            "Queued recipe generation (id=%s)",
+            sanitize_log_value(recipe_id),
+        )
         return jsonify({"recipe_id": recipe_id, "status": "generating"}), 202
     except Exception as e:
-        logger.error(f"Failed to publish recipe generation: {e}")
+        logger.error(
+            "Failed to publish recipe generation: %s",
+            sanitize_log_value(e),
+        )
         db_recipe_repository.update_recipe_status(recipe_id, "error", user_id, guest_session_id)
         return jsonify({"error": "Failed to queue generation"}), 500
 
@@ -119,7 +129,8 @@ def generate_image_for_recipe():
         }
 
     Returns:
-        200: { "image_url": "/api/recipes/<id>/image" }
+        200: { "image_url": "/api/recipes/<id>/image" } when an image already exists
+        202: { "status": "generating_image" } after queueing; poll the recipe status endpoint
         400/404/500: { "error": "..." }
     """
     data = request.get_json()
@@ -127,7 +138,7 @@ def generate_image_for_recipe():
         return jsonify({"error": "recipe_id is required"}), 400
 
     recipe_id = data["recipe_id"]
-    force_regenerate = data.get("force_regenerate", False)
+    force_regenerate = data.get("force_regenerate") is True
 
     user_id = _current_user_id()
     guest_session_id = _current_guest_session_id()
@@ -144,21 +155,60 @@ def generate_image_for_recipe():
     if not force_regenerate and has_real_image and recipe_data.get("ai_image_url"):
         return jsonify({"image_url": recipe_data["ai_image_url"]}), 200
 
+    queued = db_recipe_repository.queue_image_generation(
+        recipe_id,
+        str(uuid.uuid4()),
+        force_regenerate,
+        user_id,
+        guest_session_id,
+    )
+    if queued is None:
+        db_recipe = db_recipe_repository.get_recipe_by_id(
+            recipe_id,
+            user_id,
+            guest_session_id,
+        )
+        if db_recipe is None:
+            return jsonify({"error": "Recipe not found"}), 404
+        if db_recipe.status != "generating_image":
+            return jsonify({"error": "Recipe is not ready for image generation"}), 409
+        return jsonify({"status": "generating_image"}), 202
+    if not queued.should_publish:
+        return jsonify({"status": "generating_image"}), 202
+
     from services.pubsub_service import publish_message
 
     message_data = {
         "recipe_id": recipe_id,
         "user_id": user_id,
         "guest_session_id": guest_session_id,
-        "force_regenerate": force_regenerate,
+        "force_regenerate": queued.force_regenerate,
+        "image_request_id": queued.request_id,
     }
 
     try:
         publish_message("image-generation", message_data)
-        logger.info(f"Queued image generation for recipe (id={recipe_id})")
+        logger.info(
+            "Queued image generation for recipe (id=%s)",
+            sanitize_log_value(recipe_id),
+        )
         return jsonify({"status": "generating_image"}), 202
     except Exception as e:
-        logger.error(f"Failed to queue image generation for recipe {recipe_id}: {e}")
+        logger.error(
+            "Failed to queue image generation for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
+        if not db_recipe_repository.release_image_generation_queue(
+            recipe_id,
+            queued.request_id,
+            user_id,
+            guest_session_id,
+        ):
+            logger.info(
+                "Image queue state changed for recipe %s after publish returned an error",
+                sanitize_log_value(recipe_id),
+            )
         return jsonify({"error": "Failed to queue image generation"}), 500
 
 
@@ -197,9 +247,9 @@ def serve_recipe_image(recipe_id):
     if recipe is None:
         return jsonify({"error": "Recipe not found"}), 404
 
-    # Private images must not be stored by shared HTTP caches (browser
-    # cache is fine) — only Valkey, behind the access check, may hold them.
-    http_cache_control = "public, max-age=86400" if recipe.is_public else "private, max-age=86400"
+    # Private images must not be stored by any HTTP cache — only Valkey,
+    # behind the access check, may hold them.
+    http_cache_control = "public, max-age=86400" if recipe.is_public else "private, no-store"
 
     if not recipe.is_public:
         user_id = _current_user_id()
@@ -227,7 +277,11 @@ def serve_recipe_image(recipe_id):
     if GCS_BUCKET_NAME and recipe_data.get("ai_image_gcs"):
         from services.gcs_service import download_image
 
-        image_bytes = download_image(GCS_BUCKET_NAME, recipe_id)
+        image_bytes = download_image(
+            GCS_BUCKET_NAME,
+            recipe_id,
+            recipe_data.get("ai_image_gcs"),
+        )
 
     # Fall back to legacy base64 in DB
     if image_bytes is None:

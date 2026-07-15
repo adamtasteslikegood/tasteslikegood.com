@@ -17,6 +17,7 @@ import os
 
 from flask import Flask, render_template, request
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Import blueprints
@@ -278,6 +279,8 @@ def create_app(**config_overrides):
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
         """Log and handle unexpected exceptions."""
+        if isinstance(error, HTTPException):
+            return error
         logger.exception(f"Unexpected error: {error}")
         return render_template("500.html"), 500
 

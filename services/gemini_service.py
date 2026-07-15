@@ -10,11 +10,13 @@ Handles:
 import os
 from typing import Optional, Dict, Any
 import logging
-from google.genai import Client
+from google.genai import Client, types
 import google.oauth2.credentials
-from config import GOOGLE_API_KEY
+from config import GENAI_HTTP_TIMEOUT_MS, GOOGLE_API_KEY
+from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
+GENAI_HTTP_OPTIONS = types.HttpOptions(timeout=GENAI_HTTP_TIMEOUT_MS)
 
 
 def get_genai_client(session_credentials: Optional[Dict[str, Any]] = None) -> Optional[Client]:
@@ -39,15 +41,21 @@ def get_genai_client(session_credentials: Optional[Dict[str, Any]] = None) -> Op
                 **session_credentials,
                 client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
             )
-            return Client(credentials=creds)
+            return Client(credentials=creds, http_options=GENAI_HTTP_OPTIONS)
         except Exception as e:
-            logger.error(f"Failed to create client from user credentials: {e}")
+            logger.error(
+                "Failed to create client from user credentials: %s",
+                sanitize_log_value(e),
+            )
 
     if GOOGLE_API_KEY:
         try:
-            return Client(api_key=GOOGLE_API_KEY)
+            return Client(api_key=GOOGLE_API_KEY, http_options=GENAI_HTTP_OPTIONS)
         except Exception as e:
-            logger.error(f"Failed to create client from API key: {e}")
+            logger.error(
+                "Failed to create client from API key: %s",
+                sanitize_log_value(e),
+            )
 
     return None
 
@@ -67,10 +75,10 @@ def attempt_generation(client: Client, model: str, prompt: str) -> str:
     Raises:
         Exception: If generation fails
     """
-    logger.info(f"Attempting generation with model {model}")
+    logger.info("Attempting generation with model %s", sanitize_log_value(model))
     try:
         response = client.models.generate_content(model=model, contents=prompt)
         return response.text or ""
     except Exception as e:
-        logger.error(f"Generation failed: {e}")
+        logger.error("Generation failed: %s", sanitize_log_value(e))
         raise

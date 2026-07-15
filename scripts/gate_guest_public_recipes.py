@@ -19,6 +19,8 @@ scripts/backfill_slugs.py).
 import logging
 from typing import Dict, Optional
 
+from sqlalchemy.orm import load_only
+
 from models.recipe import Recipe
 from models.user import User
 
@@ -27,7 +29,21 @@ logger = logging.getLogger(__name__)
 
 def run_gate(session, reassign_email: Optional[str] = None) -> Dict[str, int]:
     """Apply the gate to pre-existing rows. Returns a summary dict."""
-    rows = session.query(Recipe).filter(Recipe.is_public.is_(True), Recipe.user_id.is_(None)).all()
+    rows = (
+        session.query(Recipe)
+        .options(
+            load_only(
+                Recipe.id,
+                Recipe.slug,
+                Recipe.user_id,
+                Recipe.guest_session_id,
+                Recipe.is_public,
+                Recipe.data,
+            )
+        )
+        .filter(Recipe.is_public.is_(True), Recipe.user_id.is_(None))
+        .all()
+    )
     summary = {"found": len(rows), "reassigned": 0, "unpublished": 0}
     if not rows:
         logger.info("gate_guest_public_recipes: no guest-owned public rows")
@@ -40,7 +56,12 @@ def run_gate(session, reassign_email: Optional[str] = None) -> Dict[str, int]:
     )
 
     if reassign_email:
-        user = session.query(User).filter_by(email=reassign_email).one_or_none()
+        user = (
+            session.query(User)
+            .options(load_only(User.id, User.email))
+            .filter_by(email=reassign_email)
+            .one_or_none()
+        )
         if user is None:
             raise RuntimeError(
                 f"GUEST_PUBLIC_REASSIGN_EMAIL={reassign_email!r} matches no user; "

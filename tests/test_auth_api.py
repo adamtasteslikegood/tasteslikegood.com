@@ -26,9 +26,9 @@ from app import create_app  # noqa: E402
 
 
 @pytest.fixture
-def app():
-    os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id")
-    os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
+def app(monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLIENT_ID", "test-client-id")
+    monkeypatch.setenv("GOOGLE_CLIENT_SECRET", "test-client-secret")
     flask_app = create_app(
         TESTING=True,
         SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",

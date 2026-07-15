@@ -33,6 +33,9 @@ def publish_message(topic_name: str, data: dict) -> str:
     Returns:
         The message ID as a string.
     """
+    if not GCP_PROJECT_ID:
+        raise RuntimeError("GCP_PROJECT_ID is required to publish Pub/Sub messages")
+
     publisher = _get_publisher()
     topic_path = publisher.topic_path(GCP_PROJECT_ID, topic_name)
     data_str = json.dumps(data)
