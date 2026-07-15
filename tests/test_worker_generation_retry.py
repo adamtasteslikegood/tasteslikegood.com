@@ -22,6 +22,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from httpx import ReadTimeout, Request
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -76,13 +77,15 @@ def _push_envelope(recipe_id):
     return {"message": {"data": data}}
 
 
-def _image_push_envelope(recipe_id, force_regenerate=False):
+def _image_push_envelope(recipe_id, force_regenerate=False, image_request_id=None):
     payload = {
         "recipe_id": recipe_id,
         "user_id": None,
         "guest_session_id": "guest-1",
         "force_regenerate": force_regenerate,
     }
+    if image_request_id is not None:
+        payload["image_request_id"] = image_request_id
     data = base64.b64encode(json.dumps(payload).encode()).decode()
     return {"message": {"data": data}}
 
@@ -248,8 +251,150 @@ def test_parse_max_attempts_is_defensive(raw, expected):
 
 def test_image_worker_persists_generated_image(app, client):
     recipe_id = str(uuid.uuid4())
+    image_request_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id, status="ready")
+        recipe.data["ai_metadata"] = {
+            "image_request": {
+                "id": image_request_id,
+                "status": "pending",
+                "force_regenerate": True,
+            }
+        }
+        db.session.commit()
+
+    class GeneratedImage:
+        class Image:
+            image_bytes = b"generated-image"
+
+        image = Image()
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            class Response:
+                generated_images = [GeneratedImage()]
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    with (
+        patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()),
+        patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", None),
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("blueprints.worker_api_bp.invalidate_recipe_image"),
+    ):
+        response = client.post(
+            "/api/worker/image",
+            json=_image_push_envelope(
+                recipe_id,
+                force_regenerate=True,
+                image_request_id=image_request_id,
+            ),
+        )
+
+    assert response.status_code == 200
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.data["ai_image_data"] == base64.b64encode(b"generated-image").decode("ascii")
+        assert recipe.data["ai_image_url"] == f"/api/recipes/{recipe_id}/image"
+        assert recipe.data["ai_metadata"]["image_generation"]["success"] is True
+        assert recipe.data["ai_metadata"]["image_request"]["status"] == "complete"
+
+
+def test_image_worker_records_generation_failure(app, client):
+    recipe_id = str(uuid.uuid4())
+    image_request_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id, status="ready")
+        recipe.data["ai_metadata"] = {
+            "image_request": {
+                "id": image_request_id,
+                "status": "pending",
+                "force_regenerate": True,
+            }
+        }
+        db.session.commit()
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            raise RuntimeError("Imagen unavailable")
+
+    class FakeClient:
+        models = FakeModels()
+
+    with patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()):
+        response = client.post(
+            "/api/worker/image",
+            json=_image_push_envelope(
+                recipe_id,
+                force_regenerate=True,
+                image_request_id=image_request_id,
+            ),
+        )
+
+    assert response.status_code == 500
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        metadata = recipe.data["ai_metadata"]["image_generation"]
+        assert metadata["success"] is False
+        assert metadata["error"] == "Image generation failed"
+        assert recipe.data["ai_metadata"]["image_request"]["status"] == "pending"
+
+
+def test_image_worker_records_terminal_generation_failure(app, client):
+    recipe_id = str(uuid.uuid4())
     with app.app_context():
         _make_pending_recipe(recipe_id, status="ready")
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            raise ValueError("Invalid image request")
+
+    class FakeClient:
+        models = FakeModels()
+
+    with patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.data["ai_metadata"]["image_generation"]["success"] is False
+
+
+def test_image_worker_retries_http_transport_failure(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id, status="ready")
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            raise ReadTimeout("Imagen timed out", request=Request("POST", "https://example.test"))
+
+    class FakeClient:
+        models = FakeModels()
+
+    with patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 500
+
+
+def test_legacy_image_delivery_completes_pending_non_force_request(app, client):
+    recipe_id = str(uuid.uuid4())
+    image_request_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id, status="ready")
+        recipe.data["ai_metadata"] = {
+            "image_request": {
+                "id": image_request_id,
+                "status": "pending",
+                "force_regenerate": False,
+            }
+        }
+        db.session.commit()
 
     class GeneratedImage:
         class Image:
@@ -278,32 +423,42 @@ def test_image_worker_persists_generated_image(app, client):
     assert response.status_code == 200
     with app.app_context():
         recipe = db.session.get(Recipe, recipe_id)
-        assert recipe.data["ai_image_data"] == base64.b64encode(b"generated-image").decode("ascii")
-        assert recipe.data["ai_image_url"] == f"/api/recipes/{recipe_id}/image"
-        assert recipe.data["ai_metadata"]["image_generation"]["success"] is True
+        assert recipe.data["ai_metadata"]["image_request"]["id"] == image_request_id
+        assert recipe.data["ai_metadata"]["image_request"]["status"] == "complete"
 
 
-def test_image_worker_records_generation_failure(app, client):
+def test_completed_force_image_request_is_not_replayed(app, client):
     recipe_id = str(uuid.uuid4())
+    image_request_id = str(uuid.uuid4())
     with app.app_context():
-        _make_pending_recipe(recipe_id, status="ready")
+        recipe = _make_pending_recipe(recipe_id, status="ready")
+        recipe.data.update(
+            {
+                "ai_image_data": "completed-image",
+                "ai_image_url": f"/api/recipes/{recipe_id}/image",
+                "ai_metadata": {
+                    "image_request": {
+                        "id": image_request_id,
+                        "status": "complete",
+                        "force_regenerate": True,
+                    }
+                },
+            }
+        )
+        db.session.commit()
 
-    class FakeModels:
-        def generate_images(self, **kwargs):
-            raise RuntimeError("Imagen unavailable")
-
-    class FakeClient:
-        models = FakeModels()
-
-    with patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()):
-        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+    with patch("blueprints.worker_api_bp.get_genai_client") as get_client:
+        response = client.post(
+            "/api/worker/image",
+            json=_image_push_envelope(
+                recipe_id,
+                force_regenerate=True,
+                image_request_id=image_request_id,
+            ),
+        )
 
     assert response.status_code == 200
-    with app.app_context():
-        recipe = db.session.get(Recipe, recipe_id)
-        metadata = recipe.data["ai_metadata"]["image_generation"]
-        assert metadata["success"] is False
-        assert metadata["error"] == "Image generation failed"
+    get_client.assert_not_called()
 
 
 def test_image_worker_skips_existing_image(app, client):
@@ -729,11 +884,19 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
     from repositories import db_recipe_repository
 
     recipe_id = str(uuid.uuid4())
+    image_request_id = str(uuid.uuid4())
     with app.app_context():
         recipe = _make_pending_recipe(recipe_id, status="ready")
         recipe.data = {
             **recipe.data,
             "ingredients": {"main": [{"name": "old ingredient"}]},
+            "ai_metadata": {
+                "image_request": {
+                    "id": image_request_id,
+                    "status": "pending",
+                    "force_regenerate": True,
+                }
+            },
         }
         db.session.commit()
 
@@ -750,6 +913,12 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
                 {
                     "name": "Edited While Generating",
                     "ingredients": {"main": [{"name": "new ingredient"}]},
+                    "ai_metadata": {
+                        "image_request": {
+                            "id": "stale-client-value",
+                            "status": "complete",
+                        }
+                    },
                 },
                 user_id=None,
                 guest_session_id="guest-1",
@@ -770,7 +939,14 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
         patch("blueprints.worker_api_bp.invalidate_recipe"),
         patch("blueprints.worker_api_bp.invalidate_recipe_image"),
     ):
-        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+        response = client.post(
+            "/api/worker/image",
+            json=_image_push_envelope(
+                recipe_id,
+                force_regenerate=True,
+                image_request_id=image_request_id,
+            ),
+        )
 
     assert response.status_code == 200
     with app.app_context():
@@ -778,6 +954,48 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
         assert recipe.name == "Edited While Generating"
         assert recipe.data["ingredients"]["main"][0]["name"] == "new ingredient"
         assert recipe.data["ai_image_data"] == base64.b64encode(b"generated-image").decode("ascii")
+        assert recipe.data["ai_metadata"]["image_request"]["id"] == image_request_id
+        assert recipe.data["ai_metadata"]["image_request"]["status"] == "complete"
+
+
+def test_active_image_request_survives_recipe_upsert(app):
+    from repositories import db_recipe_repository
+
+    recipe_id = str(uuid.uuid4())
+    image_request_id = str(uuid.uuid4())
+    claim_token = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id, status="generating_image")
+        recipe.worker_claim_token = claim_token
+        recipe.data["ai_metadata"] = {
+            "image_request": {
+                "id": image_request_id,
+                "status": "pending",
+                "force_regenerate": True,
+            }
+        }
+        db.session.commit()
+
+        updated = db_recipe_repository.create_recipe(
+            {
+                "id": recipe_id,
+                "name": "Edited During Generation",
+                "ai_metadata": {
+                    "image_request": {
+                        "id": "stale-client-value",
+                        "status": "complete",
+                    }
+                },
+            },
+            user_id=None,
+            guest_session_id="guest-1",
+        )
+
+        assert updated is not None
+        assert updated.status == "generating_image"
+        assert updated.worker_claim_token == claim_token
+        assert updated.data["ai_metadata"]["image_request"]["id"] == image_request_id
+        assert updated.data["ai_metadata"]["image_request"]["status"] == "pending"
 
 
 def test_superseded_gcs_worker_deletes_its_versioned_orphan(app, client):

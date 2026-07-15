@@ -112,15 +112,20 @@ def test_generate_image_queues_message_for_owned_recipe(app, client):
         recipe = db.session.get(Recipe, recipe_id)
         assert recipe.status == "generating_image"
         assert recipe.worker_claim_token is None
-    publish.assert_called_once_with(
-        "image-generation",
-        {
-            "recipe_id": recipe_id,
-            "user_id": None,
-            "guest_session_id": "guest-1",
-            "force_regenerate": True,
-        },
-    )
+        image_request = recipe.data["ai_metadata"]["image_request"]
+        assert image_request["status"] == "pending"
+        assert image_request["force_regenerate"] is True
+        uuid.UUID(image_request["id"])
+    publish.assert_called_once()
+    topic, payload = publish.call_args.args
+    assert topic == "image-generation"
+    assert payload == {
+        "recipe_id": recipe_id,
+        "user_id": None,
+        "guest_session_id": "guest-1",
+        "force_regenerate": True,
+        "image_request_id": image_request["id"],
+    }
 
 
 def test_generate_image_returns_existing_image_without_requeue(app, client):
@@ -141,21 +146,59 @@ def test_generate_image_returns_existing_image_without_requeue(app, client):
     publish.assert_not_called()
 
 
+def test_force_image_request_supersedes_pending_non_force_request(app, client):
+    stale_request_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe_id = _make_recipe(
+            status="generating_image",
+            data={
+                "name": "Test Recipe",
+                "ai_image_data": "encoded-image",
+                "ai_image_url": "/api/recipes/test/image",
+                "ai_metadata": {
+                    "image_request": {
+                        "id": stale_request_id,
+                        "status": "pending",
+                        "force_regenerate": False,
+                    },
+                    "image_enqueue": {"status": "pending"},
+                },
+            },
+        )
+
+    with patch("services.pubsub_service.publish_message") as publish:
+        response = client.post(
+            "/api/generate_image",
+            json={"recipe_id": recipe_id, "force_regenerate": True},
+        )
+
+    assert response.status_code == 202
+    payload = publish.call_args.args[1]
+    assert payload["image_request_id"] != stale_request_id
+    assert payload["force_regenerate"] is True
+
+
 def test_generate_image_reports_publish_failure(app, client):
     with app.app_context():
         recipe_id = _make_recipe()
 
-    with patch(
-        "services.pubsub_service.publish_message",
-        side_effect=RuntimeError("Pub/Sub unavailable"),
-    ):
+    with patch("services.pubsub_service.publish_message") as publish:
+        publish.side_effect = [RuntimeError("Pub/Sub unavailable"), None]
         response = client.post("/api/generate_image", json={"recipe_id": recipe_id})
 
-    assert response.status_code == 500
-    assert response.get_json() == {"error": "Failed to queue image generation"}
-    with app.app_context():
-        recipe = db.session.get(Recipe, recipe_id)
-        assert recipe.status == "ready"
+        assert response.status_code == 500
+        assert response.get_json() == {"error": "Failed to queue image generation"}
+        with app.app_context():
+            recipe = db.session.get(Recipe, recipe_id)
+            assert recipe.status == "ready"
+            pending_request_id = recipe.data["ai_metadata"]["image_request"]["id"]
+
+        retry_response = client.post("/api/generate_image", json={"recipe_id": recipe_id})
+
+    assert retry_response.status_code == 202
+    assert publish.call_count == 2
+    assert publish.call_args_list[0].args[1]["image_request_id"] == pending_request_id
+    assert publish.call_args_list[1].args[1]["image_request_id"] == pending_request_id
 
 
 def test_generate_image_does_not_republish_active_worker(app, client):

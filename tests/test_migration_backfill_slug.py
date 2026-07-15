@@ -29,6 +29,7 @@ def test_generate_slug():
     assert generate_slug("Thai Peanut Noodles!") == "thai-peanut-noodles"
     assert generate_slug("  Spaces   And-Underscores_  ") == "spaces-and-underscores"
     assert generate_slug("???") == "recipe"
+    assert generate_slug("Crème brûlée") == "creme-brulee"
 
 
 def test_backfill_slugs_retry_loop(app):

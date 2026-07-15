@@ -211,6 +211,34 @@ def test_publish_update_without_slug_keeps_existing_slug(app, user):
     assert updated.data["slug"] == "chili-classic"
 
 
+def test_partial_update_preserves_existing_unicode_slug(app, user):
+    recipe = Recipe(
+        id="unicode-slug",
+        user_id=user.id,
+        name="Crème Brûlée",
+        slug="crème-brûlée",
+        is_public=True,
+        data={
+            "id": "unicode-slug",
+            "name": "Crème Brûlée",
+            "slug": "crème-brûlée",
+            "is_public": True,
+        },
+    )
+    db.session.add(recipe)
+    db.session.commit()
+
+    updated = db_recipe_repository.update_recipe(
+        "unicode-slug",
+        {"ingredients": []},
+        user_id=user.id,
+    )
+
+    assert updated is not None
+    assert updated.slug == "crème-brûlée"
+    assert updated.data["slug"] == "crème-brûlée"
+
+
 def test_publish_slug_collision_gets_suffix(app, user):
     db_recipe_repository.create_recipe(
         _recipe_data(recipe_id="r-1", is_public=True), user_id=user.id
@@ -224,11 +252,11 @@ def test_publish_slug_collision_gets_suffix(app, user):
 
 def test_publish_provided_slug_is_sanitized(app, user):
     recipe = db_recipe_repository.create_recipe(
-        _recipe_data(slug="Chili Con Carne!", is_public=True), user_id=user.id
+        _recipe_data(slug="Crème Brûlée!", is_public=True), user_id=user.id
     )
     assert recipe is not None
-    assert recipe.slug == "chili-con-carne"
-    assert recipe.data["slug"] == "chili-con-carne"
+    assert recipe.slug == "creme-brulee"
+    assert recipe.data["slug"] == "creme-brulee"
 
 
 def test_publish_with_unusable_slug_and_name_raises(app, user):

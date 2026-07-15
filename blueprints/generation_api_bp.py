@@ -138,7 +138,7 @@ def generate_image_for_recipe():
         return jsonify({"error": "recipe_id is required"}), 400
 
     recipe_id = data["recipe_id"]
-    force_regenerate = data.get("force_regenerate", False)
+    force_regenerate = data.get("force_regenerate") is True
 
     user_id = _current_user_id()
     guest_session_id = _current_guest_session_id()
@@ -155,25 +155,14 @@ def generate_image_for_recipe():
     if not force_regenerate and has_real_image and recipe_data.get("ai_image_url"):
         return jsonify({"image_url": recipe_data["ai_image_url"]}), 200
 
-    from services.pubsub_service import publish_message
-
-    message_data = {
-        "recipe_id": recipe_id,
-        "user_id": user_id,
-        "guest_session_id": guest_session_id,
-        "force_regenerate": force_regenerate,
-    }
-
-    queued_here = db_recipe_repository.update_recipe_status(
+    queued = db_recipe_repository.queue_image_generation(
         recipe_id,
-        "generating_image",
+        str(uuid.uuid4()),
+        force_regenerate,
         user_id,
         guest_session_id,
-        expected_status="ready",
-        require_unclaimed=True,
-        clear_worker_claim=True,
     )
-    if not queued_here:
+    if queued is None:
         db_recipe = db_recipe_repository.get_recipe_by_id(
             recipe_id,
             user_id,
@@ -183,8 +172,19 @@ def generate_image_for_recipe():
             return jsonify({"error": "Recipe not found"}), 404
         if db_recipe.status != "generating_image":
             return jsonify({"error": "Recipe is not ready for image generation"}), 409
-        if db_recipe.worker_claim_token is not None:
-            return jsonify({"status": "generating_image"}), 202
+        return jsonify({"status": "generating_image"}), 202
+    if not queued.should_publish:
+        return jsonify({"status": "generating_image"}), 202
+
+    from services.pubsub_service import publish_message
+
+    message_data = {
+        "recipe_id": recipe_id,
+        "user_id": user_id,
+        "guest_session_id": guest_session_id,
+        "force_regenerate": queued.force_regenerate,
+        "image_request_id": queued.request_id,
+    }
 
     try:
         publish_message("image-generation", message_data)
@@ -199,17 +199,14 @@ def generate_image_for_recipe():
             sanitize_log_value(recipe_id),
             sanitize_log_value(e),
         )
-        if queued_here and not db_recipe_repository.update_recipe_status(
+        if not db_recipe_repository.release_image_generation_queue(
             recipe_id,
-            "ready",
+            queued.request_id,
             user_id,
             guest_session_id,
-            expected_status="generating_image",
-            require_unclaimed=True,
-            clear_worker_claim=True,
         ):
             logger.info(
-                "Image worker already claimed recipe %s after publish returned an error",
+                "Image queue state changed for recipe %s after publish returned an error",
                 sanitize_log_value(recipe_id),
             )
         return jsonify({"error": "Failed to queue image generation"}), 500

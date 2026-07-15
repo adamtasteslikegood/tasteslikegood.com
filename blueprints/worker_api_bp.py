@@ -8,7 +8,9 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, abort
 
 from google.auth.transport import requests as g_requests
+from google.genai.errors import APIError, ServerError
 from google.oauth2 import id_token
+from httpx import TransportError
 
 from config import GCS_BUCKET_NAME, WORKER_CLAIM_STALE_SECONDS
 from repositories import db_recipe_repository
@@ -53,6 +55,10 @@ def _parse_max_attempts(raw, default=3):
 GENERATION_MAX_ATTEMPTS = _parse_max_attempts(os.environ.get("GENERATION_MAX_ATTEMPTS", "3"))
 
 
+class RetryableImageError(RuntimeError):
+    """Image generation failed for a reason Pub/Sub should retry."""
+
+
 def _current_recipe_scope(recipe_id):
     """Return the row and its current owner after any guest-to-user migration."""
     recipe = db_recipe_repository.get_recipe_for_worker(recipe_id)
@@ -91,25 +97,62 @@ def _claim_image_worker(recipe_id, status):
     )
 
 
-def _record_image_failure(recipe_id, error_message, claim_token):
+def _image_request_status(recipe_data, image_request_id):
+    if image_request_id is None:
+        return None
+    metadata = (recipe_data or {}).get("ai_metadata")
+    image_request = metadata.get("image_request") if isinstance(metadata, dict) else None
+    if not isinstance(image_request, dict) or image_request.get("id") != image_request_id:
+        return "superseded"
+    return image_request.get("status")
+
+
+def _completed_image_request(recipe_data, image_request_id, force_regenerate):
+    if image_request_id is not None:
+        return image_request_id, force_regenerate
+    metadata = (recipe_data or {}).get("ai_metadata")
+    image_request = metadata.get("image_request") if isinstance(metadata, dict) else None
+    if (
+        isinstance(image_request, dict)
+        and isinstance(image_request.get("id"), str)
+        and image_request.get("status") == "pending"
+    ):
+        return image_request["id"], image_request.get("force_regenerate") is True
+    return None, force_regenerate
+
+
+def _record_image_failure(
+    recipe_id,
+    error_message,
+    claim_token,
+    image_request_id=None,
+    force_regenerate=False,
+    retryable=False,
+):
     """Persist image failure metadata without replacing user-owned recipe data."""
     timestamp = datetime.datetime.now().isoformat()
+    metadata = {
+        "image_generation": {
+            "success": False,
+            "error": error_message,
+            "timestamp": timestamp,
+        },
+        "image_enqueue": {
+            "status": "complete",
+            "timestamp": timestamp,
+        },
+    }
+    if image_request_id is not None:
+        metadata["image_request"] = {
+            "id": image_request_id,
+            "status": "pending" if retryable else "complete",
+            "force_regenerate": force_regenerate,
+            "timestamp": timestamp,
+        }
     return (
         db_recipe_repository.patch_recipe_for_worker(
             recipe_id,
-            {
-                "ai_metadata": {
-                    "image_generation": {
-                        "success": False,
-                        "error": error_message,
-                        "timestamp": timestamp,
-                    },
-                    "image_enqueue": {
-                        "status": "complete",
-                        "timestamp": timestamp,
-                    },
-                }
-            },
+            {"ai_metadata": metadata},
             claim_token,
             status="ready",
             expected_status="generating_image",
@@ -173,9 +216,15 @@ def _existing_recipe_delivery_response(recipe_id, recipe, user_id, guest_session
     return None
 
 
-def _image_generation_metadata(user_id, guest_session_id, image_prompt):
+def _image_generation_metadata(
+    user_id,
+    guest_session_id,
+    image_prompt,
+    image_request_id=None,
+    force_regenerate=False,
+):
     timestamp = datetime.datetime.now().isoformat()
-    return {
+    metadata = {
         "image_generation": {
             "model": "imagen-4.0-generate-001",
             "user_id": user_id,
@@ -191,6 +240,31 @@ def _image_generation_metadata(user_id, guest_session_id, image_prompt):
             "timestamp": timestamp,
         },
     }
+    if image_request_id is not None:
+        metadata["image_request"] = {
+            "id": image_request_id,
+            "status": "complete",
+            "force_regenerate": force_regenerate,
+            "timestamp": timestamp,
+        }
+    return metadata
+
+
+def _is_retryable_image_error(error):
+    if isinstance(
+        error,
+        (
+            RetryableImageError,
+            ServerError,
+            TransportError,
+            RuntimeError,
+            TimeoutError,
+            ConnectionError,
+            OSError,
+        ),
+    ):
+        return True
+    return isinstance(error, APIError) and error.code in {408, 409, 429}
 
 
 def _delete_replaced_gcs_image(recipe_id, previous_gcs_uri, current_gcs_uri):
@@ -212,6 +286,54 @@ def _delete_unpersisted_gcs_image(recipe_id, uploaded_gcs_uri, image_persisted):
     from services.gcs_service import delete_image
 
     delete_image(GCS_BUCKET_NAME, recipe_id, uploaded_gcs_uri)
+
+
+def _prepare_image_delivery(recipe_id, force_regenerate, image_request_id):
+    recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
+    if recipe is None:
+        logger.error("Recipe not found: %s", sanitize_log_value(recipe_id))
+        return None, (jsonify({"status": "ok"}), 200)
+
+    recipe_data = deepcopy(recipe.data or {})
+    if (
+        image_request_id is not None
+        and _image_request_status(recipe_data, image_request_id) != "pending"
+    ):
+        logger.info(
+            "Skipping completed or superseded image request %s for %s",
+            sanitize_log_value(image_request_id),
+            sanitize_log_value(recipe_id),
+        )
+        return None, (jsonify({"status": "ok"}), 200)
+
+    has_real_image = bool(recipe_data.get("ai_image_data") or recipe_data.get("ai_image_gcs"))
+    if not force_regenerate and has_real_image and recipe_data.get("ai_image_url"):
+        logger.info("Image already exists for %s", sanitize_log_value(recipe_id))
+        return None, (jsonify({"status": "ok"}), 200)
+
+    claim_token = _claim_image_worker(recipe_id, recipe.status)
+    if claim_token is None:
+        return None, (
+            jsonify({"status": "retry", "message": "Image is already processing"}),
+            500,
+        )
+
+    recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
+    if recipe is None:
+        return None, (jsonify({"status": "ok"}), 200)
+    if (
+        image_request_id is not None
+        and _image_request_status(recipe.data or {}, image_request_id) != "pending"
+    ):
+        _release_worker_claim(
+            recipe_id,
+            "ready",
+            claim_token,
+            "generating_image",
+            "Image",
+        )
+        return None, (jsonify({"status": "ok"}), 200)
+    return (recipe, user_id, guest_session_id, claim_token), None
 
 
 def require_pubsub_oidc(fn):
@@ -442,32 +564,26 @@ def process_image():
     if not recipe_id:
         return jsonify({"status": "ok"}), 200
 
-    force_regenerate = data.get("force_regenerate", False)
+    force_regenerate = data.get("force_regenerate") is True
+    raw_image_request_id = data.get("image_request_id")
+    image_request_id = (
+        raw_image_request_id
+        if isinstance(raw_image_request_id, str) and raw_image_request_id
+        else None
+    )
 
     logger.info("Processing image generation for %s", sanitize_log_value(recipe_id))
 
     claim_token = None
     try:
-        recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
-        if recipe is None:
-            logger.error("Recipe not found: %s", sanitize_log_value(recipe_id))
-            return jsonify({"status": "ok"}), 200
-
-        recipe_data = deepcopy(recipe.data or {})
-
-        # Check if image already exists
-        has_real_image = bool(recipe_data.get("ai_image_data") or recipe_data.get("ai_image_gcs"))
-        if not force_regenerate and has_real_image and recipe_data.get("ai_image_url"):
-            logger.info("Image already exists for %s", sanitize_log_value(recipe_id))
-            return jsonify({"status": "ok"}), 200
-
-        claim_token = _claim_image_worker(recipe_id, recipe.status)
-        if claim_token is None:
-            return jsonify({"status": "retry", "message": "Image is already processing"}), 500
-
-        recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
-        if recipe is None:
-            return jsonify({"status": "ok"}), 200
+        prepared, early_response = _prepare_image_delivery(
+            recipe_id,
+            force_regenerate,
+            image_request_id,
+        )
+        if early_response is not None:
+            return early_response
+        recipe, user_id, guest_session_id, claim_token = prepared
         recipe_data = deepcopy(recipe.data or {})
         previous_gcs_uri = recipe_data.get("ai_image_gcs")
 
@@ -479,6 +595,9 @@ def process_image():
                 recipe_id,
                 "No AI credentials available",
                 claim_token,
+                image_request_id,
+                force_regenerate,
+                retryable=True,
             ):
                 raise RuntimeError("Image credential failure could not be persisted")
             return jsonify({"status": "retry"}), 500
@@ -507,7 +626,7 @@ def process_image():
             )
 
             if not response.generated_images:
-                raise Exception("No images generated")
+                raise RetryableImageError("No images generated")
 
             image_bytes = response.generated_images[0].image.image_bytes
             image_url = f"/api/recipes/{recipe_id}/image"
@@ -524,7 +643,7 @@ def process_image():
                     version=claim_token,
                 )
                 if not uploaded_gcs_uri:
-                    raise Exception("Failed to upload image to storage")
+                    raise RetryableImageError("Failed to upload image to storage")
                 image_patch["ai_image_gcs"] = uploaded_gcs_uri
                 remove_data_fields = ("ai_image_data",)
             else:
@@ -534,10 +653,17 @@ def process_image():
             recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
             if recipe is None:
                 return jsonify({"status": "ok"}), 200
+            completed_request_id, completed_force_regenerate = _completed_image_request(
+                recipe.data or {},
+                image_request_id,
+                force_regenerate,
+            )
             image_patch["ai_metadata"] = _image_generation_metadata(
                 user_id,
                 guest_session_id,
                 image_prompt,
+                completed_request_id,
+                completed_force_regenerate,
             )
             updated = db_recipe_repository.patch_recipe_for_worker(
                 recipe_id,
@@ -563,6 +689,7 @@ def process_image():
 
         except Exception as e:
             _delete_unpersisted_gcs_image(recipe_id, uploaded_gcs_uri, image_persisted)
+            retryable = _is_retryable_image_error(e)
             logger.error(
                 "Image generation failed for %s: %s",
                 sanitize_log_value(recipe_id),
@@ -572,8 +699,13 @@ def process_image():
                 recipe_id,
                 "Image generation failed",
                 claim_token,
+                image_request_id,
+                force_regenerate,
+                retryable=retryable,
             ):
                 raise RuntimeError("Image generation failure could not be persisted")
+            if retryable:
+                return jsonify({"status": "retry"}), 500
 
     except Exception as e:
         logger.error("Error processing image message: %s", sanitize_log_value(e))
