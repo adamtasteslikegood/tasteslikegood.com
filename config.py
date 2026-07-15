@@ -36,6 +36,16 @@ UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
 GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "comdottasteslikegood")
 
+# Valkey/Redis response cache
+# VALKEY_HOST: Memorystore private IP (e.g. 10.128.0.11)
+# VALKEY_PORT: defaults to 6379
+# VALKEY_AUTH_MODE: 'iam' for GCP IAM auth (prod default), 'password' for static password, or unset
+# REDIS_URL: legacy — full redis:// URL for local dev; used only when VALKEY_HOST is unset
+VALKEY_HOST = os.getenv("VALKEY_HOST")
+VALKEY_PORT = int(os.getenv("VALKEY_PORT", "6379"))
+VALKEY_AUTH_MODE = os.getenv("VALKEY_AUTH_MODE", "iam")
+REDIS_URL = os.getenv("REDIS_URL")
+
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-3.1-pro-preview"
 
