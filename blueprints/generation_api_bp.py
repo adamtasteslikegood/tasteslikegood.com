@@ -231,7 +231,8 @@ def get_recipe_status(recipe_id):
 def serve_recipe_image(recipe_id):
     """
     Serve a recipe's AI-generated image.
-    Tries in order: Valkey cache → GCS bucket → legacy base64 in DB.
+    Access is checked first (existence + visibility/ownership), then the
+    bytes are resolved: Valkey cache → GCS bucket → legacy base64 in DB.
     Cached in Valkey for 24 hours.
 
     Access rules:
@@ -246,6 +247,10 @@ def serve_recipe_image(recipe_id):
     if recipe is None:
         return jsonify({"error": "Recipe not found"}), 404
 
+    # Private images must not be stored by any HTTP cache — only Valkey,
+    # behind the access check, may hold them.
+    http_cache_control = "public, max-age=86400" if recipe.is_public else "private, no-store"
+
     if not recipe.is_public:
         user_id = _current_user_id()
         guest_session_id = _current_guest_session_id()
@@ -253,17 +258,16 @@ def serve_recipe_image(recipe_id):
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
 
-    cache_control = "public, max-age=86400" if recipe.is_public else "private, no-store"
-
-    # Authorize before consulting the shared cache; private images must not
-    # become public merely because their owner populated the cache earlier.
+    # Cache lookup must stay below the access check: the key is global
+    # (same image for everyone), so serving on a hit without the check
+    # would expose private/deleted recipes' images to anyone with the UUID.
     ck = recipe_image_key(recipe_id)
     cached_bytes = safe_get(ck)
     if cached_bytes is not None:
         return Response(
             cached_bytes,
             mimetype="image/png",
-            headers={"Cache-Control": cache_control},
+            headers={"Cache-Control": http_cache_control},
         )
 
     recipe_data = recipe.data or {}
@@ -293,7 +297,7 @@ def serve_recipe_image(recipe_id):
     return Response(
         image_bytes,
         mimetype="image/png",
-        headers={"Cache-Control": cache_control},
+        headers={"Cache-Control": http_cache_control},
     )
 
 

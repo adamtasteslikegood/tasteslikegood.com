@@ -137,7 +137,7 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `GCS_BUCKET_NAME` | Recipe image storage (`tasteslikegood-recipe-images` in prod) |
 | `GCP_PROJECT_ID` | Required when API/worker code publishes Pub/Sub messages |
 | `PUBSUB_INVOKER_SA` | Required for `worker_api_bp` to authenticate push messages |
-| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Optional distributed cache configuration used by recipe, collection, and image paths; helpers fall back when unavailable |
+| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Set by cookbook deploy; backs the Flask-Caching response cache (recipe, collection, and image paths). Unset or unavailable = in-process SimpleCache fallback. |
 | `FRONTEND_URL`, `SESSION_COOKIE_DOMAIN` | OAuth redirects, cookie scoping |
 | `DD_API_KEY` | **Required in prod** for the Docker image's Datadog `serverless-init` entrypoint — without it traces/profiles/logs/AppSec events are dropped (app still serves). Injected via `--set-secrets` in the cookbook `cloudbuild.yaml`; not needed for local `python app.py`. |
 
