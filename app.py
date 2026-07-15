@@ -98,10 +98,71 @@ def create_app(**config_overrides):
         app.config.update(config_overrides)
 
     # Initialize extensions
-    from extensions import db, migrate
+    from extensions import cache, db, migrate
 
     db.init_app(app)
     migrate.init_app(app, db)
+
+    # Response cache. Priority: VALKEY_HOST (prod, IAM or password auth) >
+    # REDIS_URL (local docker) > in-process SimpleCache. An unreachable
+    # Valkey degrades to SimpleCache instead of failing startup; per-call
+    # failures are absorbed by utils/cache_utils safe_get/safe_set.
+    # Tests may pre-set CACHE_TYPE via config_overrides to skip this block.
+    if "CACHE_TYPE" not in app.config:
+        from config import REDIS_URL, VALKEY_AUTH_MODE, VALKEY_HOST, VALKEY_PORT
+
+        cache_client = None
+        if VALKEY_HOST:
+            if VALKEY_AUTH_MODE == "iam":
+                from utils.valkey_auth import create_iam_redis_client
+
+                cache_client = create_iam_redis_client(VALKEY_HOST, VALKEY_PORT)
+            else:
+                import redis
+
+                try:
+                    cache_client = redis.StrictRedis(
+                        host=VALKEY_HOST,
+                        port=VALKEY_PORT,
+                        password=os.environ.get("VALKEY_PASSWORD"),
+                        decode_responses=False,
+                    )
+                    cache_client.ping()
+                except Exception:
+                    logger.warning(
+                        "Valkey at %s:%s unreachable — falling back to SimpleCache",
+                        VALKEY_HOST,
+                        VALKEY_PORT,
+                        exc_info=True,
+                    )
+                    cache_client = None
+        elif REDIS_URL:
+            import redis
+
+            try:
+                cache_client = redis.from_url(REDIS_URL, decode_responses=False)
+                cache_client.ping()
+            except Exception:
+                logger.warning(
+                    "Redis at REDIS_URL unreachable — falling back to SimpleCache",
+                    exc_info=True,
+                )
+                cache_client = None
+
+        if cache_client is not None:
+            app.config["CACHE_TYPE"] = "RedisCache"
+            # cachelib accepts a pre-configured client via 'host'
+            # (a CACHE_REDIS config key is not recognized by Flask-Caching).
+            app.config["CACHE_REDIS_HOST"] = cache_client
+            # Keys are already namespaced 'vgc:' by utils/cache_utils builders.
+            app.config["CACHE_KEY_PREFIX"] = ""
+            logger.info("Response cache: Valkey/Redis backend")
+        else:
+            app.config["CACHE_TYPE"] = "SimpleCache"
+            logger.info("Response cache: in-memory SimpleCache (no Valkey/Redis configured)")
+        app.config.setdefault("CACHE_DEFAULT_TIMEOUT", 300)
+
+    cache.init_app(app)
 
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured
