@@ -40,7 +40,7 @@ GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "comdottasteslikegood")
 # VALKEY_HOST: Memorystore private IP (e.g. 10.128.0.11)
 # VALKEY_PORT: defaults to 6379
 # VALKEY_AUTH_MODE: 'iam' for GCP IAM auth (prod default), 'password' for static password, or unset
-# REDIS_URL: legacy — full redis:// URL (overrides VALKEY_HOST if set; used for local dev)
+# REDIS_URL: legacy — full redis:// URL for local dev; used only when VALKEY_HOST is unset
 VALKEY_HOST = os.getenv("VALKEY_HOST")
 VALKEY_PORT = int(os.getenv("VALKEY_PORT", "6379"))
 VALKEY_AUTH_MODE = os.getenv("VALKEY_AUTH_MODE", "iam")
