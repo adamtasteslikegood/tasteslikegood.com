@@ -94,7 +94,8 @@ def test_worker_rejects_wrong_or_unverified_identity(client, monkeypatch, claims
     assert response.status_code == 403
 
 
-def test_worker_verifies_token_for_exact_external_endpoint(client, monkeypatch):
+@pytest.mark.parametrize("endpoint", ["/api/worker/recipe", "/api/worker/image"])
+def test_worker_verifies_token_for_exact_external_endpoint(client, monkeypatch, endpoint):
     invoker = "pubsub@example.iam.gserviceaccount.com"
     monkeypatch.setattr(worker_module, "PUBSUB_INVOKER_SA", invoker)
     with patch.object(
@@ -102,10 +103,10 @@ def test_worker_verifies_token_for_exact_external_endpoint(client, monkeypatch):
         "verify_oauth2_token",
         return_value={"email": invoker, "email_verified": True},
     ) as verify:
-        response = client.post("/api/worker/recipe", headers=_headers(), json={})
+        response = client.post(endpoint, headers=_headers(), json={})
 
     assert response.status_code == 400
     assert verify.call_count == 1
     args, kwargs = verify.call_args
     assert args[0] == "signed-token"
-    assert kwargs["audience"] == "https://flask-backend.example/api/worker/recipe"
+    assert kwargs["audience"] == f"https://flask-backend.example{endpoint}"

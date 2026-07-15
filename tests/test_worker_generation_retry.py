@@ -292,3 +292,63 @@ def test_image_worker_records_generation_failure(app, client):
         metadata = recipe.data["ai_metadata"]["image_generation"]
         assert metadata["success"] is False
         assert metadata["error"] == "Imagen unavailable"
+
+
+def test_image_worker_skips_existing_image(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id)
+        recipe.data.update(
+            {
+                "ai_image_data": "existing-image",
+                "ai_image_url": f"/api/recipes/{recipe_id}/image",
+            }
+        )
+        db.session.commit()
+
+    with patch("blueprints.worker_api_bp.get_genai_client") as get_client:
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    get_client.assert_not_called()
+
+
+def test_image_worker_uploads_to_gcs_when_configured(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    class GeneratedImage:
+        class Image:
+            image_bytes = b"generated-image"
+
+        image = Image()
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            class Response:
+                generated_images = [GeneratedImage()]
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    with (
+        patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()),
+        patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", "recipe-images"),
+        patch(
+            "services.gcs_service.upload_image",
+            return_value=f"gs://recipe-images/{recipe_id}.png",
+        ) as upload,
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("blueprints.worker_api_bp.invalidate_recipe_image"),
+    ):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    upload.assert_called_once_with("recipe-images", recipe_id, b"generated-image")
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.data["ai_image_gcs"] == f"gs://recipe-images/{recipe_id}.png"
+        assert "ai_image_data" not in recipe.data
