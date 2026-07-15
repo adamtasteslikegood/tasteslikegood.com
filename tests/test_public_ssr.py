@@ -70,6 +70,8 @@ def test_show_public_recipe_renders_html(app, client):
     body = resp.get_data(as_text=True)
     assert "Thai Peanut Noodles" in body
     assert "Thai Peanut Noodles description" in body
+    assert '<script defer src="/static/js/public.js"></script>' in body
+    assert "document.querySelectorAll('[data-open-kitchen]')" not in body
 
 
 def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
