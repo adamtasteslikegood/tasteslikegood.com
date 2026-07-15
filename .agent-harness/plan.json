@@ -1,0 +1,299 @@
+{
+  "schema": "agent-harness/plan.v1",
+  "goal": "Restore and harden CI/CD quality gates in adamtasteslikegood/tasteslikegood.com per docs/ci/refresh/SPEC-01-ci-quality-gates.md and SPEC-02-ai-triage-and-review.md, executing docs/ci/refresh/TODO.md phases in order. Hard rules: branch off origin/dev, PR into dev, never commit to dev/main directly; one concern per PR; never lower a quality bar to force green; AI workflow checks never required; branch-protection changes (T7) escalate to human before applying.",
+  "domain": "engineering",
+  "tasks": [
+    {
+      "id": "T1",
+      "skill": "ci-rearm",
+      "skill_path": "docs/ci/refresh/SPEC-01-ci-quality-gates.md",
+      "objective": "ci.yml: change on.push/on.pull_request branches to [main, dev]; add concurrency group ci-${{ github.workflow }}-${{ github.ref }} with cancel-in-progress: true; replace deprecated safety check with pip-audit (keep continue-on-error: true). Branch chore/ci-rearm-triggers off origin/dev, PR into dev noting expected-red jobs (lint, type-check, test per baseline).",
+      "suggested_tools": [
+        "uvx --from actionlint-py actionlint .github/workflows/ci.yml",
+        "gh pr create --base dev"
+      ],
+      "verification": [
+        {
+          "cmd": "uvx --from actionlint-py actionlint .github/workflows/ci.yml",
+          "expect_exit": 0,
+          "kind": "lint"
+        },
+        {
+          "cmd": "test \"$(gh run list --workflow=ci.yml --branch chore/ci-rearm-triggers --limit 1 --json databaseId --jq '.[0].databaseId' | xargs -r -I{} gh run view {} --json jobs --jq '.jobs[].name' | grep -cE 'Lint|Type Check|Test|Security')\" -ge 4",
+          "expect_exit": 0,
+          "kind": "integration"
+        }
+      ],
+      "done_when": "actionlint clean AND a PR into dev on branch chore/ci-rearm-triggers shows Lint/Type-Check/Test/Security jobs actually running",
+      "max_attempts": 2,
+      "status": "pending"
+    },
+    {
+      "id": "T2",
+      "skill": "black-sweep",
+      "skill_path": "docs/ci/refresh/TODO.md",
+      "objective": "Run uv run black . as a single mechanical commit (15 files); add the commit hash to .git-blame-ignore-revs. Own branch/PR off origin/dev AFTER T1 merges so CI reports on it.",
+      "suggested_tools": [
+        "uv run black ."
+      ],
+      "verification": [
+        {
+          "cmd": "uv run black --check .",
+          "expect_exit": 0,
+          "kind": "lint"
+        },
+        {
+          "cmd": "test -s .git-blame-ignore-revs",
+          "expect_exit": 0,
+          "kind": "artifact"
+        }
+      ],
+      "done_when": "black --check exits 0 and the sweep commit hash is listed in .git-blame-ignore-revs",
+      "max_attempts": 1,
+      "status": "pending"
+    },
+    {
+      "id": "T3",
+      "skill": "flake8-zero",
+      "skill_path": "docs/ci/refresh/TODO.md",
+      "objective": "Fix 38 flake8 violations; align config with Black (max-line-length = 100, extend-ignore = E203,W503). Targeted # noqa only with justification comments; no blanket ignores.",
+      "suggested_tools": [
+        "uv run flake8 . --count"
+      ],
+      "verification": [
+        {
+          "cmd": "test \"$(uv run flake8 . --count | tail -1)\" = \"0\"",
+          "expect_exit": 0,
+          "kind": "lint"
+        }
+      ],
+      "done_when": "flake8 --count prints 0 with no blanket ignores in the diff",
+      "max_attempts": 3,
+      "status": "pending"
+    },
+    {
+      "id": "T4",
+      "skill": "mypy-unbroken",
+      "skill_path": "docs/ci/refresh/TODO.md",
+      "objective": "Fix mypy crash (scripts/backfill_slugs.py duplicate-module): explicit_package_bases = true or exclude scripts/ in [tool.mypy]; then fix real errors or add narrow # type: ignore[code] with tracking issue.",
+      "suggested_tools": [
+        "uv run mypy . --ignore-missing-imports"
+      ],
+      "verification": [
+        {
+          "cmd": "uv run mypy . --ignore-missing-imports",
+          "expect_exit": 0,
+          "kind": "typecheck"
+        }
+      ],
+      "done_when": "mypy exits 0 with the same invocation CI uses",
+      "max_attempts": 3,
+      "status": "pending"
+    },
+    {
+      "id": "T5",
+      "skill": "ssr-test-rootcause",
+      "skill_path": "docs/ci/refresh/TODO.md",
+      "objective": "Root-cause 4 tests/test_public_ssr.py failures (canonical link + sitemap). Decide first whether test drift or real SSR/SEO regression; a real regression is its own fix/ PR and an escalation.",
+      "suggested_tools": [
+        "uv run pytest tests/test_public_ssr.py -v"
+      ],
+      "verification": [
+        {
+          "cmd": "FLASK_SECRET_KEY=x GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=x uv run pytest -q",
+          "expect_exit": 0,
+          "kind": "test"
+        }
+      ],
+      "done_when": "full pytest suite passes (164 passed)",
+      "max_attempts": 3,
+      "status": "pending"
+    },
+    {
+      "id": "T6",
+      "skill": "docker-build-gate",
+      "skill_path": "docs/ci/refresh/SPEC-01-ci-quality-gates.md",
+      "objective": "Add build job to ci.yml: docker build -f Dockerfile . (no push, no creds). Red-test once on a scratch branch with broken requirements.txt, then revert.",
+      "suggested_tools": [
+        "uvx --from actionlint-py actionlint .github/workflows/ci.yml"
+      ],
+      "verification": [
+        {
+          "cmd": "uvx --from actionlint-py actionlint .github/workflows/ci.yml",
+          "expect_exit": 0,
+          "kind": "lint"
+        },
+        {
+          "cmd": "grep -q 'docker build' .github/workflows/ci.yml",
+          "expect_exit": 0,
+          "kind": "artifact"
+        }
+      ],
+      "done_when": "build job green on a PR; red-test performed and reverted",
+      "max_attempts": 2,
+      "status": "pending"
+    },
+    {
+      "id": "T7",
+      "skill": "branch-protection",
+      "skill_path": "docs/ci/refresh/SPEC-01-ci-quality-gates.md",
+      "objective": "ESCALATE FIRST \u2014 human approves before applying. Required status checks on dev and main exactly per SPEC-01 section 4.3 (per-language Analyze (...) contexts, never a CodeQL workflow-name context).",
+      "suggested_tools": [
+        "gh api repos/adamtasteslikegood/tasteslikegood.com/branches/dev/protection"
+      ],
+      "verification": [
+        {
+          "cmd": "gh api repos/adamtasteslikegood/tasteslikegood.com/rules/branches/dev --jq '[.[] | select(.type == \"required_status_checks\") | .parameters.required_status_checks[].context] | sort | join(\"|\")' | grep -Fx 'Analyze (actions)|Analyze (javascript-typescript)|Analyze (python)|Build (docker)|Check for Non-ASCII Characters in Filenames|Lint (Black + Flake8)|Test (pytest)|Type Check (mypy)'",
+          "expect_exit": 0,
+          "kind": "integration"
+        }
+      ],
+      "done_when": "protection contexts on dev match SPEC-01 section 4.3 exactly; human approved before apply",
+      "max_attempts": 1,
+      "status": "pending"
+    },
+    {
+      "id": "T8",
+      "skill": "dependabot-drain",
+      "skill_path": "docs/ci/refresh/TODO.md",
+      "objective": "Rebase/recreate ~10 open Dependabot PRs against the reformatted tree (@dependabot rebase); merge or close each through the new gates.",
+      "suggested_tools": [
+        "gh pr list --state open --author app/dependabot"
+      ],
+      "verification": [
+        {
+          "cmd": "test \"$(gh pr list --state open --author app/dependabot --json number --jq 'length')\" = \"0\"",
+          "expect_exit": 0,
+          "kind": "integration"
+        }
+      ],
+      "done_when": "each Dependabot PR green-merged or closed with a stated reason",
+      "max_attempts": 2,
+      "status": "pending"
+    },
+    {
+      "id": "T9",
+      "skill": "scheduled-triage-retune",
+      "skill_path": "docs/ci/refresh/SPEC-02-ai-triage-and-review.md",
+      "objective": "gemini-scheduled-triage.yml: cron hourly to every 6h; dedicated alert job (needs: [triage, label], if: failure(), own issues: write) opening/updating a ci-health issue. NO job-level continue-on-error on this workflow.",
+      "suggested_tools": [
+        "uvx --from actionlint-py actionlint .github/workflows/gemini-scheduled-triage.yml"
+      ],
+      "verification": [
+        {
+          "cmd": "uvx --from actionlint-py actionlint .github/workflows/gemini-scheduled-triage.yml",
+          "expect_exit": 0,
+          "kind": "lint"
+        },
+        {
+          "cmd": "grep -q '0 \\*/6' .github/workflows/gemini-scheduled-triage.yml",
+          "expect_exit": 0,
+          "kind": "artifact"
+        }
+      ],
+      "done_when": "green scheduled run at 6h cadence; forced-failure test opens ci-health issue",
+      "max_attempts": 2,
+      "status": "pending"
+    },
+    {
+      "id": "T10",
+      "skill": "gemini-triage-standalone",
+      "skill_path": "docs/ci/refresh/SPEC-02-ai-triage-and-review.md",
+      "objective": "Standalone gemini-triage.yml on issues: opened, reusing .github/commands/gemini-triage.toml; timeout-minutes: 10, concurrency, continue-on-error: true, pinned action SHA.",
+      "suggested_tools": [
+        "uvx --from actionlint-py actionlint .github/workflows/gemini-triage.yml"
+      ],
+      "verification": [
+        {
+          "cmd": "uvx --from actionlint-py actionlint .github/workflows/gemini-triage.yml",
+          "expect_exit": 0,
+          "kind": "lint"
+        }
+      ],
+      "done_when": "test issue auto-labeled; actionlint clean",
+      "max_attempts": 2,
+      "status": "pending"
+    },
+    {
+      "id": "T11",
+      "skill": "gemini-review-standalone",
+      "skill_path": "docs/ci/refresh/SPEC-02-ai-triage-and-review.md",
+      "objective": "Standalone gemini-review.yml: pull_request types [labeled] gated on gemini-review label + workflow_dispatch; same-repo + non-Dependabot guard skips cleanly; GEMINI_CLI_TRUST_WORKSPACE: true on checkout job; never a required check.",
+      "suggested_tools": [
+        "uvx --from actionlint-py actionlint .github/workflows/gemini-review.yml"
+      ],
+      "verification": [
+        {
+          "cmd": "uvx --from actionlint-py actionlint .github/workflows/gemini-review.yml",
+          "expect_exit": 0,
+          "kind": "lint"
+        },
+        {
+          "cmd": "grep -q 'GEMINI_CLI_TRUST_WORKSPACE' .github/workflows/gemini-review.yml",
+          "expect_exit": 0,
+          "kind": "artifact"
+        }
+      ],
+      "done_when": "labeled internal PR gets review; labeled Dependabot PR skips cleanly; check absent from required contexts",
+      "max_attempts": 2,
+      "status": "pending"
+    },
+    {
+      "id": "T12",
+      "skill": "gemini-invoke-standalone",
+      "skill_path": "docs/ci/refresh/SPEC-02-ai-triage-and-review.md",
+      "objective": "Standalone gemini-invoke.yml on @gemini-cli comments: author-association allowlist (OWNER/MEMBER/COLLABORATOR) enforced deterministically outside the model on BOTH trigger and /approve comments; GEMINI_CLI_TRUST_WORKSPACE: true.",
+      "suggested_tools": [
+        "uvx --from actionlint-py actionlint .github/workflows/gemini-invoke.yml"
+      ],
+      "verification": [
+        {
+          "cmd": "uvx --from actionlint-py actionlint .github/workflows/gemini-invoke.yml",
+          "expect_exit": 0,
+          "kind": "lint"
+        },
+        {
+          "cmd": "grep -q 'author_association' .github/workflows/gemini-invoke.yml",
+          "expect_exit": 0,
+          "kind": "artifact"
+        }
+      ],
+      "done_when": "collaborator trigger + approval acted on; outsider trigger ignored; outsider /approve leaves run halted",
+      "max_attempts": 2,
+      "status": "pending"
+    },
+    {
+      "id": "T13",
+      "skill": "docs-closeout",
+      "skill_path": "docs/ci/refresh/TODO.md",
+      "objective": "Docs close-out: dated addendum to docs/ci/CI-AUDIT-REPORT.md, CLAUDE.md commands update if changed, cookbook repo submodule pointer bump PR via the standard two-step flow.",
+      "suggested_tools": [
+        "gh pr list -R adamtasteslikegood/tasteslikegoodtheangularsvegancookbook"
+      ],
+      "verification": [
+        {
+          "cmd": "grep -qi 'addendum\\|2026-07' docs/ci/CI-AUDIT-REPORT.md",
+          "expect_exit": 0,
+          "kind": "artifact"
+        }
+      ],
+      "done_when": "docs updated; cookbook submodule-bump PR open",
+      "max_attempts": 1,
+      "status": "pending"
+    }
+  ],
+  "loop": {
+    "order": "sequential",
+    "max_loop_iterations": 40,
+    "escalate_on": [
+      "attempts_exhausted",
+      "no_verification_available",
+      "destructive_or_irreversible_action",
+      "goal_drift_detected"
+    ]
+  },
+  "close": {
+    "requires": "all tasks verified (or explicitly waived with a reason); global suite (black/flake8/mypy/pytest/actionlint) passes on dev; no PR opened by this run has unaddressed review comments",
+    "handoff": "loop_controller.py close emits the evidence log + summary; also write docs/ci/refresh/HARNESS-STATE.md on budget exhaustion"
+  }
+}
