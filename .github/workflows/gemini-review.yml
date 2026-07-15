@@ -50,11 +50,6 @@ jobs:
       id-token: 'write'
       issues: 'write'
       pull-requests: 'write'
-    env:
-      # The headless CLI refuses to operate on an untrusted checkout — the
-      # 2026-07-09 review run (job 86047077397) exited before doing any work
-      # for exactly this reason. Required on any job that checks out code.
-      GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
       - name: 'Resolve pull request'
         id: 'pr'
@@ -95,8 +90,6 @@ jobs:
             core.setOutput('number', String(prNumber));
             core.setOutput('title', pr.title || '');
             core.setOutput('body', pr.body || '');
-            core.setOutput('head_sha', pr.head.sha);
-
       - name: 'Mint identity token'
         id: 'mint_identity_token'
         if: |-
@@ -108,13 +101,6 @@ jobs:
           permission-contents: 'read'
           permission-issues: 'write'
           permission-pull-requests: 'write'
-
-      - name: 'Checkout repository'
-        if: |-
-          ${{ steps.pr.outputs.skip == 'false' }}
-        uses: 'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0' # ratchet:actions/checkout@v7
-        with:
-          ref: '${{ steps.pr.outputs.head_sha }}'
 
       - name: 'Run Gemini pull request review'
         if: |-
@@ -174,13 +160,7 @@ jobs:
                 }
               },
               "tools": {
-                "core": [
-                  "run_shell_command(cat)",
-                  "run_shell_command(echo)",
-                  "run_shell_command(grep)",
-                  "run_shell_command(head)",
-                  "run_shell_command(tail)"
-                ]
+                "core": []
               }
             }
           prompt: '/gemini-review'

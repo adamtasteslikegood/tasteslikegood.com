@@ -211,6 +211,48 @@ def test_publish_update_without_slug_keeps_existing_slug(app, user):
     assert updated.data["slug"] == "chili-classic"
 
 
+@pytest.mark.parametrize(
+    ("existing_slug", "expected_slug"),
+    [
+        ("", "spicy-chili"),
+        ("nested/chili", "nested-chili"),
+        ("nested\\chili", "nested-chili"),
+    ],
+)
+def test_publish_repairs_unusable_existing_private_slug(
+    app,
+    user,
+    existing_slug,
+    expected_slug,
+):
+    recipe = Recipe(
+        id="invalid-private-slug",
+        user_id=user.id,
+        name="Spicy Chili",
+        slug=existing_slug,
+        is_public=False,
+        data={
+            "id": "invalid-private-slug",
+            "name": "Spicy Chili",
+            "slug": existing_slug,
+            "is_public": False,
+        },
+    )
+    db.session.add(recipe)
+    db.session.commit()
+
+    updated = db_recipe_repository.update_recipe(
+        recipe.id,
+        {"is_public": True},
+        user_id=user.id,
+    )
+
+    assert updated is not None
+    assert updated.slug == expected_slug
+    assert updated.data["slug"] == expected_slug
+    assert updated.is_public is True
+
+
 def test_partial_update_preserves_existing_unicode_slug(app, user):
     recipe = Recipe(
         id="unicode-slug",

@@ -12,7 +12,7 @@ import re
 import time
 
 from flask import Blueprint, redirect, render_template, request, url_for
-from google.genai import Client
+from google.genai import Client, types
 from jsonschema import ValidationError
 
 from config import (
@@ -95,13 +95,18 @@ def build_generation_prompt(user_prompt):
     return full_prompt
 
 
-def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
+def attempt_recipe_generation(
+    full_prompt,
+    selected_model,
+    timeout_ms=None,
+):  # noqa: C901
     """
     Attempt recipe generation using the server-side API key.
 
     Args:
         full_prompt: Complete prompt with schema
         selected_model: Model ID to use for generation
+        timeout_ms: Optional HTTP timeout override for this model call
 
     Returns:
         tuple: (recipe_data, raw_json_string, error_message)
@@ -167,6 +172,9 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
             print(f"Generation error with {source_name}: {e}")
             raise e
 
+    http_options = (
+        GENAI_HTTP_OPTIONS if timeout_ms is None else types.HttpOptions(timeout=timeout_ms)
+    )
     recipe_data = None
     recipe_json_str = None
     last_error_message = "Server API key is unavailable"
@@ -175,7 +183,7 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
         try:
             api_client = Client(
                 api_key=GOOGLE_API_KEY,
-                http_options=GENAI_HTTP_OPTIONS,
+                http_options=http_options,
             )
             recipe_data, recipe_json_str = _attempt_with_client(api_client, "API Key")
         except Exception as e:

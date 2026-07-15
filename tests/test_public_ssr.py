@@ -280,6 +280,30 @@ def test_public_recipe_filters_malformed_tags_from_json_ld(app, client):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert '"keywords": "vegan, soup"' in body
+    assert '<span class="public-tag">vegan</span>' in body
+    assert '<span class="public-tag">soup</span>' in body
+    assert '<span class="public-tag">7</span>' not in body
+
+    payload = client.get("/api/recipes/public/tagged-soup").get_json()
+    assert payload["tags"] == ["vegan", "soup"]
+
+
+@pytest.mark.parametrize("tags", ["not a list", 42, {"bad": "shape"}])
+def test_public_recipe_ignores_non_list_tags(app, client, tags):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Malformed Tags",
+            "malformed-tags",
+            data={"name": "Malformed Tags", "tags": tags},
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/malformed-tags")
+
+    assert resp.status_code == 200
+    assert "public-recipe-tags" not in resp.get_data(as_text=True)
+    assert client.get("/api/recipes/public/malformed-tags").get_json()["tags"] == []
 
 
 @pytest.mark.parametrize(

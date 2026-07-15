@@ -126,6 +126,16 @@ def test_worker_retries_transient_generation_failure(app, client):
 
     assert resp.status_code == 200
     assert mock_attempt.call_count == 2
+    from blueprints import worker_api_bp
+
+    assert all(
+        call.args[2] == worker_api_bp.RECIPE_GENERATION_ATTEMPT_TIMEOUT_MS
+        for call in mock_attempt.call_args_list
+    )
+    assert (
+        worker_api_bp.RECIPE_GENERATION_ATTEMPT_TIMEOUT_MS * worker_api_bp.GENERATION_MAX_ATTEMPTS
+        <= worker_api_bp.WORKER_CLAIM_STALE_SECONDS * 1_000 - 30_000
+    )
     with app.app_context():
         recipe = db.session.get(Recipe, recipe_id)
         assert recipe.status == "ready"
@@ -194,6 +204,40 @@ def test_invalid_json_sets_real_error_message(app):
             "http_options": generation_bp.GENAI_HTTP_OPTIONS,
         }
     ]
+
+
+def test_generation_timeout_override_is_passed_to_client(app):
+    from blueprints import generation_bp
+
+    class FakeModels:
+        def generate_content(self, **kwargs):
+            class FakeResponse:
+                text = json.dumps(VALID_RECIPE)
+
+            return FakeResponse()
+
+    class FakeClient:
+        options = []
+
+        def __init__(self, **kwargs):
+            self.options.append(kwargs)
+            self.models = FakeModels()
+
+    with (
+        app.test_request_context("/api/generate"),
+        patch.object(generation_bp, "Client", FakeClient),
+        patch.object(generation_bp, "GOOGLE_API_KEY", "fake-key"),
+        patch.object(generation_bp, "validate_recipe_data"),
+    ):
+        recipe_data, _, last_error = generation_bp.attempt_recipe_generation(
+            "make peach salsa",
+            "gemini-3.1-pro-preview",
+            190_000,
+        )
+
+    assert recipe_data["name"] == VALID_RECIPE["name"]
+    assert last_error == "Server API key is unavailable"
+    assert FakeClient.options[0]["http_options"].timeout == 190_000
 
 
 def test_schema_validation_failure_sets_real_error_message(app):

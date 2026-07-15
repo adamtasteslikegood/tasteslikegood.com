@@ -234,7 +234,7 @@ def _save_recipe_payload(recipe: Recipe, image_url: str | None) -> dict[str, Any
         "ingredients": data.get("ingredients") or {},
         "instructions": _recipe_instructions(data),
         "notes": data.get("notes"),
-        "tags": data.get("tags") or [],
+        "tags": _recipe_tags(data),
         "stock_image_url": data.get("stock_image_url"),
         "ai_image_url": image_url,
         "image": image_url,
@@ -263,6 +263,7 @@ def show_public_recipe(slug):
     image_url = _recipe_image_url(recipe)
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
     instructions = _recipe_instructions(data)
+    tags = _recipe_tags(data)
 
     return render_template(
         "public/recipe.html",
@@ -272,6 +273,7 @@ def show_public_recipe(slug):
         description=description,
         ingredient_groups=_recipe_ingredient_groups(data),
         instructions=instructions,
+        tags=tags,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=_pinterest_share_url(canonical_url, image_url, recipe.name),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",

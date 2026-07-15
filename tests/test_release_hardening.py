@@ -63,6 +63,8 @@ def test_gemini_execute_is_bound_to_trusted_plan_comment():
     assert "github.event.comment.body == '@gemini-cli'" in workflow
     assert "startsWith(github.event.comment.body, '@gemini-cli ')" in workflow
     assert "contains(github.event.comment.body, '@gemini-cli')" not in workflow
+    assert "run_shell_command" not in workflow
+    assert workflow.count("persist-credentials: 'false'") == 2
 
     triage_workflow = (ROOT / ".github/workflows/gemini-triage.yml").read_text(encoding="utf-8")
     assert "github.rest.issues.addLabels" in triage_workflow
@@ -79,8 +81,10 @@ def test_gemini_execute_is_bound_to_trusted_plan_comment():
     assert "github.rest.issues.removeLabel" in scheduled_triage
 
 
-def test_manual_gemini_review_checks_out_resolved_pull_request_head():
+def test_manual_gemini_review_uses_sandboxed_github_tools():
     workflow = (ROOT / ".github/workflows/gemini-review.yml").read_text(encoding="utf-8")
 
-    assert "core.setOutput('head_sha', pr.head.sha)" in workflow
-    assert "ref: '${{ steps.pr.outputs.head_sha }}'" in workflow
+    assert "Checkout repository" not in workflow
+    assert "run_shell_command" not in workflow
+    assert '"core": []' in workflow
+    assert '"pull_request_read"' in workflow

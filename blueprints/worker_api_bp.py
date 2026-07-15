@@ -12,7 +12,7 @@ from google.genai.errors import APIError, ServerError
 from google.oauth2 import id_token
 from httpx import TransportError
 
-from config import GCS_BUCKET_NAME, WORKER_CLAIM_STALE_SECONDS
+from config import GENAI_HTTP_TIMEOUT_MS, GCS_BUCKET_NAME, WORKER_CLAIM_STALE_SECONDS
 from repositories import db_recipe_repository
 from blueprints.generation_bp import attempt_recipe_generation, build_generation_prompt
 from utils.cache_utils import invalidate_recipe, invalidate_recipe_image
@@ -53,6 +53,18 @@ def _parse_max_attempts(raw, default=3):
 
 
 GENERATION_MAX_ATTEMPTS = _parse_max_attempts(os.environ.get("GENERATION_MAX_ATTEMPTS", "3"))
+_RECIPE_GENERATION_LEASE_MS = WORKER_CLAIM_STALE_SECONDS * 1_000
+_RECIPE_GENERATION_OVERHEAD_MS = min(
+    30_000,
+    max(0, _RECIPE_GENERATION_LEASE_MS - GENERATION_MAX_ATTEMPTS),
+)
+RECIPE_GENERATION_ATTEMPT_TIMEOUT_MS = min(
+    GENAI_HTTP_TIMEOUT_MS,
+    max(
+        1,
+        (_RECIPE_GENERATION_LEASE_MS - _RECIPE_GENERATION_OVERHEAD_MS) // GENERATION_MAX_ATTEMPTS,
+    ),
+)
 
 
 class RetryableImageError(RuntimeError):
@@ -443,7 +455,9 @@ def process_recipe():
             ):
                 raise RuntimeError("Recipe worker claim was lost")
             recipe_data, recipe_json_str, last_error = attempt_recipe_generation(
-                full_prompt, selected_model
+                full_prompt,
+                selected_model,
+                RECIPE_GENERATION_ATTEMPT_TIMEOUT_MS,
             )
             if recipe_data:
                 break
