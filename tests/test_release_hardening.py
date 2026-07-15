@@ -68,6 +68,16 @@ def test_gemini_execute_is_bound_to_trusted_plan_comment():
     assert "github.rest.issues.addLabels" in triage_workflow
     assert "github.rest.issues.setLabels" not in triage_workflow
 
+    scheduled_triage = (ROOT / ".github/workflows/gemini-scheduled-triage.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "--search 'no:label'" in scheduled_triage
+    assert "--search 'label:\"status/needs-triage\"'" in scheduled_triage
+    assert 'no:label label:"status/needs-triage"' not in scheduled_triage
+    assert "github.rest.issues.addLabels" in scheduled_triage
+    assert "github.rest.issues.setLabels" not in scheduled_triage
+    assert "github.rest.issues.removeLabel" in scheduled_triage
+
 
 def test_manual_gemini_review_checks_out_resolved_pull_request_head():
     workflow = (ROOT / ".github/workflows/gemini-review.yml").read_text(encoding="utf-8")

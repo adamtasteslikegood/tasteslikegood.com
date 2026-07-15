@@ -79,12 +79,24 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN || github.token }}'
         run: |-
           echo '🔍 Finding unlabeled issues and issues marked for triage...'
-          ISSUES="$(gh issue list \
+          UNLABELED_ISSUES="$(gh issue list \
             --state 'open' \
-            --search 'no:label label:"status/needs-triage"' \
+            --search 'no:label' \
             --json number,title,body \
             --limit '100' \
             --repo "${GITHUB_REPOSITORY}"
+          )"
+          NEEDS_TRIAGE_ISSUES="$(gh issue list \
+            --state 'open' \
+            --search 'label:"status/needs-triage"' \
+            --json number,title,body \
+            --limit '100' \
+            --repo "${GITHUB_REPOSITORY}"
+          )"
+          ISSUES="$(jq -cn \
+            --argjson unlabeled "${UNLABELED_ISSUES}" \
+            --argjson needs_triage "${NEEDS_TRIAGE_ISSUES}" \
+            '$unlabeled + $needs_triage | unique_by(.number)'
           )"
 
           echo '📝 Setting output for GitHub Actions...'
@@ -198,26 +210,39 @@ jobs:
 
               // Extract and reject invalid labels - we do this just in case
               // someone was able to prompt inject malicious labels.
-              let labelsToSet = (issue.labels_to_set || [])
+              let labelsToAdd = (issue.labels_to_set || [])
                 .map((label) => label.trim())
                 .filter((label) => availableLabels.includes(label))
                 .sort()
 
-              core.debug(`Identified labels to set: ${JSON.stringify(labelsToSet)}`);
+              core.debug(`Identified labels to add: ${JSON.stringify(labelsToAdd)}`);
 
-              if (labelsToSet.length === 0) {
+              if (labelsToAdd.length === 0) {
                 core.info(`Skipping issue #${issueNumber} - no labels to set.`)
                 continue;
               }
 
-              core.debug(`Setting labels on issue #${issueNumber} to ${labelsToSet.join(', ')} (${issue.explanation || 'no explanation'})`)
+              core.debug(`Adding labels to issue #${issueNumber}: ${labelsToAdd.join(', ')} (${issue.explanation || 'no explanation'})`)
 
-              await github.rest.issues.setLabels({
+              await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issueNumber,
-                labels: labelsToSet,
+                labels: labelsToAdd,
               });
+
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  name: 'status/needs-triage',
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
             }
 
   # A silently-failing scheduled workflow must page someone (SPEC-02 §3.3).

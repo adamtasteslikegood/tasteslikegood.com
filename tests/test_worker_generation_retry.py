@@ -157,6 +157,7 @@ def test_worker_marks_error_after_all_attempts_fail(app, client):
 def test_invalid_json_sets_real_error_message(app):
     """attempt_recipe_generation must not report 'Unknown error' for bad JSON."""
     from blueprints import generation_bp
+    from flask import session
 
     class FakeModels:
         def generate_content(self, **kwargs):
@@ -178,6 +179,7 @@ def test_invalid_json_sets_real_error_message(app):
         patch.object(generation_bp, "Client", FakeClient),
         patch.object(generation_bp, "GOOGLE_API_KEY", "fake-key"),
     ):
+        session["credentials"] = {"token": "identity-only-token"}
         recipe_data, raw_json, last_error = generation_bp.attempt_recipe_generation(
             "make peach salsa", "gemini-3.1-pro-preview"
         )

@@ -125,12 +125,17 @@ def _recipe_ingredient_groups(
 
 
 def _recipe_instructions(data: dict[str, Any]) -> list[str]:
+    raw_instructions = data.get("instructions")
+    if not isinstance(raw_instructions, list):
+        return []
     instructions: list[str] = []
-    for step in data.get("instructions", []) or []:
+    for step in raw_instructions:
         if isinstance(step, dict):
             text = str(step.get("description", "") or "").strip()
-        else:
+        elif isinstance(step, str):
             text = str(step).strip()
+        else:
+            continue
         if text:
             instructions.append(text)
     return instructions
@@ -227,7 +232,7 @@ def _save_recipe_payload(recipe: Recipe, image_url: str | None) -> dict[str, Any
         "cookTime": _safe_minutes(data.get("cookTime")) or 0,
         "servings": data.get("servings") or 0,
         "ingredients": data.get("ingredients") or {},
-        "instructions": data.get("instructions") or [],
+        "instructions": _recipe_instructions(data),
         "notes": data.get("notes"),
         "tags": data.get("tags") or [],
         "stock_image_url": data.get("stock_image_url"),
@@ -257,6 +262,7 @@ def show_public_recipe(slug):
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
     image_url = _recipe_image_url(recipe)
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
+    instructions = _recipe_instructions(data)
 
     return render_template(
         "public/recipe.html",
@@ -265,6 +271,7 @@ def show_public_recipe(slug):
         image_url=image_url,
         description=description,
         ingredient_groups=_recipe_ingredient_groups(data),
+        instructions=instructions,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=_pinterest_share_url(canonical_url, image_url, recipe.name),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",

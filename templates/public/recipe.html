@@ -117,23 +117,17 @@
         </section>
         {% endif %}
 
-        {% if data.instructions %}
+        {% if instructions %}
         <section class="public-recipe-panel public-recipe-instructions">
             <header class="public-recipe-panel-header">
                 <h2>Method</h2>
             </header>
             <div class="public-recipe-panel-body">
                 <ol class="public-recipe-steps">
-                    {% for step in data.instructions %}
+                    {% for step in instructions %}
                     <li class="public-recipe-step">
                         <span class="public-step-number">{{ loop.index }}.</span>
-                        <span class="public-step-text">
-                            {% if step is mapping %}
-                            {{ step.description }}
-                            {% else %}
-                            {{ step }}
-                            {% endif %}
-                        </span>
+                        <span class="public-step-text">{{ step }}</span>
                     </li>
                     {% endfor %}
                 </ol>

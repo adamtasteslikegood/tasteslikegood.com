@@ -310,6 +310,39 @@ def test_public_recipe_ignores_malformed_ingredient_shapes(app, client, ingredie
     assert '"recipeIngredient"' not in body
 
 
+@pytest.mark.parametrize(
+    "instructions",
+    [
+        "not a list",
+        {"step": "not a list"},
+        42,
+        [None, 7, {"description": ""}],
+    ],
+)
+def test_public_recipe_ignores_malformed_instruction_shapes(app, client, instructions):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Malformed Instructions",
+            "malformed-instructions",
+            data={
+                "name": "Malformed Instructions",
+                "instructions": instructions,
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/malformed-instructions")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "public-recipe-instructions" not in body
+    assert '"recipeInstructions"' not in body
+
+    payload = client.get("/api/recipes/public/malformed-instructions").get_json()
+    assert payload["instructions"] == []
+
+
 def test_sitemap_lists_only_public_routes(app, client):
     with app.app_context():
         db.session.add_all(

@@ -8,12 +8,10 @@ Handles routes for:
 
 import datetime
 import json
-import os
 import re
 import time
 
-import google.oauth2.credentials  # noqa: F401
-from flask import Blueprint, redirect, render_template, request, session, url_for
+from flask import Blueprint, redirect, render_template, request, url_for
 from google.genai import Client
 from jsonschema import ValidationError
 
@@ -99,11 +97,7 @@ def build_generation_prompt(user_prompt):
 
 def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
     """
-    Attempt recipe generation using dual authentication strategy.
-
-    Tries:
-    1. User credentials from session (if logged in)
-    2. API key fallback
+    Attempt recipe generation using the server-side API key.
 
     Args:
         full_prompt: Complete prompt with schema
@@ -173,28 +167,11 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
             print(f"Generation error with {source_name}: {e}")
             raise e
 
-    # 1. Try with User Credentials (if logged in)
     recipe_data = None
     recipe_json_str = None
-    last_error_message = "Unknown error"
+    last_error_message = "Server API key is unavailable"
 
-    if "credentials" in session:
-        try:
-            creds = google.oauth2.credentials.Credentials(
-                **session["credentials"],
-                client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
-            )
-            user_client = Client(
-                credentials=creds,
-                http_options=GENAI_HTTP_OPTIONS,
-            )
-            recipe_data, recipe_json_str = _attempt_with_client(user_client, "User Credentials")
-        except Exception as e:
-            print(f"User credential generation failed: {e}")
-            last_error_message = f"User Auth Error ({type(e).__name__}): {e}"
-
-    # 2. Fallback to API Key if step 1 failed or wasn't attempted
-    if recipe_data is None and GOOGLE_API_KEY:
+    if GOOGLE_API_KEY:
         try:
             api_client = Client(
                 api_key=GOOGLE_API_KEY,
