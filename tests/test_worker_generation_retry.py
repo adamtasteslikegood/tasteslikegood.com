@@ -74,6 +74,17 @@ def _push_envelope(recipe_id):
     return {"message": {"data": data}}
 
 
+def _image_push_envelope(recipe_id):
+    payload = {
+        "recipe_id": recipe_id,
+        "user_id": None,
+        "guest_session_id": "guest-1",
+        "force_regenerate": False,
+    }
+    data = base64.b64encode(json.dumps(payload).encode()).decode()
+    return {"message": {"data": data}}
+
+
 def _make_pending_recipe(recipe_id):
     recipe = Recipe(
         id=recipe_id,
@@ -221,3 +232,63 @@ def test_parse_max_attempts_is_defensive(raw, expected):
     from blueprints.worker_api_bp import _parse_max_attempts
 
     assert _parse_max_attempts(raw) == expected
+
+
+def test_image_worker_persists_generated_image(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    class GeneratedImage:
+        class Image:
+            image_bytes = b"generated-image"
+
+        image = Image()
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            class Response:
+                generated_images = [GeneratedImage()]
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    with (
+        patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()),
+        patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", None),
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("blueprints.worker_api_bp.invalidate_recipe_image"),
+    ):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.data["ai_image_data"] == base64.b64encode(b"generated-image").decode("ascii")
+        assert recipe.data["ai_image_url"] == f"/api/recipes/{recipe_id}/image"
+        assert recipe.data["ai_metadata"]["image_generation"]["success"] is True
+
+
+def test_image_worker_records_generation_failure(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            raise RuntimeError("Imagen unavailable")
+
+    class FakeClient:
+        models = FakeModels()
+
+    with patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        metadata = recipe.data["ai_metadata"]["image_generation"]
+        assert metadata["success"] is False
+        assert metadata["error"] == "Imagen unavailable"
