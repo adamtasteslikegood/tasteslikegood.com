@@ -1,0 +1,158 @@
+{% extends "public/base_public.html" %}
+
+{% set data = recipe.data or {} %}
+
+{% block title %}{{ recipe.name }} · TastesLikeGood{% endblock %}
+
+{% block head %}
+<meta name="description" content="{{ description }}">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="{{ canonical_url }}">
+
+<meta property="og:type" content="article">
+<meta property="og:title" content="{{ recipe.name }} · TastesLikeGood">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:site_name" content="TastesLikeGood">
+{% if image_url %}
+<meta property="og:image" content="{{ image_url }}">
+<meta property="og:image:alt" content="{{ recipe.name }}">
+{% endif %}
+
+<meta name="twitter:card" content="{{ 'summary_large_image' if image_url else 'summary' }}">
+<meta name="twitter:title" content="{{ recipe.name }} · TastesLikeGood">
+<meta name="twitter:description" content="{{ description }}">
+{% if image_url %}
+<meta name="twitter:image" content="{{ image_url }}">
+<meta name="twitter:image:alt" content="{{ recipe.name }}">
+{% endif %}
+
+<script type="application/ld+json">{{ recipe_json_ld | tojson(indent=2) }}</script>
+{% endblock %}
+
+{% block content %}
+<article class="public-recipe">
+    <section class="public-recipe-hero">
+        {% if image_url %}
+        <div class="public-recipe-image-wrap">
+            <img src="{{ image_url }}" alt="{{ recipe.name }}" loading="lazy" />
+        </div>
+        <div class="public-recipe-hero-overlay">
+            <p class="public-eyebrow"><a href="{{ url_for('public.browse_public_recipes') }}" class="public-recipe-back">← Browse all recipes</a></p>
+            <h1 class="public-recipe-title">{{ recipe.name }}</h1>
+            {% if data.description %}
+            <p class="public-recipe-description">{{ data.description }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    <section class="public-recipe-intro">
+        {% if not image_url %}
+        <div class="public-recipe-title-block">
+            <p class="public-eyebrow"><a href="{{ url_for('public.browse_public_recipes') }}" class="public-recipe-back">← Browse all recipes</a></p>
+            <h1 class="public-recipe-title">{{ recipe.name }}</h1>
+            {% if data.description %}
+            <p class="public-recipe-description">{{ data.description }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <div class="public-recipe-toolbar">
+            <ul class="public-recipe-meta">
+                {% if data.get('prepTime') is not none %}<li>Prep {{ data.prepTime }}m</li>{% endif %}
+                {% if data.get('cookTime') is not none %}<li>Cook {{ data.cookTime }}m</li>{% endif %}
+                {% if data.get('servings') is not none %}<li>Serves {{ data.servings }}</li>{% endif %}
+                {% if recipe.user and recipe.user.name %}<li>By {{ recipe.user.name }}</li>{% endif %}
+            </ul>
+            <div class="public-recipe-actions">
+                {# Plain anchor: the SPA's ?save= flow fetches the recipe from
+                   /api/recipes/public/<slug> and saves it through the hardened
+                   session-aware path (fresh id, image fields, auth-race guard). #}
+                <a href="{{ spa_save_url }}" class="public-save-cta" data-save-recipe>
+                    Save to your cookbook
+                </a>
+                <a href="{{ pinterest_share_url }}" target="_blank" rel="noopener noreferrer" class="public-recipe-action-link" aria-label="Share {{ recipe.name }} on Pinterest">
+                    Save to Pinterest
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <section class="public-recipe-content">
+        {% if ingredient_groups %}
+        <section class="public-recipe-panel public-recipe-ingredients">
+            <header class="public-recipe-panel-header">
+                <h2>Ingredients</h2>
+            </header>
+            <div class="public-recipe-panel-body">
+                {% for group_name, group in ingredient_groups %}
+                <section class="public-ingredient-group">
+                    <h3>{{ group_name | capitalize }}</h3>
+                    <ul>
+                        {% for ing in group %}
+                        {% set amount = ing.get('amount') %}
+                        <li class="public-ingredient-row">
+                            <span class="public-ingredient-amount">
+                                {% if amount is iterable and amount is not string %}
+                                    {% if amount | length >= 2 %}
+                                    {{ amount[0] }}–{{ amount[1] }}
+                                    {% elif amount | length == 1 %}
+                                    {{ amount[0] }}
+                                    {% endif %}
+                                {% elif amount is not none %}
+                                {{ amount }}
+                                {% endif %}
+                                {{ ing.get('units', '') }}
+                            </span>
+                            <span class="public-ingredient-text"
+                                >{{ ing.name }}{% if ing.notes %} <em>({{ ing.notes }})</em>{% endif %}</span
+                            >
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </section>
+                {% endfor %}
+            </div>
+        </section>
+        {% endif %}
+
+        {% if instructions %}
+        <section class="public-recipe-panel public-recipe-instructions">
+            <header class="public-recipe-panel-header">
+                <h2>Method</h2>
+            </header>
+            <div class="public-recipe-panel-body">
+                <ol class="public-recipe-steps">
+                    {% for step in instructions %}
+                    <li class="public-recipe-step">
+                        <span class="public-step-number">{{ loop.index }}.</span>
+                        <span class="public-step-text">{{ step }}</span>
+                    </li>
+                    {% endfor %}
+                </ol>
+            </div>
+        </section>
+        {% endif %}
+    </section>
+
+    {% if data.notes %}
+    <section class="public-recipe-notes">
+        <header class="public-recipe-notes-header">
+            <h2>Chef's notes</h2>
+        </header>
+        <div class="public-recipe-notes-body">
+            <p>{{ data.notes }}</p>
+        </div>
+    </section>
+    {% endif %}
+
+    {% if tags %}
+    <section class="public-recipe-tags">
+        {% for tag in tags %}
+        <span class="public-tag">{{ tag }}</span>
+        {% endfor %}
+    </section>
+    {% endif %}
+</article>
+{% endblock %}

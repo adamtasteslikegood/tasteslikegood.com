@@ -16,10 +16,20 @@ import json
 import os
 import traceback
 
-from flask import session, url_for
+from flask import has_request_context, url_for
 
 from services.gemini_service import get_genai_client
 from utils.session_utils import get_user_metadata
+
+
+def _anonymous_user_metadata():
+    """Default metadata used when no Flask request context is available."""
+    return {
+        "user_id": None,
+        "display_name": None,
+        "is_authenticated": False,
+        "session_id": None,
+    }
 
 
 def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
@@ -48,20 +58,29 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
     if force_regenerate and "ai_image_url" in recipe_data:
         del recipe_data["ai_image_url"]
 
-    # Get authenticated client
-    session_credentials = session.get("credentials") if session else None
-    client = get_genai_client(session_credentials)
+    # Imagen is a server-side operation. Identity-only OAuth credentials are
+    # insufficient for image generation, so always use the configured server
+    # credential instead of a signed-in user's session token.
+    client = get_genai_client(None)
 
     if not client:
         return None, {"error": "No credentials available", "status": 500}
 
     try:
-        # Get comprehensive user metadata
-        user_metadata = get_user_metadata()
+        # Get comprehensive user metadata when available; fall back to
+        # anonymous metadata when called outside of a Flask request context
+        # (e.g. from unit tests or background/CLI jobs).
+        if has_request_context():
+            user_metadata = get_user_metadata()
+        else:
+            user_metadata = _anonymous_user_metadata()
         _ = user_metadata["user_id"]  # noqa: F841
 
         model_to_use = "imagen-4.0-generate-001"
-        image_prompt = f"A delicious, high-quality food photography shot of {recipe_data.get('name')}. Professional lighting, appetizing."
+        image_prompt = (
+            f"A delicious, high-quality food photography shot of "
+            f"{recipe_data.get('name')}. Professional lighting, appetizing."
+        )
         generation_timestamp = datetime.datetime.now().isoformat()
 
         action = "Regenerating" if force_regenerate else "Generating"
@@ -96,7 +115,6 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
         return image_url, None
 
     except Exception as e:
-        error_msg = f"{type(e).__name__}: {str(e)}" or "Unknown error"
         traceback_str = traceback.format_exc()
         print(f"Error generating image: {e}")
         print(traceback_str)
@@ -106,7 +124,7 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
         with open("recipe_error.txt", "a") as f:
             f.write(f"\nLast Error (Image Gen): {repr(e)}\nTraceback:\n{traceback_str}\n")
 
-        return None, {"error": error_msg, "status": 500}
+        return None, {"error": "Image generation failed", "status": 500}
 
 
 def save_image_file(generated_image, filename):
@@ -135,7 +153,9 @@ def save_image_file(generated_image, filename):
         img_f.write(image_data)
 
     # Return URL for template
-    return url_for("static", filename=f"images/{image_filename}")
+    if has_request_context():
+        return url_for("static", filename=f"images/{image_filename}")
+    return f"/static/images/{image_filename}"
 
 
 def update_recipe_with_image(

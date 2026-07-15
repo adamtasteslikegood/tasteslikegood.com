@@ -20,22 +20,38 @@ from utils.session_utils import get_user_metadata
 # Curated static fallback images from Unsplash (real, permanent URLs)
 FALLBACK_FOOD_IMAGES = [
     # All vegan-appropriate images for better fallback variety
-    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop",  # Healthy bowl
-    "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop",  # Colorful salad
-    "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&h=600&fit=crop",  # Veggie bowl
-    "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&h=600&fit=crop",  # Fresh produce
-    "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&h=600&fit=crop",  # Buddha bowl
-    "https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=800&h=600&fit=crop",  # Avocado toast
-    "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=800&h=600&fit=crop",  # Smoothie bowl
-    "https://images.unsplash.com/photo-1547592180-85f173990554?w=800&h=600&fit=crop",  # Vegetable curry
-    "https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&h=600&fit=crop",  # Indian dal
-    "https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&h=600&fit=crop",  # Hummus plate
-    "https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=800&h=600&fit=crop",  # Fresh smoothie
-    "https://images.unsplash.com/photo-1529059997568-3d847b1154f0?w=800&h=600&fit=crop",  # Grain bowl
-    "https://images.unsplash.com/photo-1515543237350-b3eea1ec8082?w=800&h=600&fit=crop",  # Stuffed peppers
-    "https://images.unsplash.com/photo-1600850056064-a8b380df8395?w=800&h=600&fit=crop",  # Falafel wrap
-    "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop",  # Roasted veggies
-    "https://images.unsplash.com/photo-1490914327627-9fe8d52f4d90?w=800&h=600&fit=crop",  # Green juice
+    # Healthy bowl
+    "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop",
+    # Colorful salad
+    "https://images.unsplash.com/photo-1540189549336-e6e99c3679fe?w=800&h=600&fit=crop",
+    # Veggie bowl
+    "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?w=800&h=600&fit=crop",
+    # Fresh produce
+    "https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=800&h=600&fit=crop",
+    # Buddha bowl
+    "https://images.unsplash.com/photo-1543339308-43e59d6b73a6?w=800&h=600&fit=crop",
+    # Avocado toast
+    "https://images.unsplash.com/photo-1511690743698-d9d85f2fbf38?w=800&h=600&fit=crop",
+    # Smoothie bowl
+    "https://images.unsplash.com/photo-1623428187969-5da2dcea5ebf?w=800&h=600&fit=crop",
+    # Vegetable curry
+    "https://images.unsplash.com/photo-1547592180-85f173990554?w=800&h=600&fit=crop",
+    # Indian dal
+    "https://images.unsplash.com/photo-1574484284002-952d92456975?w=800&h=600&fit=crop",
+    # Hummus plate
+    "https://images.unsplash.com/photo-1559847844-5315695dadae?w=800&h=600&fit=crop",
+    # Fresh smoothie
+    "https://images.unsplash.com/photo-1505576399279-565b52d4ac71?w=800&h=600&fit=crop",
+    # Grain bowl
+    "https://images.unsplash.com/photo-1529059997568-3d847b1154f0?w=800&h=600&fit=crop",
+    # Stuffed peppers
+    "https://images.unsplash.com/photo-1515543237350-b3eea1ec8082?w=800&h=600&fit=crop",
+    # Falafel wrap
+    "https://images.unsplash.com/photo-1600850056064-a8b380df8395?w=800&h=600&fit=crop",
+    # Roasted veggies
+    "https://images.unsplash.com/photo-1544025162-d76694265947?w=800&h=600&fit=crop",
+    # Green juice
+    "https://images.unsplash.com/photo-1490914327627-9fe8d52f4d90?w=800&h=600&fit=crop",
 ]
 
 
@@ -103,7 +119,10 @@ def search_unsplash(keywords, per_page=1):
                             "photographer_name": photographer_name,
                             "photographer_url": photographer_url,
                             "unsplash_url": unsplash_url,
-                            "html": f'Photo by <a href="{photographer_url}">{photographer_name}</a> on <a href="{unsplash_url}">Unsplash</a>',
+                            "html": (
+                                f'Photo by <a href="{photographer_url}">{photographer_name}</a>'
+                                f' on <a href="{unsplash_url}">Unsplash</a>'
+                            ),
                         },
                     }
         else:

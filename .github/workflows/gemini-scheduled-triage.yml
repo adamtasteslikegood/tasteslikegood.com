@@ -2,7 +2,7 @@ name: '📋 Gemini Scheduled Issue Triage'
 
 on:
   schedule:
-    - cron: '0 * * * *' # Runs every hour
+    - cron: '0 */6 * * *' # Every 6 hours — hourly was over-provisioned for issue volume (SPEC-02 §3.4)
   pull_request:
     branches:
       - 'main'
@@ -34,13 +34,21 @@ jobs:
       id-token: 'write'
       issues: 'read'
       pull-requests: 'read'
+    env:
+      # Current gemini-cli refuses to run in an untrusted directory even
+      # without a checkout (see fix for the standalone triage, run
+      # 29353718769). This job's Gemini step is skipped whenever there are
+      # no untriaged issues, so historical green runs never exercised it —
+      # the next real batch would have hit the trust error and paged via
+      # the alert job. The workspace is empty; trusting it is safe.
+      GEMINI_CLI_TRUST_WORKSPACE: 'true'
     outputs:
       available_labels: '${{ steps.get_labels.outputs.available_labels }}'
       triaged_issues: '${{ env.TRIAGED_ISSUES }}'
     steps:
       - name: 'Get repository labels'
         id: 'get_labels'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7.0.1
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
         with:
           # NOTE: we intentionally do not use the minted token. The default
           # GITHUB_TOKEN provided by the action has enough permissions to read
@@ -71,12 +79,24 @@ jobs:
           GITHUB_TOKEN: '${{ secrets.GITHUB_TOKEN || github.token }}'
         run: |-
           echo '🔍 Finding unlabeled issues and issues marked for triage...'
-          ISSUES="$(gh issue list \
+          UNLABELED_ISSUES="$(gh issue list \
             --state 'open' \
-            --search 'no:label label:"status/needs-triage"' \
+            --search 'no:label' \
             --json number,title,body \
             --limit '100' \
             --repo "${GITHUB_REPOSITORY}"
+          )"
+          NEEDS_TRIAGE_ISSUES="$(gh issue list \
+            --state 'open' \
+            --search 'label:"status/needs-triage"' \
+            --json number,title,body \
+            --limit '100' \
+            --repo "${GITHUB_REPOSITORY}"
+          )"
+          ISSUES="$(jq -cn \
+            --argjson unlabeled "${UNLABELED_ISSUES}" \
+            --argjson needs_triage "${NEEDS_TRIAGE_ISSUES}" \
+            '$unlabeled + $needs_triage | unique_by(.number)'
           )"
 
           echo '📝 Setting output for GitHub Actions...'
@@ -89,7 +109,7 @@ jobs:
         id: 'gemini_issue_analysis'
         if: |-
           ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
-        uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0.1.22
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
           ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
@@ -146,7 +166,7 @@ jobs:
         id: 'mint_identity_token'
         if: |-
           ${{ vars.APP_ID }}
-        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+        uses: 'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ vars.APP_ID }}'
           private-key: '${{ secrets.APP_PRIVATE_KEY }}'
@@ -158,7 +178,7 @@ jobs:
         env:
           AVAILABLE_LABELS: '${{ needs.triage.outputs.available_labels }}'
           TRIAGED_ISSUES: '${{ needs.triage.outputs.triaged_issues }}'
-        uses: 'actions/github-script@60a0d83039c74a4aee543508d2ffcb1c3799cdea' # ratchet:actions/github-script@v7.0.1
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
         with:
           # Use the provided token so that the "gemini-cli" is the actor in the
           # log for what changed the labels.
@@ -190,24 +210,111 @@ jobs:
 
               // Extract and reject invalid labels - we do this just in case
               // someone was able to prompt inject malicious labels.
-              let labelsToSet = (issue.labels_to_set || [])
+              let labelsToAdd = (issue.labels_to_set || [])
                 .map((label) => label.trim())
                 .filter((label) => availableLabels.includes(label))
                 .sort()
 
-              core.debug(`Identified labels to set: ${JSON.stringify(labelsToSet)}`);
+              core.debug(`Identified labels to add: ${JSON.stringify(labelsToAdd)}`);
 
-              if (labelsToSet.length === 0) {
+              if (labelsToAdd.length === 0) {
                 core.info(`Skipping issue #${issueNumber} - no labels to set.`)
                 continue;
               }
 
-              core.debug(`Setting labels on issue #${issueNumber} to ${labelsToSet.join(', ')} (${issue.explanation || 'no explanation'})`)
+              core.debug(`Adding labels to issue #${issueNumber}: ${labelsToAdd.join(', ')} (${issue.explanation || 'no explanation'})`)
 
-              await github.rest.issues.setLabels({
+              await github.rest.issues.addLabels({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issueNumber,
-                labels: labelsToSet,
+                labels: labelsToAdd,
               });
+
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                  name: 'status/needs-triage',
+                });
+              } catch (error) {
+                if (error.status !== 404) {
+                  throw error;
+                }
+              }
+            }
+
+  # A silently-failing scheduled workflow must page someone (SPEC-02 §3.3).
+  # This must be its own job: a step inside triage/label cannot see the other
+  # job's result, triage only has issues:read, and job-level continue-on-error
+  # anywhere in this workflow would report failed jobs as succeeded and keep
+  # failure() here from ever firing.
+  alert:
+    runs-on: 'ubuntu-latest'
+    needs:
+      - 'triage'
+      - 'label'
+    if: |-
+      failure() &&
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+    permissions:
+      issues: 'write'
+    steps:
+      - name: 'Open or update ci-health issue'
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
+        with:
+          script: |-
+            const title = '[ci-health] gemini-scheduled-triage is failing';
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `Scheduled issue triage failed. Latest failing run: ${runUrl}\n\n` +
+              'One of the `triage`/`label` jobs concluded `failure`. Check API keys / WIF ' +
+              'configuration and the run logs. This issue is updated automatically by the ' +
+              '`alert` job in `gemini-scheduled-triage.yml`; close it once runs are green.';
+
+            try {
+              await github.rest.issues.createLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                name: 'ci-health',
+                color: 'B60205',
+                description: 'Automated alerts about CI / agent workflow health',
+              });
+            } catch (e) {
+              // Only tolerate "label already exists" (422 validation error);
+              // anything else (permissions, outage) must fail the alert job
+              // visibly rather than half-run.
+              const alreadyExists = e.status === 422 &&
+                (e.response?.data?.errors || []).some((err) => err.code === 'already_exists');
+              if (!alreadyExists) {
+                throw e;
+              }
+            }
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'ci-health',
+              per_page: 100,
+            });
+            const match = existing.data.find((issue) => issue.title === title);
+
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body: `Still failing: ${runUrl}`,
+              });
+              core.info(`Updated existing ci-health issue #${match.number}`);
+            } else {
+              const created = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['ci-health'],
+              });
+              core.info(`Opened ci-health issue #${created.data.number}`);
             }

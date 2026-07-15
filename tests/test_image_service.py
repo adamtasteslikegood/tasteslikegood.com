@@ -3,13 +3,16 @@
 import sys
 from pathlib import Path
 import unittest
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
+
+from flask import session
 
 # Ensure app can be imported
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from services.image_service import (
     generate_ai_image,
+    save_image_file,
     update_recipe_with_image,
 )
 
@@ -42,26 +45,26 @@ class TestImageService(unittest.TestCase):
         self.assertEqual(url, "/static/images/existing.png")
         self.assertIsNone(err)
 
-    @patch("services.image_service.session")
     @patch("services.image_service.get_genai_client")
-    def test_generate_fails_without_client(self, mock_get_client, mock_session):
-        """Should return an error if no Gemini client can be created (no auth)."""
+    def test_generate_fails_without_client(self, mock_get_client):
+        """Should use server credentials even when identity-only OAuth exists."""
+        session["credentials"] = {"token": "identity-only-token"}
         mock_get_client.return_value = None
 
         url, err = generate_ai_image("dummy_path", {"name": "Test Recipe"}, "test.json")
 
+        mock_get_client.assert_called_once_with(None)
         self.assertIsNone(url)
         self.assertEqual(err["status"], 500)
         self.assertIn("credentials", err["error"].lower())
 
-    @patch("services.image_service.session")
     @patch("services.image_service.get_genai_client")
     @patch("services.image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
     @patch("services.image_service.save_image_file")
     @patch("services.image_service.update_recipe_with_image")
     @patch("builtins.open", new_callable=mock_open)
     def test_successful_generation(
-        self, mock_file_open, mock_update, mock_save, mock_meta, mock_client, mock_session
+        self, mock_file_open, mock_update, mock_save, mock_meta, mock_client
     ):
         """Should complete the entire generation pipeline and save the JSON."""
         # Setup mock client and response
@@ -87,13 +90,10 @@ class TestImageService(unittest.TestCase):
         # Verify file write for the JSON was called
         mock_file_open().write.assert_called()
 
-    @patch("services.image_service.session")
     @patch("services.image_service.get_genai_client")
     @patch("services.image_service.get_user_metadata", side_effect=Exception("Simulated API Crash"))
     @patch("builtins.open", new_callable=mock_open)
-    def test_generation_exception_handling(
-        self, mock_file_open, mock_meta, mock_client, mock_session
-    ):
+    def test_generation_exception_handling(self, mock_file_open, mock_meta, mock_client):
         """Should catch unexpected exceptions, log them, and return a clean 500 error."""
         mock_client.return_value = MagicMock()
 
@@ -101,12 +101,24 @@ class TestImageService(unittest.TestCase):
 
         self.assertIsNone(url)
         self.assertEqual(err["status"], 500)
-        self.assertIn("Simulated API Crash", err["error"])
+        self.assertEqual(err["error"], "Image generation failed")
         # Should have appended to the recipe_error.txt log file
         mock_file_open.assert_called_with("recipe_error.txt", "a")
 
 
 class TestImageServiceHelpers(unittest.TestCase):
+    @patch("services.image_service.os.makedirs")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_save_image_file_without_request_context(self, mock_file_open, mock_makedirs):
+        generated_image = MagicMock()
+        generated_image.image.image_bytes = b"image-bytes"
+
+        url = save_image_file(generated_image, "test.json")
+
+        self.assertEqual(url, "/static/images/ai_test.png")
+        mock_makedirs.assert_called_once()
+        mock_file_open.assert_called_once_with("static/images/ai_test.png", "wb")
+
     def test_update_recipe_with_image(self):
         """Should mutate the recipe dictionary with image generation metadata."""
         recipe_data = {"name": "Test Recipe"}

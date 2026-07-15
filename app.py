@@ -17,6 +17,7 @@ import os
 
 from flask import Flask, render_template, request
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Import blueprints
@@ -26,8 +27,10 @@ from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
 from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
+from blueprints.public_bp import public_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
+from blueprints.worker_api_bp import worker_api_bp
 from utils.logging_config import setup_logging
 
 # Import session utilities
@@ -37,9 +40,17 @@ from utils.session_utils import get_or_create_session_id
 logger = setup_logging()
 
 
-def create_app():
+def create_app(**config_overrides):
     """
     Application factory for creating the Flask app.
+
+    Args:
+        **config_overrides: Flask config values to apply after the default
+            environment-driven config has loaded but before extensions are
+            initialized. Tests use this to bind the SQLAlchemy engine to
+            ``sqlite:///:memory:`` from the start, avoiding a brief window
+            where the engine would otherwise pick up the file-based dev DB
+            from ``config.py`` (issue #118).
 
     Returns:
         Flask: Configured Flask application
@@ -82,11 +93,83 @@ def create_app():
     app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 
+    # Apply caller-supplied overrides (e.g. test fixtures binding to
+    # sqlite:///:memory:) before extensions latch on to the URI.
+    if config_overrides:
+        app.config.update(config_overrides)
+
     # Initialize extensions
-    from extensions import db, migrate
+    from extensions import cache, db, migrate
 
     db.init_app(app)
     migrate.init_app(app, db)
+
+    # Response cache. Priority: VALKEY_HOST (prod, IAM or password auth) >
+    # REDIS_URL (local docker) > in-process SimpleCache. An unreachable
+    # Valkey degrades to SimpleCache instead of failing startup; per-call
+    # failures are absorbed by utils/cache_utils safe_get/safe_set.
+    # Tests may pre-set CACHE_TYPE via config_overrides to skip this block.
+    if "CACHE_TYPE" not in app.config:
+        from config import REDIS_URL, VALKEY_AUTH_MODE, VALKEY_HOST, VALKEY_PORT
+
+        cache_client = None
+        if VALKEY_HOST:
+            if VALKEY_AUTH_MODE == "iam":
+                from utils.valkey_auth import create_iam_redis_client
+
+                cache_client = create_iam_redis_client(VALKEY_HOST, VALKEY_PORT)
+            else:
+                import redis
+
+                try:
+                    cache_client = redis.StrictRedis(
+                        host=VALKEY_HOST,
+                        port=VALKEY_PORT,
+                        password=os.environ.get("VALKEY_PASSWORD"),
+                        decode_responses=False,
+                    )
+                    cache_client.ping()
+                except Exception:
+                    logger.warning(
+                        "Valkey at %s:%s unreachable — falling back to SimpleCache",
+                        VALKEY_HOST,
+                        VALKEY_PORT,
+                        exc_info=True,
+                    )
+                    cache_client = None
+        elif REDIS_URL:
+            import redis
+
+            try:
+                cache_client = redis.from_url(REDIS_URL, decode_responses=False)
+                cache_client.ping()
+            except Exception:
+                logger.warning(
+                    "Redis at REDIS_URL unreachable — falling back to SimpleCache",
+                    exc_info=True,
+                )
+                cache_client = None
+
+        if cache_client is not None:
+            app.config["CACHE_TYPE"] = "RedisCache"
+            # cachelib accepts a pre-configured client via 'host'
+            # (a CACHE_REDIS config key is not recognized by Flask-Caching).
+            app.config["CACHE_REDIS_HOST"] = cache_client
+            # Keys are already namespaced 'vgc:' by utils/cache_utils builders.
+            app.config["CACHE_KEY_PREFIX"] = ""
+            logger.info("Response cache: Valkey/Redis backend")
+        else:
+            app.config["CACHE_TYPE"] = "SimpleCache"
+            if VALKEY_HOST or REDIS_URL:
+                logger.warning(
+                    "Response cache: in-memory SimpleCache fallback — "
+                    "configured Valkey/Redis is unavailable"
+                )
+            else:
+                logger.info("Response cache: in-memory SimpleCache (no Valkey/Redis configured)")
+        app.config.setdefault("CACHE_DEFAULT_TIMEOUT", 300)
+
+    cache.init_app(app)
 
     # Import models so they are registered with SQLAlchemy
     # This must be done after db is created / configured
@@ -95,10 +178,11 @@ def create_app():
 
     # Production should continue using Flask-Migrate/Alembic as the primary path.
 
-    # ####### DEVELOPMENT NOTE: If you want to quickly create tables without running migrations #######
+    # ####### DEVELOPMENT NOTE: creating tables quickly without migrations #######
     # # ***** (for example, for local development or testing), you can use db.create_all().  *****
-    # # For local development or quick testing, you can use db.create_all() to create tables without running migrations.
-    # # Uncomment the following lines if you want to use create_all() for quick local development without migrations.
+    # # For local development or quick testing, db.create_all() creates tables
+    # # without running migrations. Uncomment the following lines to use
+    # # create_all() for quick local development without migrations.
     #
     # def create_tables_with_retry(app, db, attempts=5, delay_seconds=2):
     #     """
@@ -120,9 +204,11 @@ def create_app():
     #                 time.sleep(delay_seconds)
     #             else:
     #                 app.logger.error(f"db.create_all() gave up after {attempts} attempts")
-    # # Uncomment the following line if you want to use create_all() for quick local development without migrations.
+    # # Uncomment the following line to use create_all() for quick local
+    # # development without migrations.
     # create_tables_with_retry(app, db)
-    # # Note: In production, rely on proper migrations instead of create_all() to manage schema changes.
+    # # Note: In production, rely on proper migrations instead of create_all()
+    # # to manage schema changes.
 
     # Configure CORS to allow Angular frontend to call this API
     # Allow both dev (4200, 8080) and production origins
@@ -175,12 +261,14 @@ def create_app():
     # Register blueprints
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(auth_api_bp)  # /api/auth/* endpoints
+    app.register_blueprint(public_bp)  # No prefix - includes '/r/<slug>' and '/browse'
     app.register_blueprint(recipes_bp)  # No prefix - includes '/' and '/recipe/*'
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
     app.register_blueprint(generation_api_bp)  # Prefix '/api' - Angular JSON endpoints
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
+    app.register_blueprint(worker_api_bp)  # Prefix '/api/worker' set in blueprint
 
     # Error handlers
     @app.errorhandler(404)
@@ -191,6 +279,8 @@ def create_app():
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
         """Log and handle unexpected exceptions."""
+        if isinstance(error, HTTPException):
+            return error
         logger.exception(f"Unexpected error: {error}")
         return render_template("500.html"), 500
 

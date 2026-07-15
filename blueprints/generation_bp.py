@@ -8,13 +8,12 @@ Handles routes for:
 
 import datetime
 import json
-import os
 import re
 import time
 
-import google.oauth2.credentials  # noqa: F401
-from flask import Blueprint, redirect, render_template, request, session, url_for
-from google.genai import Client
+from flask import Blueprint, redirect, render_template, request, url_for
+from google.genai import Client, types
+from jsonschema import ValidationError
 
 from config import (
     CONFIG,
@@ -27,6 +26,7 @@ from repositories.recipe_repository import (
     invalidate_cache,
     save_recipe,
 )
+from services.gemini_service import GENAI_HTTP_OPTIONS
 from utils import normalize_recipe_data
 from utils.session_utils import get_user_metadata
 from validators import validate_recipe_data
@@ -80,11 +80,14 @@ def build_generation_prompt(user_prompt):
         f"The output must be a valid JSON object that strictly follows this schema:\n"
         f"{schema}\n"
         f"IMPORTANT: Include 'image_keywords' - an array of 3-5 descriptive terms optimized for "
-        f"stock photo searches (e.g., ['vegan buddha bowl', 'colorful vegetables', 'healthy lunch']). "
+        f"stock photo searches (e.g., ['vegan buddha bowl', 'colorful vegetables', "
+        f"'healthy lunch']). "
         f"Focus on visual descriptions of the finished dish, not recipe names.\n"
-        f"Do NOT include these fields (we handle them separately): 'stock_image_url', 'ai_image_url', 'image', 'user_id', 'ai_metadata'. "
+        f"Do NOT include these fields (we handle them separately): 'stock_image_url', "
+        f"'ai_image_url', 'image', 'user_id', 'ai_metadata'. "
         f"Just omit them entirely - do not set them to null.\n"
-        f"CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it inside a 'properties' or 'type' object. "
+        f"CRITICAL: Return ONLY the flat JSON object matching the schema. Do NOT nest it "
+        f"inside a 'properties' or 'type' object. "
         f"The top-level keys must be 'name', 'description', 'ingredients', etc.\n"
         f"Do not include any text before or after the JSON object."
     )
@@ -92,17 +95,18 @@ def build_generation_prompt(user_prompt):
     return full_prompt
 
 
-def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
+def attempt_recipe_generation(
+    full_prompt,
+    selected_model,
+    timeout_ms=None,
+):  # noqa: C901
     """
-    Attempt recipe generation using dual authentication strategy.
-
-    Tries:
-    1. User credentials from session (if logged in)
-    2. API key fallback
+    Attempt recipe generation using the server-side API key.
 
     Args:
         full_prompt: Complete prompt with schema
         selected_model: Model ID to use for generation
+        timeout_ms: Optional HTTP timeout override for this model call
 
     Returns:
         tuple: (recipe_data, raw_json_string, error_message)
@@ -147,41 +151,40 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
                 # Normalize data to handle typos and variations
                 data = normalize_recipe_data(data)
 
-                # Validate against schema
-                if not validate_recipe_data(data):
-                    print(f"Validation failed for {source_name}")
-                    return None, None
+                # Validate against schema — validate_recipe_data raises
+                # ValidationError (it never returns False), so surface it
+                # with a clear cause instead of a generic error label.
+                try:
+                    validate_recipe_data(data)
+                except ValidationError as e:
+                    print(f"Validation failed for {source_name}: {e}")
+                    raise ValueError(f"Generated recipe failed schema validation: {e}") from e
 
                 return data, text_response
-            except json.JSONDecodeError:
+            except json.JSONDecodeError as e:
                 print(f"JSON Decode Error for {source_name}: {text_response[:100]}...")
-                return None, None
+                raise ValueError(
+                    f"Model returned invalid JSON "
+                    f"(likely truncated, {len(text_response)} chars): {e}"
+                ) from e
 
         except Exception as e:
             print(f"Generation error with {source_name}: {e}")
             raise e
 
-    # 1. Try with User Credentials (if logged in)
+    http_options = (
+        GENAI_HTTP_OPTIONS if timeout_ms is None else types.HttpOptions(timeout=timeout_ms)
+    )
     recipe_data = None
     recipe_json_str = None
-    last_error_message = "Unknown error"
+    last_error_message = "Server API key is unavailable"
 
-    if "credentials" in session:
+    if GOOGLE_API_KEY:
         try:
-            creds = google.oauth2.credentials.Credentials(
-                **session["credentials"],
-                client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
+            api_client = Client(
+                api_key=GOOGLE_API_KEY,
+                http_options=http_options,
             )
-            user_client = Client(credentials=creds)
-            recipe_data, recipe_json_str = _attempt_with_client(user_client, "User Credentials")
-        except Exception as e:
-            print(f"User credential generation failed: {e}")
-            last_error_message = f"User Auth Error ({type(e).__name__}): {e}"
-
-    # 2. Fallback to API Key if step 1 failed or wasn't attempted
-    if recipe_data is None and GOOGLE_API_KEY:
-        try:
-            api_client = Client(api_key=GOOGLE_API_KEY)
             recipe_data, recipe_json_str = _attempt_with_client(api_client, "API Key")
         except Exception as e:
             print(f"API Key generation failed: {e}")

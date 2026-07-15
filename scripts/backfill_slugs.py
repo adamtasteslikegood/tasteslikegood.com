@@ -1,0 +1,46 @@
+import sys
+from pathlib import Path
+from sqlalchemy.exc import IntegrityError
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from app import create_app  # noqa: E402
+from extensions import db  # noqa: E402
+from models.recipe import Recipe  # noqa: E402
+from utils.slug_utils import normalize_slug  # noqa: E402
+
+
+def generate_slug(text):
+    """Generate a clean URL slug from a title."""
+    return normalize_slug(text) or "recipe"
+
+
+def run_backfill(app):
+    with app.app_context():
+        recipes = Recipe.query.filter(Recipe.slug.is_(None)).all()
+        print(f"Found {len(recipes)} recipes without slugs.")
+
+        success_count = 0
+        for recipe in recipes:
+            base_slug = generate_slug(recipe.name)
+            slug = base_slug
+            suffix = 1
+
+            while True:
+                recipe.slug = slug
+                try:
+                    db.session.commit()
+                    print(f"Backfilled slug '{slug}' for recipe '{recipe.name}'")
+                    success_count += 1
+                    break
+                except IntegrityError:
+                    db.session.rollback()
+                    suffix += 1
+                    slug = f"{base_slug}-{suffix}"
+
+        print(f"Successfully backfilled {success_count} slugs.")
+
+
+if __name__ == "__main__":
+    app = create_app()
+    run_backfill(app)

@@ -175,3 +175,32 @@ Event arrives (push, PR, issue, schedule, comment)
 │            └──────────────────┘                      │
 └──────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Addendum — 2026-07-14: CI/CD Refresh executed (supersedes the recommendations above)
+
+The April audit's key recommendation — required status checks — was never
+implemented, and between April and July the pipeline regressed further:
+`ci.yml`'s branch filters stopped matching the integration branch entirely, so
+the Lint/Type-Check/Test/Security jobs silently never ran, and the Gemini
+dispatch pipeline was deleted (`9ef54fc`) after months of failures. The full
+post-mortem and redesign live in [`refresh/`](refresh/) (SPEC-01, SPEC-02,
+TODO, PROMPT).
+
+Executed 2026-07-14 via an agent-harness loop; state of the world as of close:
+
+| Area | Change | Landed in |
+|---|---|---|
+| CI triggers | `on.push`/`on.pull_request` → `[main, dev]`; concurrency group; safety→pip-audit | #169 |
+| Tree health | Black sweep (15 files, `.git-blame-ignore-revs`), flake8 0 (E266/E501 now enforced), mypy fixed (`explicit_package_bases` in pyproject; `setup.cfg` deleted — it was shadowed), test suite hermetic (FRONTEND_URL leakage, lazy Pub/Sub client) | #170 #171 #172 #173 |
+| Build gate | `Build (docker)` job (no push); red-tested via #175 | #174 |
+| Branch protection | 8 required contexts on `dev` **and** `main` via repository rulesets (`rule222`, `protect-main`), incl. per-language `Analyze (…)` CodeQL contexts | rulesets |
+| Dependency queue | 10 Dependabot PRs drained: #158 merged; #157 closed (py3.14 vs `requires-python <3.14`; Dockerfile aligned to 3.13 in #178); #159–#166 superseded by consolidated refresh #179 (Dependabot's own `requirements.txt` regeneration drops packages/markers — the sync gate caught all eight) | #178 #179 |
+| AI workflows | Scheduled triage: 6h cron + `ci-health` failure-alert job (#180); standalone `gemini-triage.yml` (#181, hardened #183); standalone label-gated `gemini-review.yml` (#184); standalone `gemini-invoke.yml` with deterministic two-phase approval (#185) | #180–#185 |
+
+Correction to SPEC-02 §3.5 discovered during rollout: current gemini-cli
+requires `GEMINI_CLI_TRUST_WORKSPACE=true` on **every** `run-gemini-cli` job,
+not only those that check out code (evidence: run 29353718769 failed in an
+empty workspace; the scheduled workflow's historical greens were vacuous —
+its Gemini step skips when there are no untriaged issues).

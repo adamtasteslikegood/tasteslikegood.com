@@ -8,29 +8,23 @@ Provides endpoints for the Angular frontend (via Express proxy):
 """
 
 import base64
-import datetime
 import logging
 import uuid
 
 from flask import Blueprint, Response, jsonify, request, session
 
 from config import DEFAULT_MODEL, GCS_BUCKET_NAME
-from blueprints.generation_bp import (
-    build_generation_prompt,
-    attempt_recipe_generation,
-    validate_generation_input,
-)
+from blueprints.generation_bp import validate_generation_input
 from repositories import db_recipe_repository
-from services.gemini_service import get_genai_client
 from utils.cache_utils import (
     recipe_image_key,
-    invalidate_recipe,
-    invalidate_recipe_image,
     safe_get,
     safe_set,
     TTL_IMAGE,
 )
-from utils.session_utils import get_or_create_session_id, get_user_metadata
+from utils.admin_auth import require_admin
+from utils.log_sanitizer import sanitize_log_value
+from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +51,7 @@ def generate_recipe_json():
         }
 
     Returns:
-        201: { "recipe": { ...recipe data... } }
+        202: { "recipe_id": "uuid-string", "status": "generating" }
         400: { "error": "..." }
         500: { "error": "..." }
     """
@@ -72,54 +66,52 @@ def generate_recipe_json():
 
     selected_model = data.get("model", DEFAULT_MODEL)
 
-    # Build prompt with schema
-    full_prompt = build_generation_prompt(prompt)
-
-    # Generate recipe using dual auth strategy
-    recipe_data, recipe_json_str, last_error = attempt_recipe_generation(
-        full_prompt, selected_model
-    )
-
-    if not recipe_data:
-        logger.error(f"Recipe generation failed: {last_error}")
-        return jsonify({"error": f"Generation failed: {last_error}"}), 500
+    # The Pub/Sub worker rebuilds the full schema prompt from the raw prompt
+    # (worker_api_bp), so only the raw prompt is published here.
 
     # Assign an ID
     recipe_id = str(uuid.uuid4())
-    recipe_data["id"] = recipe_id
-
-    # Add metadata
-    user_metadata = get_user_metadata()
-    recipe_data["user_id"] = user_metadata["user_id"]
-    recipe_data["ai_metadata"] = {
-        "recipe_generation": {
-            "model": selected_model,
-            "user_id": user_metadata["user_id"],
-            "user_display_name": user_metadata["display_name"],
-            "is_authenticated": user_metadata["is_authenticated"],
-            "session_id": user_metadata["session_id"],
-            "prompt": prompt,
-            "timestamp": datetime.datetime.now().isoformat(),
-            "success": True,
-        },
-        "image_generation": None,
-        "stock_image_generation": None,
-    }
-
-    # Save to database
     user_id = _current_user_id()
     guest_session_id = _current_guest_session_id()
 
-    db_recipe = db_recipe_repository.create_recipe(recipe_data, user_id, guest_session_id)
+    # Save a pending recipe to database
+    pending_data = {"id": recipe_id, "name": "Generating...", "user_id": user_id}
+
+    db_recipe = db_recipe_repository.create_recipe(
+        pending_data,
+        user_id,
+        guest_session_id,
+        status="generating",
+    )
 
     if not db_recipe:
         return jsonify({"error": "Failed to save recipe to database"}), 500
 
-    invalidate_recipe(user_id, guest_session_id, recipe_id)
+    # Publish message to Pub/Sub
+    from services.pubsub_service import publish_message
 
-    logger.info(f"Generated and saved recipe '{recipe_data.get('name')}' (id={recipe_id})")
+    message_data = {
+        "recipe_id": recipe_id,
+        "prompt": prompt,
+        "model": selected_model,
+        "user_id": user_id,
+        "guest_session_id": guest_session_id,
+    }
 
-    return jsonify({"recipe": recipe_data}), 201
+    try:
+        publish_message("recipe-generation", message_data)
+        logger.info(
+            "Queued recipe generation (id=%s)",
+            sanitize_log_value(recipe_id),
+        )
+        return jsonify({"recipe_id": recipe_id, "status": "generating"}), 202
+    except Exception as e:
+        logger.error(
+            "Failed to publish recipe generation: %s",
+            sanitize_log_value(e),
+        )
+        db_recipe_repository.update_recipe_status(recipe_id, "error", user_id, guest_session_id)
+        return jsonify({"error": "Failed to queue generation"}), 500
 
 
 @generation_api_bp.route("/generate_image", methods=["POST"])
@@ -137,7 +129,8 @@ def generate_image_for_recipe():
         }
 
     Returns:
-        200: { "image_url": "/api/recipes/<id>/image" }
+        200: { "image_url": "/api/recipes/<id>/image" } when an image already exists
+        202: { "status": "generating_image" } after queueing; poll the recipe status endpoint
         400/404/500: { "error": "..." }
     """
     data = request.get_json()
@@ -145,7 +138,7 @@ def generate_image_for_recipe():
         return jsonify({"error": "recipe_id is required"}), 400
 
     recipe_id = data["recipe_id"]
-    force_regenerate = data.get("force_regenerate", False)
+    force_regenerate = data.get("force_regenerate") is True
 
     user_id = _current_user_id()
     guest_session_id = _current_guest_session_id()
@@ -162,111 +155,120 @@ def generate_image_for_recipe():
     if not force_regenerate and has_real_image and recipe_data.get("ai_image_url"):
         return jsonify({"image_url": recipe_data["ai_image_url"]}), 200
 
-    # Get authenticated client
-    session_credentials = session.get("credentials") if session else None
-    client = get_genai_client(session_credentials)
+    queued = db_recipe_repository.queue_image_generation(
+        recipe_id,
+        str(uuid.uuid4()),
+        force_regenerate,
+        user_id,
+        guest_session_id,
+    )
+    if queued is None:
+        db_recipe = db_recipe_repository.get_recipe_by_id(
+            recipe_id,
+            user_id,
+            guest_session_id,
+        )
+        if db_recipe is None:
+            return jsonify({"error": "Recipe not found"}), 404
+        if db_recipe.status != "generating_image":
+            return jsonify({"error": "Recipe is not ready for image generation"}), 409
+        return jsonify({"status": "generating_image"}), 202
+    if not queued.should_publish:
+        return jsonify({"status": "generating_image"}), 202
 
-    if not client:
-        return jsonify({"error": "No AI credentials available"}), 500
+    from services.pubsub_service import publish_message
+
+    message_data = {
+        "recipe_id": recipe_id,
+        "user_id": user_id,
+        "guest_session_id": guest_session_id,
+        "force_regenerate": queued.force_regenerate,
+        "image_request_id": queued.request_id,
+    }
 
     try:
-        recipe_name = recipe_data.get("name", "vegan dish")
-        image_keywords = recipe_data.get("image_keywords", [])
-
-        # Build image prompt from keywords if available
-        keyword_str = ", ".join(image_keywords) if image_keywords else ""
-        image_prompt = (
-            f"Professional food photography of {recipe_name}. "
-            f"{keyword_str}. "
-            f"High resolution, photorealistic, natural lighting, overhead shot, "
-            f"delicious plating."
+        publish_message("image-generation", message_data)
+        logger.info(
+            "Queued image generation for recipe (id=%s)",
+            sanitize_log_value(recipe_id),
         )
-
-        logger.info(f"Generating image for recipe '{recipe_name}' (id={recipe_id})")
-
-        # Generate image via Imagen
-        response = client.models.generate_images(
-            model="imagen-4.0-generate-001",
-            prompt=image_prompt,
-            config={
-                "number_of_images": 1,
-            },
-        )
-
-        if not response.generated_images:
-            return jsonify({"error": "No images generated"}), 500
-
-        image_bytes = response.generated_images[0].image.image_bytes
-        image_url = f"/api/recipes/{recipe_id}/image"
-
-        # Upload to GCS if configured, otherwise fall back to base64-in-DB
-        if GCS_BUCKET_NAME:
-            from services.gcs_service import upload_image
-
-            gcs_uri = upload_image(GCS_BUCKET_NAME, recipe_id, image_bytes)
-            if not gcs_uri:
-                return jsonify({"error": "Failed to upload image to storage"}), 500
-            recipe_data["ai_image_gcs"] = gcs_uri
-            recipe_data.pop("ai_image_data", None)  # Remove legacy base64 if present
-        else:
-            # Legacy fallback: store as base64 in the JSON column
-            image_b64 = base64.b64encode(image_bytes).decode("ascii")
-            recipe_data["ai_image_data"] = image_b64
-
-        recipe_data["ai_image_url"] = image_url
-
-        # Update metadata
-        user_metadata = get_user_metadata()
-        if "ai_metadata" not in recipe_data:
-            recipe_data["ai_metadata"] = {}
-
-        recipe_data["ai_metadata"]["image_generation"] = {
-            "model": "imagen-4.0-generate-001",
-            "user_id": user_metadata["user_id"],
-            "user_display_name": user_metadata["display_name"],
-            "is_authenticated": user_metadata["is_authenticated"],
-            "session_id": user_metadata["session_id"],
-            "prompt": image_prompt,
-            "timestamp": datetime.datetime.now().isoformat(),
-            "success": True,
-        }
-
-        db_recipe_repository.update_recipe(recipe_id, recipe_data, user_id, guest_session_id)
-
-        invalidate_recipe_image(recipe_id)
-        invalidate_recipe(user_id, guest_session_id, recipe_id)
-
-        logger.info(f"Generated image for recipe '{recipe_name}': {image_url}")
-        return jsonify({"image_url": image_url}), 200
-
+        return jsonify({"status": "generating_image"}), 202
     except Exception as e:
-        logger.error(f"Image generation error for recipe {recipe_id}: {e}")
-        return jsonify({"error": "Image generation failed"}), 500
+        logger.error(
+            "Failed to queue image generation for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
+        if not db_recipe_repository.release_image_generation_queue(
+            recipe_id,
+            queued.request_id,
+            user_id,
+            guest_session_id,
+        ):
+            logger.info(
+                "Image queue state changed for recipe %s after publish returned an error",
+                sanitize_log_value(recipe_id),
+            )
+        return jsonify({"error": "Failed to queue image generation"}), 500
+
+
+@generation_api_bp.route("/recipes/<recipe_id>/status", methods=["GET"])
+def get_recipe_status(recipe_id):
+    """
+    Get the generation status of a recipe.
+    """
+    user_id = _current_user_id()
+    guest_session_id = _current_guest_session_id()
+
+    recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
+    if not recipe:
+        return jsonify({"error": "Recipe not found"}), 404
+
+    return jsonify({"status": recipe.status, "recipe": recipe.data}), 200
 
 
 @generation_api_bp.route("/recipes/<recipe_id>/image", methods=["GET"])
 def serve_recipe_image(recipe_id):
     """
     Serve a recipe's AI-generated image.
-    Tries in order: Valkey cache → GCS bucket → legacy base64 in DB.
+    Access is checked first (existence + visibility/ownership), then the
+    bytes are resolved: Valkey cache → GCS bucket → legacy base64 in DB.
     Cached in Valkey for 24 hours.
-    Only serves the image if the recipe belongs to the current user/guest session.
+
+    Access rules:
+        - If the recipe is public (``is_public=True``) anyone may fetch the image.
+        - Otherwise the recipe must belong to the current user or guest session.
     """
-    # Check Valkey cache first (stores raw bytes)
+    # Public recipes bypass ownership scoping so unauthenticated SSR pages
+    # and crawlers can still load the image.
+    from models import Recipe
+
+    recipe = Recipe.query.filter_by(id=recipe_id).first()
+    if recipe is None:
+        return jsonify({"error": "Recipe not found"}), 404
+
+    # Private images must not be stored by any HTTP cache — only Valkey,
+    # behind the access check, may hold them.
+    http_cache_control = "public, max-age=86400" if recipe.is_public else "private, no-store"
+
+    if not recipe.is_public:
+        user_id = _current_user_id()
+        guest_session_id = _current_guest_session_id()
+        recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
+        if not recipe:
+            return jsonify({"error": "Recipe not found"}), 404
+
+    # Cache lookup must stay below the access check: the key is global
+    # (same image for everyone), so serving on a hit without the check
+    # would expose private/deleted recipes' images to anyone with the UUID.
     ck = recipe_image_key(recipe_id)
     cached_bytes = safe_get(ck)
     if cached_bytes is not None:
         return Response(
             cached_bytes,
             mimetype="image/png",
-            headers={"Cache-Control": "public, max-age=86400"},
+            headers={"Cache-Control": http_cache_control},
         )
-
-    user_id = _current_user_id()
-    guest_session_id = _current_guest_session_id()
-    recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
-    if not recipe:
-        return jsonify({"error": "Recipe not found"}), 404
 
     recipe_data = recipe.data or {}
     image_bytes = None
@@ -275,7 +277,11 @@ def serve_recipe_image(recipe_id):
     if GCS_BUCKET_NAME and recipe_data.get("ai_image_gcs"):
         from services.gcs_service import download_image
 
-        image_bytes = download_image(GCS_BUCKET_NAME, recipe_id)
+        image_bytes = download_image(
+            GCS_BUCKET_NAME,
+            recipe_id,
+            recipe_data.get("ai_image_gcs"),
+        )
 
     # Fall back to legacy base64 in DB
     if image_bytes is None:
@@ -291,26 +297,15 @@ def serve_recipe_image(recipe_id):
     return Response(
         image_bytes,
         mimetype="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": http_cache_control},
     )
-
-
-def _require_admin():
-    """Check for admin bearer token (ADMIN_API_TOKEN). Returns error response or None."""
-    import os
-
-    admin_key = os.environ.get("ADMIN_API_TOKEN", "")
-    auth_header = request.headers.get("Authorization", "")
-    if not admin_key or not auth_header.startswith("Bearer ") or auth_header[7:] != admin_key:
-        return jsonify({"error": "Unauthorized — admin token required"}), 403
-    return None
 
 
 @generation_api_bp.route("/admin/image-audit", methods=["GET"])
 def audit_recipe_images():
     """Diagnostic: show which recipes have/lack image data in the DB.
     Requires admin bearer token."""
-    err = _require_admin()
+    err = require_admin()
     if err:
         return err
 
@@ -367,7 +362,7 @@ def migrate_image_urls():
     Also fixes legacy URL patterns (data: URLs, /static/ paths).
     Returns summary of migrated recipes.
     """
-    auth_error = _require_admin()
+    auth_error = require_admin()
     if auth_error:
         return auth_error
     from models import Recipe

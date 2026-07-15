@@ -107,10 +107,8 @@ def get_all_recipes() -> List[Dict[str, str]]:
     """
     current_time = time.time()
     # Return cached data if still valid
-    if (
-        _recipes_cache["data"] is not None
-        and (current_time - _recipes_cache["timestamp"]) < _RECIPES_CACHE_TTL  # type: ignore[operator]
-    ):
+    cache_age = current_time - _recipes_cache["timestamp"]  # type: ignore[operator]
+    if _recipes_cache["data"] is not None and cache_age < _RECIPES_CACHE_TTL:
         return _recipes_cache["data"]  # type: ignore[return-value]
 
     # Cache miss or expired - read from disk

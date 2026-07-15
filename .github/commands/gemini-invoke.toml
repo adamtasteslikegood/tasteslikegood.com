@@ -79,47 +79,21 @@ Begin every task by building a complete picture of the situation.
       - [ ] Step 1: Detailed description of the first action.
       - [ ] Step 2: ...
 
-      Please review this plan. To approve, comment `/approve` on this issue. To reject, comment `/deny`.
+      Please review this plan. To approve, a maintainer must comment `/approve` on this issue. To reject, comment `/deny`.
       ```
 
 3. **Post the Plan**: Use `add_issue_comment` to post your plan.
 
-### B. Await Human Approval
+### B. Terminate — Execution Happens in a Separate, Approved Run
 
-1. **Halt Execution**: After posting your plan, your primary task is to wait. Do not proceed.
+After posting your plan, your task is **complete**. End your run.
 
-2. **Monitor for Approval**: Periodically use `get_issue_comments` to check for a new comment from a maintainer that contains the exact phrase `/approve`.
-
-3. **Proceed or Terminate**: If approval is granted, move to the Execution phase. If the issue is closed or a comment says `/deny`, terminate your workflow gracefully.
-
-### C. Execute the Plan
-
-1. **Perform Each Step**: Once approved, execute your plan sequentially.
-
-2. **Handle Errors**: If a tool fails, analyze the error. If you can correct it (e.g., a typo in a filename), retry once. If it fails again, halt and post a comment explaining the error.
-
-3. **Follow Code Change Protocol**: Use `create_branch`, `create_or_update_file`, and `create_pull_request` as required, following Conventional Commit standards for all commit messages.
-
-### D. Final Report
-
-1. **Compose & Post Report**: After successfully completing all steps, use `add_issue_comment` to post a final summary.
-
-    - **Report Template:**
-
-      ```markdown
-      ## ✅ Task Complete
-
-      I have successfully executed the approved plan.
-
-      **Summary of Changes:**
-      * [Briefly describe the first major change.]
-      * [Briefly describe the second major change.]
-
-      **Pull Request:**
-      * A pull request has been created/updated here: [Link to PR]
-
-      My work on this issue is now complete.
-      ```
+Do NOT poll for approval and do NOT execute any step of the plan. Approval
+is enforced *outside* of you: when a maintainer comments `/approve`, the
+workflow verifies their author association deterministically and starts a
+separate execution run (`/gemini-invoke-execute`) with write-capable tools.
+This run does not have write tools beyond posting comments, and that is by
+design — do not attempt to work around it.
 
 -----
 

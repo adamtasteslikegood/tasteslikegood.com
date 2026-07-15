@@ -1,15 +1,23 @@
 name: '🔎 Gemini Review'
 
+# Standalone successor to the dispatch-hub review deleted in 9ef54fc
+# (SPEC-02 §3.6: docs/ci/refresh/SPEC-02-ai-triage-and-review.md).
+# Opt-in only: a human applies the 'gemini-review' label (or dispatches
+# manually). Never a required check.
+
 on:
-  workflow_call:
+  pull_request:
+    types:
+      - 'labeled'
+  workflow_dispatch:
     inputs:
-      additional_context:
+      pr_number:
         type: 'string'
-        description: 'Any additional context from the request'
-        required: false
+        description: 'Pull request number to review'
+        required: true
 
 concurrency:
-  group: '${{ github.workflow }}-review-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}'
+  group: '${{ github.workflow }}-${{ github.event.pull_request.number || inputs.pr_number }}'
   cancel-in-progress: true
 
 defaults:
@@ -19,18 +27,74 @@ defaults:
 jobs:
   review:
     runs-on: 'ubuntu-latest'
-    timeout-minutes: 7
+    timeout-minutes: 10
+    # Advisory automation: a Gemini outage must never redden a PR
+    # (SPEC-02 §3.3 — event-triggered workflows only; the scheduled triage
+    # keeps its loud failures + alerting).
+    continue-on-error: true
+    # Event model (SPEC-02 §3.6): only the 'gemini-review' label triggers a
+    # run; Dependabot- and fork-headed PRs receive no repository secrets on
+    # pull_request events, so Gemini auth is structurally impossible there —
+    # skip cleanly instead of failing. workflow_dispatch is maintainer-only
+    # by definition and resolves its PR via input.
+    if: |-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.label.name == 'gemini-review' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.login != 'dependabot[bot]' &&
+        github.actor != 'dependabot[bot]'
+      )
     permissions:
       contents: 'read'
       id-token: 'write'
       issues: 'write'
       pull-requests: 'write'
     steps:
+      - name: 'Resolve pull request'
+        id: 'pr'
+        env:
+          EVENT_PR_NUMBER: '${{ github.event.pull_request.number }}'
+          INPUT_PR_NUMBER: '${{ inputs.pr_number }}'
+        uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
+        with:
+          # core.setOutput escapes multiline values with randomized
+          # delimiters, so untrusted PR titles/bodies cannot inject outputs.
+          script: |-
+            const raw = (process.env.EVENT_PR_NUMBER || process.env.INPUT_PR_NUMBER || '').trim();
+            const prNumber = Number.parseInt(raw, 10);
+            if (!Number.isInteger(prNumber) || prNumber <= 0 || String(prNumber) !== raw) {
+              core.setFailed(`Invalid pull request number: ${JSON.stringify(raw)}`);
+              return;
+            }
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            // workflow_dispatch bypasses the event-level guard, so re-apply
+            // it here: same-repo head, non-Dependabot author.
+            if (pr.head.repo.full_name !== `${context.repo.owner}/${context.repo.repo}`) {
+              core.setFailed(`PR #${prNumber} head is not in this repository — fork PRs are not reviewed.`);
+              return;
+            }
+            if (pr.user.login === 'dependabot[bot]') {
+              core.info(`PR #${prNumber} is a Dependabot PR — skipping cleanly.`);
+              core.setOutput('skip', 'true');
+              return;
+            }
+
+            core.setOutput('skip', 'false');
+            core.setOutput('number', String(prNumber));
+            core.setOutput('title', pr.title || '');
+            core.setOutput('body', pr.body || '');
       - name: 'Mint identity token'
         id: 'mint_identity_token'
         if: |-
-          ${{ vars.APP_ID }}
-        uses: 'actions/create-github-app-token@a8d616148505b5069dccd32f177bb87d7f39123b' # ratchet:actions/create-github-app-token@v2
+          ${{ steps.pr.outputs.skip == 'false' && vars.APP_ID }}
+        uses: 'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ vars.APP_ID }}'
           private-key: '${{ secrets.APP_PRIVATE_KEY }}'
@@ -38,19 +102,18 @@ jobs:
           permission-issues: 'write'
           permission-pull-requests: 'write'
 
-      - name: 'Checkout repository'
-        uses: 'actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8' # ratchet:actions/checkout@v5
-
       - name: 'Run Gemini pull request review'
-        uses: 'google-github-actions/run-gemini-cli@v0' # ratchet:exclude
+        if: |-
+          ${{ steps.pr.outputs.skip == 'false' }}
+        uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0.1.22
         id: 'gemini_pr_review'
         env:
           GITHUB_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
-          ISSUE_TITLE: '${{ github.event.pull_request.title || github.event.issue.title }}'
-          ISSUE_BODY: '${{ github.event.pull_request.body || github.event.issue.body }}'
-          PULL_REQUEST_NUMBER: '${{ github.event.pull_request.number || github.event.issue.number }}'
+          ISSUE_TITLE: '${{ steps.pr.outputs.title }}'
+          ISSUE_BODY: '${{ steps.pr.outputs.body }}'
+          PULL_REQUEST_NUMBER: '${{ steps.pr.outputs.number }}'
           REPOSITORY: '${{ github.repository }}'
-          ADDITIONAL_CONTEXT: '${{ inputs.additional_context }}'
+          ADDITIONAL_CONTEXT: ''
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -67,7 +130,7 @@ jobs:
           settings: |-
             {
               "model": {
-                "maxSessionTurns": 25
+                "maxSessionTurns": 50
               },
               "telemetry": {
                 "enabled": true,
@@ -83,7 +146,7 @@ jobs:
                     "--rm",
                     "-e",
                     "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                    "ghcr.io/github/github-mcp-server@sha256:5228f9e0b057d419e0e1919729493f75674304181f0ac85ae8385d89dd86affc"
                   ],
                   "includeTools": [
                     "add_comment_to_pending_review",
@@ -97,13 +160,7 @@ jobs:
                 }
               },
               "tools": {
-                "core": [
-                  "run_shell_command(cat)",
-                  "run_shell_command(echo)",
-                  "run_shell_command(grep)",
-                  "run_shell_command(head)",
-                  "run_shell_command(tail)"
-                ]
+                "core": []
               }
             }
           prompt: '/gemini-review'

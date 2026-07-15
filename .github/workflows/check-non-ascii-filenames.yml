@@ -28,10 +28,10 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # ratchet:actions/checkout@v7
       
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # ratchet:actions/setup-python@v6
         with:
           python-version: '3.x'
       
@@ -47,7 +47,7 @@ jobs:
       
       - name: Upload log file
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           name: non-ascii-filenames-log
           path: non_ascii_filenames.log
@@ -84,7 +84,7 @@ jobs:
       
       - name: Upload fix log
         if: github.event_name == 'workflow_dispatch' && inputs.fix_files == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # ratchet:actions/upload-artifact@v7
         with:
           name: non-ascii-filenames-fix-log
           path: non_ascii_filenames_fixed.log

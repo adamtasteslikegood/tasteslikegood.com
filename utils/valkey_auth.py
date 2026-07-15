@@ -149,5 +149,5 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
 
         return client
     except Exception as e:
-        logger.error("Valkey IAM auth failed: %s — falling back to SQLAlchemy sessions", e)
+        logger.error("Valkey IAM auth failed: %s — caller will fall back", e)
         return None

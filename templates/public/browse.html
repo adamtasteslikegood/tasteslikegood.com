@@ -1,0 +1,94 @@
+{% extends "public/base_public.html" %}
+
+{% block title %}Browse Vegan Recipes · TastesLikeGood{% endblock %}
+
+{% block head %}
+<meta name="description" content="{{ description }}">
+<meta name="robots" content="index,follow">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Browse Vegan Recipes · TastesLikeGood">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:site_name" content="TastesLikeGood">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Browse Vegan Recipes · TastesLikeGood">
+<meta name="twitter:description" content="{{ description }}">
+{% endblock %}
+
+{% block content %}
+<section class="public-browse">
+    <header class="public-browse-header">
+        <p class="public-eyebrow">Anti-recipe browse</p>
+        <h1>Browse Vegan Recipes</h1>
+        <p>
+            High-contrast, fast-loading public recipes. Showing {{ recipes|length }} of {{ total }}
+            published recipes.
+        </p>
+    </header>
+
+    {% if recipes %}
+    <ul class="public-browse-list">
+        {% for recipe in recipes %}
+        {% set data = recipe.data or {} %}
+        {% set image_src = data.ai_image_url or (url_for('generation_api.serve_recipe_image', recipe_id=recipe.id) if (data.ai_image_data or data.ai_image_gcs) else data.stock_image_url) %}
+        <li class="public-browse-item">
+            <a href="{{ url_for('public.show_public_recipe', slug=recipe.slug) }}">
+                {% if image_src %}
+                <div class="public-browse-card-image">
+                    <img src="{{ image_src }}" alt="{{ recipe.name }}" loading="lazy" />
+                </div>
+                {% endif %}
+                <div class="public-browse-card-copy">
+                    <h2>{{ recipe.name }}</h2>
+                    <ul class="public-browse-meta">
+                        {% if data.get('prepTime') is not none %}
+                        <li>Prep {{ data.prepTime }}m</li>
+                        {% endif %}
+                        {% if data.get('cookTime') is not none %}
+                        <li>Cook {{ data.cookTime }}m</li>
+                        {% endif %}
+                        {% if recipe.user and recipe.user.name %}
+                        <li>By {{ recipe.user.name }}</li>
+                        {% endif %}
+                    </ul>
+                    {% if data.description %}
+                    <p>{{ data.description }}</p>
+                    {% endif %}
+                    {% if data.tags %}
+                    <div class="public-browse-tags">
+                        {% for tag in data.tags[:3] %}
+                        <span class="public-tag">{{ tag }}</span>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="public-browse-empty">
+        No public recipes yet. Check back soon, or <a href="/#kitchen">open the cookbook app</a>.
+    </p>
+    {% endif %}
+
+    {% if total_pages > 1 %}
+    <nav class="public-browse-pagination" aria-label="Pagination">
+        {% if page > 1 %}
+        <a href="{{ url_for('public.browse_public_recipes', page=page - 1) }}" rel="prev"
+            >← Previous</a
+        >
+        {% else %}
+        <span></span>
+        {% endif %}
+        <span>Page {{ page }} of {{ total_pages }}</span>
+        {% if page < total_pages %}
+        <a href="{{ url_for('public.browse_public_recipes', page=page + 1) }}" rel="next"
+            >Next →</a
+        >
+        {% endif %}
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>{% block title %}TastesLikeGood{% endblock %}</title>
+        <link
+            rel="icon"
+            href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥗</text></svg>"
+        />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}" />
+        <link rel="stylesheet" href="{{ url_for('static', filename='css/recipe-site.css') }}" />
+        {% block head %}{% endblock %}
+    </head>
+    <body class="public-site">
+        <div class="public-shell">
+            <header class="public-header">
+                <div class="public-header-inner">
+                    <a href="{{ url_for('public.browse_public_recipes') }}" class="public-brand">
+                        <span class="public-brand-mark">🥗</span>
+                        <span class="public-brand-text">VeganGenius Chef</span>
+                    </a>
+                    <nav class="public-nav" aria-label="Primary">
+                        <a href="{{ url_for('public.browse_public_recipes') }}" class="public-nav-link">Browse</a>
+                        <button type="button" class="public-nav-button" data-open-kitchen>My Kitchen ↗</button>
+                    </nav>
+                </div>
+            </header>
+
+            <main class="public-main">{% block content %}{% endblock %}</main>
+
+            <footer class="public-footer">
+                <div class="public-footer-inner">
+                    <p>TastesLikeGood.org · honest vegan recipes</p>
+                    <nav class="public-footer-links" aria-label="Footer">
+                        <a href="{{ url_for('public.browse_public_recipes') }}">Browse</a>
+                        <a href="/privacy-policy">Privacy</a>
+                    </nav>
+                </div>
+            </footer>
+        </div>
+
+        <div id="public-toast" class="public-toast" hidden></div>
+
+        <div id="spa-modal" class="public-modal" aria-hidden="true">
+            <div class="public-modal-card" role="dialog" aria-modal="true" aria-labelledby="spa-modal-title" tabindex="-1">
+                <div class="public-modal-header">
+                    <p class="public-eyebrow">Your Kitchen Awaits</p>
+                    <h2 id="spa-modal-title" class="public-modal-title">Open the cookbook app</h2>
+                </div>
+                <div class="public-modal-body">
+                    <p class="public-modal-body">
+                        Jump into the SPA to save recipes, organize cookbooks, and continue as a
+                        guest or with Google.
+                    </p>
+                </div>
+                <div class="public-modal-actions">
+                    <a href="/#kitchen" class="public-modal-button public-modal-button--primary"
+                        >Continue as guest</a
+                    >
+                    <a href="/#kitchen" class="public-modal-button">Open my kitchen</a>
+                    <button type="button" class="public-modal-button" data-close-modal>Stay here</button>
+                </div>
+            </div>
+        </div>
+
+        <script defer src="{{ url_for('static', filename='js/public.js') }}"></script>
+    </body>
+</html>
