@@ -12,6 +12,7 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
     guest_session_id = db.Column(db.String(64), nullable=True, index=True)
     name = db.Column(db.String(200), nullable=False)
     status = db.Column(db.String(20), nullable=False, default="ready")
+    worker_claim_token = db.Column(db.String(36), nullable=True)
     slug = db.Column(db.String(255), unique=True, index=True, nullable=True)
     is_public = db.Column(db.Boolean, default=False, nullable=False, server_default="0")
     # MutableDict ensures in-place JSON updates are tracked (important for SQLite dev).

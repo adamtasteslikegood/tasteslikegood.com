@@ -14,6 +14,7 @@ JSON API) continues to flow through the existing blueprints.
 
 import logging
 import os
+from collections.abc import Mapping
 from math import ceil
 from typing import Any
 from urllib.parse import urlencode
@@ -81,7 +82,7 @@ def _recipe_image_url(recipe: Recipe) -> str | None:
     return _absolute_url(data.get("stock_image_url"))
 
 
-def _format_ingredient(ingredient: dict[str, Any]) -> str:
+def _format_ingredient(ingredient: Mapping[str, Any]) -> str:
     amount = ingredient.get("amount")
     if isinstance(amount, (list, tuple)):
         if len(amount) >= 2:
@@ -104,6 +105,23 @@ def _format_ingredient(ingredient: dict[str, Any]) -> str:
     if notes:
         text = f"{text} ({notes})" if text else notes
     return text
+
+
+def _recipe_ingredient_groups(
+    data: dict[str, Any],
+) -> list[tuple[str, list[dict[str, Any]]]]:
+    raw_groups = data.get("ingredients")
+    if not isinstance(raw_groups, dict):
+        return []
+
+    groups: list[tuple[str, list[dict[str, Any]]]] = []
+    for group_name, raw_ingredients in raw_groups.items():
+        if not isinstance(raw_ingredients, list):
+            continue
+        ingredients = [ingredient for ingredient in raw_ingredients if isinstance(ingredient, dict)]
+        if ingredients:
+            groups.append((str(group_name), ingredients))
+    return groups
 
 
 def _recipe_instructions(data: dict[str, Any]) -> list[str]:
@@ -137,13 +155,12 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
     total_minutes = (prep_minutes or 0) + (cook_minutes or 0)
     instructions = _recipe_instructions(data)
 
-    ingredient_lines: list[str] = []
-    for group in (data.get("ingredients") or {}).values():
-        for ingredient in group or []:
-            if isinstance(ingredient, dict):
-                formatted = _format_ingredient(ingredient)
-                if formatted:
-                    ingredient_lines.append(formatted)
+    ingredient_lines = [
+        formatted
+        for _, group in _recipe_ingredient_groups(data)
+        for ingredient in group
+        if (formatted := _format_ingredient(ingredient))
+    ]
 
     author_name = None
     if recipe.user and recipe.user.name:
@@ -240,6 +257,7 @@ def show_public_recipe(slug):
         canonical_url=canonical_url,
         image_url=image_url,
         description=description,
+        ingredient_groups=_recipe_ingredient_groups(data),
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=_pinterest_share_url(canonical_url, image_url, recipe.name),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
@@ -305,7 +323,8 @@ def browse_public_recipes():
 def sitemap_xml():
     """Return an XML sitemap of the public recipe surface."""
     recipes = (
-        Recipe.query.filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
+        Recipe.query.with_entities(Recipe.slug, Recipe.updated_at, Recipe.created_at)
+        .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
         .order_by(Recipe.updated_at.desc(), Recipe.created_at.desc())
         .all()
     )

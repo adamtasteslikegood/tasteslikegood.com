@@ -464,7 +464,7 @@ def test_recipe_worker_retries_unexpected_failure(app, client):
             return_value=(VALID_RECIPE, json.dumps(VALID_RECIPE), None),
         ),
         patch(
-            "blueprints.worker_api_bp.db_recipe_repository.update_recipe",
+            "blueprints.worker_api_bp.db_recipe_repository.update_recipe_for_worker",
             side_effect=RuntimeError("database unavailable"),
         ),
     ):
@@ -499,12 +499,13 @@ def test_worker_claim_prevents_concurrent_generation_and_reclaims_stale_work(app
     with app.app_context():
         recipe = _make_pending_recipe(recipe_id)
 
-        assert db_recipe_repository.claim_recipe_for_worker(
+        first_claim = db_recipe_repository.claim_recipe_for_worker(
             recipe_id,
             expected_status="generating",
             processing_status="processing",
             stale_after_seconds=120,
         )
+        assert first_claim
         assert not db_recipe_repository.claim_recipe_for_worker(
             recipe_id,
             expected_status="generating",
@@ -516,9 +517,117 @@ def test_worker_claim_prevents_concurrent_generation_and_reclaims_stale_work(app
         recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
         db.session.commit()
 
-        assert db_recipe_repository.claim_recipe_for_worker(
+        second_claim = db_recipe_repository.claim_recipe_for_worker(
             recipe_id,
             expected_status="generating",
             processing_status="processing",
             stale_after_seconds=120,
         )
+        assert second_claim
+        assert second_claim != first_claim
+        assert not db_recipe_repository.set_recipe_status_for_worker(
+            recipe_id,
+            "ready",
+            first_claim,
+            expected_status="processing",
+            release_claim=True,
+        )
+        assert db_recipe_repository.set_recipe_status_for_worker(
+            recipe_id,
+            "ready",
+            second_claim,
+            expected_status="processing",
+            release_claim=True,
+        )
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.worker_claim_token is None
+
+
+def test_superseded_recipe_worker_cannot_commit_or_enqueue_image(app, client):
+    from repositories import db_recipe_repository
+
+    recipe_id = str(uuid.uuid4())
+    replacement_claim = None
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    def reclaim_during_generation(*_args):
+        nonlocal replacement_claim
+        recipe = db.session.get(Recipe, recipe_id)
+        recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
+        db.session.commit()
+        replacement_claim = db_recipe_repository.claim_recipe_for_worker(
+            recipe_id,
+            expected_status="generating",
+            processing_status="processing",
+            stale_after_seconds=120,
+        )
+        return VALID_RECIPE, json.dumps(VALID_RECIPE), None
+
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            side_effect=reclaim_during_generation,
+        ),
+        patch("services.pubsub_service.publish_message") as publish,
+    ):
+        response = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+
+    assert response.status_code == 500
+    assert replacement_claim
+    publish.assert_not_called()
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "processing"
+        assert recipe.worker_claim_token == replacement_claim
+        assert recipe.data["name"] == "Generating..."
+
+
+def test_superseded_image_worker_cannot_commit_generated_bytes(app, client):
+    from repositories import db_recipe_repository
+
+    recipe_id = str(uuid.uuid4())
+    replacement_claim = None
+    with app.app_context():
+        _make_pending_recipe(recipe_id, status="ready")
+
+    class GeneratedImage:
+        class Image:
+            image_bytes = b"superseded-image"
+
+        image = Image()
+
+    class FakeModels:
+        def generate_images(self, **_kwargs):
+            nonlocal replacement_claim
+            recipe = db.session.get(Recipe, recipe_id)
+            recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
+            db.session.commit()
+            replacement_claim = db_recipe_repository.claim_recipe_for_worker(
+                recipe_id,
+                expected_status="ready",
+                processing_status="generating_image",
+                stale_after_seconds=120,
+            )
+
+            class Response:
+                generated_images = [GeneratedImage()]
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    with (
+        patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()),
+        patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", None),
+    ):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 500
+    assert replacement_claim
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "generating_image"
+        assert recipe.worker_claim_token == replacement_claim
+        assert "ai_image_data" not in recipe.data

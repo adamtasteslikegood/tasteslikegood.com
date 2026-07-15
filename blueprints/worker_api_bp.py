@@ -3,6 +3,7 @@ import logging
 import datetime
 import base64
 import os
+from copy import deepcopy
 from functools import wraps
 from flask import Blueprint, request, jsonify, abort
 
@@ -60,9 +61,27 @@ def _current_recipe_scope(recipe_id):
     return recipe, recipe.user_id, recipe.guest_session_id
 
 
-def _record_image_failure(recipe_id, recipe_data, error_message):
+def _release_worker_claim(recipe_id, status, claim_token, expected_status, worker_kind):
+    """Release a lease after an unexpected failure if it is still ours."""
+    if claim_token is None:
+        return
+    if not db_recipe_repository.set_recipe_status_for_worker(
+        recipe_id,
+        status,
+        claim_token,
+        expected_status=expected_status,
+        release_claim=True,
+    ):
+        logger.info(
+            "%s worker lease for %s was already superseded",
+            worker_kind,
+            sanitize_log_value(recipe_id),
+        )
+
+
+def _record_image_failure(recipe_id, recipe_data, error_message, claim_token):
     """Persist image failure metadata against the recipe's current owner."""
-    recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
+    recipe, _, _ = _current_recipe_scope(recipe_id)
     if recipe is None:
         return False
     metadata = dict((recipe_data or {}).get("ai_metadata") or {})
@@ -73,12 +92,12 @@ def _record_image_failure(recipe_id, recipe_data, error_message):
     }
     updated_data = {**(recipe_data or {}), "ai_metadata": metadata}
     return (
-        db_recipe_repository.update_recipe(
+        db_recipe_repository.update_recipe_for_worker(
             recipe_id,
             updated_data,
-            user_id,
-            guest_session_id,
+            claim_token,
             status="ready",
+            expected_status="generating_image",
         )
         is not None
     )
@@ -151,6 +170,7 @@ def process_recipe():
     selected_model = data.get("model")
     logger.info("Processing recipe generation for %s", sanitize_log_value(recipe_id))
 
+    claim_token = None
     try:
         recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
         if recipe is None:
@@ -162,12 +182,13 @@ def process_recipe():
                 sanitize_log_value(recipe.status),
             )
             return jsonify({"status": "ok"}), 200
-        if not db_recipe_repository.claim_recipe_for_worker(
+        claim_token = db_recipe_repository.claim_recipe_for_worker(
             recipe_id,
             expected_status="generating",
             processing_status="processing",
             stale_after_seconds=WORKER_CLAIM_STALE_SECONDS,
-        ):
+        )
+        if claim_token is None:
             return jsonify({"status": "retry", "message": "Recipe is already processing"}), 500
 
         full_prompt = build_generation_prompt(prompt)
@@ -183,6 +204,7 @@ def process_recipe():
             if not db_recipe_repository.set_recipe_status_for_worker(
                 recipe_id,
                 "processing",
+                claim_token,
                 expected_status="processing",
             ):
                 raise RuntimeError("Recipe worker claim was lost")
@@ -208,7 +230,9 @@ def process_recipe():
             if not db_recipe_repository.set_recipe_status_for_worker(
                 recipe_id,
                 "error",
+                claim_token,
                 expected_status="processing",
+                release_claim=True,
             ):
                 raise RuntimeError("Recipe failure status could not be persisted")
             return jsonify({"status": "ok"}), 200
@@ -235,16 +259,18 @@ def process_recipe():
             "stock_image_generation": None,
         }
 
-        updated = db_recipe_repository.update_recipe(
+        updated = db_recipe_repository.update_recipe_for_worker(
             recipe_id,
             recipe_data,
-            user_id,
-            guest_session_id,
+            claim_token,
             status="ready",
+            expected_status="processing",
         )
         if updated is None:
             raise RuntimeError("Generated recipe could not be persisted")
 
+        user_id = updated.user_id
+        guest_session_id = updated.guest_session_id
         invalidate_recipe(user_id, guest_session_id, recipe_id)
         logger.info("Successfully generated recipe %s", sanitize_log_value(recipe_id))
 
@@ -275,10 +301,12 @@ def process_recipe():
     except Exception as e:
         logger.error("Error processing recipe message: %s", sanitize_log_value(e))
         try:
-            db_recipe_repository.set_recipe_status_for_worker(
+            _release_worker_claim(
                 recipe_id,
                 "generating",
-                expected_status="processing",
+                claim_token,
+                "processing",
+                "Recipe",
             )
         except Exception as status_error:
             logger.error(
@@ -316,13 +344,14 @@ def process_image():
 
     logger.info("Processing image generation for %s", sanitize_log_value(recipe_id))
 
+    claim_token = None
     try:
         recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
         if recipe is None:
             logger.error("Recipe not found: %s", sanitize_log_value(recipe_id))
             return jsonify({"status": "ok"}), 200
 
-        recipe_data = recipe.data or {}
+        recipe_data = deepcopy(recipe.data or {})
 
         # Check if image already exists
         has_real_image = bool(recipe_data.get("ai_image_data") or recipe_data.get("ai_image_gcs"))
@@ -330,18 +359,19 @@ def process_image():
             logger.info("Image already exists for %s", sanitize_log_value(recipe_id))
             return jsonify({"status": "ok"}), 200
 
-        if not db_recipe_repository.claim_recipe_for_worker(
+        claim_token = db_recipe_repository.claim_recipe_for_worker(
             recipe_id,
             expected_status="ready",
             processing_status="generating_image",
             stale_after_seconds=WORKER_CLAIM_STALE_SECONDS,
-        ):
+        )
+        if claim_token is None:
             return jsonify({"status": "retry", "message": "Image is already processing"}), 500
 
         recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
         if recipe is None:
             return jsonify({"status": "ok"}), 200
-        recipe_data = recipe.data or {}
+        recipe_data = deepcopy(recipe.data or {})
 
         client = get_genai_client(None)
 
@@ -351,6 +381,7 @@ def process_image():
                 recipe_id,
                 recipe_data,
                 "No AI credentials available",
+                claim_token,
             ):
                 raise RuntimeError("Image credential failure could not be persisted")
             return jsonify({"status": "retry"}), 500
@@ -410,15 +441,17 @@ def process_image():
             recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
             if recipe is None:
                 return jsonify({"status": "ok"}), 200
-            updated = db_recipe_repository.update_recipe(
+            updated = db_recipe_repository.update_recipe_for_worker(
                 recipe_id,
                 recipe_data,
-                user_id,
-                guest_session_id,
+                claim_token,
                 status="ready",
+                expected_status="generating_image",
             )
             if updated is None:
                 raise RuntimeError("Generated image could not be persisted")
+            user_id = updated.user_id
+            guest_session_id = updated.guest_session_id
             invalidate_recipe_image(recipe_id)
             invalidate_recipe(user_id, guest_session_id, recipe_id)
 
@@ -437,16 +470,19 @@ def process_image():
                 recipe_id,
                 recipe_data,
                 "Image generation failed",
+                claim_token,
             ):
                 raise RuntimeError("Image generation failure could not be persisted")
 
     except Exception as e:
         logger.error("Error processing image message: %s", sanitize_log_value(e))
         try:
-            db_recipe_repository.set_recipe_status_for_worker(
+            _release_worker_claim(
                 recipe_id,
                 "ready",
-                expected_status="generating_image",
+                claim_token,
+                "generating_image",
+                "Image",
             )
         except Exception as status_error:
             logger.error(

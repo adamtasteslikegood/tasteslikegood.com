@@ -256,6 +256,34 @@ def test_partial_recipe_omits_blank_metadata_and_formats_amount_ranges(app, clie
     assert "1–2" in body
 
 
+@pytest.mark.parametrize(
+    "ingredients",
+    [
+        [{"name": "not grouped"}],
+        {"main": ["not an ingredient", None]},
+    ],
+)
+def test_public_recipe_ignores_malformed_ingredient_shapes(app, client, ingredients):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Malformed Ingredients",
+            "malformed-ingredients",
+            data={
+                "name": "Malformed Ingredients",
+                "ingredients": ingredients,
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/malformed-ingredients")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "public-recipe-ingredients" not in body
+    assert '"recipeIngredient"' not in body
+
+
 def test_sitemap_lists_only_public_routes(app, client):
     with app.app_context():
         db.session.add_all(
@@ -276,6 +304,35 @@ def test_sitemap_lists_only_public_routes(app, client):
     assert "http://localhost/r/public-one" in body
     assert "http://localhost/r/public-two" in body
     assert "http://localhost/r/private" not in body
+
+
+def test_sitemap_selects_only_slug_and_timestamps(app, client):
+    with app.app_context():
+        db.session.add(
+            _make_recipe(
+                "Large Public Image",
+                "large-public-image",
+                data={"name": "Large Public Image", "ai_image_data": "x" * 100_000},
+            )
+        )
+        db.session.commit()
+
+    statements = []
+
+    @event.listens_for(db.engine, "before_cursor_execute")
+    def _capture(_conn, _cursor, statement, _params, _ctx, _exec):
+        if statement.lstrip().upper().startswith("SELECT"):
+            statements.append(statement)
+
+    try:
+        resp = client.get("/sitemap.xml")
+    finally:
+        event.remove(db.engine, "before_cursor_execute", _capture)
+
+    assert resp.status_code == 200
+    recipe_queries = [statement for statement in statements if "FROM recipe" in statement]
+    assert recipe_queries
+    assert all("recipe.data" not in statement for statement in recipe_queries)
 
 
 def test_public_recipe_image_served_without_session(app, client):

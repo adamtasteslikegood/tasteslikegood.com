@@ -256,10 +256,11 @@ def claim_recipe_for_worker(
     expected_status: str,
     processing_status: str,
     stale_after_seconds: int,
-) -> bool:
-    """Atomically claim one generation job, reclaiming abandoned stale work."""
+) -> Optional[str]:
+    """Atomically claim one generation job and return its unique lease token."""
     now = datetime.utcnow()
     stale_before = now - timedelta(seconds=stale_after_seconds)
+    claim_token = str(uuid.uuid4())
     claimed = cast(
         int,
         Recipe.query.filter(
@@ -272,32 +273,95 @@ def claim_recipe_for_worker(
                 ),
             ),
         ).update(
-            {"status": processing_status, "updated_at": now},
+            {
+                "status": processing_status,
+                "worker_claim_token": claim_token,
+                "updated_at": now,
+            },
             synchronize_session=False,
         ),
     )
     db.session.commit()
-    return claimed == 1
+    return claim_token if claimed == 1 else None
 
 
 def set_recipe_status_for_worker(
     recipe_id: str,
     status: str,
+    claim_token: str,
     expected_status: Optional[str] = None,
+    release_claim: bool = False,
 ) -> bool:
-    """Update worker state without stale enqueue-time ownership credentials."""
-    query = Recipe.query.filter(Recipe.id == recipe_id)
+    """Heartbeat or release worker state only while the caller owns the lease."""
+    query = Recipe.query.filter(
+        Recipe.id == recipe_id,
+        Recipe.worker_claim_token == claim_token,
+    )
     if expected_status is not None:
         query = query.filter(Recipe.status == expected_status)
     updated = cast(
         int,
         query.update(
-            {"status": status, "updated_at": datetime.utcnow()},
+            {
+                "status": status,
+                "worker_claim_token": None if release_claim else claim_token,
+                "updated_at": datetime.utcnow(),
+            },
             synchronize_session=False,
         ),
     )
     db.session.commit()
     return updated == 1
+
+
+def update_recipe_for_worker(
+    recipe_id: str,
+    recipe_data: Dict[str, Any],
+    claim_token: str,
+    status: str,
+    expected_status: str,
+) -> Optional[Recipe]:
+    """Persist generated data only if the caller still owns the worker lease."""
+    recipe = (
+        Recipe.query.populate_existing()
+        .filter(
+            Recipe.id == recipe_id,
+            Recipe.status == expected_status,
+            Recipe.worker_claim_token == claim_token,
+        )
+        .first()
+    )
+    if recipe is None:
+        return None
+
+    merged = {**(recipe.data or {}), **recipe_data, "id": recipe_id}
+    merged["is_public"] = recipe.is_public
+    if recipe.slug is not None:
+        merged["slug"] = recipe.slug
+    else:
+        merged.pop("slug", None)
+
+    updated = cast(
+        int,
+        Recipe.query.filter(
+            Recipe.id == recipe_id,
+            Recipe.status == expected_status,
+            Recipe.worker_claim_token == claim_token,
+        ).update(
+            {
+                "name": recipe_data.get("name", recipe.name),
+                "data": merged,
+                "status": status,
+                "worker_claim_token": None,
+                "updated_at": datetime.utcnow(),
+            },
+            synchronize_session=False,
+        ),
+    )
+    db.session.commit()
+    if updated != 1:
+        return None
+    return get_recipe_for_worker(recipe_id)
 
 
 def create_recipe(
