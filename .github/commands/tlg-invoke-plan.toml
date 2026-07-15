@@ -79,7 +79,10 @@ Begin every task by building a complete picture of the situation.
       - [ ] Step 1: Detailed description of the first action.
       - [ ] Step 2: ...
 
-      Please review this plan. To approve, a maintainer must comment `/approve` on this issue. To reject, comment `/deny`.
+      Please review this plan. The workflow will post a separate immutable
+      approval reference after this comment. To approve, a maintainer must use
+      the exact `/approve <plan-run-id>` command from that reference. To reject,
+      comment `/deny`.
       ```
 
 3. **Post the Plan**: Use `add_issue_comment` to post your plan.

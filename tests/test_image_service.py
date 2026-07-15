@@ -10,6 +10,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from services.image_service import (
     generate_ai_image,
+    save_image_file,
     update_recipe_with_image,
 )
 
@@ -102,6 +103,18 @@ class TestImageService(unittest.TestCase):
 
 
 class TestImageServiceHelpers(unittest.TestCase):
+    @patch("services.image_service.os.makedirs")
+    @patch("builtins.open", new_callable=mock_open)
+    def test_save_image_file_without_request_context(self, mock_file_open, mock_makedirs):
+        generated_image = MagicMock()
+        generated_image.image.image_bytes = b"image-bytes"
+
+        url = save_image_file(generated_image, "test.json")
+
+        self.assertEqual(url, "/static/images/ai_test.png")
+        mock_makedirs.assert_called_once()
+        mock_file_open.assert_called_once_with("static/images/ai_test.png", "wb")
+
     def test_update_recipe_with_image(self):
         """Should mutate the recipe dictionary with image generation metadata."""
         recipe_data = {"name": "Test Recipe"}

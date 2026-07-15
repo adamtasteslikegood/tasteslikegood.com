@@ -23,6 +23,7 @@ from utils.cache_utils import (
     TTL_IMAGE,
 )
 from utils.admin_auth import require_admin
+from utils.log_sanitizer import sanitize_log_value
 from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
@@ -96,10 +97,16 @@ def generate_recipe_json():
 
     try:
         publish_message("recipe-generation", message_data)
-        logger.info(f"Queued recipe generation (id={recipe_id})")
+        logger.info(
+            "Queued recipe generation (id=%s)",
+            sanitize_log_value(recipe_id),
+        )
         return jsonify({"recipe_id": recipe_id, "status": "generating"}), 202
     except Exception as e:
-        logger.error(f"Failed to publish recipe generation: {e}")
+        logger.error(
+            "Failed to publish recipe generation: %s",
+            sanitize_log_value(e),
+        )
         db_recipe_repository.update_recipe_status(recipe_id, "error", user_id, guest_session_id)
         return jsonify({"error": "Failed to queue generation"}), 500
 
@@ -155,10 +162,17 @@ def generate_image_for_recipe():
 
     try:
         publish_message("image-generation", message_data)
-        logger.info(f"Queued image generation for recipe (id={recipe_id})")
+        logger.info(
+            "Queued image generation for recipe (id=%s)",
+            sanitize_log_value(recipe_id),
+        )
         return jsonify({"status": "generating_image"}), 202
     except Exception as e:
-        logger.error(f"Failed to queue image generation for recipe {recipe_id}: {e}")
+        logger.error(
+            "Failed to queue image generation for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Failed to queue image generation"}), 500
 
 

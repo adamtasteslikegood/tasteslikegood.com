@@ -34,7 +34,9 @@ os.makedirs(RECIPES_DIR, exist_ok=True)
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY")
 GCS_BUCKET_NAME = os.getenv("GCS_BUCKET_NAME", "")
-GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "comdottasteslikegood")
+GCP_PROJECT_ID = os.getenv("GCP_PROJECT_ID", "")
+GENAI_HTTP_TIMEOUT_MS = int(os.getenv("GENAI_HTTP_TIMEOUT_MS", "540000"))
+WORKER_CLAIM_STALE_SECONDS = int(os.getenv("WORKER_CLAIM_STALE_SECONDS", "600"))
 
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-3.1-pro-preview"

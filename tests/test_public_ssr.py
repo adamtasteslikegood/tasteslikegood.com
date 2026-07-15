@@ -73,6 +73,13 @@ def test_show_public_recipe_renders_html(app, client):
     assert '<script defer src="/static/js/public.js"></script>' in body
     assert "document.querySelectorAll('[data-open-kitchen]')" not in body
 
+    public_js = (Path(__file__).resolve().parent.parent / "static/js/public.js").read_text(
+        encoding="utf-8"
+    )
+    assert 'event.key === "Escape"' in public_js
+    assert "lastFocused.focus()" in public_js
+    assert 'event.key !== "Tab"' in public_js
+
 
 def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     png_bytes = b"\x89PNG\r\n\x1a\nseo"
@@ -183,10 +190,10 @@ def test_browse_paginates(app, client):
 def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
     """Eagerly loading Recipe.user keeps queries constant regardless of row count."""
     with app.app_context():
-        owner = User(email="chef@example.com", name="Chef One")
-        db.session.add(owner)
-        db.session.commit()
         for idx in range(5):
+            owner = User(email=f"chef-{idx}@example.com", name=f"Chef {idx}")
+            db.session.add(owner)
+            db.session.flush()
             db.session.add(_make_recipe(f"Owned {idx}", f"owned-{idx}", owner=owner))
         db.session.commit()
 
@@ -207,6 +214,33 @@ def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
     # Expect a small, fixed number of SELECTs — count(*) + recipes+user join.
     # Anything above 5 means eager loading regressed and rows are loading users one-by-one.
     assert select_count <= 5, f"expected ≤5 SELECTs, got {select_count} (N+1 regression)"
+
+
+def test_partial_recipe_omits_blank_metadata_and_formats_amount_ranges(app, client):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Flexible Pantry Soup",
+            "flexible-pantry-soup",
+            data={
+                "name": "Flexible Pantry Soup",
+                "ingredients": {
+                    "soup": [
+                        {"amount": [1], "units": "cup", "name": "lentils"},
+                        {"amount": [1, 2], "units": "tbsp", "name": "lemon juice"},
+                    ]
+                },
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    body = client.get("/r/flexible-pantry-soup").get_data(as_text=True)
+
+    assert "Prep m" not in body
+    assert "Cook m" not in body
+    assert "Serves </li>" not in body
+    assert "1–</span>" not in body
+    assert "1–2" in body
 
 
 def test_sitemap_lists_only_public_routes(app, client):

@@ -52,3 +52,13 @@ def test_backfill_slugs_retry_loop(app):
         assert "vegan-chili" in slugs
         assert "vegan-chili-2" in slugs
         assert "vegan-chili-3" in slugs
+
+
+def test_status_migration_preserves_server_side_sessions():
+    migration = (
+        Path(__file__).resolve().parent.parent
+        / "migrations/versions/03da1e46c9a5_add_status_to_recipe.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'drop_table("flask_sessions")' not in migration
+    assert 'create_table(\n        "flask_sessions"' not in migration

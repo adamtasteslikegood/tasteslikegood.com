@@ -21,7 +21,7 @@ def generate_slug(text):
 
 def run_backfill(app):
     with app.app_context():
-        recipes = Recipe.query.filter(Recipe.slug == None).all()
+        recipes = Recipe.query.filter(Recipe.slug.is_(None)).all()
         print(f"Found {len(recipes)} recipes without slugs.")
 
         success_count = 0

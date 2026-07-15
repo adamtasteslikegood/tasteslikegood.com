@@ -164,7 +164,9 @@ def save_image_file(generated_image, filename):
         img_f.write(image_data)
 
     # Return URL for template
-    return url_for("static", filename=f"images/{image_filename}")
+    if has_request_context():
+        return url_for("static", filename=f"images/{image_filename}")
+    return f"/static/images/{image_filename}"
 
 
 def update_recipe_with_image(

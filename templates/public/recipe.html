@@ -60,9 +60,9 @@
 
         <div class="public-recipe-toolbar">
             <ul class="public-recipe-meta">
-                {% if data.prepTime is not none %}<li>Prep {{ data.prepTime }}m</li>{% endif %}
-                {% if data.cookTime is not none %}<li>Cook {{ data.cookTime }}m</li>{% endif %}
-                {% if data.servings is not none %}<li>Serves {{ data.servings }}</li>{% endif %}
+                {% if data.get('prepTime') is not none %}<li>Prep {{ data.prepTime }}m</li>{% endif %}
+                {% if data.get('cookTime') is not none %}<li>Cook {{ data.cookTime }}m</li>{% endif %}
+                {% if data.get('servings') is not none %}<li>Serves {{ data.servings }}</li>{% endif %}
                 {% if recipe.user and recipe.user.name %}<li>By {{ recipe.user.name }}</li>{% endif %}
             </ul>
             <div class="public-recipe-actions">
@@ -91,14 +91,19 @@
                     <h3>{{ group_name | capitalize }}</h3>
                     <ul>
                         {% for ing in group %}
+                        {% set amount = ing.get('amount') %}
                         <li class="public-ingredient-row">
                             <span class="public-ingredient-amount">
-                                {% if ing.amount is iterable and ing.amount is not string %}
-                                {{ ing.amount[0] }}–{{ ing.amount[1] }}
-                                {% else %}
-                                {{ ing.amount }}
+                                {% if amount is iterable and amount is not string %}
+                                    {% if amount | length >= 2 %}
+                                    {{ amount[0] }}–{{ amount[1] }}
+                                    {% elif amount | length == 1 %}
+                                    {{ amount[0] }}
+                                    {% endif %}
+                                {% elif amount is not none %}
+                                {{ amount }}
                                 {% endif %}
-                                {{ ing.units }}
+                                {{ ing.get('units', '') }}
                             </span>
                             <span class="public-ingredient-text"
                                 >{{ ing.name }}{% if ing.notes %} <em>({{ ing.notes }})</em>{% endif %}</span

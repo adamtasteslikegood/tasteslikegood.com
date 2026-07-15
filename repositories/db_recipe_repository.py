@@ -10,13 +10,15 @@ Handles recipe CRUD operations with SQLAlchemy ORM:
 import logging
 import re
 import uuid
-from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from datetime import datetime, timedelta
+from typing import Any, Callable, Dict, List, Optional, cast
 
+from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 
 from extensions import db
 from models import Recipe, User  # noqa: F401
+from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -156,8 +158,8 @@ def _commit_publish_retrying(
             skip.add(attempted_slug)
             logger.warning(
                 "Slug %r for recipe %s lost a publication race; retrying",
-                attempted_slug,
-                recipe_id,
+                sanitize_log_value(attempted_slug),
+                sanitize_log_value(recipe_id),
             )
 
 
@@ -182,7 +184,7 @@ def _gate_is_public(recipe_data: Dict[str, Any], user_id: Optional[int]) -> Dict
     if wants_public and user_id is None:
         logger.warning(
             "Guest attempted to publish recipe %s — forcing is_public=False",
-            recipe_data.get("id", "<no id>"),
+            sanitize_log_value(recipe_data.get("id", "<no id>")),
         )
     return {**recipe_data, "is_public": wants_public if user_id is not None else False}
 
@@ -205,7 +207,11 @@ def get_user_recipes(
         )
         return query.all()  # type: ignore[no-any-return]
     except Exception as e:
-        logger.error(f"Error fetching recipes for user {user_id}: {e}")
+        logger.error(
+            "Error fetching recipes for user %s: %s",
+            sanitize_log_value(user_id),
+            sanitize_log_value(e),
+        )
         return []
 
 
@@ -229,8 +235,69 @@ def get_recipe_by_id(
 
         return query.first()  # type: ignore[no-any-return]
     except Exception as e:
-        logger.error(f"Error fetching recipe {recipe_id}: {e}")
+        logger.error(
+            "Error fetching recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return None
+
+
+def get_recipe_for_worker(recipe_id: str) -> Optional[Recipe]:
+    """Fetch a recipe without owner scoping for an OIDC-authenticated worker."""
+    return cast(
+        Optional[Recipe],
+        Recipe.query.populate_existing().filter_by(id=recipe_id).first(),
+    )
+
+
+def claim_recipe_for_worker(
+    recipe_id: str,
+    expected_status: str,
+    processing_status: str,
+    stale_after_seconds: int,
+) -> bool:
+    """Atomically claim one generation job, reclaiming abandoned stale work."""
+    now = datetime.utcnow()
+    stale_before = now - timedelta(seconds=stale_after_seconds)
+    claimed = cast(
+        int,
+        Recipe.query.filter(
+            Recipe.id == recipe_id,
+            or_(
+                Recipe.status == expected_status,
+                and_(
+                    Recipe.status == processing_status,
+                    Recipe.updated_at < stale_before,
+                ),
+            ),
+        ).update(
+            {"status": processing_status, "updated_at": now},
+            synchronize_session=False,
+        ),
+    )
+    db.session.commit()
+    return claimed == 1
+
+
+def set_recipe_status_for_worker(
+    recipe_id: str,
+    status: str,
+    expected_status: Optional[str] = None,
+) -> bool:
+    """Update worker state without stale enqueue-time ownership credentials."""
+    query = Recipe.query.filter(Recipe.id == recipe_id)
+    if expected_status is not None:
+        query = query.filter(Recipe.status == expected_status)
+    updated = cast(
+        int,
+        query.update(
+            {"status": status, "updated_at": datetime.utcnow()},
+            synchronize_session=False,
+        ),
+    )
+    db.session.commit()
+    return updated == 1
 
 
 def create_recipe(
@@ -266,9 +333,9 @@ def create_recipe(
             if not same_owner:
                 logger.warning(
                     "Recipe ID collision for id=%s (user_id=%s, guest_session_id=%s)",
-                    recipe_id,
-                    user_id,
-                    guest_session_id,
+                    sanitize_log_value(recipe_id),
+                    sanitize_log_value(user_id),
+                    sanitize_log_value(guest_session_id),
                 )
                 return None
 
@@ -299,13 +366,17 @@ def create_recipe(
 
         recipe = _commit_publish_retrying(stage_new, recipe_data_with_id, recipe_id)
 
-        logger.info(f"Created recipe {recipe_id} for user {user_id}")
+        logger.info(
+            "Created recipe %s for user %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(user_id),
+        )
         return recipe
 
     except RecipeSlugError:
         raise
     except Exception as e:
-        logger.error(f"Error creating recipe: {e}")
+        logger.error("Error creating recipe: %s", sanitize_log_value(e))
         db.session.rollback()
         return None
 
@@ -315,6 +386,7 @@ def update_recipe(
     recipe_data: Dict[str, Any],
     user_id: Optional[int] = None,
     guest_session_id: Optional[str] = None,
+    status: Optional[str] = None,
 ) -> Optional[Recipe]:
     """
     Update an existing recipe.
@@ -331,7 +403,11 @@ def update_recipe(
         recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
 
         if not recipe:
-            logger.warning(f"Recipe {recipe_id} not found for user {user_id}")
+            logger.warning(
+                "Recipe %s not found for user %s",
+                sanitize_log_value(recipe_id),
+                sanitize_log_value(user_id),
+            )
             return None
 
         # Merge the payload into the persisted blob (and pin the id): PUT
@@ -372,6 +448,8 @@ def update_recipe(
             recipe.slug = data.get("slug")
             recipe.is_public = data["is_public"]
             recipe.data = data
+            if status is not None:
+                recipe.status = status
             recipe.updated_at = datetime.utcnow()
             return recipe
 
@@ -379,13 +457,17 @@ def update_recipe(
             stage_update, recipe_data_with_id, recipe_id, recipe.slug
         )
 
-        logger.info(f"Updated recipe {recipe_id}")
+        logger.info("Updated recipe %s", sanitize_log_value(recipe_id))
         return updated
 
     except RecipeSlugError:
         raise
     except Exception as e:
-        logger.error(f"Error updating recipe {recipe_id}: {e}")
+        logger.error(
+            "Error updating recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         db.session.rollback()
         return None
 
@@ -408,7 +490,11 @@ def update_recipe_status(
         db.session.commit()
         return True
     except Exception as e:
-        logger.error(f"Error updating status for recipe {recipe_id}: {e}")
+        logger.error(
+            "Error updating status for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         db.session.rollback()
         return False
 
@@ -432,17 +518,25 @@ def delete_recipe(
         recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
 
         if not recipe:
-            logger.warning(f"Recipe {recipe_id} not found for user {user_id}")
+            logger.warning(
+                "Recipe %s not found for user %s",
+                sanitize_log_value(recipe_id),
+                sanitize_log_value(user_id),
+            )
             return False
 
         db.session.delete(recipe)
         db.session.commit()
 
-        logger.info(f"Deleted recipe {recipe_id}")
+        logger.info("Deleted recipe %s", sanitize_log_value(recipe_id))
         return True
 
     except Exception as e:
-        logger.error(f"Error deleting recipe {recipe_id}: {e}")
+        logger.error(
+            "Error deleting recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         db.session.rollback()
         return False
 
@@ -461,7 +555,7 @@ def get_all_recipes(limit: int = 100) -> List[Recipe]:
         query = Recipe.query.order_by(Recipe.created_at.desc())
         return query.limit(limit).all()  # type: ignore[no-any-return]
     except Exception as e:
-        logger.error(f"Error fetching all recipes: {e}")
+        logger.error("Error fetching all recipes: %s", sanitize_log_value(e))
         return []
 
 
@@ -479,7 +573,11 @@ def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] =
         scoped = _apply_recipe_scope(Recipe.query, user_id, guest_session_id)
         return scoped.count()  # type: ignore[no-any-return]
     except Exception as e:
-        logger.error(f"Error counting recipes for user {user_id}: {e}")
+        logger.error(
+            "Error counting recipes for user %s: %s",
+            sanitize_log_value(user_id),
+            sanitize_log_value(e),
+        )
         return 0
 
 
@@ -507,7 +605,10 @@ def migrate_file_to_db(
         # Check if already exists
         existing = Recipe.query.filter_by(id=recipe_id).first()  # type: ignore[no-any-return]
         if existing:
-            logger.warning(f"Recipe {recipe_id} already exists in database, skipping")
+            logger.warning(
+                "Recipe %s already exists in database, skipping",
+                sanitize_log_value(recipe_id),
+            )
             return existing  # type: ignore[no-any-return]
 
         recipe = Recipe(
@@ -522,10 +623,18 @@ def migrate_file_to_db(
         db.session.add(recipe)
         db.session.commit()
 
-        logger.info(f"Migrated recipe {recipe_id} from file {filename}")
+        logger.info(
+            "Migrated recipe %s from file %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(filename),
+        )
         return recipe
 
     except Exception as e:
-        logger.error(f"Error migrating recipe {filename}: {e}")
+        logger.error(
+            "Error migrating recipe %s: %s",
+            sanitize_log_value(filename),
+            sanitize_log_value(e),
+        )
         db.session.rollback()
         return None

@@ -152,6 +152,48 @@ jobs:
             }
           prompt: '/tlg-invoke-plan'
 
+      - name: 'Publish immutable approval reference'
+        if: steps.run_gemini_plan.outcome == 'success'
+        env:
+          GH_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          PLAN_RUN_ID: '${{ github.run_id }}'
+          TRIGGER_COMMENT_ID: '${{ github.event.comment.id }}'
+          APP_SLUG: "${{ steps.mint_identity_token.outputs['app-slug'] }}"
+        run: |-
+          TRUSTED_BOT_LOGIN="github-actions[bot]"
+          if [[ -n "${APP_SLUG}" ]]; then
+            TRUSTED_BOT_LOGIN="${APP_SLUG}[bot]"
+          fi
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments?per_page=100" \
+            --jq '.[]' > "${RUNNER_TEMP}/gemini-comments.jsonl"
+          PLAN_COMMENT_ID="$(
+            jq -sr \
+              --argjson trigger "${TRIGGER_COMMENT_ID}" \
+              --arg bot "${TRUSTED_BOT_LOGIN}" '
+              [.[] | select(
+                .id > $trigger and
+                .user.login == $bot and
+                (.body | contains("## 🤖 AI Assistant: Plan of Action"))
+              )] | last | .id // empty
+            ' "${RUNNER_TEMP}/gemini-comments.jsonl"
+          )"
+          if [[ -z "${PLAN_COMMENT_ID}" ]]; then
+            echo "::error::Gemini did not publish a trusted plan comment in this run"
+            exit 1
+          fi
+          BODY="Plan comment ${PLAN_COMMENT_ID} is ready for review.
+
+          Approve exactly this plan with:
+
+          \`/approve ${PLAN_RUN_ID}\`
+
+          <!-- gemini-plan-link:${PLAN_RUN_ID}:${PLAN_COMMENT_ID} -->"
+          gh api --method POST \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments" \
+            -f body="${BODY}"
+
   execute:
     runs-on: 'ubuntu-latest'
     timeout-minutes: 10
@@ -164,13 +206,76 @@ jobs:
       startsWith(github.event.comment.body, '/approve') &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     permissions:
-      contents: 'read'
+      contents: 'write'
       id-token: 'write'
       issues: 'write'
       pull-requests: 'write'
     env:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     steps:
+      - name: 'Mint identity token'
+        id: 'mint_identity_token'
+        if: |-
+          ${{ vars.APP_ID }}
+        uses: 'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1' # ratchet:actions/create-github-app-token@v2
+        with:
+          app-id: '${{ vars.APP_ID }}'
+          private-key: '${{ secrets.APP_PRIVATE_KEY }}'
+          permission-contents: 'write'
+          permission-issues: 'write'
+          permission-pull-requests: 'write'
+
+      - name: 'Verify approval references a trusted plan'
+        id: 'verify_plan'
+        env:
+          GH_TOKEN: '${{ steps.mint_identity_token.outputs.token || secrets.GITHUB_TOKEN || github.token }}'
+          APPROVAL_COMMENT: '${{ github.event.comment.body }}'
+          ISSUE_NUMBER: '${{ github.event.issue.number }}'
+          APP_SLUG: "${{ steps.mint_identity_token.outputs['app-slug'] }}"
+        run: |-
+          if [[ ! "${APPROVAL_COMMENT}" =~ ^/approve[[:space:]]+([0-9]+)[[:space:]]*$ ]]; then
+            echo "::error::Approval must be exactly '/approve <plan-run-id>'"
+            exit 1
+          fi
+          PLAN_RUN_ID="${BASH_REMATCH[1]}"
+          TRUSTED_BOT_LOGIN="github-actions[bot]"
+          if [[ -n "${APP_SLUG}" ]]; then
+            TRUSTED_BOT_LOGIN="${APP_SLUG}[bot]"
+          fi
+          gh api --paginate \
+            "repos/${GITHUB_REPOSITORY}/issues/${ISSUE_NUMBER}/comments?per_page=100" \
+            --jq '.[]' > "${RUNNER_TEMP}/gemini-comments.jsonl"
+          PLAN_COMMENT_ID="$(
+            jq -sr \
+              --arg run "${PLAN_RUN_ID}" \
+              --arg bot "${TRUSTED_BOT_LOGIN}" '
+              [
+                .[]
+                | select(.user.login == $bot)
+                | .body
+                | capture("<!-- gemini-plan-link:" + $run + ":(?<id>[0-9]+) -->")?
+              ] | last | .id // empty
+            ' "${RUNNER_TEMP}/gemini-comments.jsonl"
+          )"
+          if [[ -z "${PLAN_COMMENT_ID}" ]]; then
+            echo "::error::No trusted approval reference exists for plan run ${PLAN_RUN_ID}"
+            exit 1
+          fi
+          if ! jq -se \
+            --argjson id "${PLAN_COMMENT_ID}" \
+            --arg bot "${TRUSTED_BOT_LOGIN}" '
+            .[] | select(
+              .id == $id and
+              .user.login == $bot and
+              (.body | contains("## 🤖 AI Assistant: Plan of Action"))
+            )
+          ' "${RUNNER_TEMP}/gemini-comments.jsonl" >/dev/null; then
+            echo "::error::Referenced plan comment is missing or untrusted"
+            exit 1
+          fi
+          echo "plan_run_id=${PLAN_RUN_ID}" >> "${GITHUB_OUTPUT}"
+          echo "plan_comment_id=${PLAN_COMMENT_ID}" >> "${GITHUB_OUTPUT}"
+
       - name: 'Checkout repository'
         uses: 'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0' # ratchet:actions/checkout@v7
 
@@ -182,18 +287,6 @@ jobs:
         run: |-
           mkdir -p .gemini/commands
           cp .github/commands/tlg-invoke-plan.toml .github/commands/tlg-invoke-execute.toml .gemini/commands/
-
-      - name: 'Mint identity token'
-        id: 'mint_identity_token'
-        if: |-
-          ${{ vars.APP_ID }}
-        uses: 'actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1' # ratchet:actions/create-github-app-token@v2
-        with:
-          app-id: '${{ vars.APP_ID }}'
-          private-key: '${{ secrets.APP_PRIVATE_KEY }}'
-          permission-contents: 'read'
-          permission-issues: 'write'
-          permission-pull-requests: 'write'
 
       - name: 'Run Gemini CLI (execute approved plan)'
         id: 'run_gemini_execute'
@@ -207,6 +300,8 @@ jobs:
           ISSUE_NUMBER: '${{ github.event.issue.number }}'
           REPOSITORY: '${{ github.repository }}'
           APPROVAL_COMMENT: '${{ github.event.comment.body }}'
+          PLAN_RUN_ID: '${{ steps.verify_plan.outputs.plan_run_id }}'
+          PLAN_COMMENT_ID: '${{ steps.verify_plan.outputs.plan_comment_id }}'
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -253,8 +348,6 @@ jobs:
                     "search_pull_requests",
                     "create_branch",
                     "create_or_update_file",
-                    "delete_file",
-                    "fork_repository",
                     "get_commit",
                     "get_file_contents",
                     "list_commits",

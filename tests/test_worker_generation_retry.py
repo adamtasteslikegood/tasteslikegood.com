@@ -14,6 +14,7 @@ Covers:
 """
 
 import base64
+import datetime
 import json
 import sys
 import uuid
@@ -27,6 +28,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
+from models.user import User  # noqa: E402
 
 
 @pytest.fixture
@@ -85,13 +87,13 @@ def _image_push_envelope(recipe_id):
     return {"message": {"data": data}}
 
 
-def _make_pending_recipe(recipe_id):
+def _make_pending_recipe(recipe_id, status="generating"):
     recipe = Recipe(
         id=recipe_id,
         user_id=None,
         guest_session_id="guest-1",
         name="Generating...",
-        status="generating",
+        status=status,
         data={"id": recipe_id, "name": "Generating..."},
     )
     db.session.add(recipe)
@@ -237,7 +239,7 @@ def test_parse_max_attempts_is_defensive(raw, expected):
 def test_image_worker_persists_generated_image(app, client):
     recipe_id = str(uuid.uuid4())
     with app.app_context():
-        _make_pending_recipe(recipe_id)
+        _make_pending_recipe(recipe_id, status="ready")
 
     class GeneratedImage:
         class Image:
@@ -274,7 +276,7 @@ def test_image_worker_persists_generated_image(app, client):
 def test_image_worker_records_generation_failure(app, client):
     recipe_id = str(uuid.uuid4())
     with app.app_context():
-        _make_pending_recipe(recipe_id)
+        _make_pending_recipe(recipe_id, status="ready")
 
     class FakeModels:
         def generate_images(self, **kwargs):
@@ -297,7 +299,7 @@ def test_image_worker_records_generation_failure(app, client):
 def test_image_worker_skips_existing_image(app, client):
     recipe_id = str(uuid.uuid4())
     with app.app_context():
-        recipe = _make_pending_recipe(recipe_id)
+        recipe = _make_pending_recipe(recipe_id, status="ready")
         recipe.data.update(
             {
                 "ai_image_data": "existing-image",
@@ -316,7 +318,7 @@ def test_image_worker_skips_existing_image(app, client):
 def test_image_worker_uploads_to_gcs_when_configured(app, client):
     recipe_id = str(uuid.uuid4())
     with app.app_context():
-        _make_pending_recipe(recipe_id)
+        _make_pending_recipe(recipe_id, status="ready")
 
     class GeneratedImage:
         class Image:
@@ -352,3 +354,162 @@ def test_image_worker_uploads_to_gcs_when_configured(app, client):
         recipe = db.session.get(Recipe, recipe_id)
         assert recipe.data["ai_image_gcs"] == f"gs://recipe-images/{recipe_id}.png"
         assert "ai_image_data" not in recipe.data
+
+
+def test_recipe_worker_uses_owner_after_guest_login(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id)
+        user = User(email="worker-owner@example.com", name="Worker Owner")
+        db.session.add(user)
+        db.session.flush()
+        recipe.user_id = user.id
+        recipe.guest_session_id = None
+        db.session.commit()
+        owner_id = user.id
+
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            return_value=(VALID_RECIPE, json.dumps(VALID_RECIPE), None),
+        ),
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("services.pubsub_service.publish_message"),
+    ):
+        response = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "ready"
+        assert recipe.user_id == owner_id
+        assert recipe.guest_session_id is None
+
+
+def test_image_worker_uses_owner_after_guest_login(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id, status="ready")
+        user = User(email="image-worker-owner@example.com", name="Image Worker Owner")
+        db.session.add(user)
+        db.session.flush()
+        recipe.user_id = user.id
+        recipe.guest_session_id = None
+        db.session.commit()
+        owner_id = user.id
+
+    class GeneratedImage:
+        class Image:
+            image_bytes = b"generated-image"
+
+        image = Image()
+
+    class FakeModels:
+        def generate_images(self, **kwargs):
+            class Response:
+                generated_images = [GeneratedImage()]
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    with (
+        patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()),
+        patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", None),
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("blueprints.worker_api_bp.invalidate_recipe_image"),
+    ):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.user_id == owner_id
+        assert recipe.guest_session_id is None
+        assert recipe.data["ai_image_url"] == f"/api/recipes/{recipe_id}/image"
+
+
+def test_recipe_worker_skips_completed_redelivery(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id)
+        recipe.status = "ready"
+        db.session.commit()
+
+    with patch("blueprints.worker_api_bp.attempt_recipe_generation") as generate:
+        response = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    generate.assert_not_called()
+
+
+def test_recipe_worker_retries_unexpected_failure(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            return_value=(VALID_RECIPE, json.dumps(VALID_RECIPE), None),
+        ),
+        patch(
+            "blueprints.worker_api_bp.db_recipe_repository.update_recipe",
+            side_effect=RuntimeError("database unavailable"),
+        ),
+    ):
+        response = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+
+    assert response.status_code == 500
+    with app.app_context():
+        assert db.session.get(Recipe, recipe_id).status == "generating"
+
+
+def test_image_worker_records_missing_credentials_and_retries(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id, status="ready")
+
+    with patch("blueprints.worker_api_bp.get_genai_client", return_value=None):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 500
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "ready"
+        metadata = recipe.data["ai_metadata"]["image_generation"]
+        assert metadata["success"] is False
+        assert metadata["error"] == "No AI credentials available"
+
+
+def test_worker_claim_prevents_concurrent_generation_and_reclaims_stale_work(app):
+    from repositories import db_recipe_repository
+
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id)
+
+        assert db_recipe_repository.claim_recipe_for_worker(
+            recipe_id,
+            expected_status="generating",
+            processing_status="processing",
+            stale_after_seconds=120,
+        )
+        assert not db_recipe_repository.claim_recipe_for_worker(
+            recipe_id,
+            expected_status="generating",
+            processing_status="processing",
+            stale_after_seconds=120,
+        )
+
+        recipe = db.session.get(Recipe, recipe_id)
+        recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
+        db.session.commit()
+
+        assert db_recipe_repository.claim_recipe_for_worker(
+            recipe_id,
+            expected_status="generating",
+            processing_status="processing",
+            stale_after_seconds=120,
+        )
