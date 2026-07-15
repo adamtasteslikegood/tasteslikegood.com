@@ -159,7 +159,13 @@ def create_app(**config_overrides):
             logger.info("Response cache: Valkey/Redis backend")
         else:
             app.config["CACHE_TYPE"] = "SimpleCache"
-            logger.info("Response cache: in-memory SimpleCache (no Valkey/Redis configured)")
+            if VALKEY_HOST or REDIS_URL:
+                logger.warning(
+                    "Response cache: in-memory SimpleCache fallback — "
+                    "configured Valkey/Redis is unavailable"
+                )
+            else:
+                logger.info("Response cache: in-memory SimpleCache (no Valkey/Redis configured)")
         app.config.setdefault("CACHE_DEFAULT_TIMEOUT", 300)
 
     cache.init_app(app)

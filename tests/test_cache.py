@@ -121,7 +121,7 @@ def test_valkey_password_backend_roundtrips_through_client(monkeypatch):
     assert any(key.endswith("k") for key in fake.store)
 
 
-def test_unreachable_valkey_falls_back_to_simplecache(monkeypatch):
+def test_unreachable_valkey_falls_back_to_simplecache(monkeypatch, caplog):
     class BoomRedis:
         def __init__(self, **kwargs):
             pass
@@ -134,9 +134,13 @@ def test_unreachable_valkey_falls_back_to_simplecache(monkeypatch):
     monkeypatch.setattr("config.REDIS_URL", None)
     monkeypatch.setattr("redis.StrictRedis", BoomRedis)
 
-    app = create_app(TESTING=True, SQLALCHEMY_DATABASE_URI="sqlite:///:memory:")
+    with caplog.at_level("WARNING"):
+        app = create_app(TESTING=True, SQLALCHEMY_DATABASE_URI="sqlite:///:memory:")
 
     assert app.config["CACHE_TYPE"] == "SimpleCache"
+    # The fallback must be logged as configured-but-unavailable, not as
+    # "no Valkey/Redis configured" — the two states need different triage.
+    assert any("configured Valkey/Redis is unavailable" in r.message for r in caplog.records)
     with app.app_context():
         cache.set("k", "v", timeout=60)
         assert cache.get("k") == "v"
