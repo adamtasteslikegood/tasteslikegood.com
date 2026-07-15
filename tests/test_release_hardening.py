@@ -35,6 +35,16 @@ def test_release_workflows_pin_third_party_actions():
         re.MULTILINE,
     )
 
+    workflows = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (ROOT / ".github/workflows").glob("gemini-*.yml")
+    )
+    assert "ghcr.io/github/github-mcp-server:v0.18.0" not in workflows
+    assert (
+        "ghcr.io/github/github-mcp-server@sha256:"
+        "5228f9e0b057d419e0e1919729493f75674304181f0ac85ae8385d89dd86affc"
+    ) in workflows
+
 
 def test_gemini_execute_is_bound_to_trusted_plan_comment():
     workflow = (ROOT / ".github/workflows/gemini-invoke.yml").read_text(encoding="utf-8")
@@ -51,6 +61,10 @@ def test_gemini_execute_is_bound_to_trusted_plan_comment():
     assert '"fork_repository"' not in workflow
     assert "Approved Plan Comment ID" in execute_prompt
     assert "Never substitute a newer or similarly titled comment" in execute_prompt
+
+    triage_workflow = (ROOT / ".github/workflows/gemini-triage.yml").read_text(encoding="utf-8")
+    assert "github.rest.issues.addLabels" in triage_workflow
+    assert "github.rest.issues.setLabels" not in triage_workflow
 
 
 def test_manual_gemini_review_checks_out_resolved_pull_request_head():

@@ -83,8 +83,13 @@ def _recipe_image_url(recipe: Recipe) -> str | None:
 
 def _format_ingredient(ingredient: dict[str, Any]) -> str:
     amount = ingredient.get("amount")
-    if isinstance(amount, (list, tuple)) and len(amount) >= 2:
-        amount_text = f"{amount[0]}–{amount[1]}"
+    if isinstance(amount, (list, tuple)):
+        if len(amount) >= 2:
+            amount_text = f"{amount[0]}–{amount[1]}"
+        elif len(amount) == 1:
+            amount_text = str(amount[0])
+        else:
+            amount_text = ""
     elif amount not in (None, ""):
         amount_text = str(amount)
     else:

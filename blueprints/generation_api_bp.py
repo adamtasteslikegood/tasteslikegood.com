@@ -51,7 +51,7 @@ def generate_recipe_json():
         }
 
     Returns:
-        201: { "recipe": { ...recipe data... } }
+        202: { "recipe_id": "uuid-string", "status": "generating" }
         400: { "error": "..." }
         500: { "error": "..." }
     """
@@ -77,12 +77,15 @@ def generate_recipe_json():
     # Save a pending recipe to database
     pending_data = {"id": recipe_id, "name": "Generating...", "user_id": user_id}
 
-    db_recipe = db_recipe_repository.create_recipe(pending_data, user_id, guest_session_id)
+    db_recipe = db_recipe_repository.create_recipe(
+        pending_data,
+        user_id,
+        guest_session_id,
+        status="generating",
+    )
 
     if not db_recipe:
         return jsonify({"error": "Failed to save recipe to database"}), 500
-
-    db_recipe_repository.update_recipe_status(recipe_id, "generating", user_id, guest_session_id)
 
     # Publish message to Pub/Sub
     from services.pubsub_service import publish_message
@@ -126,7 +129,8 @@ def generate_image_for_recipe():
         }
 
     Returns:
-        200: { "image_url": "/api/recipes/<id>/image" }
+        200: { "image_url": "/api/recipes/<id>/image" } when an image already exists
+        202: { "status": "generating_image" } after queueing; poll the recipe status endpoint
         400/404/500: { "error": "..." }
     """
     data = request.get_json()

@@ -14,6 +14,9 @@ def require_admin():
     admin_key = os.environ.get("ADMIN_API_TOKEN", "")
     auth_header = request.headers.get("Authorization", "")
     supplied_key = auth_header[7:] if auth_header.startswith("Bearer ") else ""
-    if not admin_key or not hmac.compare_digest(supplied_key, admin_key):
+    if not admin_key or not hmac.compare_digest(
+        supplied_key.encode("utf-8"),
+        admin_key.encode("utf-8"),
+    ):
         return jsonify({"error": "Unauthorized — admin token required"}), 403
     return None

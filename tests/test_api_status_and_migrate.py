@@ -63,6 +63,12 @@ class TestMigrateAuth:
         resp = client.post("/api/migrate", headers={"Authorization": "Bearer anything"})
         assert resp.status_code == 403
 
+    def test_non_ascii_token_rejected(self, client, monkeypatch):
+        monkeypatch.setenv("ADMIN_API_TOKEN", "sekrit")
+        auth_header = "".join(["Bear", "er ", "s\u00e9krit"])
+        resp = client.post("/api/migrate", headers={"Authorization": auth_header})
+        assert resp.status_code == 403
+
     def test_valid_token_runs_migration(self, client, monkeypatch):
         monkeypatch.setenv("ADMIN_API_TOKEN", "sekrit")
         with patch(

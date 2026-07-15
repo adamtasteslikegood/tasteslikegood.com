@@ -52,7 +52,12 @@ def _make_recipe(*, status="ready", data=None, guest_session_id="guest-1"):
 
 
 def test_generate_recipe_creates_pending_row_and_queues_message(app, client):
-    with patch("services.pubsub_service.publish_message") as publish:
+    with (
+        patch("services.pubsub_service.publish_message") as publish,
+        patch(
+            "blueprints.generation_api_bp.db_recipe_repository.update_recipe_status"
+        ) as update_status,
+    ):
         response = client.post(
             "/api/generate",
             json={"prompt": "A bright summer pasta", "model": "models/test-model"},
@@ -75,6 +80,7 @@ def test_generate_recipe_creates_pending_row_and_queues_message(app, client):
             "guest_session_id": "guest-1",
         },
     )
+    update_status.assert_not_called()
 
 
 def test_generate_recipe_marks_pending_row_error_when_publish_fails(app, client):

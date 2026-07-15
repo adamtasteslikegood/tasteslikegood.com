@@ -119,7 +119,7 @@ jobs:
                     "--rm",
                     "-e",
                     "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                    "ghcr.io/github/github-mcp-server@sha256:5228f9e0b057d419e0e1919729493f75674304181f0ac85ae8385d89dd86affc"
                   ],
                   "includeTools": [
                     "add_issue_comment",
@@ -334,7 +334,7 @@ jobs:
                     "--rm",
                     "-e",
                     "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "ghcr.io/github/github-mcp-server:v0.18.0"
+                    "ghcr.io/github/github-mcp-server@sha256:5228f9e0b057d419e0e1919729493f75674304181f0ac85ae8385d89dd86affc"
                   ],
                   "includeTools": [
                     "add_issue_comment",

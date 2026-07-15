@@ -163,7 +163,10 @@ def test_invalid_json_sets_real_error_message(app):
             return FakeResponse()
 
     class FakeClient:
+        options = []
+
         def __init__(self, **kwargs):
+            self.options.append(kwargs)
             self.models = FakeModels()
 
     with (
@@ -179,6 +182,12 @@ def test_invalid_json_sets_real_error_message(app):
     assert raw_json is None
     assert last_error != "Unknown error"
     assert "invalid JSON" in last_error
+    assert FakeClient.options == [
+        {
+            "api_key": "fake-key",
+            "http_options": generation_bp.GENAI_HTTP_OPTIONS,
+        }
+    ]
 
 
 def test_schema_validation_failure_sets_real_error_message(app):

@@ -304,6 +304,7 @@ def create_recipe(
     recipe_data: Dict[str, Any],
     user_id: Optional[int] = None,
     guest_session_id: Optional[str] = None,
+    status: str = "ready",
 ) -> Optional[Recipe]:
     """
     Create a new recipe in the database.
@@ -311,6 +312,8 @@ def create_recipe(
     Args:
         recipe_data: Full recipe JSON data
         user_id: Optional user ID (None for anonymous recipes)
+        guest_session_id: Guest owner scope when user_id is None
+        status: Initial generation state, persisted in the creation transaction
 
     Returns:
         Created Recipe object, or None if creation failed
@@ -344,6 +347,7 @@ def create_recipe(
                 existing.slug = data.get("slug")
                 existing.is_public = data.get("is_public", False)
                 existing.data = data
+                existing.status = status
                 existing.updated_at = datetime.utcnow()
                 return existing  # type: ignore[no-any-return]
 
@@ -360,6 +364,7 @@ def create_recipe(
                 slug=data.get("slug"),
                 is_public=data.get("is_public", False),
                 data=data,
+                status=status,
             )
             db.session.add(recipe)
             return recipe

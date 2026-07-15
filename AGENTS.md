@@ -61,12 +61,12 @@ utils.py                        # recipe data normalization (units, fractions, f
 
 blueprints/
   auth_api_bp.py                # /api/auth/* — OAuth flow, sessions, profile
-  generation_bp.py              # /api/generate, /api/generate_image (Gemini + Imagen)
-  generation_api_bp.py          # JSON variant for SPA
+  generation_bp.py              # legacy HTML generation helpers/routes
+  generation_api_bp.py          # /api/generate, /api/generate_image, status/image API
   recipes_api_bp.py             # /api/recipes CRUD
   collections_api_bp.py         # /api/collections (cookbooks) CRUD
   worker_api_bp.py              # Pub/Sub push handlers (OIDC-verified)
-  public_ssr_bp.py              # SSR public recipe routes (slug-based)
+  public_bp.py                  # SSR public recipe routes (slug-based)
 
 services/                       # business logic (gemini_service, image_service, ...)
 repositories/                   # data access with file locking + DB

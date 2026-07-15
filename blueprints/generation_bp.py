@@ -28,6 +28,7 @@ from repositories.recipe_repository import (
     invalidate_cache,
     save_recipe,
 )
+from services.gemini_service import GENAI_HTTP_OPTIONS
 from utils import normalize_recipe_data
 from utils.session_utils import get_user_metadata
 from validators import validate_recipe_data
@@ -183,7 +184,10 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
                 **session["credentials"],
                 client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
             )
-            user_client = Client(credentials=creds)
+            user_client = Client(
+                credentials=creds,
+                http_options=GENAI_HTTP_OPTIONS,
+            )
             recipe_data, recipe_json_str = _attempt_with_client(user_client, "User Credentials")
         except Exception as e:
             print(f"User credential generation failed: {e}")
@@ -192,7 +196,10 @@ def attempt_recipe_generation(full_prompt, selected_model):  # noqa: C901
     # 2. Fallback to API Key if step 1 failed or wasn't attempted
     if recipe_data is None and GOOGLE_API_KEY:
         try:
-            api_client = Client(api_key=GOOGLE_API_KEY)
+            api_client = Client(
+                api_key=GOOGLE_API_KEY,
+                http_options=GENAI_HTTP_OPTIONS,
+            )
             recipe_data, recipe_json_str = _attempt_with_client(api_client, "API Key")
         except Exception as e:
             print(f"API Key generation failed: {e}")
