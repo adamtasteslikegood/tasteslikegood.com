@@ -51,3 +51,10 @@ def test_gemini_execute_is_bound_to_trusted_plan_comment():
     assert '"fork_repository"' not in workflow
     assert "Approved Plan Comment ID" in execute_prompt
     assert "Never substitute a newer or similarly titled comment" in execute_prompt
+
+
+def test_manual_gemini_review_checks_out_resolved_pull_request_head():
+    workflow = (ROOT / ".github/workflows/gemini-review.yml").read_text(encoding="utf-8")
+
+    assert "core.setOutput('head_sha', pr.head.sha)" in workflow
+    assert "ref: '${{ steps.pr.outputs.head_sha }}'" in workflow

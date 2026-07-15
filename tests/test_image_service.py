@@ -3,7 +3,9 @@
 import sys
 from pathlib import Path
 import unittest
-from unittest.mock import MagicMock, patch, mock_open
+from unittest.mock import MagicMock, mock_open, patch
+
+from flask import session
 
 # Ensure app can be imported
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -45,11 +47,13 @@ class TestImageService(unittest.TestCase):
 
     @patch("services.image_service.get_genai_client")
     def test_generate_fails_without_client(self, mock_get_client):
-        """Should return an error if no Gemini client can be created (no auth)."""
+        """Should use server credentials even when identity-only OAuth exists."""
+        session["credentials"] = {"token": "identity-only-token"}
         mock_get_client.return_value = None
 
         url, err = generate_ai_image("dummy_path", {"name": "Test Recipe"}, "test.json")
 
+        mock_get_client.assert_called_once_with(None)
         self.assertIsNone(url)
         self.assertEqual(err["status"], 500)
         self.assertIn("credentials", err["error"].lower())
@@ -97,7 +101,7 @@ class TestImageService(unittest.TestCase):
 
         self.assertIsNone(url)
         self.assertEqual(err["status"], 500)
-        self.assertIn("Simulated API Crash", err["error"])
+        self.assertEqual(err["error"], "Image generation failed")
         # Should have appended to the recipe_error.txt log file
         mock_file_open.assert_called_with("recipe_error.txt", "a")
 

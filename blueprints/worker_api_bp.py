@@ -433,7 +433,11 @@ def process_image():
                 sanitize_log_value(recipe_id),
                 sanitize_log_value(e),
             )
-            if not _record_image_failure(recipe_id, recipe_data, str(e)):
+            if not _record_image_failure(
+                recipe_id,
+                recipe_data,
+                "Image generation failed",
+            ):
                 raise RuntimeError("Image generation failure could not be persisted")
 
     except Exception as e:

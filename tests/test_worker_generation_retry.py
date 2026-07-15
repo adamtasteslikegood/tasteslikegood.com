@@ -293,7 +293,7 @@ def test_image_worker_records_generation_failure(app, client):
         recipe = db.session.get(Recipe, recipe_id)
         metadata = recipe.data["ai_metadata"]["image_generation"]
         assert metadata["success"] is False
-        assert metadata["error"] == "Imagen unavailable"
+        assert metadata["error"] == "Image generation failed"
 
 
 def test_image_worker_skips_existing_image(app, client):

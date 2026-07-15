@@ -95,6 +95,7 @@ jobs:
             core.setOutput('number', String(prNumber));
             core.setOutput('title', pr.title || '');
             core.setOutput('body', pr.body || '');
+            core.setOutput('head_sha', pr.head.sha);
 
       - name: 'Mint identity token'
         id: 'mint_identity_token'
@@ -112,6 +113,8 @@ jobs:
         if: |-
           ${{ steps.pr.outputs.skip == 'false' }}
         uses: 'actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0' # ratchet:actions/checkout@v7
+        with:
+          ref: '${{ steps.pr.outputs.head_sha }}'
 
       - name: 'Run Gemini pull request review'
         if: |-
