@@ -61,7 +61,11 @@ def require_pubsub_oidc(fn):
             abort(401)
         token = auth_header.split(None, 1)[1].strip()
         try:
-            claims = id_token.verify_oauth2_token(token, g_requests.Request())
+            claims = id_token.verify_oauth2_token(
+                token,
+                g_requests.Request(),
+                audience=request.base_url,
+            )
         except ValueError as e:
             logger.warning(f"Pub/Sub OIDC verification failed: {e}")
             abort(401)
