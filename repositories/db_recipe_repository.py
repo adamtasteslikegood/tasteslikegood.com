@@ -103,13 +103,13 @@ def _resolve_public_slug(
     since candidates are tested by exact membership.
     """
     provided_slug = recipe_data.get("slug")
-    preserve_current_slug = (
+    if (
         current_slug is not None
-        and bool(current_slug.strip())
+        and current_slug.strip()
         and "/" not in current_slug
         and "\\" not in current_slug
-    )
-    if preserve_current_slug and (provided_slug is None or str(provided_slug) == current_slug):
+        and (provided_slug is None or str(provided_slug) == current_slug)
+    ):
         return current_slug
 
     for source in (recipe_data.get("slug"), current_slug, recipe_data.get("name")):
