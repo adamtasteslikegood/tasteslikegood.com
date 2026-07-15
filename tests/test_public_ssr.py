@@ -13,6 +13,7 @@ import base64
 import sys
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from sqlalchemy import event
@@ -261,6 +262,26 @@ def test_partial_recipe_omits_blank_metadata_and_formats_amount_ranges(app, clie
     assert "1–2" in body
 
 
+def test_public_recipe_filters_malformed_tags_from_json_ld(app, client):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Tagged Soup",
+            "tagged-soup",
+            data={
+                "name": "Tagged Soup",
+                "tags": ["vegan", 7, None, {"bad": "shape"}, " soup "],
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/tagged-soup")
+
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert '"keywords": "vegan, soup"' in body
+
+
 @pytest.mark.parametrize(
     "ingredients",
     [
@@ -361,6 +382,37 @@ def test_public_recipe_image_served_without_session(app, client):
     assert resp.mimetype == "image/png"
     assert resp.data == png_bytes
     assert resp.headers["Cache-Control"] == "public, max-age=86400"
+
+
+def test_public_recipe_image_uses_stored_versioned_gcs_uri(app, client):
+    gcs_uri = "gs://recipe-images/images/recipe-id/lease-token.png"
+    png_bytes = b"\x89PNG\r\n\x1a\ngcs"
+    with app.app_context():
+        recipe = _make_recipe(
+            "Public GCS Image",
+            "public-gcs-image",
+            data={
+                "name": "Public GCS Image",
+                "ai_image_gcs": gcs_uri,
+                "ai_image_url": "/api/recipes/recipe-id/image",
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    with (
+        patch("blueprints.generation_api_bp.GCS_BUCKET_NAME", "recipe-images"),
+        patch(
+            "services.gcs_service.download_image",
+            return_value=png_bytes,
+        ) as download,
+    ):
+        resp = client.get(f"/api/recipes/{recipe_id}/image")
+
+    assert resp.status_code == 200
+    assert resp.data == png_bytes
+    download.assert_called_once_with("recipe-images", recipe_id, gcs_uri)
 
 
 def test_private_recipe_image_still_requires_ownership(app, client):

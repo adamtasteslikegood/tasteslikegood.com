@@ -61,12 +61,12 @@ utils.py                        # recipe data normalization (units, fractions, f
 
 blueprints/
   auth_api_bp.py                # /api/auth/* — OAuth flow, sessions, profile
-  generation_bp.py              # /api/generate, /api/generate_image (Gemini + Imagen)
-  generation_api_bp.py          # JSON variant for SPA
+  generation_bp.py              # legacy HTML generation helpers/routes
+  generation_api_bp.py          # /api/generate, /api/generate_image, status/image API
   recipes_api_bp.py             # /api/recipes CRUD
   collections_api_bp.py         # /api/collections (cookbooks) CRUD
   worker_api_bp.py              # Pub/Sub push handlers (OIDC-verified)
-  public_ssr_bp.py              # SSR public recipe routes (slug-based)
+  public_bp.py                  # SSR public recipe routes (slug-based)
 
 services/                       # business logic (gemini_service, image_service, ...)
 repositories/                   # data access with file locking + DB
@@ -90,7 +90,7 @@ OAuth flow lives in `blueprints/auth_api_bp.py`. PKCE `code_verifier` is persist
 
 ### Async generation (Pub/Sub)
 
-`worker_api_bp.py` exposes HTTP push endpoints that Pub/Sub invokes with OIDC tokens. It fails closed with 503 if `GCP_PROJECT_ID` or `PUBSUB_INVOKER_SA` are unset. The cookbook's `cloudbuild.yaml` injects both env vars on Flask Cloud Run deploys.
+`worker_api_bp.py` exposes HTTP push endpoints that Pub/Sub invokes with OIDC tokens. Push authentication fails closed with 503 when `PUBSUB_INVOKER_SA` is unset. `GCP_PROJECT_ID` is separately required when API/worker code publishes Pub/Sub messages. The cookbook's `cloudbuild.yaml` injects both env vars on Flask Cloud Run deploys.
 
 ## Commands
 
@@ -135,8 +135,9 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `FLASK_SECRET_KEY` | Session signing. **Required in prod** — `FLASK_ENV=production` fails fast if missing. |
 | `FLASK_ENV` | `production` activates `OAUTHLIB_INSECURE_TRANSPORT` guard + secret-key fail-fast. |
 | `GCS_BUCKET_NAME` | Recipe image storage (`tasteslikegood-recipe-images` in prod) |
-| `GCP_PROJECT_ID`, `PUBSUB_INVOKER_SA` | Required for `worker_api_bp` to accept push messages |
-| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Set by cookbook deploy; backend currently does not use Valkey directly |
+| `GCP_PROJECT_ID` | Required when API/worker code publishes Pub/Sub messages |
+| `PUBSUB_INVOKER_SA` | Required for `worker_api_bp` to authenticate push messages |
+| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Optional distributed cache configuration used by recipe, collection, and image paths; helpers fall back when unavailable |
 | `FRONTEND_URL`, `SESSION_COOKIE_DOMAIN` | OAuth redirects, cookie scoping |
 | `DD_API_KEY` | **Required in prod** for the Docker image's Datadog `serverless-init` entrypoint — without it traces/profiles/logs/AppSec events are dropped (app still serves). Injected via `--set-secrets` in the cookbook `cloudbuild.yaml`; not needed for local `python app.py`. |
 

@@ -276,7 +276,11 @@ def serve_recipe_image(recipe_id):
     if GCS_BUCKET_NAME and recipe_data.get("ai_image_gcs"):
         from services.gcs_service import download_image
 
-        image_bytes = download_image(GCS_BUCKET_NAME, recipe_id)
+        image_bytes = download_image(
+            GCS_BUCKET_NAME,
+            recipe_id,
+            recipe_data.get("ai_image_gcs"),
+        )
 
     # Fall back to legacy base64 in DB
     if image_bytes is None:

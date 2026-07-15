@@ -40,7 +40,8 @@ jobs:
     # Deterministic trigger gate: association is computed by GitHub from the
     # actual commenter, and cannot be forged via comment content.
     if: |-
-      contains(github.event.comment.body, '@gemini-cli') &&
+      (github.event.comment.body == '@gemini-cli' ||
+       startsWith(github.event.comment.body, '@gemini-cli ')) &&
       !startsWith(github.event.comment.body, '/approve') &&
       contains(fromJSON('["OWNER", "MEMBER", "COLLABORATOR"]'), github.event.comment.author_association)
     permissions:

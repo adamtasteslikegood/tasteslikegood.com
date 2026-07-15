@@ -90,7 +90,7 @@ OAuth flow lives in `blueprints/auth_api_bp.py`. PKCE `code_verifier` is persist
 
 ### Async generation (Pub/Sub)
 
-`worker_api_bp.py` exposes HTTP push endpoints that Pub/Sub invokes with OIDC tokens. It fails closed with 503 if `GCP_PROJECT_ID` or `PUBSUB_INVOKER_SA` are unset. The cookbook's `cloudbuild.yaml` injects both env vars on Flask Cloud Run deploys.
+`worker_api_bp.py` exposes HTTP push endpoints that Pub/Sub invokes with OIDC tokens. Push authentication fails closed with 503 when `PUBSUB_INVOKER_SA` is unset. `GCP_PROJECT_ID` is separately required when API/worker code publishes Pub/Sub messages. The cookbook's `cloudbuild.yaml` injects both env vars on Flask Cloud Run deploys.
 
 ## Commands
 
@@ -139,8 +139,9 @@ On feature branches, commit and push after every significant work-run so work is
 | `FLASK_SECRET_KEY` | Session signing. **Required in prod** — `FLASK_ENV=production` fails fast if missing. |
 | `FLASK_ENV` | `production` activates `OAUTHLIB_INSECURE_TRANSPORT` guard + secret-key fail-fast. |
 | `GCS_BUCKET_NAME` | Recipe image storage (`tasteslikegood-recipe-images` in prod) |
-| `GCP_PROJECT_ID`, `PUBSUB_INVOKER_SA` | Required for `worker_api_bp` to accept push messages |
-| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Set by cookbook deploy; backend currently does not use Valkey directly |
+| `GCP_PROJECT_ID` | Required when API/worker code publishes Pub/Sub messages |
+| `PUBSUB_INVOKER_SA` | Required for `worker_api_bp` to authenticate push messages |
+| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Optional distributed cache configuration used by recipe, collection, and image paths; helpers fall back when unavailable |
 | `FRONTEND_URL`, `SESSION_COOKIE_DOMAIN` | OAuth redirects, cookie scoping |
 
 In production all secrets come from Google Secret Manager via Cloud Run `--set-secrets`.

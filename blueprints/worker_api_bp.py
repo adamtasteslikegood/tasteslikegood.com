@@ -91,28 +91,127 @@ def _claim_image_worker(recipe_id, status):
     )
 
 
-def _record_image_failure(recipe_id, recipe_data, error_message, claim_token):
-    """Persist image failure metadata against the recipe's current owner."""
-    recipe, _, _ = _current_recipe_scope(recipe_id)
-    if recipe is None:
-        return False
-    metadata = dict((recipe_data or {}).get("ai_metadata") or {})
-    metadata["image_generation"] = {
-        "success": False,
-        "error": error_message,
-        "timestamp": datetime.datetime.now().isoformat(),
-    }
-    updated_data = {**(recipe_data or {}), "ai_metadata": metadata}
+def _record_image_failure(recipe_id, error_message, claim_token):
+    """Persist image failure metadata without replacing user-owned recipe data."""
+    timestamp = datetime.datetime.now().isoformat()
     return (
-        db_recipe_repository.update_recipe_for_worker(
+        db_recipe_repository.patch_recipe_for_worker(
             recipe_id,
-            updated_data,
+            {
+                "ai_metadata": {
+                    "image_generation": {
+                        "success": False,
+                        "error": error_message,
+                        "timestamp": timestamp,
+                    },
+                    "image_enqueue": {
+                        "status": "complete",
+                        "timestamp": timestamp,
+                    },
+                }
+            },
             claim_token,
             status="ready",
             expected_status="generating_image",
         )
         is not None
     )
+
+
+def _image_enqueue_pending(recipe_data):
+    metadata = (recipe_data or {}).get("ai_metadata")
+    if not isinstance(metadata, dict):
+        return False
+    enqueue = metadata.get("image_enqueue")
+    return isinstance(enqueue, dict) and enqueue.get("status") == "pending"
+
+
+def _publish_image_generation(recipe_id, user_id, guest_session_id):
+    from services.pubsub_service import publish_message
+
+    publish_message(
+        "image-generation",
+        {
+            "recipe_id": recipe_id,
+            "user_id": user_id,
+            "guest_session_id": guest_session_id,
+            "force_regenerate": False,
+        },
+    )
+    logger.info(
+        "Queued image generation for recipe %s",
+        sanitize_log_value(recipe_id),
+    )
+
+
+def _existing_recipe_delivery_response(recipe_id, recipe, user_id, guest_session_id):
+    """Handle recipe-message redelivery after generation has already finished."""
+    should_retry_enqueue = _image_enqueue_pending(recipe.data) and (
+        recipe.status == "ready"
+        or (recipe.status == "generating_image" and recipe.worker_claim_token is None)
+    )
+    if should_retry_enqueue:
+        try:
+            _publish_image_generation(recipe_id, user_id, guest_session_id)
+        except Exception as e:
+            logger.error(
+                "Failed to requeue image generation for %s: %s",
+                sanitize_log_value(recipe_id),
+                sanitize_log_value(e),
+            )
+            return jsonify({"status": "retry"}), 500
+        return jsonify({"status": "ok"}), 200
+    if recipe.status == "ready":
+        return jsonify({"status": "ok"}), 200
+    if recipe.status in {"error", "generating_image"}:
+        logger.info(
+            "Skipping recipe generation for %s with terminal status %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(recipe.status),
+        )
+        return jsonify({"status": "ok"}), 200
+    return None
+
+
+def _image_generation_metadata(user_id, guest_session_id, image_prompt):
+    timestamp = datetime.datetime.now().isoformat()
+    return {
+        "image_generation": {
+            "model": "imagen-4.0-generate-001",
+            "user_id": user_id,
+            "user_display_name": "Background Worker",
+            "is_authenticated": user_id is not None,
+            "session_id": guest_session_id,
+            "prompt": image_prompt,
+            "timestamp": timestamp,
+            "success": True,
+        },
+        "image_enqueue": {
+            "status": "complete",
+            "timestamp": timestamp,
+        },
+    }
+
+
+def _delete_replaced_gcs_image(recipe_id, previous_gcs_uri, current_gcs_uri):
+    if (
+        not GCS_BUCKET_NAME
+        or not previous_gcs_uri
+        or not current_gcs_uri
+        or previous_gcs_uri == current_gcs_uri
+    ):
+        return
+    from services.gcs_service import delete_image
+
+    delete_image(GCS_BUCKET_NAME, recipe_id, previous_gcs_uri)
+
+
+def _delete_unpersisted_gcs_image(recipe_id, uploaded_gcs_uri, image_persisted):
+    if not uploaded_gcs_uri or image_persisted:
+        return
+    from services.gcs_service import delete_image
+
+    delete_image(GCS_BUCKET_NAME, recipe_id, uploaded_gcs_uri)
 
 
 def require_pubsub_oidc(fn):
@@ -187,13 +286,14 @@ def process_recipe():
         recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
         if recipe is None:
             return jsonify({"status": "ok"}), 200
-        if recipe.status in {"ready", "error"}:
-            logger.info(
-                "Skipping recipe generation for %s with terminal status %s",
-                sanitize_log_value(recipe_id),
-                sanitize_log_value(recipe.status),
-            )
-            return jsonify({"status": "ok"}), 200
+        existing_response = _existing_recipe_delivery_response(
+            recipe_id,
+            recipe,
+            user_id,
+            guest_session_id,
+        )
+        if existing_response is not None:
+            return existing_response
         claim_token = db_recipe_repository.claim_recipe_for_worker(
             recipe_id,
             expected_status="generating",
@@ -268,6 +368,10 @@ def process_recipe():
                 "success": True,
             },
             "image_generation": None,
+            "image_enqueue": {
+                "status": "pending",
+                "timestamp": datetime.datetime.now().isoformat(),
+            },
             "stock_image_generation": None,
         }
 
@@ -286,29 +390,15 @@ def process_recipe():
         invalidate_recipe(user_id, guest_session_id, recipe_id)
         logger.info("Successfully generated recipe %s", sanitize_log_value(recipe_id))
 
-        # Trigger image generation
-        from services.pubsub_service import publish_message
-
         try:
-            publish_message(
-                "image-generation",
-                {
-                    "recipe_id": recipe_id,
-                    "user_id": user_id,
-                    "guest_session_id": guest_session_id,
-                    "force_regenerate": False,
-                },
-            )
-            logger.info(
-                "Queued image generation for recipe %s",
-                sanitize_log_value(recipe_id),
-            )
+            _publish_image_generation(recipe_id, user_id, guest_session_id)
         except Exception as e:
             logger.error(
                 "Failed to queue image generation for %s: %s",
                 sanitize_log_value(recipe_id),
                 sanitize_log_value(e),
             )
+            return jsonify({"status": "retry"}), 500
 
     except Exception as e:
         logger.error("Error processing recipe message: %s", sanitize_log_value(e))
@@ -379,6 +469,7 @@ def process_image():
         if recipe is None:
             return jsonify({"status": "ok"}), 200
         recipe_data = deepcopy(recipe.data or {})
+        previous_gcs_uri = recipe_data.get("ai_image_gcs")
 
         client = get_genai_client(None)
 
@@ -386,7 +477,6 @@ def process_image():
             logger.error("No AI credentials available for worker")
             if not _record_image_failure(
                 recipe_id,
-                recipe_data,
                 "No AI credentials available",
                 claim_token,
             ):
@@ -394,9 +484,12 @@ def process_image():
             return jsonify({"status": "retry"}), 500
 
         recipe_name = recipe_data.get("name", "vegan dish")
-        image_keywords = recipe_data.get("image_keywords", [])
-
-        keyword_str = ", ".join(image_keywords) if image_keywords else ""
+        image_keywords = recipe_data.get("image_keywords")
+        keyword_str = (
+            ", ".join(keyword for keyword in image_keywords if isinstance(keyword, str))
+            if isinstance(image_keywords, list)
+            else ""
+        )
         image_prompt = (
             f"Professional food photography of {recipe_name}. "
             f"{keyword_str}. "
@@ -404,6 +497,8 @@ def process_image():
             f"delicious plating."
         )
 
+        uploaded_gcs_uri = None
+        image_persisted = False
         try:
             response = client.models.generate_images(
                 model="imagen-4.0-generate-001",
@@ -416,51 +511,50 @@ def process_image():
 
             image_bytes = response.generated_images[0].image.image_bytes
             image_url = f"/api/recipes/{recipe_id}/image"
+            image_patch = {"ai_image_url": image_url}
+            remove_data_fields: tuple[str, ...] = ()
 
             if GCS_BUCKET_NAME:
                 from services.gcs_service import upload_image
 
-                gcs_uri = upload_image(GCS_BUCKET_NAME, recipe_id, image_bytes)
-                if not gcs_uri:
+                uploaded_gcs_uri = upload_image(
+                    GCS_BUCKET_NAME,
+                    recipe_id,
+                    image_bytes,
+                    version=claim_token,
+                )
+                if not uploaded_gcs_uri:
                     raise Exception("Failed to upload image to storage")
-                recipe_data["ai_image_gcs"] = gcs_uri
-                recipe_data.pop("ai_image_data", None)
+                image_patch["ai_image_gcs"] = uploaded_gcs_uri
+                remove_data_fields = ("ai_image_data",)
             else:
-                image_b64 = base64.b64encode(image_bytes).decode("ascii")
-                recipe_data["ai_image_data"] = image_b64
-
-            recipe_data["ai_image_url"] = image_url
-
-            if "ai_metadata" not in recipe_data:
-                recipe_data["ai_metadata"] = {}
-
-            recipe_data["ai_metadata"]["image_generation"] = {
-                "model": "imagen-4.0-generate-001",
-                "user_id": user_id,
-                "user_display_name": "Background Worker",
-                "is_authenticated": user_id is not None,
-                "session_id": guest_session_id,
-                "prompt": image_prompt,
-                "timestamp": datetime.datetime.now().isoformat(),
-                "success": True,
-            }
+                image_patch["ai_image_data"] = base64.b64encode(image_bytes).decode("ascii")
+                remove_data_fields = ("ai_image_gcs",)
 
             recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
             if recipe is None:
                 return jsonify({"status": "ok"}), 200
-            updated = db_recipe_repository.update_recipe_for_worker(
+            image_patch["ai_metadata"] = _image_generation_metadata(
+                user_id,
+                guest_session_id,
+                image_prompt,
+            )
+            updated = db_recipe_repository.patch_recipe_for_worker(
                 recipe_id,
-                recipe_data,
+                image_patch,
                 claim_token,
                 status="ready",
                 expected_status="generating_image",
+                remove_data_fields=remove_data_fields,
             )
             if updated is None:
                 raise RuntimeError("Generated image could not be persisted")
+            image_persisted = True
             user_id = updated.user_id
             guest_session_id = updated.guest_session_id
             invalidate_recipe_image(recipe_id)
             invalidate_recipe(user_id, guest_session_id, recipe_id)
+            _delete_replaced_gcs_image(recipe_id, previous_gcs_uri, uploaded_gcs_uri)
 
             logger.info(
                 "Successfully generated image for recipe %s",
@@ -468,6 +562,7 @@ def process_image():
             )
 
         except Exception as e:
+            _delete_unpersisted_gcs_image(recipe_id, uploaded_gcs_uri, image_persisted)
             logger.error(
                 "Image generation failed for %s: %s",
                 sanitize_log_value(recipe_id),
@@ -475,7 +570,6 @@ def process_image():
             )
             if not _record_image_failure(
                 recipe_id,
-                recipe_data,
                 "Image generation failed",
                 claim_token,
             ):

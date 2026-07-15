@@ -136,6 +136,13 @@ def _recipe_instructions(data: dict[str, Any]) -> list[str]:
     return instructions
 
 
+def _recipe_tags(data: dict[str, Any]) -> list[str]:
+    raw_tags = data.get("tags")
+    if not isinstance(raw_tags, list):
+        return []
+    return [tag.strip() for tag in raw_tags if isinstance(tag, str) and tag.strip()]
+
+
 def _clean_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {
@@ -193,7 +200,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
             for index, text in enumerate(instructions)
         ]
         or None,
-        "keywords": ", ".join(data.get("tags", [])) if isinstance(data.get("tags"), list) else None,
+        "keywords": ", ".join(_recipe_tags(data)) or None,
         "recipeCategory": "Vegan",
     }
     cleaned: dict[str, Any] = _clean_json(json_ld)

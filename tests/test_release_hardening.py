@@ -23,17 +23,16 @@ def test_pubsub_publish_fails_closed_without_project_id(monkeypatch):
 
 
 def test_release_workflows_pin_third_party_actions():
-    ci = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    dependabot = (ROOT / ".github/workflows/dependabot-auto-merge.yml").read_text(encoding="utf-8")
-
-    assert not re.search(r"^\s*uses:\s*actions/checkout@v", ci, re.MULTILINE)
-    assert not re.search(r"^\s*uses:\s*astral-sh/setup-uv@v", ci, re.MULTILINE)
-    assert not re.search(r"^\s*uses:\s*actions/upload-artifact@v", ci, re.MULTILINE)
-    assert not re.search(
-        r"^\s*uses:\s*dependabot/fetch-metadata@v",
-        dependabot,
-        re.MULTILINE,
-    )
+    mutable_refs = []
+    for pattern in ("*.yml", "*.yaml"):
+        for path in (ROOT / ".github/workflows").glob(pattern):
+            for line_number, line in enumerate(
+                path.read_text(encoding="utf-8").splitlines(),
+                start=1,
+            ):
+                if re.search(r"^\s*uses:\s*['\"]?[^'\"\s]+@v\d", line):
+                    mutable_refs.append(f"{path.name}:{line_number}: {line.strip()}")
+    assert mutable_refs == []
 
     workflows = "\n".join(
         path.read_text(encoding="utf-8")
@@ -61,6 +60,9 @@ def test_gemini_execute_is_bound_to_trusted_plan_comment():
     assert '"fork_repository"' not in workflow
     assert "Approved Plan Comment ID" in execute_prompt
     assert "Never substitute a newer or similarly titled comment" in execute_prompt
+    assert "github.event.comment.body == '@gemini-cli'" in workflow
+    assert "startsWith(github.event.comment.body, '@gemini-cli ')" in workflow
+    assert "contains(github.event.comment.body, '@gemini-cli')" not in workflow
 
     triage_workflow = (ROOT / ".github/workflows/gemini-triage.yml").read_text(encoding="utf-8")
     assert "github.rest.issues.addLabels" in triage_workflow

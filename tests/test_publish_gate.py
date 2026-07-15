@@ -69,6 +69,18 @@ def test_user_create_can_publish(app, user):
     assert recipe.data["is_public"] is True
 
 
+@pytest.mark.parametrize("invalid_flag", ["true", "false", 1, 0, {}, []])
+def test_user_create_fails_closed_for_non_boolean_publish_flag(app, user, invalid_flag):
+    recipe = db_recipe_repository.create_recipe(
+        _recipe_data(is_public=invalid_flag),
+        user_id=user.id,
+    )
+
+    assert recipe is not None
+    assert recipe.is_public is False
+    assert recipe.data["is_public"] is False
+
+
 def test_guest_upsert_cannot_flip_public(app):
     """REGRESSION (upsert branch): the Angular toggle persists via POST upsert."""
     db_recipe_repository.create_recipe(

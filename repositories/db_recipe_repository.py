@@ -10,6 +10,7 @@ Handles recipe CRUD operations with SQLAlchemy ORM:
 import logging
 import re
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, cast
 
@@ -37,6 +38,12 @@ PUBLIC_SLUG_REQUIRED_ERROR = (
 
 class RecipeSlugError(ValueError):
     """A recipe cannot be published without a usable /r/<slug> address."""
+
+
+@dataclass(frozen=True)
+class WorkerRecipeUpdate:
+    user_id: Optional[int]
+    guest_session_id: Optional[str]
 
 
 def _slugify(text: str) -> str:
@@ -180,7 +187,7 @@ def _gate_is_public(recipe_data: Dict[str, Any], user_id: Optional[int]) -> Dict
     is normalized in the data blob itself so the JSON payload and the
     is_public column can never disagree.
     """
-    wants_public = bool(recipe_data.get("is_public", False))
+    wants_public = recipe_data.get("is_public") is True
     if wants_public and user_id is None:
         logger.warning(
             "Guest attempted to publish recipe %s — forcing is_public=False",
@@ -326,7 +333,7 @@ def update_recipe_for_worker(
     claim_token: str,
     status: str,
     expected_status: str,
-) -> Optional[Recipe]:
+) -> Optional[WorkerRecipeUpdate]:
     """Persist generated data only if the caller still owns the worker lease."""
     recipe = (
         Recipe.query.populate_existing()
@@ -340,6 +347,8 @@ def update_recipe_for_worker(
     if recipe is None:
         return None
 
+    result = WorkerRecipeUpdate(recipe.user_id, recipe.guest_session_id)
+    observed_updated_at = recipe.updated_at
     merged = {**(recipe.data or {}), **recipe_data, "id": recipe_id}
     merged["is_public"] = recipe.is_public
     if recipe.slug is not None:
@@ -353,6 +362,7 @@ def update_recipe_for_worker(
             Recipe.id == recipe_id,
             Recipe.status == expected_status,
             Recipe.worker_claim_token == claim_token,
+            Recipe.updated_at == observed_updated_at,
         ).update(
             {
                 "name": recipe_data.get("name", recipe.name),
@@ -367,7 +377,73 @@ def update_recipe_for_worker(
     db.session.commit()
     if updated != 1:
         return None
-    return get_recipe_for_worker(recipe_id)
+    return result
+
+
+def patch_recipe_for_worker(
+    recipe_id: str,
+    recipe_patch: Dict[str, Any],
+    claim_token: str,
+    status: str,
+    expected_status: str,
+    remove_data_fields: tuple[str, ...] = (),
+) -> Optional[WorkerRecipeUpdate]:
+    """Patch worker-owned fields without overwriting concurrent user edits."""
+    for _ in range(3):
+        recipe = (
+            Recipe.query.populate_existing()
+            .filter(
+                Recipe.id == recipe_id,
+                Recipe.status == expected_status,
+                Recipe.worker_claim_token == claim_token,
+            )
+            .first()
+        )
+        if recipe is None:
+            return None
+
+        result = WorkerRecipeUpdate(recipe.user_id, recipe.guest_session_id)
+        observed_updated_at = recipe.updated_at
+        merged = dict(recipe.data or {})
+        patch = dict(recipe_patch)
+        metadata_patch = patch.pop("ai_metadata", None)
+        merged.update(patch)
+        if isinstance(metadata_patch, dict):
+            metadata = dict(merged.get("ai_metadata") or {})
+            metadata.update(metadata_patch)
+            merged["ai_metadata"] = metadata
+        for field in remove_data_fields:
+            merged.pop(field, None)
+
+        merged["id"] = recipe_id
+        merged["is_public"] = recipe.is_public
+        if recipe.slug is not None:
+            merged["slug"] = recipe.slug
+        else:
+            merged.pop("slug", None)
+
+        updated = cast(
+            int,
+            Recipe.query.filter(
+                Recipe.id == recipe_id,
+                Recipe.status == expected_status,
+                Recipe.worker_claim_token == claim_token,
+                Recipe.updated_at == observed_updated_at,
+            ).update(
+                {
+                    "data": merged,
+                    "status": status,
+                    "worker_claim_token": None,
+                    "updated_at": datetime.utcnow(),
+                },
+                synchronize_session=False,
+            ),
+        )
+        db.session.commit()
+        if updated == 1:
+            return result
+        db.session.expire_all()
+    return None
 
 
 def create_recipe(

@@ -76,12 +76,12 @@ def _push_envelope(recipe_id):
     return {"message": {"data": data}}
 
 
-def _image_push_envelope(recipe_id):
+def _image_push_envelope(recipe_id, force_regenerate=False):
     payload = {
         "recipe_id": recipe_id,
         "user_id": None,
         "guest_session_id": "guest-1",
-        "force_regenerate": False,
+        "force_regenerate": force_regenerate,
     }
     data = base64.b64encode(json.dumps(payload).encode()).decode()
     return {"message": {"data": data}}
@@ -127,6 +127,7 @@ def test_worker_retries_transient_generation_failure(app, client):
         recipe = db.session.get(Recipe, recipe_id)
         assert recipe.status == "ready"
         assert recipe.data["name"] == "Fresh Peach Salsa"
+        assert recipe.data["ai_metadata"]["image_enqueue"]["status"] == "pending"
 
 
 def test_worker_marks_error_after_all_attempts_fail(app, client):
@@ -326,8 +327,15 @@ def test_image_worker_skips_existing_image(app, client):
 
 def test_image_worker_uploads_to_gcs_when_configured(app, client):
     recipe_id = str(uuid.uuid4())
+    previous_gcs_uri = f"gs://recipe-images/images/{recipe_id}/previous-lease.png"
     with app.app_context():
-        _make_pending_recipe(recipe_id, status="ready")
+        recipe = _make_pending_recipe(recipe_id, status="ready")
+        recipe.data = {
+            **recipe.data,
+            "ai_image_gcs": previous_gcs_uri,
+            "ai_image_url": f"/api/recipes/{recipe_id}/image",
+        }
+        db.session.commit()
 
     class GeneratedImage:
         class Image:
@@ -350,19 +358,28 @@ def test_image_worker_uploads_to_gcs_when_configured(app, client):
         patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", "recipe-images"),
         patch(
             "services.gcs_service.upload_image",
-            return_value=f"gs://recipe-images/{recipe_id}.png",
+            return_value=f"gs://recipe-images/images/{recipe_id}/lease-token.png",
         ) as upload,
+        patch("services.gcs_service.delete_image", return_value=True) as delete,
         patch("blueprints.worker_api_bp.invalidate_recipe"),
         patch("blueprints.worker_api_bp.invalidate_recipe_image"),
     ):
-        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+        response = client.post(
+            "/api/worker/image",
+            json=_image_push_envelope(recipe_id, force_regenerate=True),
+        )
 
     assert response.status_code == 200
-    upload.assert_called_once_with("recipe-images", recipe_id, b"generated-image")
+    upload.assert_called_once()
+    assert upload.call_args.args == ("recipe-images", recipe_id, b"generated-image")
+    uuid.UUID(upload.call_args.kwargs["version"])
     with app.app_context():
         recipe = db.session.get(Recipe, recipe_id)
-        assert recipe.data["ai_image_gcs"] == f"gs://recipe-images/{recipe_id}.png"
+        assert (
+            recipe.data["ai_image_gcs"] == f"gs://recipe-images/images/{recipe_id}/lease-token.png"
+        )
         assert "ai_image_data" not in recipe.data
+    delete.assert_called_once_with("recipe-images", recipe_id, previous_gcs_uri)
 
 
 def test_recipe_worker_uses_owner_after_guest_login(app, client):
@@ -475,6 +492,57 @@ def test_recipe_worker_retries_unexpected_failure(app, client):
         assert db.session.get(Recipe, recipe_id).status == "generating"
 
 
+def test_recipe_worker_redelivery_retries_only_failed_image_enqueue(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            return_value=(VALID_RECIPE, json.dumps(VALID_RECIPE), None),
+        ) as generate,
+        patch(
+            "services.pubsub_service.publish_message",
+            side_effect=[RuntimeError("Pub/Sub unavailable"), "message-id"],
+        ) as publish,
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+    ):
+        first = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+        second = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+
+    assert first.status_code == 500
+    assert second.status_code == 200
+    generate.assert_called_once()
+    assert publish.call_count == 2
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "ready"
+        assert recipe.data["name"] == "Fresh Peach Salsa"
+        assert recipe.data["ai_metadata"]["image_enqueue"]["status"] == "pending"
+
+
+def test_recipe_redelivery_requeues_unclaimed_generating_image(app, client):
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id, status="generating_image")
+        recipe.data = {
+            **recipe.data,
+            "ai_metadata": {"image_enqueue": {"status": "pending"}},
+        }
+        db.session.commit()
+
+    with (
+        patch("services.pubsub_service.publish_message") as publish,
+        patch("blueprints.worker_api_bp.attempt_recipe_generation") as generate,
+    ):
+        response = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    publish.assert_called_once()
+    generate.assert_not_called()
+
+
 def test_image_worker_records_missing_credentials_and_retries(app, client):
     recipe_id = str(uuid.uuid4())
     with app.app_context():
@@ -490,6 +558,7 @@ def test_image_worker_records_missing_credentials_and_retries(app, client):
         metadata = recipe.data["ai_metadata"]["image_generation"]
         assert metadata["success"] is False
         assert metadata["error"] == "No AI credentials available"
+        assert recipe.data["ai_metadata"]["image_enqueue"]["status"] == "complete"
 
 
 def test_worker_claim_prevents_concurrent_generation_and_reclaims_stale_work(app):
@@ -654,3 +723,117 @@ def test_superseded_image_worker_cannot_commit_generated_bytes(app, client):
         assert recipe.status == "generating_image"
         assert recipe.worker_claim_token == replacement_claim
         assert "ai_image_data" not in recipe.data
+
+
+def test_image_worker_preserves_user_edits_made_during_generation(app, client):
+    from repositories import db_recipe_repository
+
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        recipe = _make_pending_recipe(recipe_id, status="ready")
+        recipe.data = {
+            **recipe.data,
+            "ingredients": {"main": [{"name": "old ingredient"}]},
+        }
+        db.session.commit()
+
+    class GeneratedImage:
+        class Image:
+            image_bytes = b"generated-image"
+
+        image = Image()
+
+    class FakeModels:
+        def generate_images(self, **_kwargs):
+            updated = db_recipe_repository.update_recipe(
+                recipe_id,
+                {
+                    "name": "Edited While Generating",
+                    "ingredients": {"main": [{"name": "new ingredient"}]},
+                },
+                user_id=None,
+                guest_session_id="guest-1",
+            )
+            assert updated is not None
+
+            class Response:
+                generated_images = [GeneratedImage()]
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    with (
+        patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()),
+        patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", None),
+        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("blueprints.worker_api_bp.invalidate_recipe_image"),
+    ):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 200
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.name == "Edited While Generating"
+        assert recipe.data["ingredients"]["main"][0]["name"] == "new ingredient"
+        assert recipe.data["ai_image_data"] == base64.b64encode(b"generated-image").decode("ascii")
+
+
+def test_superseded_gcs_worker_deletes_its_versioned_orphan(app, client):
+    from repositories import db_recipe_repository
+
+    recipe_id = str(uuid.uuid4())
+    replacement_claim = None
+    uploaded_versions = []
+    with app.app_context():
+        _make_pending_recipe(recipe_id, status="ready")
+
+    class GeneratedImage:
+        class Image:
+            image_bytes = b"superseded-image"
+
+        image = Image()
+
+    class FakeModels:
+        def generate_images(self, **_kwargs):
+            nonlocal replacement_claim
+            recipe = db.session.get(Recipe, recipe_id)
+            recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
+            db.session.commit()
+            replacement_claim = db_recipe_repository.claim_recipe_for_worker(
+                recipe_id,
+                expected_status="ready",
+                processing_status="generating_image",
+                stale_after_seconds=120,
+            )
+
+            class Response:
+                generated_images = [GeneratedImage()]
+
+            return Response()
+
+    class FakeClient:
+        models = FakeModels()
+
+    def upload(_bucket, _recipe_id, _bytes, *, version):
+        uploaded_versions.append(version)
+        return f"gs://recipe-images/images/{recipe_id}/{version}.png"
+
+    with (
+        patch("blueprints.worker_api_bp.get_genai_client", return_value=FakeClient()),
+        patch("blueprints.worker_api_bp.GCS_BUCKET_NAME", "recipe-images"),
+        patch("services.gcs_service.upload_image", side_effect=upload),
+        patch("services.gcs_service.delete_image", return_value=True) as delete,
+    ):
+        response = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert response.status_code == 500
+    assert replacement_claim
+    assert len(uploaded_versions) == 1
+    assert uploaded_versions[0] != replacement_claim
+    delete.assert_called_once_with(
+        "recipe-images",
+        recipe_id,
+        f"gs://recipe-images/images/{recipe_id}/{uploaded_versions[0]}.png",
+    )
