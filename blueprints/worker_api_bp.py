@@ -79,6 +79,18 @@ def _release_worker_claim(recipe_id, status, claim_token, expected_status, worke
         )
 
 
+def _claim_image_worker(recipe_id, status):
+    """Claim queued/current image work while still accepting legacy ready rows."""
+    if status not in {"ready", "generating_image"}:
+        return None
+    return db_recipe_repository.claim_recipe_for_worker(
+        recipe_id,
+        expected_status=status,
+        processing_status="generating_image",
+        stale_after_seconds=WORKER_CLAIM_STALE_SECONDS,
+    )
+
+
 def _record_image_failure(recipe_id, recipe_data, error_message, claim_token):
     """Persist image failure metadata against the recipe's current owner."""
     recipe, _, _ = _current_recipe_scope(recipe_id)
@@ -359,12 +371,7 @@ def process_image():
             logger.info("Image already exists for %s", sanitize_log_value(recipe_id))
             return jsonify({"status": "ok"}), 200
 
-        claim_token = db_recipe_repository.claim_recipe_for_worker(
-            recipe_id,
-            expected_status="ready",
-            processing_status="generating_image",
-            stale_after_seconds=WORKER_CLAIM_STALE_SECONDS,
-        )
+        claim_token = _claim_image_worker(recipe_id, recipe.status)
         if claim_token is None:
             return jsonify({"status": "retry", "message": "Image is already processing"}), 500
 

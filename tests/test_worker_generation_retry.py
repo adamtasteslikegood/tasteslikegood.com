@@ -543,6 +543,29 @@ def test_worker_claim_prevents_concurrent_generation_and_reclaims_stale_work(app
         assert recipe.worker_claim_token is None
 
 
+def test_worker_claims_queued_image_status_only_once(app):
+    from repositories import db_recipe_repository
+
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id, status="generating_image")
+
+        claim_token = db_recipe_repository.claim_recipe_for_worker(
+            recipe_id,
+            expected_status="generating_image",
+            processing_status="generating_image",
+            stale_after_seconds=120,
+        )
+
+        assert claim_token
+        assert not db_recipe_repository.claim_recipe_for_worker(
+            recipe_id,
+            expected_status="generating_image",
+            processing_status="generating_image",
+            stale_after_seconds=120,
+        )
+
+
 def test_superseded_recipe_worker_cannot_commit_or_enqueue_image(app, client):
     from repositories import db_recipe_repository
 

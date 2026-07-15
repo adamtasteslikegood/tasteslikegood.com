@@ -20,7 +20,7 @@ from sqlalchemy import event
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
-from blueprints.public_bp import _format_ingredient  # noqa: E402
+from blueprints.public_bp import _format_ingredient, _safe_minutes  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from models.user import User  # noqa: E402
@@ -70,6 +70,11 @@ def _make_recipe(name, slug, *, public=True, owner=None, data=None):
 )
 def test_format_ingredient_handles_all_amount_array_lengths(amount, expected):
     assert _format_ingredient({"amount": amount, "units": "cup", "name": "lentils"}) == expected
+
+
+@pytest.mark.parametrize("value", ["Infinity", "-Infinity", float("inf"), float("-inf")])
+def test_safe_minutes_rejects_infinite_values(value):
+    assert _safe_minutes(value) is None
 
 
 def test_show_public_recipe_renders_html(app, client):

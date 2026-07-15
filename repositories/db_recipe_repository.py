@@ -261,12 +261,18 @@ def claim_recipe_for_worker(
     now = datetime.utcnow()
     stale_before = now - timedelta(seconds=stale_after_seconds)
     claim_token = str(uuid.uuid4())
+    unclaimed_status = Recipe.status == expected_status
+    if expected_status == processing_status:
+        unclaimed_status = and_(
+            unclaimed_status,
+            Recipe.worker_claim_token.is_(None),
+        )
     claimed = cast(
         int,
         Recipe.query.filter(
             Recipe.id == recipe_id,
             or_(
-                Recipe.status == expected_status,
+                unclaimed_status,
                 and_(
                     Recipe.status == processing_status,
                     Recipe.updated_at < stale_before,
@@ -546,18 +552,34 @@ def update_recipe_status(
     status: str,
     user_id: Optional[int] = None,
     guest_session_id: Optional[str] = None,
+    expected_status: Optional[str] = None,
+    require_unclaimed: bool = False,
+    clear_worker_claim: bool = False,
 ) -> bool:
-    """
-    Update the status of an existing recipe.
-    """
+    """Conditionally update an owner-scoped recipe status."""
     try:
-        recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
-        if not recipe:
-            return False
+        query = _apply_recipe_scope(
+            Recipe.query.filter(Recipe.id == recipe_id),
+            user_id,
+            guest_session_id,
+        )
+        if expected_status is not None:
+            query = query.filter(Recipe.status == expected_status)
+        if require_unclaimed:
+            query = query.filter(Recipe.worker_claim_token.is_(None))
 
-        recipe.status = status
+        values = {
+            "status": status,
+            "updated_at": datetime.utcnow(),
+        }
+        if clear_worker_claim:
+            values["worker_claim_token"] = None
+        updated = cast(
+            int,
+            query.update(values, synchronize_session=False),
+        )
         db.session.commit()
-        return True
+        return updated == 1
     except Exception as e:
         logger.error(
             "Error updating status for recipe %s: %s",

@@ -108,6 +108,10 @@ def test_generate_image_queues_message_for_owned_recipe(app, client):
 
     assert response.status_code == 202
     assert response.get_json() == {"status": "generating_image"}
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "generating_image"
+        assert recipe.worker_claim_token is None
     publish.assert_called_once_with(
         "image-generation",
         {
@@ -149,6 +153,27 @@ def test_generate_image_reports_publish_failure(app, client):
 
     assert response.status_code == 500
     assert response.get_json() == {"error": "Failed to queue image generation"}
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "ready"
+
+
+def test_generate_image_does_not_republish_active_worker(app, client):
+    with app.app_context():
+        recipe_id = _make_recipe(status="generating_image")
+        recipe = db.session.get(Recipe, recipe_id)
+        recipe.worker_claim_token = str(uuid.uuid4())
+        db.session.commit()
+
+    with patch("services.pubsub_service.publish_message") as publish:
+        response = client.post(
+            "/api/generate_image",
+            json={"recipe_id": recipe_id, "force_regenerate": True},
+        )
+
+    assert response.status_code == 202
+    assert response.get_json() == {"status": "generating_image"}
+    publish.assert_not_called()
 
 
 def test_recipe_status_returns_owned_recipe(app, client):

@@ -60,7 +60,7 @@ def _safe_minutes(value: Any) -> int | None:
         return None
     try:
         minutes = int(float(value))
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return None
     return minutes if minutes > 0 else None
 
