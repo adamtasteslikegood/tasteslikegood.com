@@ -188,16 +188,6 @@ def serve_recipe_image(recipe_id):
         - If the recipe is public (``is_public=True``) anyone may fetch the image.
         - Otherwise the recipe must belong to the current user or guest session.
     """
-    # Check Valkey cache first (stores raw bytes)
-    ck = recipe_image_key(recipe_id)
-    cached_bytes = safe_get(ck)
-    if cached_bytes is not None:
-        return Response(
-            cached_bytes,
-            mimetype="image/png",
-            headers={"Cache-Control": "public, max-age=86400"},
-        )
-
     # Public recipes bypass ownership scoping so unauthenticated SSR pages
     # and crawlers can still load the image.
     from models import Recipe
@@ -212,6 +202,19 @@ def serve_recipe_image(recipe_id):
         recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
+
+    cache_control = "public, max-age=86400" if recipe.is_public else "private, no-store"
+
+    # Authorize before consulting the shared cache; private images must not
+    # become public merely because their owner populated the cache earlier.
+    ck = recipe_image_key(recipe_id)
+    cached_bytes = safe_get(ck)
+    if cached_bytes is not None:
+        return Response(
+            cached_bytes,
+            mimetype="image/png",
+            headers={"Cache-Control": cache_control},
+        )
 
     recipe_data = recipe.data or {}
     image_bytes = None
@@ -236,7 +239,7 @@ def serve_recipe_image(recipe_id):
     return Response(
         image_bytes,
         mimetype="image/png",
-        headers={"Cache-Control": "public, max-age=86400"},
+        headers={"Cache-Control": cache_control},
     )
 
 

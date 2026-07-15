@@ -251,6 +251,7 @@ def test_public_recipe_image_served_without_session(app, client):
     assert resp.status_code == 200
     assert resp.mimetype == "image/png"
     assert resp.data == png_bytes
+    assert resp.headers["Cache-Control"] == "public, max-age=86400"
 
 
 def test_private_recipe_image_still_requires_ownership(app, client):
@@ -271,6 +272,54 @@ def test_private_recipe_image_still_requires_ownership(app, client):
 
     resp = client.get(f"/api/recipes/{recipe_id}/image")
     assert resp.status_code == 404
+
+
+def test_cached_private_recipe_image_still_requires_ownership(app, client, monkeypatch):
+    png_bytes = b"\x89PNG\r\n\x1a\ncached-secret"
+    with app.app_context():
+        recipe = _make_recipe(
+            "Cached Private Image",
+            "cached-private-image",
+            public=False,
+            data={"name": "Cached Private Image"},
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    monkeypatch.setattr("blueprints.generation_api_bp.safe_get", lambda _key: png_bytes)
+
+    resp = client.get(f"/api/recipes/{recipe_id}/image")
+    assert resp.status_code == 404
+
+
+def test_cached_private_recipe_image_is_not_stored_by_clients(app, client, monkeypatch):
+    png_bytes = b"\x89PNG\r\n\x1a\ncached-secret"
+    with app.app_context():
+        owner = User(email="image-owner@example.com", name="Image Owner")
+        db.session.add(owner)
+        db.session.commit()
+        recipe = _make_recipe(
+            "Owned Cached Image",
+            "owned-cached-image",
+            public=False,
+            owner=owner,
+            data={"name": "Owned Cached Image"},
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        owner_id = owner.id
+        recipe_id = recipe.id
+
+    with client.session_transaction() as flask_session:
+        flask_session["user_id"] = owner_id
+
+    monkeypatch.setattr("blueprints.generation_api_bp.safe_get", lambda _key: png_bytes)
+
+    resp = client.get(f"/api/recipes/{recipe_id}/image")
+    assert resp.status_code == 200
+    assert resp.data == png_bytes
+    assert resp.headers["Cache-Control"] == "private, no-store"
 
 
 def test_public_recipe_json_returns_save_payload(app, client):
