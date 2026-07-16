@@ -16,13 +16,15 @@ Two complementary defenses, both verified here:
 import os
 import sys
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
+from extensions import db  # noqa: E402
 
 
 @pytest.fixture
@@ -68,3 +70,72 @@ def test_login_does_not_request_include_granted_scopes(client):
         "response, which trips oauthlib's scope-mismatch check."
     )
     assert kwargs.get("access_type") == "offline"
+
+
+@pytest.fixture
+def db_app():
+    """App with tables created — the callback persists a User row."""
+    os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id")
+    os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
+    flask_app = create_app(
+        TESTING=True,
+        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
+        SECRET_KEY="test-secret",
+        SERVER_NAME="testserver",
+    )
+    with flask_app.app_context():
+        db.create_all()
+        yield flask_app
+        db.session.remove()
+        db.drop_all()
+
+
+def test_callback_returns_302_redirect_not_inline_script(db_app):
+    """The OAuth callback must redirect with a real HTTP 302, never an inline
+    <script> body.
+
+    Regression: PR #3109 turned on a Helmet CSP of `script-src 'self'` in the
+    Express layer that fronts this endpoint. That CSP blocks inline scripts, so
+    the previous `<script>window.location.href=…</script>` success response
+    never executed — users were stranded on a blank callback page. A 302
+    Location redirect carries no script for CSP to block.
+    """
+    client = db_app.test_client()
+
+    with client.session_transaction() as sess:
+        sess["state"] = "test-state"
+        sess["code_verifier"] = "test-verifier"
+
+    fake_credentials = SimpleNamespace(
+        token="test-token",
+        refresh_token="test-refresh",
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id="test-client-id",
+        scopes=["openid", "email", "profile"],
+    )
+    fake_flow = MagicMock()
+    fake_flow.credentials = fake_credentials
+
+    userinfo = {"id": "google-123", "email": "chef@example.com", "name": "Chef"}
+    fake_userinfo_service = MagicMock()
+    fake_userinfo_service.userinfo.return_value.get.return_value.execute.return_value = (
+        userinfo
+    )
+
+    with (
+        patch(
+            "blueprints.auth_api_bp.Flow.from_client_config", return_value=fake_flow
+        ),
+        patch(
+            "blueprints.auth_api_bp.googleapiclient.discovery.build",
+            return_value=fake_userinfo_service,
+        ),
+        patch.dict(os.environ, {"FRONTEND_URL": "https://tasteslikegood.org"}),
+    ):
+        resp = client.get("/api/auth/callback?state=test-state&code=test-code")
+
+    assert resp.status_code == 302, resp.data
+    assert resp.headers["Location"] == "https://tasteslikegood.org?auth=success"
+    # The failure mode we are guarding against: a 200 body containing an inline
+    # script that the CSP would refuse to execute.
+    assert b"<script" not in resp.data
