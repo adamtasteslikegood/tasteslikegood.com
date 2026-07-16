@@ -167,3 +167,4 @@ jobs:
           claude_args: |
             --model ${{ steps.pick.outputs.model }}
             --max-turns 60
+            --dangerously-skip-permissions
