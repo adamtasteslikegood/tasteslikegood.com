@@ -87,16 +87,24 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh pr checkout "${{ github.event.inputs.pr }}"
+          # Pass the untrusted dispatch input via env, never templated into the
+          # shell source — otherwise a crafted `pr` value is a command-injection
+          # sink (this job has contents/pull-requests/id-token: write).
+          PR_NUMBER: ${{ github.event.inputs.pr }}
+        run: gh pr checkout "$PR_NUMBER"
 
       - name: Pick a cost-optimized, independent review model
         id: pick
+        env:
+          # Via env, not templated into the shell source (same injection-safety
+          # rule as the dispatch input above; a stray quote/backtick in the var
+          # value would otherwise break or inject the script).
+          CLAUDE_REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL }}
         run: |
           # Deterministic, always-cheaper-than-author selection:
           #   default = highest Opus 4.x below 4.8 (cheaper than Opus 4.8 / Fable 5
           #   AND a different model, for genuinely independent perspective).
-          MODEL="${{ vars.CLAUDE_REVIEW_MODEL }}"
-          [ -z "$MODEL" ] && MODEL="claude-opus-4-7"
+          MODEL="${CLAUDE_REVIEW_MODEL:-claude-opus-4-7}"
           case "$MODEL" in
             claude-opus-4-8*|claude-fable-5*)
               echo "::warning::CLAUDE_REVIEW_MODEL=$MODEL is the authoring tier; using claude-opus-4-7 for a cheaper, independent review."
