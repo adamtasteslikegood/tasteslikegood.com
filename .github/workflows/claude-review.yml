@@ -1,0 +1,178 @@
+# Independent Claude review — advisory, cost-optimized, fail-open.
+#
+# Runs a SECOND, INDEPENDENT review of a PR in its own CI session, on a DIFFERENT
+# and CHEAPER model than the authoring session (author works in Opus 4.8 / Fable 5;
+# this reviewer uses an Opus 4.x < 4.8). It reasons about scope, picks the review
+# skill + reasoning effort, applies fixes, and leaves a comment per fix.
+#
+# ADVISORY ONLY — never a required status check. `continue-on-error: true` so a
+# flaky/absent key never blocks a merge, and the review step is SKIPPED entirely
+# when no Claude credential is configured. Complements (does not replace) the
+# label-gated gemini-review.yml.
+#
+# AUTH: prefers a Claude Pro/Max subscription OAuth token, falls back to an API key.
+#   * CLAUDE_CODE_OAUTH_TOKEN (primary) — long-lived token from `claude setup-token`;
+#     draws on your subscription's usage/rate limits.
+#   * ANTHROPIC_API_KEY (fallback) — metered API billing; used when the OAuth secret
+#     is absent. If BOTH are set, the action prefers the OAuth token.
+# `id-token: write` (below) is required so the action can mint the official Claude
+# GitHub App token via OIDC to post comments / push fixes — it is GitHub-side auth,
+# independent of which Claude credential you use.
+#
+# PREREQUISITES (one-time, by a maintainer):
+#   1. Add at least one Claude credential secret (Settings → Secrets → Actions):
+#      CLAUDE_CODE_OAUTH_TOKEN (preferred) and/or ANTHROPIC_API_KEY. With neither,
+#      the review step skips cleanly (advisory, no failure).
+#   2. (recommended) Add repo variable  CLAUDE_REVIEW_MODEL  = the exact Opus 4.x<8
+#      model id you want (verify at console.anthropic.com). Default below is a
+#      placeholder — CONFIRM the id before relying on it.
+#   3. Create the `claude-review` label (used to request/re-request a review).
+#
+# Design doc lives in the cookbook superproject:
+#   docs/ci/refresh/SPEC-03-claude-independent-review.md  (adamtasteslikegood/
+#   tasteslikegoodtheangularsvegancookbook). This is the Backend port of that spec.
+
+name: Claude Review (independent model)
+
+on:
+  pull_request:
+    # Auto once per PR (opened / un-drafted) + on-demand via the `claude-review`
+    # label. Deliberately NOT `synchronize` — one review per PR keeps cost bounded;
+    # re-request by re-applying the label. To review every push, add `synchronize`.
+    types: [opened, ready_for_review, labeled]
+    branches: [main, dev, 'dev/**']
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: 'PR number to review'
+        required: true
+
+permissions:
+  contents: write # apply + push fixes to the PR branch
+  pull-requests: write # post review comments
+  issues: write # fallback / summary comment
+  id-token: write # OIDC → official Claude GitHub App token (post comments / push fixes)
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.event.inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: Independent Claude review
+    # Same-repo only (forks/Dependabot have no secrets → skip cleanly), non-bot,
+    # non-draft; on `labeled` events only fire for the `claude-review` label.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.draft == false &&
+        github.event.pull_request.user.login != 'dependabot[bot]' &&
+        github.event.sender.type != 'Bot' &&
+        (github.event.action != 'labeled' || github.event.label.name == 'claude-review')
+      )
+    runs-on: ubuntu-latest
+    continue-on-error: true # advisory — never blocks the merge
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # ratchet:actions/checkout@v7
+        with:
+          # For pull_request events this is the PR branch, so --fix can push back.
+          ref: ${{ github.head_ref }}
+          fetch-depth: 0 # full history — /code-review --comment needs PR context
+          submodules: recursive
+
+      - name: Checkout dispatched PR
+        if: github.event_name == 'workflow_dispatch'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Pass the untrusted dispatch input via env, never templated into the
+          # shell source — otherwise a crafted `pr` value is a command-injection
+          # sink (this job has contents/pull-requests/id-token: write).
+          PR_NUMBER: ${{ github.event.inputs.pr }}
+        run: gh pr checkout "$PR_NUMBER"
+
+      - name: Pick a cost-optimized, independent review model
+        id: pick
+        env:
+          # Via env, not templated into the shell source (same injection-safety
+          # rule as the dispatch input above; a stray quote/backtick in the var
+          # value would otherwise break or inject the script).
+          CLAUDE_REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL }}
+        run: |
+          # Deterministic, always-cheaper-than-author selection:
+          #   default = highest Opus 4.x below 4.8 (cheaper than Opus 4.8 / Fable 5
+          #   AND a different model, for genuinely independent perspective).
+          MODEL="${CLAUDE_REVIEW_MODEL:-claude-opus-4-7}"
+          case "$MODEL" in
+            claude-opus-4-8*|claude-fable-5*)
+              echo "::warning::CLAUDE_REVIEW_MODEL=$MODEL is the authoring tier; using claude-opus-4-7 for a cheaper, independent review."
+              MODEL="claude-opus-4-7" ;;
+          esac
+          echo "model=$MODEL" >> "$GITHUB_OUTPUT"
+          echo "::notice::Independent review model: $MODEL"
+
+      - name: Check for a Claude credential
+        id: auth
+        env:
+          OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Advisory workflow: if no credential is configured, skip cleanly instead
+          # of failing (forks/Dependabot also land here — they have no secrets).
+          if [ -n "$OAUTH_TOKEN" ]; then
+            echo "::notice::Authenticating with CLAUDE_CODE_OAUTH_TOKEN (subscription)."
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          elif [ -n "$API_KEY" ]; then
+            echo "::notice::Authenticating with ANTHROPIC_API_KEY (API billing)."
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::No CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY secret — skipping independent Claude review (advisory)."
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Review + fix + comment
+        if: steps.auth.outputs.present == 'true'
+        uses: anthropics/claude-code-action@1298632ce7736903d02a1435002705aa2a594a6c # ratchet:anthropics/claude-code-action@v1
+        with:
+          # OAuth token (subscription) is primary; the action prefers it when set and
+          # falls back to the API key when the OAuth secret is empty/unset.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            You are an INDEPENDENT code reviewer running in CI, on a different and
+            cheaper model than the author's session. This is the Flask backend
+            (adamtasteslikegood/tasteslikegood.com). Review THIS pull request's diff
+            against its base branch. Be rigorous but do not fabricate issues.
+
+            1. Inspect the changed files (diff vs the base branch).
+            2. REASON about scope and risk, then CHOOSE:
+               - a reasoning effort level for the review — `low` or `medium` for
+                 small / low-risk diffs; `high` or `max` for large diffs or changes
+                 to core logic, auth / OAuth (auth.py, blueprints/auth_api_bp.py),
+                 the Pub/Sub worker (blueprints/worker_api_bp.py), config.py,
+                 request validators (validators/), the Gemini/Imagen services
+                 (services/), database migrations (migrations/), the Dockerfile,
+                 dependency manifests (pyproject.toml, uv.lock, requirements.txt),
+                 or CI workflows (.github/).
+               - the review skill(s): always run the built-in `/code-review`;
+                 ADDITIONALLY run `/security-review` when the diff touches auth,
+                 secrets, the Pub/Sub worker, request validators, migrations, the
+                 Dockerfile, or dependency manifests.
+            3. Run the review so it BOTH applies fixes and posts comments, e.g.
+               `/code-review <effort> --comment --fix` (substitute the effort you
+               chose). `--fix` edits the working tree (this action commits & pushes
+               to the PR branch); `--comment` posts each finding as an inline PR
+               comment.
+            4. Ensure EVERY fix you apply has a corresponding PR comment saying what
+               changed and why (inline on the changed line where possible). Finish
+               with ONE summary comment listing each fix as a bullet and noting the
+               model + effort you used, signed:
+               `— Independent Claude review (<model>, effort <level>)`.
+            5. If nothing is worth fixing, post a single short "no changes needed"
+               comment. This review is ADVISORY — never block the merge.
+          claude_args: |
+            --model ${{ steps.pick.outputs.model }}
+            --max-turns 60
+            --dangerously-skip-permissions

@@ -14,7 +14,7 @@ from functools import wraps
 import google.oauth2.credentials  # noqa: F401
 import googleapiclient.discovery
 from dotenv import load_dotenv
-from flask import Blueprint, jsonify, request, session, url_for
+from flask import Blueprint, jsonify, redirect, request, session, url_for
 from google_auth_oauthlib.flow import Flow
 
 load_dotenv()
@@ -234,10 +234,15 @@ def api_callback():  # noqa: C901
                     merge_error,
                 )
 
-        # Redirect to frontend (Angular)
-        # In production, redirect to your actual frontend URL
+        # Redirect to frontend (Angular) with a real HTTP 302.
+        # Must NOT be an inline <script> redirect: Express fronts this response
+        # with a Helmet CSP of `script-src 'self'`, which blocks inline scripts,
+        # so a `<script>window.location…</script>` body never executes and the
+        # browser is left stranded on a blank callback page. A 302 Location
+        # redirect carries no script for CSP to block and preserves the
+        # Set-Cookie session header. (regression: #3109 enabled scoped CSP)
         frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
-        return f'<script>window.location.href = "{frontend_url}?auth=success";</script>'
+        return redirect(f"{frontend_url}?auth=success")
 
     except Exception as e:
         logger.exception("OAuth callback failed: %s", e)
