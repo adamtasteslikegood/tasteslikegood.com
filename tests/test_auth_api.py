@@ -118,14 +118,10 @@ def test_callback_returns_302_redirect_not_inline_script(db_app):
 
     userinfo = {"id": "google-123", "email": "chef@example.com", "name": "Chef"}
     fake_userinfo_service = MagicMock()
-    fake_userinfo_service.userinfo.return_value.get.return_value.execute.return_value = (
-        userinfo
-    )
+    fake_userinfo_service.userinfo.return_value.get.return_value.execute.return_value = userinfo
 
     with (
-        patch(
-            "blueprints.auth_api_bp.Flow.from_client_config", return_value=fake_flow
-        ),
+        patch("blueprints.auth_api_bp.Flow.from_client_config", return_value=fake_flow),
         patch(
             "blueprints.auth_api_bp.googleapiclient.discovery.build",
             return_value=fake_userinfo_service,
