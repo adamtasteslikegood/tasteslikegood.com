@@ -76,7 +76,7 @@ jobs:
 
     steps:
       - name: Checkout PR head
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # ratchet:actions/checkout@v7
         with:
           # For pull_request events this is the PR branch, so --fix can push back.
           ref: ${{ github.head_ref }}
@@ -126,7 +126,7 @@ jobs:
 
       - name: Review + fix + comment
         if: steps.auth.outputs.present == 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@1298632ce7736903d02a1435002705aa2a594a6c # ratchet:anthropics/claude-code-action@v1
         with:
           # OAuth token (subscription) is primary; the action prefers it when set and
           # falls back to the API key when the OAuth secret is empty/unset.
