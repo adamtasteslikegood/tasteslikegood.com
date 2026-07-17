@@ -7,7 +7,7 @@ Flask backend for **Vegangenius Chef**, a vegan recipe generator and personal co
 ## Stack
 
 - Python 3.13 only (`requires-python = ">=3.13,<3.14"`), Flask app factory in `app.py:create_app()`
-- SQLAlchemy + Flask-Migrate (Alembic), Flask-Login, Flask-Caching
+- SQLAlchemy + Flask-Migrate (Alembic), Flask-Caching (session auth is hand-rolled on Flask sessions — no Flask-Login)
 - `google-genai` client for Gemini text and Imagen image generation
 - **uv** manages dependencies. Never `pip install` into the project.
 
@@ -24,7 +24,7 @@ uv run mypy . --ignore-missing-imports
 uv run flask db heads                 # must print exactly ONE line
 ```
 
-CI (`.github/workflows/ci.yml`) enforces: Black + Flake8, requirements.txt↔uv.lock sync, mypy, pytest, a Docker image build, and pip-audit.
+CI (`.github/workflows/ci.yml`) enforces: Black + Flake8, requirements.txt↔uv.lock sync, mypy, pytest, and a Docker image build. pip-audit also runs but is advisory (`continue-on-error: true`) — treat findings as signal, not build failures.
 
 ## Architecture
 
@@ -35,12 +35,12 @@ CI (`.github/workflows/ci.yml`) enforces: Black + Flake8, requirements.txt↔uv.
 | `auth_api_bp` | `/api/auth/*` | Google OAuth flow, sessions, profile |
 | `generation_api_bp` | `/api/generate`, `/api/generate_image`, status/image routes | Gemini + Imagen |
 | `recipes_api_bp` | `/api/recipes` | recipe CRUD |
-| `collections_api_bp` | `/api/collections` | cookbook CRUD |
+| `collections_api_bp` | `/api/collections` | cookbook list/create/get/delete + add/remove recipes (no update route) |
 | `worker_api_bp` | `/api/worker/*` | Pub/Sub push handlers; OIDC-verified; 503s (fails closed) if `PUBSUB_INVOKER_SA` is unset |
 | `public_bp` | `/r/<slug>`, `/browse` | SSR public recipe pages (Jinja) |
 | `auth_bp`, `recipes_bp`, `generation_bp`, `api_bp` | legacy HTML/JSON routes | |
 
-Supporting layers: `services/` (business logic), `repositories/` (data access), `validators/` (JSON Schema Draft 7, `recipe_schema.json`), `models/` (User, Recipe, Collection), `migrations/` (Alembic).
+Supporting layers: `services/` (business logic), `repositories/` (data access), `validators/` (JSON Schema Draft 7, `recipe_schema.json`), `models/` (`User`, `Recipe`, `Cookbook` — the cookbook model class is `Cookbook`, not `Collection`), `migrations/` (Alembic).
 
 ### Behind the Express proxy
 
@@ -48,11 +48,11 @@ All browser traffic arrives through the cookbook repo's Express proxy. `ProxyFix
 
 ### Gemini auth is dual-credential
 
-`services/gemini_service.py:get_genai_client()` tries the user's OAuth credentials from the Flask session first, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works. Preserve that order. Gemini model names carry the `models/` prefix (e.g. `models/gemini-…`); filter model listings by `generateContent` in `supported_generation_methods`.
+`services/gemini_service.py:get_genai_client()` tries the user's OAuth credentials from the Flask session first, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works. Preserve that order. Model IDs from the model-list API carry the `models/` prefix — filter listings by `generateContent` in `supported_generation_methods` — while `config.py:DEFAULT_MODEL` and the generation paths use bare IDs (`gemini-3.1-pro-preview`). Both forms are in active use; don't flag either as wrong.
 
 ### Caching
 
-Flask-Caching response cache: `RedisCache` against Valkey when `VALKEY_HOST` is set (prod), otherwise in-process `SimpleCache`. Code must behave correctly under both backends.
+Flask-Caching response cache, selected in `create_app()` with priority `VALKEY_HOST` (prod, IAM or password auth) > `REDIS_URL` (local Docker) > in-process `SimpleCache`. An unreachable Valkey/Redis degrades to `SimpleCache` at startup instead of failing, and per-call cache errors are absorbed by `utils/cache_utils`. Code must behave correctly under any backend.
 
 ## Migrations (Alembic via Flask-Migrate)
 
