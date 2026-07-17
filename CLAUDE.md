@@ -55,7 +55,7 @@ Modular Flask app, not the monolithic `app.py` of older docs. Composition wired 
 ```
 app.py                          # create_app() — registers blueprints, extensions, ProxyFix
 config.py                       # env-driven config (DATABASE_URL, OAuth, secrets)
-extensions.py                   # SQLAlchemy, Migrate, LoginManager singletons
+extensions.py                   # SQLAlchemy, Migrate, Cache singletons
 auth.py                         # legacy OAuth helpers (still used by blueprints)
 utils.py                        # recipe data normalization (units, fractions, fuzzy keys)
 
@@ -71,7 +71,7 @@ blueprints/
 services/                       # business logic (gemini_service, image_service, ...)
 repositories/                   # data access with file locking + DB
 validators/                     # JSON Schema Draft 7 (recipe_schema.json)
-models/                         # SQLAlchemy: User, Recipe, Collection
+models/                         # SQLAlchemy: User, Recipe, Cookbook
 migrations/                     # Alembic via Flask-Migrate
 tests/                          # pytest
 recipe_schema.json              # canonical recipe shape

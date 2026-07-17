@@ -1,182 +1,101 @@
-# GitHub Copilot Instructions for tasteslikegood.com
+# Copilot instructions — tasteslikegood.com (Flask backend)
 
-## Project Overview
+Flask backend for **Vegangenius Chef**, a vegan recipe generator and personal cookbook app. It serves the JSON API and SSR public recipe pages behind an Express reverse proxy that owns all browser traffic. This repo is consumed as the `Backend/` git submodule of the cookbook repo (`adamtasteslikegood/tasteslikegoodtheangularsvegancookbook`); production (Cloud Run) deploys whatever Backend SHA the cookbook pins when a release tag is cut.
 
-This is a Flask-based web application for viewing and generating vegan recipes. The application uses Google's Gemini AI to generate new recipes based on user prompts and validates them against a JSON schema.
+`CLAUDE.md` at the repo root is the deeper companion doc; `API.md` is the endpoint reference. Ignore older markdown files describing a monolithic `app.py` — the app has been modular (blueprints + app factory) since the refactor.
 
-## Technology Stack
+## Stack
 
-- **Backend**: Python 3.x with Flask framework
-- **AI Integration**: Google Generative AI (Gemini 2.5 Pro)
-- **Validation**: JSON Schema (Draft 7) with jsonschema library
-- **Frontend**: HTML templates with Jinja2, CSS, JavaScript
+- Python 3.13 only (`requires-python = ">=3.13,<3.14"`), Flask app factory in `app.py:create_app()`
+- SQLAlchemy + Flask-Migrate (Alembic), Flask-Caching (session auth is hand-rolled on Flask sessions — no Flask-Login)
+- `google-genai` client for Gemini text and Imagen image generation
+- **uv** manages dependencies. Never `pip install` into the project.
 
-## Development Setup
+## Commands
 
-### Prerequisites
-- Python 3.x
-- pip (Python package manager)
-- Google API key for Gemini AI (set as `GOOGLE_API_KEY` environment variable)
-
-### Installation Steps
-1. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-2. Set up Google API key:
-   ```bash
-   export GOOGLE_API_KEY="your_google_api_key_here"
-   ```
-
-3. Run the development server:
-   ```bash
-   python app.py
-   ```
-
-4. Access the application at `http://localhost:5000`
-
-## Code Style and Conventions
-
-### Python
-- Follow PEP 8 style guidelines
-- Use meaningful variable names (e.g., `recipe_data`, `safe_filename`)
-- Keep functions focused and single-purpose
-- Document complex logic with clear comments
-- Use type hints where appropriate for clarity
-
-### Error Handling
-- Catch specific exceptions rather than broad `Exception` catches
-- Log errors appropriately (e.g., to `recipe_error.json` and `recipe_error.txt`)
-- Provide user-friendly error messages while logging detailed errors separately
-- Always validate user input before processing
-
-### File Operations
-- Always use `os.path.join()` for cross-platform path compatibility
-- Check file existence with `os.path.exists()` before operations
-- Handle JSON parsing errors gracefully with try-except blocks
-- Use context managers (`with` statements) for file operations
-
-## Project Structure
-
-```
-tasteslikegood.com/
-├── app.py                    # Main Flask application
-├── recipe_schema.json        # JSON schema for recipe validation
-├── recipes/                  # Directory for stored recipe JSON files (gitignored)
-├── templates/               # Jinja2 HTML templates
-├── static/                  # CSS, JavaScript, and other static assets
-├── tests/                   # Test files
-│   └── test_recipe_validation.py
-├── requirements.txt         # Python dependencies
-└── README.md               # Project documentation
-```
-
-## Testing
-
-### Running Tests
-First, ensure pytest is installed:
 ```bash
-pip install pytest
+uv sync --locked --dev                # install deps (exactly what CI runs)
+uv run python app.py                  # dev server on :5000 (Werkzeug debug — dev only)
+uv run pytest                         # tests; CI adds --cov=. and dummy FLASK_SECRET_KEY /
+                                      # GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET env vars
+uv run black --check .                # formatting gate
+uv run flake8 . --count --show-source --statistics
+uv run mypy . --ignore-missing-imports
+uv run flask db heads                 # must print exactly ONE line
 ```
 
-Then run the tests:
-```bash
-pytest tests/
-```
+CI (`.github/workflows/ci.yml`) enforces: Black + Flake8, requirements.txt↔uv.lock sync, mypy, pytest, and a Docker image build. pip-audit also runs but is advisory (`continue-on-error: true`) — treat findings as signal, not build failures.
 
-### Test Conventions
-- Use pytest as the testing framework
-- Place test files in the `tests/` directory
-- Prefix test files with `test_`
-- Use fixtures for common test data (e.g., `base_recipe` fixture)
-- Test both valid and invalid inputs
-- Verify proper error handling with `pytest.raises()`
+## Architecture
 
-### Key Test Areas
-- Recipe validation against JSON schema
-- Both string and object instruction formats are supported
-- Required field validation
-- Error handling for malformed data
+`create_app()` wires ProxyFix, extensions (`extensions.py`), the response cache, and registers blueprints:
 
-## Key Components
+| Blueprint | Routes | Notes |
+| --- | --- | --- |
+| `auth_api_bp` | `/api/auth/*` | Google OAuth flow, sessions, profile |
+| `generation_api_bp` | `/api/generate`, `/api/generate_image`, status/image routes | Gemini + Imagen |
+| `recipes_api_bp` | `/api/recipes` | recipe CRUD |
+| `collections_api_bp` | `/api/collections` | cookbook list/create/get/delete + add/remove recipes (no update route) |
+| `worker_api_bp` | `/api/worker/*` | Pub/Sub push handlers; OIDC-verified; 503s (fails closed) if `PUBSUB_INVOKER_SA` is unset — except when `PUBSUB_AUTH_OPTIONAL=1`, a local-dev/test bypass that skips OIDC entirely (never set in prod) |
+| `public_bp` | `/r/<slug>`, `/browse` | SSR public recipe pages (Jinja) |
+| `auth_bp`, `recipes_bp`, `generation_bp`, `api_bp` | legacy HTML/JSON routes | |
 
-### Recipe Schema (`recipe_schema.json`)
-- Defines the structure for recipe JSON files
-- Uses JSON Schema Draft 7
-- Supports flexible instruction formats (strings or objects with step numbers)
-- Validates ingredient structure (wet, dry, other categories)
-- Required fields: name, description, prepTime, cookTime, servings, ingredients, instructions
+Supporting layers: `services/` (business logic), `repositories/` (data access), `validators/` (JSON Schema Draft 7, `recipe_schema.json`), `models/` (`User`, `Recipe`, `Cookbook` — the cookbook model class is `Cookbook`, not `Collection`), `migrations/` (Alembic).
 
-### Main Application (`app.py`)
+### Behind the Express proxy
 
-#### Core Functions
-- `get_all_recipes()`: Lists all recipes from the recipes directory
-- `validate_recipe_data(recipe_data)`: Validates recipe JSON against schema
-- `_load_recipe_schema()`: Loads and caches the recipe schema
+All browser traffic arrives through the cookbook repo's Express proxy. `ProxyFix` trusts `X-Forwarded-*`, so `url_for(_external=True)` produces correct external URLs — don't hand-build absolute URLs and don't strip or rework forwarded headers.
 
-#### Routes
-- `/`: Homepage with recipe list
-- `/recipe/<filename>`: Display individual recipe
-- `/recipe/<filename>/json`: View raw JSON for a recipe
-- `/generate_recipe`: Form and handler for AI recipe generation
+### Gemini auth is dual-credential
 
-### Recipe Generation
-- Uses Gemini 2.5 Pro model
-- Validates generated recipes before saving
-- Creates safe filenames from recipe names
-- Stores generation errors in log files for debugging
-- Redirects to the new recipe page on success
+`services/gemini_service.py:get_genai_client(session_credentials)` prefers caller-supplied user OAuth credentials, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works — it never reads the Flask session itself. Today the generation call sites (`image_service`, the Pub/Sub worker) pass `None`, so generation runs on the server key; only model refresh (`api_bp` → `refresh_models_from_api`) forwards `session.get("credentials")`. Preserve that preference order. Model IDs from the model-list API carry the `models/` prefix — filter listings by `generateContent` in `supported_generation_methods` — while `config.py:DEFAULT_MODEL` and the generation paths use bare IDs (`gemini-3.1-pro-preview`). Both forms are in active use; don't flag either as wrong.
 
-## Important Notes
+### Caching
 
-### Security
-- Never commit API keys or secrets to the repository
-- API keys should be set as environment variables
-- The `.gitignore` excludes sensitive files like `.env` and `api_key.py`
+Flask-Caching response cache, selected in `create_app()` with priority `VALKEY_HOST` (prod, IAM or password auth) > `REDIS_URL` (local Docker) > in-process `SimpleCache`. An unreachable Valkey/Redis degrades to `SimpleCache` at startup instead of failing, and per-call cache errors are absorbed by `utils/cache_utils`. Code must behave correctly under any backend.
 
-### Recipe Storage
-- Individual recipes are stored as JSON files in the `recipes/` directory
-- The `recipes/` directory is gitignored (not version controlled)
-- Filenames are generated from recipe names using safe characters only
+## Migrations (Alembic via Flask-Migrate)
 
-### Error Logging
-- Generation errors are logged to `recipe_error.json` and `recipe_error.txt`
-- These log files are gitignored
-- Include full prompt and response for debugging
-
-## Common Workflows
-
-### Adding a New Route
-1. Define the route handler function with `@app.route()` decorator
-2. Handle potential errors with try-except blocks
-3. Return appropriate HTTP status codes
-4. Create corresponding template in `templates/` if needed
-
-### Modifying Recipe Schema
-1. Update `recipe_schema.json`
-2. Run existing tests to ensure backward compatibility
-3. Update tests if schema changes affect validation logic
-4. Update documentation if schema structure changes significantly
-
-### Adding New Tests
-1. Create test file in `tests/` directory (prefix with `test_`)
-2. Import necessary modules and functions from `app.py`
-3. Use fixtures for reusable test data
-4. Test both success and failure cases
-5. Run full test suite to ensure no regressions
+- `uv run flask db migrate -m "…"` to autogenerate, `uv run flask db upgrade` to apply locally.
+- **Single-head rule:** `uv run flask db heads` must print exactly one line. Two PRs adding migrations off the same parent create branched heads and `flask db upgrade` refuses to run; unify with `uv run flask db merge -m "…" <revA> <revB>` and commit the (typically empty) merge migration.
+- Production migrations run via the cookbook repo's `flask-backend-migrate` Cloud Run Job before each deploy. Never run `flask db upgrade` against prod from a developer machine.
 
 ## Dependencies
 
-Key dependencies in `requirements.txt`:
-- `Flask==3.1.1`: Web framework
-- `google-genai`: Google Generative AI client (no version pinned)
-- `jsonschema==4.25.1`: JSON schema validation
+`uv.lock` is the source of truth. `requirements.txt` is **generated** for the Docker build — never hand-edit it. Regenerate only with:
 
-Development dependencies (install separately):
-- `pytest`: Testing framework (required to run tests)
+```bash
+uv export --format requirements-txt --no-dev --extra postgres --no-hashes --no-emit-project -o requirements.txt
+```
 
-When adding new dependencies:
-1. Add them to `requirements.txt` with specific version numbers
-2. Ensure they're compatible with existing packages
-3. Document any new environment variables or configuration needed
+CI fails when it diverges from `uv.lock`. To change dependencies: edit `pyproject.toml`, run `uv lock`, then regenerate `requirements.txt` with the exact command above.
+
+## Environment variables
+
+| Var | Notes |
+| --- | --- |
+| `DATABASE_URL` | Postgres in prod, SQLite in dev. `postgres://` URIs are auto-rewritten to `postgresql://` in `config.py`. |
+| `FLASK_SECRET_KEY` | `create_app()` raises at startup when `FLASK_ENV=production` and it's missing; dev generates an ephemeral key. |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth. |
+| `GOOGLE_API_KEY` | Server-side Gemini fallback credential. |
+| `GCS_BUCKET_NAME` | Recipe image storage. |
+| `GCP_PROJECT_ID` | Required when publishing Pub/Sub messages. |
+| `PUBSUB_INVOKER_SA` | Required for worker push auth; endpoints fail closed without it (bypassed only by `PUBSUB_AUTH_OPTIONAL=1`, local dev/tests). |
+| `VALKEY_HOST`, `VALKEY_PORT`, `VALKEY_AUTH_MODE` | Response-cache backend (`iam` is the prod auth default; legacy `REDIS_URL` only when `VALKEY_HOST` is unset). |
+| `DD_API_KEY` | Required in prod: the Docker entrypoint is Datadog `serverless-init`, and without the key telemetry is silently dropped (the app still serves). |
+
+In production all secrets come from Google Secret Manager via Cloud Run `--set-secrets`, wired in the cookbook repo's `cloudbuild.yaml`.
+
+## Review checklist (each of these has actually broken)
+
+- `requirements.txt` edited by hand, or regenerated with different flags → prod deploy breaks. Only the exact `uv export` command above is valid.
+- A new migration while another migration PR is in flight → two Alembic heads. Require a merge migration.
+- mypy config lives **only** in `pyproject.toml` `[tool.mypy]`, and mypy reads a single config file (discovery order: `mypy.ini` > `.mypy.ini` > `pyproject.toml` > `setup.cfg`). Reject any new mypy config file: a `setup.cfg` `[mypy]` section is silently ignored because pyproject wins (that shadowing once shipped a config that crashed mypy), while a new `mypy.ini` would take precedence and replace the load-bearing config entirely. `explicit_package_bases = true` is load-bearing because `scripts/` has no `__init__.py`.
+- Every `run-gemini-cli` job in `.github/workflows/` needs `GEMINI_CLI_TRUST_WORKSPACE: 'true'` or the CLI refuses to run.
+- `config.py` reads env vars at import time — set them before Flask starts, not after.
+- Flask SQLite URIs resolve under `instance/` (`sqlite:///foo.db` → `instance/foo.db`, not the cwd).
+- Production serves via `ddtrace-run gunicorn` (Dockerfile `CMD`); `python app.py` is the Werkzeug debug server and must never serve production traffic.
+
+## Git workflow
+
+Branch `feat/*` / `fix/*` / `chore/*` off `dev`; PR back into `dev`. Never commit directly to `main` or `dev`. Shipping to production additionally requires a cookbook-repo PR bumping the `Backend/` submodule pointer — there is no path that deploys Backend code without one.
