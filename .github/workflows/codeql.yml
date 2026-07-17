@@ -52,6 +52,12 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           config-file: ./.github/codeql/codeql-config.yml
+          # Force the bundle shipped with the pinned action version. Without
+          # this, push and pull_request runs can resolve different CodeQL
+          # versions (dev baseline 2.26.1 vs PR 2.26.0), and the PR check then
+          # can't match the baseline configs ("2 configurations not found"),
+          # which blocks the code_scanning ruleset gate on every PR.
+          tools: linked
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
