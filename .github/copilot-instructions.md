@@ -90,7 +90,7 @@ In production all secrets come from Google Secret Manager via Cloud Run `--set-s
 
 - `requirements.txt` edited by hand, or regenerated with different flags → prod deploy breaks. Only the exact `uv export` command above is valid.
 - A new migration while another migration PR is in flight → two Alembic heads. Require a merge migration.
-- mypy config lives **only** in `pyproject.toml` `[tool.mypy]`. Reject new `setup.cfg`/`mypy.ini` mypy sections — pyproject silently shadows them (that shadowing once shipped a config that crashed mypy). `explicit_package_bases = true` is load-bearing because `scripts/` has no `__init__.py`.
+- mypy config lives **only** in `pyproject.toml` `[tool.mypy]`, and mypy reads a single config file (discovery order: `mypy.ini` > `.mypy.ini` > `pyproject.toml` > `setup.cfg`). Reject any new mypy config file: a `setup.cfg` `[mypy]` section is silently ignored because pyproject wins (that shadowing once shipped a config that crashed mypy), while a new `mypy.ini` would take precedence and replace the load-bearing config entirely. `explicit_package_bases = true` is load-bearing because `scripts/` has no `__init__.py`.
 - Every `run-gemini-cli` job in `.github/workflows/` needs `GEMINI_CLI_TRUST_WORKSPACE: 'true'` or the CLI refuses to run.
 - `config.py` reads env vars at import time — set them before Flask starts, not after.
 - Flask SQLite URIs resolve under `instance/` (`sqlite:///foo.db` → `instance/foo.db`, not the cwd).
