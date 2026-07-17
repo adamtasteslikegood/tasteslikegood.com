@@ -9,12 +9,16 @@ Handles:
 """
 
 import json
+import logging
 import time
 
 import google.oauth2.credentials
 from google.genai import Client
 
 from config import GOOGLE_API_KEY
+from utils.log_sanitizer import sanitize_log_value
+
+logger = logging.getLogger(__name__)
 
 MODELS_LIST_PATH = "models_list.json"
 
@@ -195,6 +199,8 @@ def refresh_models_from_api(session_credentials=None):  # noqa: C901
         return filtered_models, auth_method, None
 
     except Exception as e:
-        error_msg = f"Failed to fetch models: {str(e)}"
-        print(f"Error refreshing models from API: {e}")
+        # Log the detail server-side; error_msg is returned to clients by
+        # /api/models/refresh, so it must stay constant with no exception text
+        logger.error("Error refreshing models from API: %s", sanitize_log_value(e))
+        error_msg = "Failed to fetch models from the Gemini API"
         return None, auth_method, error_msg

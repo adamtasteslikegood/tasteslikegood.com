@@ -34,9 +34,6 @@ def _get_iam_token():
 # ── Module-level state for token refresh ──────────────────────────
 _lock = threading.Lock()
 _current_client: redis.StrictRedis | None = None
-_client_host: str | None = None
-_client_port: int = 6379
-_token_created_at: float = 0
 _refresh_thread: threading.Thread | None = None
 
 
@@ -99,14 +96,12 @@ def _refresh_token_in_place() -> bool:
 
 def _refresh_loop():
     """Background thread that refreshes the Valkey token before it expires."""
-    global _token_created_at
     while True:
         time.sleep(_TOKEN_REFRESH_INTERVAL)
         try:
             refreshed = _refresh_token_in_place()
             if not refreshed:
                 return  # no client to manage; stop the thread
-            _token_created_at = time.time()
             logger.info("Valkey token refreshed in-place successfully")
         except Exception as e:
             logger.warning("Valkey token refresh failed (will retry next cycle): %s", e)
@@ -128,7 +123,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
     Returns None if the connection cannot be established, allowing the
     caller to fall back to a different session backend.
     """
-    global _current_client, _client_host, _client_port, _token_created_at, _refresh_thread
+    global _current_client, _refresh_thread
 
     try:
         client = _build_client(host, port)
@@ -137,9 +132,6 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
 
         with _lock:
             _current_client = client
-            _client_host = host
-            _client_port = port
-            _token_created_at = time.time()
 
         # Start background token refresh thread (daemon — dies with the process)
         if _refresh_thread is None or not _refresh_thread.is_alive():

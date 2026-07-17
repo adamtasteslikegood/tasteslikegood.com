@@ -1,3 +1,5 @@
+import sys
+
 from app import get_genai_client, DEFAULT_MODEL
 from dotenv import load_dotenv
 
@@ -9,7 +11,7 @@ try:
     client = get_genai_client()
     if not client:
         print("Error: Could not get GenAI client.")
-        exit(1)
+        sys.exit(1)
 
     print("Client obtained successfully.")
 

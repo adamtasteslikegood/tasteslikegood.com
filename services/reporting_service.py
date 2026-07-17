@@ -5,6 +5,8 @@ import logging
 from typing import Dict, Any, List, Optional
 from flask import session
 
+from utils.log_sanitizer import sanitize_log_value
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,11 +43,19 @@ class ReportingService:
             with open(ReportingService.REPORTS_FILE, "w") as f:
                 json.dump(reports, f, indent=2)
 
-            logger.info(f"Report submitted for {filename} by {report_entry['user_id']}")
+            logger.info(
+                "Report submitted for %s by %s",
+                sanitize_log_value(filename),
+                sanitize_log_value(report_entry["user_id"]),
+            )
             return {"message": "Report submitted successfully"}
 
         except Exception as e:
-            logger.error(f"Error logging report for {filename}: {e}")
+            logger.error(
+                "Error logging report for %s: %s",
+                sanitize_log_value(filename),
+                sanitize_log_value(e),
+            )
             raise
 
     @staticmethod

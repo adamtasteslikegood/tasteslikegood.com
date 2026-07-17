@@ -15,6 +15,7 @@ from flask import Blueprint, jsonify, request, session
 
 from extensions import db  # noqa: F401
 from repositories import db_recipe_repository
+from utils.log_sanitizer import sanitize_log_value
 from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
@@ -148,7 +149,11 @@ def get_recipe(user_id, guest_session_id, recipe_id):
         return jsonify(recipe.to_dict()), 200
 
     except Exception as e:
-        logger.error(f"Error fetching recipe {recipe_id}: {e}")
+        logger.error(
+            "Error fetching recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Failed to fetch recipe"}), 500
 
 
@@ -184,7 +189,11 @@ def update_recipe(user_id, guest_session_id, recipe_id):
         # Fixed message, not str(e): exception text must never reach clients.
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
     except Exception as e:
-        logger.error(f"Error updating recipe {recipe_id}: {e}")
+        logger.error(
+            "Error updating recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Failed to update recipe"}), 500
 
 
@@ -205,7 +214,11 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
         return jsonify({"message": "Recipe deleted successfully"}), 200
 
     except Exception as e:
-        logger.error(f"Error deleting recipe {recipe_id}: {e}")
+        logger.error(
+            "Error deleting recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Failed to delete recipe"}), 500
 
 

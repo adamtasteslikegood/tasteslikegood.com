@@ -18,6 +18,7 @@ import logging
 from typing import List, Dict, Any, Tuple, Generator
 from contextlib import contextmanager
 from config import RECIPES_DIR, _recipes_cache, _RECIPES_CACHE_TTL
+from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -58,16 +59,23 @@ def validate_recipe_filepath(filename: str) -> str:
     """
     try:
         safe_filename = sanitize_filename(filename)
-        filepath = os.path.join(RECIPES_DIR, safe_filename)
-        # Resolve to absolute path and verify it's within RECIPES_DIR
-        abs_filepath = os.path.abspath(filepath)
+        # Resolve to absolute path and verify it's within RECIPES_DIR.
+        # Return the normalized path itself so the containment check applies
+        # to the exact value callers use (also what CodeQL's py/path-injection
+        # barrier requires to recognize this function as a sanitizer).
+        filepath = os.path.abspath(os.path.join(RECIPES_DIR, safe_filename))
         abs_recipes_dir = os.path.abspath(RECIPES_DIR)
-        if not abs_filepath.startswith(abs_recipes_dir + os.sep):
+        if not filepath.startswith(abs_recipes_dir + os.sep):
             raise ValueError("Path traversal detected")
         return filepath
     except (ValueError, OSError) as e:
-        logger.warning(f"Invalid filename validation attempt: {filename}. Error: {e}")
-        raise ValueError(f"Invalid filename: {e}")
+        logger.warning(
+            "Invalid filename validation attempt: %s. Error: %s",
+            sanitize_log_value(filename),
+            sanitize_log_value(e),
+        )
+        # Constant message: the original exception text must not reach clients
+        raise ValueError("Invalid filename")
 
 
 @contextmanager
@@ -92,8 +100,10 @@ def locked_file(filepath: str, mode: str = "r") -> Generator:
         fcntl.flock(f.fileno(), lock_type)
         yield f
     finally:
-        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
-        f.close()
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+        finally:
+            f.close()
 
 
 def get_all_recipes() -> List[Dict[str, str]]:
@@ -214,7 +224,7 @@ def migrate_recipe_data(data: Dict[str, Any], filename: str) -> Tuple[Dict[str, 
 
     # 1. Fix nested 'properties'
     if "properties" in data and "name" not in data:
-        logger.info(f"Migrating nested JSON in {filename}")
+        logger.info("Migrating nested JSON in %s", sanitize_log_value(filename))
         data = data["properties"]
         changed = True
 

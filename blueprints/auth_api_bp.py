@@ -11,7 +11,6 @@ import logging
 import os
 from functools import wraps
 
-import google.oauth2.credentials  # noqa: F401
 import googleapiclient.discovery
 from dotenv import load_dotenv
 from flask import Blueprint, jsonify, redirect, request, session, url_for

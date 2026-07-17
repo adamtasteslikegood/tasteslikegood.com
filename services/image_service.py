@@ -17,6 +17,7 @@ import os
 import traceback
 
 from flask import has_request_context, url_for
+from werkzeug.utils import secure_filename
 
 from services.gemini_service import get_genai_client
 from utils.session_utils import get_user_metadata
@@ -140,8 +141,9 @@ def save_image_file(generated_image, filename):
     """
     image_data = generated_image.image.image_bytes
 
-    # Sanitize filename (already validated by caller)
-    safe_filename = os.path.basename(filename)
+    # Sanitize filename (already validated by caller; secure_filename keeps
+    # the written path inside static/images/ even for hostile input)
+    safe_filename = secure_filename(filename)
     image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
     image_path = os.path.join("static", "images", image_filename)
 
@@ -179,7 +181,8 @@ def update_recipe_with_image(
     if "ai_metadata" not in recipe_data:
         recipe_data["ai_metadata"] = {}
 
-    safe_filename = os.path.basename(filename)
+    # Must mirror save_image_file() so the recorded path matches the file
+    safe_filename = secure_filename(filename)
     image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
     image_path = os.path.join("static", "images", image_filename)
 
