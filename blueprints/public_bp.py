@@ -212,20 +212,23 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
     return cleaned
 
 
-def _has_pinnable_image(recipe: Recipe) -> bool:
-    """True only when the recipe has an image Pinterest can actually fetch.
+def _pinnable_image_url(recipe: Recipe) -> str | None:
+    """URL of an image Pinterest can actually fetch, or ``None`` to hide the button.
 
     A recipe row can carry an ``ai_image_url`` whose bytes were never
     persisted (the /api/recipes/<id>/image endpoint then 404s), which makes
     ``_recipe_image_url`` return a dead link. Pinning that produces a broken
     pin — and a run of broken pins to a fresh domain is exactly what trips
-    Pinterest's new-account spam heuristics. Gate on the same signal the image
-    endpoint serves from (real GCS/base64 bytes) plus an external stock image.
+    Pinterest's new-account spam heuristics. Derive the pin media from the
+    signal the image endpoint actually serves from (real GCS/base64 bytes),
+    else an external stock image — the shared URL is the value that passed
+    the gate, so the two can never disagree (a stale ``ai_image_url`` next
+    to a valid stock image must pin the stock image, not the dead link).
     """
     data = recipe.data or {}
-    return bool(
-        data.get("ai_image_gcs") or data.get("ai_image_data") or data.get("stock_image_url")
-    )
+    if data.get("ai_image_gcs") or data.get("ai_image_data"):
+        return _canonical_url("generation_api.serve_recipe_image", recipe_id=recipe.id)
+    return _absolute_url(data.get("stock_image_url"))
 
 
 def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
@@ -277,6 +280,7 @@ def show_public_recipe(slug):
     data = recipe.data or {}
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
     image_url = _recipe_image_url(recipe)
+    pinterest_image_url = _pinnable_image_url(recipe)
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
@@ -292,8 +296,8 @@ def show_public_recipe(slug):
         tags=tags,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=(
-            _pinterest_share_url(canonical_url, image_url, recipe.name)
-            if _has_pinnable_image(recipe)
+            _pinterest_share_url(canonical_url, pinterest_image_url, recipe.name)
+            if pinterest_image_url
             else None
         ),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
