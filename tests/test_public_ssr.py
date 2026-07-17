@@ -152,6 +152,52 @@ def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     assert "Save to Pinterest" in body
 
 
+def test_pinterest_button_hidden_when_recipe_has_no_image(app, client):
+    # A recipe with no fetchable image (no ai_image_gcs/ai_image_data/stock)
+    # must not render a "Save to Pinterest" link — pinning it would create a
+    # broken pin whose media 404s.
+    with app.app_context():
+        recipe = _make_recipe(
+            "Imageless Stew",
+            "imageless-stew",
+            data={"name": "Imageless Stew", "description": "No picture yet."},
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/imageless-stew")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Save to Pinterest" not in body
+    # The cookbook CTA is unconditional and must still be present.
+    assert "Save to your cookbook" in body
+
+
+@pytest.mark.parametrize(
+    "image_field",
+    [
+        {"ai_image_data": base64.b64encode(b"\x89PNGpin").decode("ascii")},
+        {"ai_image_gcs": "gs://bucket/recipe/v1.png"},
+        {"stock_image_url": "https://img.example/stock.jpg"},
+    ],
+)
+def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Pinnable Pie",
+            "pinnable-pie",
+            data={"name": "Pinnable Pie", "description": "Has a photo.", **image_field},
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/pinnable-pie")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Save to Pinterest" in body
+    assert "pinterest.com/pin/create/button/" in body
+
+
 def test_show_public_recipe_404_when_missing(client):
     resp = client.get("/r/does-not-exist")
     assert resp.status_code == 404
