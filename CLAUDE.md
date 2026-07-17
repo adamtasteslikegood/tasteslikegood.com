@@ -79,10 +79,7 @@ recipe_schema.json              # canonical recipe shape
 
 ### Authentication
 
-Dual-credential strategy in services that call Gemini:
-
-1. **Primary** — user OAuth credentials from session.
-2. **Fallback** — server `GOOGLE_API_KEY`.
+Gemini credential handling lives in `services/gemini_service.py:get_genai_client(session_credentials)`: it prefers caller-supplied user OAuth credentials, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works — it never reads the Flask session itself. Today both live generation call sites (`services/image_service.py` and the Pub/Sub worker in `blueprints/worker_api_bp.py`) pass `None`, so generation runs on the server key; only model refresh (`blueprints/api_bp.py` → `refresh_models_from_api`) forwards `session.get("credentials")`. Preserve that preference order.
 
 OAuth flow lives in `blueprints/auth_api_bp.py`. PKCE `code_verifier` is persisted across the redirect (see `fix(auth): persist PKCE code_verifier across OAuth redirect`).
 
