@@ -36,7 +36,7 @@ CI (`.github/workflows/ci.yml`) enforces: Black + Flake8, requirements.txt↔uv.
 | `generation_api_bp` | `/api/generate`, `/api/generate_image`, status/image routes | Gemini + Imagen |
 | `recipes_api_bp` | `/api/recipes` | recipe CRUD |
 | `collections_api_bp` | `/api/collections` | cookbook list/create/get/delete + add/remove recipes (no update route) |
-| `worker_api_bp` | `/api/worker/*` | Pub/Sub push handlers; OIDC-verified; 503s (fails closed) if `PUBSUB_INVOKER_SA` is unset |
+| `worker_api_bp` | `/api/worker/*` | Pub/Sub push handlers; OIDC-verified; 503s (fails closed) if `PUBSUB_INVOKER_SA` is unset — except when `PUBSUB_AUTH_OPTIONAL=1`, a local-dev/test bypass that skips OIDC entirely (never set in prod) |
 | `public_bp` | `/r/<slug>`, `/browse` | SSR public recipe pages (Jinja) |
 | `auth_bp`, `recipes_bp`, `generation_bp`, `api_bp` | legacy HTML/JSON routes | |
 
@@ -48,7 +48,7 @@ All browser traffic arrives through the cookbook repo's Express proxy. `ProxyFix
 
 ### Gemini auth is dual-credential
 
-`services/gemini_service.py:get_genai_client()` tries the user's OAuth credentials from the Flask session first, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works. Preserve that order. Model IDs from the model-list API carry the `models/` prefix — filter listings by `generateContent` in `supported_generation_methods` — while `config.py:DEFAULT_MODEL` and the generation paths use bare IDs (`gemini-3.1-pro-preview`). Both forms are in active use; don't flag either as wrong.
+`services/gemini_service.py:get_genai_client(session_credentials)` prefers caller-supplied user OAuth credentials, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works — it never reads the Flask session itself. Today the generation call sites (`image_service`, the Pub/Sub worker) pass `None`, so generation runs on the server key; only model refresh (`api_bp` → `refresh_models_from_api`) forwards `session.get("credentials")`. Preserve that preference order. Model IDs from the model-list API carry the `models/` prefix — filter listings by `generateContent` in `supported_generation_methods` — while `config.py:DEFAULT_MODEL` and the generation paths use bare IDs (`gemini-3.1-pro-preview`). Both forms are in active use; don't flag either as wrong.
 
 ### Caching
 
@@ -80,7 +80,7 @@ CI fails when it diverges from `uv.lock`. To change dependencies: edit `pyprojec
 | `GOOGLE_API_KEY` | Server-side Gemini fallback credential. |
 | `GCS_BUCKET_NAME` | Recipe image storage. |
 | `GCP_PROJECT_ID` | Required when publishing Pub/Sub messages. |
-| `PUBSUB_INVOKER_SA` | Required for worker push auth; endpoints fail closed without it. |
+| `PUBSUB_INVOKER_SA` | Required for worker push auth; endpoints fail closed without it (bypassed only by `PUBSUB_AUTH_OPTIONAL=1`, local dev/tests). |
 | `VALKEY_HOST`, `VALKEY_PORT`, `VALKEY_AUTH_MODE` | Response-cache backend (`iam` is the prod auth default; legacy `REDIS_URL` only when `VALKEY_HOST` is unset). |
 | `DD_API_KEY` | Required in prod: the Docker entrypoint is Datadog `serverless-init`, and without the key telemetry is silently dropped (the app still serves). |
 
