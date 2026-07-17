@@ -212,6 +212,22 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
     return cleaned
 
 
+def _has_pinnable_image(recipe: Recipe) -> bool:
+    """True only when the recipe has an image Pinterest can actually fetch.
+
+    A recipe row can carry an ``ai_image_url`` whose bytes were never
+    persisted (the /api/recipes/<id>/image endpoint then 404s), which makes
+    ``_recipe_image_url`` return a dead link. Pinning that produces a broken
+    pin — and a run of broken pins to a fresh domain is exactly what trips
+    Pinterest's new-account spam heuristics. Gate on the same signal the image
+    endpoint serves from (real GCS/base64 bytes) plus an external stock image.
+    """
+    data = recipe.data or {}
+    return bool(
+        data.get("ai_image_gcs") or data.get("ai_image_data") or data.get("stock_image_url")
+    )
+
+
 def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
     params = {
         "url": canonical_url,
@@ -275,7 +291,11 @@ def show_public_recipe(slug):
         instructions=instructions,
         tags=tags,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
-        pinterest_share_url=_pinterest_share_url(canonical_url, image_url, recipe.name),
+        pinterest_share_url=(
+            _pinterest_share_url(canonical_url, image_url, recipe.name)
+            if _has_pinnable_image(recipe)
+            else None
+        ),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
         save_to_cookbook_url=f"{_public_base_url()}/#kitchen",
     )
