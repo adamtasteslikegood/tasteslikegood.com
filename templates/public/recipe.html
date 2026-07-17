@@ -72,9 +72,14 @@
                 <a href="{{ spa_save_url }}" class="public-save-cta" data-save-recipe>
                     Save to your cookbook
                 </a>
+                {# Only offer the Pinterest pin when the recipe has a fetchable
+                   image (see public_bp._pinnable_image_url). Pinning a recipe
+                   whose image 404s creates a broken pin. #}
+                {% if pinterest_share_url %}
                 <a href="{{ pinterest_share_url }}" target="_blank" rel="noopener noreferrer" class="public-recipe-action-link" aria-label="Share {{ recipe.name }} on Pinterest">
                     Save to Pinterest
                 </a>
+                {% endif %}
             </div>
         </div>
     </section>
