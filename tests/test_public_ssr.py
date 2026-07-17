@@ -10,10 +10,13 @@ Covers:
 """
 
 import base64
+import html
+import re
 import sys
 import uuid
 from pathlib import Path
 from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from sqlalchemy import event
@@ -173,15 +176,34 @@ def test_pinterest_button_hidden_when_recipe_has_no_image(app, client):
     assert "Save to your cookbook" in body
 
 
+def _pinterest_media_param(body: str) -> str:
+    match = re.search(r'href="(https://www\.pinterest\.com/pin/create/button/\?[^"]+)"', body)
+    assert match, "no Pinterest share link in page"
+    href = html.unescape(match.group(1))
+    return parse_qs(urlsplit(href).query)["media"][0]
+
+
 @pytest.mark.parametrize(
-    "image_field",
+    "image_field, expected_media",
     [
-        {"ai_image_data": base64.b64encode(b"\x89PNGpin").decode("ascii")},
-        {"ai_image_gcs": "gs://bucket/recipe/v1.png"},
-        {"stock_image_url": "https://img.example/stock.jpg"},
+        (
+            {"ai_image_data": base64.b64encode(b"\x89PNGpin").decode("ascii")},
+            "endpoint",
+        ),
+        ({"ai_image_gcs": "gs://bucket/recipe/v1.png"}, "endpoint"),
+        ({"stock_image_url": "https://img.example/stock.jpg"}, "https://img.example/stock.jpg"),
+        (
+            # Stored bytes win over whatever ai_image_url claims — the pin
+            # media must be the URL the gate actually verified.
+            {
+                "ai_image_data": base64.b64encode(b"\x89PNGpin").decode("ascii"),
+                "ai_image_url": "https://cdn.example/old.png",
+            },
+            "endpoint",
+        ),
     ],
 )
-def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field):
+def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, expected_media):
     with app.app_context():
         recipe = _make_recipe(
             "Pinnable Pie",
@@ -190,12 +212,41 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field):
         )
         db.session.add(recipe)
         db.session.commit()
+        recipe_id = recipe.id
 
     resp = client.get("/r/pinnable-pie")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Save to Pinterest" in body
-    assert "pinterest.com/pin/create/button/" in body
+    if expected_media == "endpoint":
+        expected_media = f"http://localhost/api/recipes/{recipe_id}/image"
+    assert _pinterest_media_param(body) == expected_media
+
+
+def test_pinterest_media_ignores_stale_ai_url_when_stock_exists(app, client):
+    # Regression (Copilot review on #202): a stale ai_image_url with no
+    # stored bytes next to a valid stock image passed the gate via the stock
+    # URL but shipped the dead ai_image_url as the pin media. The media must
+    # be the stock URL — the value that made the recipe pinnable.
+    with app.app_context():
+        recipe = _make_recipe(
+            "Stale Link Curry",
+            "stale-link-curry",
+            data={
+                "name": "Stale Link Curry",
+                "description": "AI image bytes were never persisted.",
+                "ai_image_url": "/api/recipes/00000000-dead-dead-dead-000000000000/image",
+                "stock_image_url": "https://img.example/stock.jpg",
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    resp = client.get("/r/stale-link-curry")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Save to Pinterest" in body
+    assert _pinterest_media_param(body) == "https://img.example/stock.jpg"
 
 
 def test_show_public_recipe_404_when_missing(client):
