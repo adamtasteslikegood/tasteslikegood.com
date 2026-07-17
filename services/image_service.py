@@ -12,6 +12,7 @@ Handles:
 """
 
 import datetime
+import hashlib
 import json
 import os
 import traceback
@@ -31,6 +32,24 @@ def _anonymous_user_metadata():
         "is_authenticated": False,
         "session_id": None,
     }
+
+
+def _image_filename(filename):
+    """Map a recipe filename to its AI image filename inside static/images/.
+
+    secure_filename() keeps the path contained but is lossy — it strips
+    non-ASCII, and recipe filenames may contain Unicode word characters (see
+    save_generated_recipe). Whenever sanitization changed the stem, append a
+    digest of the original so distinct recipes never collide on one image.
+    """
+    stem = os.path.basename(filename)
+    if stem.endswith(".json"):
+        stem = stem[: -len(".json")]
+    safe_stem = secure_filename(stem)
+    if safe_stem != stem:
+        digest = hashlib.sha256(stem.encode("utf-8")).hexdigest()[:12]
+        safe_stem = f"{safe_stem}-{digest}" if safe_stem else f"recipe-{digest}"
+    return f"ai_{safe_stem}.png"
 
 
 def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
@@ -141,10 +160,7 @@ def save_image_file(generated_image, filename):
     """
     image_data = generated_image.image.image_bytes
 
-    # Sanitize filename (already validated by caller; secure_filename keeps
-    # the written path inside static/images/ even for hostile input)
-    safe_filename = secure_filename(filename)
-    image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
+    image_filename = _image_filename(filename)
     image_path = os.path.join("static", "images", image_filename)
 
     # Ensure directory exists
@@ -181,9 +197,8 @@ def update_recipe_with_image(
     if "ai_metadata" not in recipe_data:
         recipe_data["ai_metadata"] = {}
 
-    # Must mirror save_image_file() so the recorded path matches the file
-    safe_filename = secure_filename(filename)
-    image_filename = f"ai_{safe_filename.replace('.json', '.png')}"
+    # Same helper as save_image_file() so the recorded path matches the file
+    image_filename = _image_filename(filename)
     image_path = os.path.join("static", "images", image_filename)
 
     recipe_data["ai_metadata"]["image_generation"] = {

@@ -7,11 +7,16 @@ message — the original exception text is echoed nowhere, only logged.
 """
 
 import os
+import sys
+from pathlib import Path
 
 import pytest
 
-from config import RECIPES_DIR
-from repositories.recipe_repository import validate_recipe_filepath
+# Add the project root directory to sys.path (repo test convention)
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from config import RECIPES_DIR  # noqa: E402
+from repositories.recipe_repository import validate_recipe_filepath  # noqa: E402
 
 
 def test_valid_filename_resolves_inside_recipes_dir():
@@ -43,3 +48,24 @@ def test_hostile_filenames_rejected_or_contained(hostile):
         # If accepted (basename() may reduce it to a harmless name),
         # the resolved path must still be inside RECIPES_DIR
         assert filepath.startswith(os.path.abspath(RECIPES_DIR) + os.sep)
+
+
+def test_image_filename_unicode_names_do_not_collide():
+    """secure_filename strips non-ASCII; the digest suffix must keep distinct
+    Unicode recipe names on distinct image paths (Copilot review on PR #213)."""
+    from services.image_service import _image_filename
+
+    sushi = _image_filename("寿司.json")
+    curry = _image_filename("咖喱.json")
+    assert sushi != curry
+    for name in (sushi, curry):
+        assert name.startswith("ai_")
+        assert name.endswith(".png")
+        assert "/" not in name and ".." not in name
+
+
+def test_image_filename_ascii_names_unchanged():
+    from services.image_service import _image_filename
+
+    assert _image_filename("test.json") == "ai_test.png"
+    assert _image_filename("thai_peanut_noodles.json") == "ai_thai_peanut_noodles.png"
