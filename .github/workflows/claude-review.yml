@@ -154,7 +154,7 @@ jobs:
                  the Pub/Sub worker (blueprints/worker_api_bp.py), config.py,
                  request validators (validators/), the Gemini/Imagen services
                  (services/), database migrations (migrations/), the Dockerfile,
-                 dependency manifests (pyproject.toml, uv.lock, requirements.txt),
+                 dependency manifests (pyproject.toml, uv.lock),
                  or CI workflows (.github/).
                - the review skill(s): always run the built-in `/code-review`;
                  ADDITIONALLY run `/security-review` when the diff touches auth,

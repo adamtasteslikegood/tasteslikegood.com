@@ -16,12 +16,9 @@ Get Tastes Like Good running in 5 minutes! ⚡
 # Clone the repository
 cd tasteslikegood.com
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies with uv (creates .venv automatically)
+# Install uv first if needed: https://docs.astral.sh/uv/
+uv sync
 ```
 
 ### 2. Get API Credentials (3 minutes)
@@ -84,11 +81,11 @@ Open http://localhost:5000 🎉
 
 ### "Module not found"
 ```bash
-# Make sure you activated the virtual environment
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+# Reinstall dependencies from the lockfile
+uv sync
 
-# Reinstall dependencies
-pip install -r requirements.txt
+# Or run commands through uv so the right environment is used
+uv run python app.py
 ```
 
 ### "API key not found"

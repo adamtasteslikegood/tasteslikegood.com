@@ -124,16 +124,16 @@ recipes/            # Storage for generated recipes (JSON files)
    cd tasteslikegood.com
    ```
 
-2. **Create and activate a virtual environment**
+2. **Install [uv](https://docs.astral.sh/uv/)** (if not already installed)
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   curl -LsSf https://astral.sh/uv/install.sh | sh
    ```
 
 3. **Install dependencies**
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
+   uv creates and manages the `.venv/` virtual environment automatically. Dependencies are locked in `uv.lock` — there is no `requirements.txt`.
 
 4. **Configure environment variables**
    

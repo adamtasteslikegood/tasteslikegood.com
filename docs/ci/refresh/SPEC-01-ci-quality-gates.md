@@ -191,3 +191,17 @@ pre-existing rot.
 | mypy surfaces a large error backlog once it stops crashing | Time-box: fix cheap errors, add explicit `# type: ignore[code]` with tracking issue for the rest; never leave mypy crashing |
 | SSR test failures are a real prod bug, not test drift | Investigate before "fixing the test" — if the canonical tags are genuinely missing in prod, that's an SEO bug worth its own fix PR |
 | Required checks block urgent fixes | Repo admins can bypass; keep the bypass audited |
+
+## Addendum (2026-07-17): requirements-sync gate retired
+
+The `requirements.txt ⇄ uv.lock` diff step described in §4.1 and §5.1 no longer
+exists, because the tracked `requirements.txt` itself is gone. The Dockerfile now
+materializes the requirement set in a dedicated export stage
+(`uv export --frozen` from `pyproject.toml` + `uv.lock` on a pinned uv image), so
+the image installs exactly what `uv.lock` pins and there is no artifact to drift.
+The failure mode the gate guarded against (a stale/corrupt export shipping to
+production — the v0.3.0 incident, and again with Dependabot PRs #208/#209) is
+now structurally impossible rather than merely detected. The Build (docker) job
+exercises the export + install path on every PR; pip-audit audits a fresh frozen
+export instead of the tracked file. Required-check contexts are unchanged (the
+sync check was a step inside `Lint (Black + Flake8)`, never its own context).
