@@ -43,7 +43,7 @@ colorama==0.4.6 ; sys_platform == 'win32'
     #   tqdm
 cryptography==46.0.7
     # via google-auth
-ddtrace==4.11.0
+ddtrace==4.11.1
     # via tasteslikegood-com
 distro==1.9.0
     # via
