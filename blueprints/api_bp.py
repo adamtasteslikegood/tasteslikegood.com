@@ -31,6 +31,7 @@ from services.model_service import (
 )
 from services.reporting_service import ReportingService
 from utils.admin_auth import require_admin
+from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -92,8 +93,8 @@ def generate_recipe_image(filename):
     """
     try:
         filepath = validate_recipe_filepath(filename)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    except ValueError:
+        return jsonify({"error": "Invalid filename"}), 400
 
     try:
         # Load recipe with file locking
@@ -112,7 +113,11 @@ def generate_recipe_image(filename):
     except FileNotFoundError:
         return jsonify({"error": "Recipe not found"}), 404
     except Exception as e:
-        logger.error(f"Image generation error for {filename}: {e}")
+        logger.error(
+            "Image generation error for %s: %s",
+            sanitize_log_value(filename),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Image generation failed"}), 500
 
 
@@ -121,8 +126,8 @@ def regenerate_recipe_image(filename):
     """Force regeneration of an AI image, even if one already exists."""
     try:
         filepath = validate_recipe_filepath(filename)
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    except ValueError:
+        return jsonify({"error": "Invalid filename"}), 400
 
     try:
         # Load recipe with file locking
@@ -139,7 +144,11 @@ def regenerate_recipe_image(filename):
     except FileNotFoundError:
         return jsonify({"error": "Recipe not found"}), 404
     except Exception as e:
-        logger.error(f"Regeneration error for {filename}: {e}")
+        logger.error(
+            "Regeneration error for %s: %s",
+            sanitize_log_value(filename),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Image regeneration failed"}), 500
 
 
@@ -156,18 +165,21 @@ def report_recipe(filename):
         result = ReportingService.report_recipe(filename, reason)
         return jsonify(result)
 
-    except ValueError as e:
-        return jsonify({"error": str(e)}), 400
+    except ValueError:
+        return jsonify({"error": "Invalid filename"}), 400
     except Exception as e:
-        logger.error(f"Error logging report for {filename}: {e}")
+        logger.error(
+            "Error logging report for %s: %s",
+            sanitize_log_value(filename),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Failed to submit report"}), 500
 
 
 @api_bp.route("/status", methods=["GET"])
 def api_status():
     """Return API status and configuration info."""
-    # Check database connection
-    db_status = "unknown"
+    # Check database connection (both branches below assign db_status)
     db_error = None
     try:
         from extensions import db

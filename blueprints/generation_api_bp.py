@@ -410,7 +410,12 @@ def migrate_image_urls():
                         else:
                             errors.append({"id": recipe.id, "error": "GCS upload failed"})
                     except Exception as e:
-                        errors.append({"id": recipe.id, "error": str(e)})
+                        logger.error(
+                            "Image migration failed for recipe %s: %s",
+                            sanitize_log_value(recipe.id),
+                            sanitize_log_value(e),
+                        )
+                        errors.append({"id": recipe.id, "error": "Image upload failed"})
 
                 # Case 2: data: URL in ai_image_url — extract, upload, fix
                 elif url and url.startswith("data:image/"):
@@ -425,7 +430,12 @@ def migrate_image_urls():
                                 data.pop("ai_image_data", None)
                                 changed = True
                     except Exception as e:
-                        errors.append({"id": recipe.id, "error": str(e)})
+                        logger.error(
+                            "Image migration failed for recipe %s: %s",
+                            sanitize_log_value(recipe.id),
+                            sanitize_log_value(e),
+                        )
+                        errors.append({"id": recipe.id, "error": "Image upload failed"})
 
                 # Case 3: /static/ path or missing URL but has GCS — fix URL
                 elif (url and url.startswith("/static/")) or (not url and data.get("ai_image_gcs")):

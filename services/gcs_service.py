@@ -13,28 +13,28 @@ from typing import Optional
 
 from google.cloud import storage
 
+from utils.log_sanitizer import sanitize_log_value
+
 logger = logging.getLogger(__name__)
 
-# Lazy-initialized GCS client and bucket
-_client: Optional[storage.Client] = None
+# Lazy-initialized GCS bucket (holds its client reference internally)
 _bucket: Optional[storage.Bucket] = None
 _bucket_name: Optional[str] = None
 
 
 def _init_gcs(bucket_name: str) -> bool:
     """Initialize GCS client and bucket reference. Returns True if successful."""
-    global _client, _bucket, _bucket_name
+    global _bucket, _bucket_name
     if _bucket is not None and _bucket_name == bucket_name:
         return True
     try:
-        _client = storage.Client()
-        _bucket = _client.bucket(bucket_name)
+        client = storage.Client()
+        _bucket = client.bucket(bucket_name)
         _bucket_name = bucket_name
-        logger.info(f"GCS initialized with bucket: {bucket_name}")
+        logger.info("GCS initialized with bucket: %s", bucket_name)
         return True
     except Exception as e:
-        logger.error(f"Failed to initialize GCS client: {e}")
-        _client = None
+        logger.error("Failed to initialize GCS client: %s", sanitize_log_value(e))
         _bucket = None
         _bucket_name = None
         return False
@@ -102,10 +102,18 @@ def upload_image(
         blob = _bucket.blob(object_name)
         blob.upload_from_string(image_bytes, content_type="image/png")
         gcs_uri = f"gs://{bucket_name}/{object_name}"
-        logger.info(f"Uploaded image for recipe {recipe_id}: {gcs_uri}")
+        logger.info(
+            "Uploaded image for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(gcs_uri),
+        )
         return gcs_uri
     except Exception as e:
-        logger.error(f"Failed to upload image for recipe {recipe_id}: {e}")
+        logger.error(
+            "Failed to upload image for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return None
 
 
@@ -133,7 +141,11 @@ def download_image(
             return None
         return blob.download_as_bytes()  # type: ignore[no-any-return]
     except Exception as e:
-        logger.error(f"Failed to download image for recipe {recipe_id}: {e}")
+        logger.error(
+            "Failed to download image for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return None
 
 
@@ -162,15 +174,22 @@ def delete_image(
             else _object_name(recipe_id)
         )
         if object_name is None:
-            logger.warning("Refusing to delete invalid GCS image URI for recipe %s", recipe_id)
+            logger.warning(
+                "Refusing to delete invalid GCS image URI for recipe %s",
+                sanitize_log_value(recipe_id),
+            )
             return False
         blob = _bucket.blob(object_name)
         if blob.exists():
             blob.delete()
-            logger.info(f"Deleted image for recipe {recipe_id}")
+            logger.info("Deleted image for recipe %s", sanitize_log_value(recipe_id))
         return True
     except Exception as e:
-        logger.error(f"Failed to delete image for recipe {recipe_id}: {e}")
+        logger.error(
+            "Failed to delete image for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return False
 
 
@@ -183,5 +202,9 @@ def image_exists(bucket_name: str, recipe_id: str) -> bool:
         blob = _bucket.blob(_object_name(recipe_id))
         return blob.exists()  # type: ignore[no-any-return]
     except Exception as e:
-        logger.error(f"Failed to check image existence for recipe {recipe_id}: {e}")
+        logger.error(
+            "Failed to check image existence for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
         return False

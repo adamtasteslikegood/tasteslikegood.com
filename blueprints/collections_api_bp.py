@@ -18,6 +18,7 @@ from flask import Blueprint, jsonify, request, session
 
 from extensions import db
 from models import Cookbook
+from utils.log_sanitizer import sanitize_log_value
 from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
@@ -125,7 +126,11 @@ def get_collection(user_id, guest_session_id, collection_id):
             return jsonify({"error": "Collection not found"}), 404
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
-        logger.error(f"Error fetching collection {collection_id}: {e}")
+        logger.error(
+            "Error fetching collection %s: %s",
+            sanitize_log_value(collection_id),
+            sanitize_log_value(e),
+        )
         return jsonify({"error": "Failed to fetch collection"}), 500
 
 
@@ -143,7 +148,11 @@ def delete_collection(user_id, guest_session_id, collection_id):
         db.session.commit()
         return jsonify({"message": "Collection deleted"}), 200
     except Exception as e:
-        logger.error(f"Error deleting collection {collection_id}: {e}")
+        logger.error(
+            "Error deleting collection %s: %s",
+            sanitize_log_value(collection_id),
+            sanitize_log_value(e),
+        )
         db.session.rollback()
         return jsonify({"error": "Failed to delete collection"}), 500
 
@@ -177,7 +186,11 @@ def add_recipe_to_collection(user_id, guest_session_id, collection_id):
 
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
-        logger.error(f"Error adding recipe to collection {collection_id}: {e}")
+        logger.error(
+            "Error adding recipe to collection %s: %s",
+            sanitize_log_value(collection_id),
+            sanitize_log_value(e),
+        )
         db.session.rollback()
         return jsonify({"error": "Failed to update collection"}), 500
 
@@ -200,6 +213,10 @@ def remove_recipe_from_collection(user_id, guest_session_id, collection_id, reci
 
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
-        logger.error(f"Error removing recipe from collection {collection_id}: {e}")
+        logger.error(
+            "Error removing recipe from collection %s: %s",
+            sanitize_log_value(collection_id),
+            sanitize_log_value(e),
+        )
         db.session.rollback()
         return jsonify({"error": "Failed to update collection"}), 500

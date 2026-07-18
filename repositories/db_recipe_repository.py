@@ -17,7 +17,7 @@ from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
 
 from extensions import db
-from models import Recipe, User  # noqa: F401
+from models import Recipe
 from utils.log_sanitizer import sanitize_log_value
 from utils.slug_utils import normalize_slug
 

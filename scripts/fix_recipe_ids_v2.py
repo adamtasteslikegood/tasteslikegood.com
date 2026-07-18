@@ -56,7 +56,7 @@ def fix_recipe_ids():
                         logger.warning(f"Recipe '{recipe.name}' has string data - parsing")
                         try:
                             data = json.loads(recipe.data)
-                        except:
+                        except Exception:
                             logger.error(f"Failed to parse data for '{recipe.name}' - skipping")
                             continue
                     else:
