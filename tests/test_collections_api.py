@@ -261,5 +261,39 @@ def test_login_merge_no_collision_reassigns_cleanly(app):
         assert moved.guest_session_id is None
 
 
+def test_login_merge_retries_on_integrity_error_then_raises(app, monkeypatch):
+    """A name lost to a concurrent write mid-merge must retry, not fail silently.
+
+    Force every rename to land on a name the user already owns so the commit
+    keeps hitting the unique index; the loop must retry the configured number of
+    times and then re-raise so the caller rolls back (never leaving the session
+    half-merged without signalling).
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    import blueprints.auth_api_bp as auth_mod
+
+    with app.app_context():
+        uid = _make_user("owner@example.com")
+        db.session.add(Cookbook(id="u1", user_id=uid, name="Taken"))
+        db.session.add(Cookbook(id="g1", guest_session_id="sess-3", name="Guest Book"))
+        db.session.commit()
+
+        calls = {"n": 0}
+
+        def _always_collide(name, taken):
+            calls["n"] += 1
+            return "Taken"  # collides with the user's existing cookbook every time
+
+        monkeypatch.setattr(auth_mod, "_dedupe_cookbook_name", _always_collide)
+
+        user = db.session.get(User, uid)
+        with pytest.raises(IntegrityError):
+            auth_mod._merge_guest_session_into_user(user, "sess-3", max_retries=3)
+
+        # One dedupe call per attempt → proves it retried the full budget.
+        assert calls["n"] == 3
+
+
 def _client_for(app):
     return app.test_client()
