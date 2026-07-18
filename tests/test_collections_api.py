@@ -220,5 +220,46 @@ def test_model_rejects_duplicate_user_name(app):
         db.session.rollback()
 
 
+# ── Guest → user login merge (regression: unique index must not orphan rows) ──
+
+
+def test_login_merge_renames_colliding_guest_cookbook(app):
+    from blueprints.auth_api_bp import _merge_guest_session_into_user
+
+    with app.app_context():
+        uid = _make_user("owner@example.com")
+        # User already owns "My Book". Guest has a same-named "My Book" plus a
+        # distinct "Other" — without collision handling the merge would fail on
+        # the (user_id, name) index and roll back, losing all guest rows.
+        db.session.add(Cookbook(id="u1", user_id=uid, name="My Book"))
+        db.session.add(Cookbook(id="g1", guest_session_id="sess-1", name="My Book"))
+        db.session.add(Cookbook(id="g2", guest_session_id="sess-1", name="Other"))
+        db.session.commit()
+
+        user = db.session.get(User, uid)
+        _merge_guest_session_into_user(user, "sess-1")
+
+        owned = sorted(cb.name for cb in Cookbook.query.filter_by(user_id=uid).all())
+        assert owned == ["My Book", "My Book (2)", "Other"]  # nothing lost
+        # No orphaned guest rows remain for that session.
+        assert Cookbook.query.filter_by(guest_session_id="sess-1").count() == 0
+
+
+def test_login_merge_no_collision_reassigns_cleanly(app):
+    from blueprints.auth_api_bp import _merge_guest_session_into_user
+
+    with app.app_context():
+        uid = _make_user("owner@example.com")
+        db.session.add(Cookbook(id="g1", guest_session_id="sess-2", name="Weeknight"))
+        db.session.commit()
+
+        user = db.session.get(User, uid)
+        _merge_guest_session_into_user(user, "sess-2")
+
+        moved = Cookbook.query.filter_by(user_id=uid).one()
+        assert moved.name == "Weeknight"
+        assert moved.guest_session_id is None
+
+
 def _client_for(app):
     return app.test_client()
