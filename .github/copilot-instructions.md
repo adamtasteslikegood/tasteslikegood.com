@@ -24,7 +24,7 @@ uv run mypy . --ignore-missing-imports
 uv run flask db heads                 # must print exactly ONE line
 ```
 
-CI (`.github/workflows/ci.yml`) enforces: Black + Flake8, requirements.txt↔uv.lock sync, mypy, pytest, and a Docker image build. pip-audit also runs but is advisory (`continue-on-error: true`) — treat findings as signal, not build failures.
+CI (`.github/workflows/ci.yml`) enforces: Black + Flake8, mypy, pytest, and a Docker image build (which materializes requirements from `uv.lock` in its export stage). pip-audit also runs but is advisory (`continue-on-error: true`) — treat findings as signal, not build failures.
 
 ## Architecture
 
@@ -62,13 +62,7 @@ Flask-Caching response cache, selected in `create_app()` with priority `VALKEY_H
 
 ## Dependencies
 
-`uv.lock` is the source of truth. `requirements.txt` is **generated** for the Docker build — never hand-edit it. Regenerate only with:
-
-```bash
-uv export --format requirements-txt --no-dev --extra postgres --no-hashes --no-emit-project -o requirements.txt
-```
-
-CI fails when it diverges from `uv.lock`. To change dependencies: edit `pyproject.toml`, run `uv lock`, then regenerate `requirements.txt` with the exact command above.
+`uv.lock` is the single source of truth — there is no tracked `requirements.txt`. The Dockerfile's export stage runs `uv export --frozen` from `pyproject.toml` + `uv.lock` at image build time, so the image always installs exactly what's locked. To change dependencies: edit `pyproject.toml`, run `uv lock`, commit both. Never commit a `requirements.txt`.
 
 ## Environment variables
 
@@ -88,7 +82,7 @@ In production all secrets come from Google Secret Manager via Cloud Run `--set-s
 
 ## Review checklist (each of these has actually broken)
 
-- `requirements.txt` edited by hand, or regenerated with different flags → prod deploy breaks. Only the exact `uv export` command above is valid.
+- A tracked `requirements.txt` reintroduced (e.g. by a tool or a stale branch) → it would silently drift from `uv.lock` again; the Docker build reads only `pyproject.toml` + `uv.lock`. Reject the file.
 - A new migration while another migration PR is in flight → two Alembic heads. Require a merge migration.
 - mypy config lives **only** in `pyproject.toml` `[tool.mypy]`, and mypy reads a single config file (discovery order: `mypy.ini` > `.mypy.ini` > `pyproject.toml` > `setup.cfg`). Reject any new mypy config file: a `setup.cfg` `[mypy]` section is silently ignored because pyproject wins (that shadowing once shipped a config that crashed mypy), while a new `mypy.ini` would take precedence and replace the load-bearing config entirely. `explicit_package_bases = true` is load-bearing because `scripts/` has no `__init__.py`.
 - Every `run-gemini-cli` job in `.github/workflows/` needs `GEMINI_CLI_TRUST_WORKSPACE: 'true'` or the CLI refuses to run.

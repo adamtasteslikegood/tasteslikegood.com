@@ -16,12 +16,9 @@ Get Tastes Like Good running in 5 minutes! ⚡
 # Clone the repository
 cd tasteslikegood.com
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
+# Install dependencies with uv (creates .venv automatically)
+# Install uv first if needed: https://docs.astral.sh/uv/
+uv sync
 ```
 
 ### 2. Get API Credentials (3 minutes)
@@ -65,7 +62,7 @@ UNSPLASH_ACCESS_KEY=your_unsplash_key  # Optional
 ### 4. Run!
 
 ```bash
-python app.py
+uv run python app.py
 ```
 
 Open http://localhost:5000 🎉
@@ -84,11 +81,11 @@ Open http://localhost:5000 🎉
 
 ### "Module not found"
 ```bash
-# Make sure you activated the virtual environment
-source .venv/bin/activate  # or .venv\Scripts\activate on Windows
+# Reinstall dependencies from the lockfile
+uv sync
 
-# Reinstall dependencies
-pip install -r requirements.txt
+# Or run commands through uv so the right environment is used
+uv run python app.py
 ```
 
 ### "API key not found"
@@ -122,14 +119,10 @@ When running with `python app.py`, you get:
 
 ## Production Deployment
 
-For production, use a WSGI server:
+For production, use a WSGI server (gunicorn is already a locked dependency — `uv sync` installs it):
 
 ```bash
-# Install gunicorn
-pip install gunicorn
-
-# Run with gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 app:app
+uv run gunicorn -w 4 -b 0.0.0.0:5000 app:app
 ```
 
 See [Dockerfile](Dockerfile) for containerized deployment.
@@ -140,13 +133,13 @@ Run the test suite:
 
 ```bash
 # All tests
-pytest
+uv run pytest
 
 # With coverage
-pytest --cov=.
+uv run pytest --cov=.
 
 # Specific test
-pytest tests/test_normalization.py -v
+uv run pytest tests/test_normalization.py -v
 ```
 
 ## Need Help?
