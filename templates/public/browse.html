@@ -31,7 +31,11 @@
     <ul class="public-browse-list">
         {% for recipe in recipes %}
         {% set data = recipe.data or {} %}
-        {% set image_src = data.ai_image_url or (url_for('generation_api.serve_recipe_image', recipe_id=recipe.id) if (data.ai_image_data or data.ai_image_gcs) else data.stock_image_url) %}
+        {# Byte-gated, host-relative image URL — mirrors public_bp._recipe_image_url.
+           A stored ai_image_url is never trusted here: its bytes may not exist
+           (dead card image) and it may carry an absolute host that diverges
+           from the relative URLs on sibling cards (cookbook #3164). #}
+        {% set image_src = (url_for('generation_api.serve_recipe_image', recipe_id=recipe.id) if (data.ai_image_data or data.ai_image_gcs) else data.stock_image_url) %}
         <li class="public-browse-item">
             <a href="{{ url_for('public.show_public_recipe', slug=recipe.slug) }}">
                 {% if image_src %}

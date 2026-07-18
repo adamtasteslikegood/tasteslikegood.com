@@ -11,11 +11,11 @@ import logging
 import os
 from functools import wraps
 
-import google.oauth2.credentials  # noqa: F401
 import googleapiclient.discovery
 from dotenv import load_dotenv
 from flask import Blueprint, jsonify, redirect, request, session, url_for
 from google_auth_oauthlib.flow import Flow
+from sqlalchemy.exc import IntegrityError
 
 load_dotenv()
 
@@ -41,6 +41,75 @@ SCOPES = [
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
+
+_COOKBOOK_NAME_MAX = 200  # Cookbook.name is String(200)
+
+
+def _dedupe_cookbook_name(name, taken):
+    """Return ``name`` if free under this owner, else a suffixed variant.
+
+    Mirrors migration b7e2a9c4d1f8's policy ("Name (2)", "Name (3)", …) and
+    trims the base so the suffixed result still fits ``Cookbook.name``.
+    """
+    if name not in taken:
+        return name
+    n = 2
+    while True:
+        tag = f" ({n})"
+        candidate = name[: max(0, _COOKBOOK_NAME_MAX - len(tag))] + tag
+        if candidate not in taken:
+            return candidate
+        n += 1
+
+
+def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
+    """Reassign a guest session's recipes and cookbooks to an authenticated user.
+
+    Cookbook names are unique per owner (``uq_cookbook_user_name``), so a guest
+    cookbook whose name already exists under the target user would collide on
+    reassignment and roll back the entire merge — silently orphaning the guest's
+    rows under the now-authenticated session. Rename such guest cookbooks with a
+    numeric suffix instead, so every row is preserved.
+
+    Reading the occupied names and committing the rename is a check-then-act
+    sequence: a concurrent create/merge for the same owner could claim a name in
+    the window and make the commit hit the unique index. Retry on
+    ``IntegrityError`` (re-reading the occupied names each attempt) so a lost
+    race re-resolves instead of leaving the session unmerged. Commits on success
+    and raises after exhausting retries so the caller can roll back and log.
+    """
+    from extensions import db
+    from models import Cookbook, Recipe
+
+    for attempt in range(max_retries):
+        try:
+            Recipe.query.filter_by(user_id=None, guest_session_id=guest_session_id).update(
+                {"user_id": user.id, "guest_session_id": None},
+                synchronize_session=False,
+            )
+
+            guest_cookbooks = Cookbook.query.filter_by(
+                user_id=None, guest_session_id=guest_session_id
+            ).all()
+            if guest_cookbooks:
+                taken = {
+                    row.name
+                    for row in db.session.query(Cookbook.name).filter_by(user_id=user.id).all()
+                }
+                for cb in guest_cookbooks:
+                    cb.name = _dedupe_cookbook_name(cb.name, taken)
+                    cb.user_id = user.id
+                    cb.guest_session_id = None
+                    taken.add(cb.name)
+
+            db.session.commit()
+            return
+        except IntegrityError:
+            # Rollback reverts the uncommitted recipe reassignment too, so the
+            # next attempt re-reads guest rows and occupied names from scratch.
+            db.session.rollback()
+            if attempt == max_retries - 1:
+                raise
 
 
 def credentials_to_dict(credentials):
@@ -166,7 +235,7 @@ def api_callback():  # noqa: C901
 
         # Persist user to database (Phase 3)
         from extensions import db
-        from models import Cookbook, Recipe, User
+        from models import User
 
         google_id = user_info.get("id")
         email = user_info.get("email")
@@ -208,24 +277,13 @@ def api_callback():  # noqa: C901
         session["user_id"] = user.id
         session["db_user"] = user.to_dict()  # Cache user info
 
-        # Merge anonymous rows for this browser session into the authenticated user.
+        # Merge anonymous rows for this browser session into the authenticated
+        # user. Cookbook names are unique per owner, so the merge renames any
+        # guest cookbook whose name collides with one the user already owns
+        # rather than failing and orphaning the guest's rows.
         if previous_guest_session_id:
             try:
-                Recipe.query.filter_by(
-                    user_id=None, guest_session_id=previous_guest_session_id
-                ).update(
-                    {"user_id": user.id, "guest_session_id": None},
-                    synchronize_session=False,
-                )
-
-                Cookbook.query.filter_by(
-                    user_id=None, guest_session_id=previous_guest_session_id
-                ).update(
-                    {"user_id": user.id, "guest_session_id": None},
-                    synchronize_session=False,
-                )
-
-                db.session.commit()
+                _merge_guest_session_into_user(user, previous_guest_session_id)
             except Exception as merge_error:
                 db.session.rollback()
                 logger.warning(

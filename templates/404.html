@@ -1,6 +1,12 @@
-{% extends "base.html" %}
+{% extends "public/base_public.html" %}
 
-{% block title %}404 - Page Not Found | TastesLikeGood.com{% endblock %}
+{# Rendered by the app-level 404 handler (app.py), so it must extend the
+   PUBLIC base: in production only /r/<slug>, /browse, /sitemap.xml and
+   /api/* reach Flask through Express, and the legacy base.html CTAs
+   (/ and /generate_recipe) are never proxied — they silently landed
+   visitors on the SPA shell (cookbook #3164). #}
+
+{% block title %}404 - Page Not Found · TastesLikeGood.org{% endblock %}
 
 {% block content %}
 <div class="error-page">
@@ -9,8 +15,8 @@
     <p>It might have been moved, deleted, or you may have mistyped the URL.</p>
 
     <div class="error-actions">
-        <a href="{{ url_for('recipes.index') }}" class="button">Go to Home</a>
-        <a href="{{ url_for('generation.generate_recipe') }}" class="button">Generate a Recipe</a>
+        <a href="{{ url_for('public.browse_public_recipes') }}" class="button">Browse recipes</a>
+        <a href="/#kitchen" class="button">Open the cookbook app</a>
     </div>
 </div>
 
@@ -45,7 +51,7 @@
     .error-actions .button {
         display: inline-block;
         padding: 0.75rem 1.5rem;
-        background-color: #4CAF50;
+        background-color: #4caf50;
         color: white;
         text-decoration: none;
         border-radius: 4px;

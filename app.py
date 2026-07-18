@@ -40,6 +40,31 @@ from utils.session_utils import get_or_create_session_id
 logger = setup_logging()
 
 
+def _register_image_cache_hygiene(app):
+    """Strip CORS headers from the public recipe-image endpoint.
+
+    Recipe images are consumed same-origin through the Express proxy and
+    must be cacheable by shared caches (CDN/browser). Flask-CORS decorates
+    every response app-wide, which stamped Access-Control-Allow-Origin
+    (reflecting whatever dev origin was allowed) + Vary onto image bytes and
+    defeated caching (cookbook #3164). Must be called BEFORE CORS(app):
+    Flask runs app-level after_request functions in reverse registration
+    order, so this runs after Flask-CORS has added its headers.
+    """
+
+    @app.after_request
+    def strip_cors_from_recipe_images(response):
+        if request.endpoint == "generation_api.serve_recipe_image":
+            for header in (
+                "Access-Control-Allow-Origin",
+                "Access-Control-Allow-Credentials",
+                "Access-Control-Expose-Headers",
+                "Vary",
+            ):
+                response.headers.pop(header, None)
+        return response
+
+
 def create_app(**config_overrides):
     """
     Application factory for creating the Flask app.
@@ -233,6 +258,9 @@ def create_app(**config_overrides):
         ]
     )
 
+    # Must stay before CORS(app) — see _register_image_cache_hygiene.
+    _register_image_cache_hygiene(app)
+
     CORS(
         app,
         origins=cors_origins,
@@ -252,6 +280,14 @@ def create_app(**config_overrides):
         """
         # Skip session creation for static files to avoid unnecessary overhead
         if request.endpoint and "static" in request.endpoint:
+            return None
+
+        # Skip the recipe-image endpoint: touching the session there attached
+        # Set-Cookie + Vary: Cookie to every image response, making the
+        # public, cacheable images uncacheable by any shared cache (cookbook
+        # #3164). Private-image access control still reads the existing
+        # session cookie inside the endpoint itself.
+        if request.endpoint == "generation_api.serve_recipe_image":
             return None
 
         # Ensure session has an ID for tracking
@@ -295,4 +331,11 @@ if __name__ == "__main__":
     # Run the development server
     # In production, use a WSGI server like gunicorn or uwsgi
     port = int(os.environ.get("PORT", 5000))
-    app.run(debug=True, host="0.0.0.0", port=port)
+    # Debug (werkzeug reloader + interactive debugger) stays on for local dev
+    # but must never activate under FLASK_ENV=production — the debugger
+    # evaluates arbitrary code on request
+    app.run(
+        debug=os.environ.get("FLASK_ENV") != "production",
+        host="0.0.0.0",
+        port=port,
+    )

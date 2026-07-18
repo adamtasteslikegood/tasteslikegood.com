@@ -314,8 +314,9 @@ def generate_recipe():
     except Exception as logging_error:
         print(f"Error while logging: {logging_error}")
 
-    # Show the error response to the user
+    # Show the error response to the user. The failure detail was written to
+    # the error logs above and must not be echoed back to the client.
     return (
-        f"Sorry, there was an error generating the recipe. Details: {last_error_message}",
+        "Sorry, there was an error generating the recipe. Please try again.",
         500,
     )

@@ -11,7 +11,6 @@ import sys
 import argparse
 import re
 import unicodedata
-from pathlib import Path
 from datetime import datetime
 
 

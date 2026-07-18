@@ -55,7 +55,7 @@ Modular Flask app, not the monolithic `app.py` of older docs. Composition wired 
 ```
 app.py                          # create_app() — registers blueprints, extensions, ProxyFix
 config.py                       # env-driven config (DATABASE_URL, OAuth, secrets)
-extensions.py                   # SQLAlchemy, Migrate, LoginManager singletons
+extensions.py                   # SQLAlchemy, Migrate, Cache singletons
 auth.py                         # legacy OAuth helpers (still used by blueprints)
 utils.py                        # recipe data normalization (units, fractions, fuzzy keys)
 
@@ -71,18 +71,19 @@ blueprints/
 services/                       # business logic (gemini_service, image_service, ...)
 repositories/                   # data access with file locking + DB
 validators/                     # JSON Schema Draft 7 (recipe_schema.json)
-models/                         # SQLAlchemy: User, Recipe, Collection
+models/                         # SQLAlchemy: User, Recipe, Cookbook
 migrations/                     # Alembic via Flask-Migrate
 tests/                          # pytest
 recipe_schema.json              # canonical recipe shape
 ```
 
+### Legacy Flask HTML surface is DEV-ONLY
+
+The original server-rendered HTML UI — `/` and `/recipe/<filename>` (`recipes_bp.py`), `/generate_recipe` (`generation_bp.py`), the `/auth/*` pages, and the templates extending `templates/base.html` (`index.html`, `generate_recipe.html`, `recipe.html`, `profile.html`, `json_viewer.html`) — is **never reachable in production**: the Express proxy only forwards `/api/*`, `/r/<slug>`, `/browse`, `/sitemap.xml`, and `/static/*` to Flask. These pages exist only when running Flask directly on :5000 for local development. The production-facing SSR pages live under `templates/public/` (`base_public.html`); the app-level 404/500 error pages extend the public base for that reason. Do not add production features to the legacy surface, and do not link production pages to its routes. Deleting it entirely is a tracked follow-up (cookbook #3164).
+
 ### Authentication
 
-Dual-credential strategy in services that call Gemini:
-
-1. **Primary** — user OAuth credentials from session.
-2. **Fallback** — server `GOOGLE_API_KEY`.
+Gemini credential handling lives in `services/gemini_service.py:get_genai_client(session_credentials)`: it prefers caller-supplied user OAuth credentials, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works — it never reads the Flask session itself. Today both live generation call sites (`services/image_service.py` and the Pub/Sub worker in `blueprints/worker_api_bp.py`) pass `None`, so generation runs on the server key; only model refresh (`blueprints/api_bp.py` → `refresh_models_from_api`) forwards `session.get("credentials")`. Preserve that preference order.
 
 OAuth flow lives in `blueprints/auth_api_bp.py`. PKCE `code_verifier` is persisted across the redirect (see `fix(auth): persist PKCE code_verifier across OAuth redirect`).
 
@@ -150,7 +151,7 @@ In production all secrets come from Google Secret Manager via Cloud Run `--set-s
 - **Flask SQLite paths resolve under `instance/`** — `sqlite:///foo.db` writes to `instance/foo.db`, not the cwd.
 - **Gemini model names include `models/` prefix** (e.g., `models/gemini-3.1-pro-preview`); filter API responses by `'generateContent' in supported_generation_methods`.
 - **Tests must hit the right DB engine** — `tests/test_migration_backfill_slug.py::test_backfill_slugs_retry_loop` set `SQLALCHEMY_DATABASE_URI` after `create_app()` and ran `db.create_all()` against a stale engine. Compare against `tests/test_public_ssr.py` for the working pattern (issue #118).
-- **`requirements.txt` is generated, never hand-edited** — regenerate with `uv export --format requirements-txt --no-dev --extra postgres --no-hashes --no-emit-project -o requirements.txt`. CI's Lint job fails if it diverges from `uv.lock` (Dependabot's own regeneration drops packages/markers — that's why its uv PRs can't merge as-is; see `docs/ci/CI-AUDIT-REPORT.md` addendum).
+- **There is no tracked `requirements.txt` — `uv.lock` is the single source of truth** — the Dockerfile's export stage runs `uv export --frozen` from `pyproject.toml` + `uv.lock` at image build time, so the image always installs exactly what's locked. To change dependencies: edit `pyproject.toml`, run `uv lock`, commit both — nothing else to regenerate. (A tracked export artifact used to exist and repeatedly drifted or got corrupted — a Dependabot regeneration once dropped most runtime deps and killed the v0.3.0 deploy; see `docs/ci/CI-AUDIT-REPORT.md` addendum.)
 - **mypy config lives only in `pyproject.toml` `[tool.mypy]`** — a `setup.cfg` `[mypy]` section is silently shadowed by it (that shadowing shipped a config that crashed mypy for months; `setup.cfg` was deleted 2026-07-14). `explicit_package_bases = true` is required because `scripts/` has no `__init__.py`.
 - **Every `run-gemini-cli` job needs `GEMINI_CLI_TRUST_WORKSPACE: 'true'`** — current gemini-cli refuses to run in an untrusted directory even without a checkout. CI quality gates and the required-check list are documented in `docs/ci/refresh/` (SPEC-01/SPEC-02).
 

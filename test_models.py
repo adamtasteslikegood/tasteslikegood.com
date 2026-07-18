@@ -1,4 +1,6 @@
 import os
+import sys
+
 from google.genai import Client
 from dotenv import load_dotenv
 
@@ -8,7 +10,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     print("Error: GOOGLE_API_KEY not found.")
-    exit(1)
+    sys.exit(1)
 
 client = Client(api_key=GOOGLE_API_KEY)
 
@@ -42,7 +44,7 @@ test_models = [
 for model_name in test_models:
     print(f"Testing {model_name}...", end=" ")
     try:
-        response = client.models.generate_content(model=model_name, contents="Say 'Hello'")
+        client.models.generate_content(model=model_name, contents="Say 'Hello'")
         print("SUCCESS")
     except Exception as e:
         print(f"FAILED: {e}")

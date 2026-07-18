@@ -169,7 +169,6 @@ Backend/
 ├── pyproject.toml     # Project dependencies and metadata
 ├── uv.lock           # Locked dependency versions (like package-lock.json)
 ├── .venv/            # Virtual environment (created by uv)
-├── requirements.txt  # Legacy file (optional, for compatibility)
 └── app.py           # Main Flask app
 ```
 
@@ -265,20 +264,6 @@ uv add package-name --upgrade
 uv sync --upgrade
 
 # This updates uv.lock with new versions
-```
-
----
-
-## Working with requirements.txt (Legacy)
-
-uv can still use `requirements.txt` for compatibility:
-
-```bash
-# Install from requirements.txt
-uv pip install -r requirements.txt
-
-# But prefer using pyproject.toml + uv.lock
-uv sync
 ```
 
 ---

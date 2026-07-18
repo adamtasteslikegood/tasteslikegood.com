@@ -1,6 +1,6 @@
 import os
+import sys
 
-import pandas as pd
 from dotenv import load_dotenv
 from google.genai import Client
 
@@ -10,7 +10,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 if not GOOGLE_API_KEY:
     print("Error: GOOGLE_API_KEY not found.")
-    exit(1)
+    sys.exit(1)
 
 # Initialize Client (default)
 client = Client(api_key=GOOGLE_API_KEY)

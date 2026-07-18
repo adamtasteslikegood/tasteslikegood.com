@@ -10,6 +10,7 @@ and fall through to the database, never crash the request.
 import logging
 
 from extensions import cache
+from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +28,11 @@ def safe_get(key):
     try:
         return cache.get(key)
     except Exception as e:
-        logger.warning(f"Cache GET failed for {key}: {e}")
+        logger.warning(
+            "Cache GET failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
         return None
 
 
@@ -36,7 +41,11 @@ def safe_set(key, value, timeout=None):
     try:
         cache.set(key, value, timeout=timeout)
     except Exception as e:
-        logger.warning(f"Cache SET failed for {key}: {e}")
+        logger.warning(
+            "Cache SET failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
 
 
 # ── Key builders ──────────────────────────────────────────────────────────────
@@ -101,4 +110,8 @@ def _delete_keys(keys):
         try:
             cache.delete(key)
         except Exception as e:
-            logger.warning(f"Cache delete failed for {key}: {e}")
+            logger.warning(
+                "Cache delete failed for %s: %s",
+                sanitize_log_value(key),
+                sanitize_log_value(e),
+            )
