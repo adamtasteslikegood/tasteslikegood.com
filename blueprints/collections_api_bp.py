@@ -129,7 +129,11 @@ def create_collection(user_id, guest_session_id):
     except IntegrityError:
         # Lost a race: either the same id was inserted concurrently (idempotent
         # replay → 200) or a cookbook with this name already exists in scope
-        # (unique index → 409). Resolve against the now-committed row.
+        # (unique index → 409). Resolve against the now-committed row. Fall
+        # through to a generic conflict when neither an in-scope id nor an
+        # in-scope name matches — the IntegrityError was on the primary key
+        # cross-scope, or on the FK to user (stale session), and reporting a
+        # name collision the caller does not actually own would mislead them.
         db.session.rollback()
         if requested_id:
             replay = (
@@ -141,13 +145,20 @@ def create_collection(user_id, guest_session_id):
                 return jsonify(replay.to_dict()), 200
         existing = (
             _scope_collections_query(user_id, guest_session_id)
-            .filter_by(name=data.get("name"))
+            .filter_by(name=data["name"])
             .first()
         )
-        payload = {"error": "You already have a cookbook with that name"}
         if existing is not None:
-            payload["collection"] = existing.to_dict()
-        return jsonify(payload), 409
+            return (
+                jsonify(
+                    {
+                        "error": "You already have a cookbook with that name",
+                        "collection": existing.to_dict(),
+                    }
+                ),
+                409,
+            )
+        return jsonify({"error": "Could not create cookbook due to a conflict"}), 409
     except Exception as e:
         logger.error(f"Error creating collection: {e}")
         db.session.rollback()
