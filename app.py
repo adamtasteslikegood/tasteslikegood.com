@@ -40,6 +40,31 @@ from utils.session_utils import get_or_create_session_id
 logger = setup_logging()
 
 
+def _register_image_cache_hygiene(app):
+    """Strip CORS headers from the public recipe-image endpoint.
+
+    Recipe images are consumed same-origin through the Express proxy and
+    must be cacheable by shared caches (CDN/browser). Flask-CORS decorates
+    every response app-wide, which stamped Access-Control-Allow-Origin
+    (reflecting whatever dev origin was allowed) + Vary onto image bytes and
+    defeated caching (cookbook #3164). Must be called BEFORE CORS(app):
+    Flask runs app-level after_request functions in reverse registration
+    order, so this runs after Flask-CORS has added its headers.
+    """
+
+    @app.after_request
+    def strip_cors_from_recipe_images(response):
+        if request.endpoint == "generation_api.serve_recipe_image":
+            for header in (
+                "Access-Control-Allow-Origin",
+                "Access-Control-Allow-Credentials",
+                "Access-Control-Expose-Headers",
+                "Vary",
+            ):
+                response.headers.pop(header, None)
+        return response
+
+
 def create_app(**config_overrides):
     """
     Application factory for creating the Flask app.
@@ -233,25 +258,8 @@ def create_app(**config_overrides):
         ]
     )
 
-    # Recipe images are consumed same-origin through the Express proxy and
-    # must be cacheable by shared caches (CDN/browser). Flask-CORS decorates
-    # every response app-wide, which stamped Access-Control-Allow-Origin
-    # (reflecting whatever dev origin was allowed) + Vary onto image bytes and
-    # defeated caching (cookbook #3164). Strip CORS headers from that endpoint.
-    # Registered BEFORE CORS(app) on purpose: Flask runs app-level
-    # after_request functions in reverse registration order, so this runs
-    # after Flask-CORS has added its headers.
-    @app.after_request
-    def strip_cors_from_recipe_images(response):
-        if request.endpoint == "generation_api.serve_recipe_image":
-            for header in (
-                "Access-Control-Allow-Origin",
-                "Access-Control-Allow-Credentials",
-                "Access-Control-Expose-Headers",
-                "Vary",
-            ):
-                response.headers.pop(header, None)
-        return response
+    # Must stay before CORS(app) — see _register_image_cache_hygiene.
+    _register_image_cache_hygiene(app)
 
     CORS(
         app,

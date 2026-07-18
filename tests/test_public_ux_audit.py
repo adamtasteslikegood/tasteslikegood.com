@@ -269,6 +269,29 @@ def test_unpublish_slugs_is_idempotent_and_reversible(app):
         assert Recipe.query.filter_by(slug="junk-one").one().is_public is True
 
 
+def test_unpublish_slugs_syncs_the_data_blob(app):
+    # The recipes API returns recipe.data verbatim and a later full save
+    # writes data["is_public"] back to the column, so the blob must be
+    # unpublished together with the column or the recipe silently
+    # republishes on the next save.
+    with app.app_context():
+        db.session.add(
+            _make_recipe(
+                "Blob Junk",
+                "blob-junk",
+                data={"name": "Blob Junk", "is_public": True},
+            )
+        )
+        db.session.commit()
+
+    unpublish_slugs(app, ["blob-junk"])
+
+    with app.app_context():
+        recipe = Recipe.query.filter_by(slug="blob-junk").one()
+        assert recipe.is_public is False
+        assert recipe.data["is_public"] is False
+
+
 def test_unpublished_recipes_leave_browse_and_sitemap(app, client):
     with app.app_context():
         db.session.add(_make_recipe("Junk Three", "junk-three"))

@@ -51,6 +51,13 @@ def unpublish_slugs(app, slugs):
                 print(f"ALREADY   {slug} — is_public was already False")
                 continue
             recipe.is_public = False
+            # The recipes API returns recipe.data verbatim and full saves write
+            # data["is_public"] back to the column (db_recipe_repository.py:534,
+            # 653), so a column-only unpublish would show stale is_public: true
+            # in the SPA and get silently republished by the next save. Keep the
+            # blob in sync, same as scripts/gate_guest_public_recipes.py.
+            if isinstance(recipe.data, dict) and recipe.data.get("is_public"):
+                recipe.data["is_public"] = False
             unpublished.append(slug)
             print(f"UNPUBLISH {slug} — is_public set to False (recipe id {recipe.id})")
         db.session.commit()
