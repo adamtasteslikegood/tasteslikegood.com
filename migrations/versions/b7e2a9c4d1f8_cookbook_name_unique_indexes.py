@@ -79,6 +79,17 @@ def _dedupe_scope(bind, scope_col):
 
 def upgrade():
     bind = op.get_bind()
+
+    # The prod migrate job (flask-backend-migrate) runs while the OLD Flask
+    # revision is still serving traffic, so it could INSERT a fresh duplicate
+    # between the de-dup pass below and CREATE UNIQUE INDEX — which would make
+    # the index build fail and abort the deploy. Take an exclusive table lock
+    # (held until this transaction commits, i.e. past index creation) so no
+    # write can slip into that window. Postgres only: SQLite has no LOCK TABLE
+    # and runs the migration single-connection anyway.
+    if bind.dialect.name == "postgresql":
+        op.execute("LOCK TABLE cookbook IN ACCESS EXCLUSIVE MODE")
+
     _dedupe_scope(bind, "user_id")
     _dedupe_scope(bind, "guest_session_id")
 

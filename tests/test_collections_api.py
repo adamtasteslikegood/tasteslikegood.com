@@ -148,6 +148,39 @@ def test_missing_name_still_400(app, client):
     assert resp.status_code == 400
 
 
+def test_oversized_id_rejected_400(app, client):
+    with app.app_context():
+        uid = _make_user("owner@example.com")
+    _login(client, uid)
+    # id longer than Cookbook.id String(36) — must 400, not 500 (Postgres) or
+    # a silently-accepted overlong row (SQLite).
+    resp = client.post("/api/collections", json={"name": "X", "id": "y" * 64})
+    assert resp.status_code == 400
+    assert _count(client) == 0
+
+
+def test_oversized_idempotency_key_header_rejected_400(app, client):
+    with app.app_context():
+        uid = _make_user("owner@example.com")
+    _login(client, uid)
+    resp = client.post(
+        "/api/collections",
+        json={"name": "X"},
+        headers={"Idempotency-Key": "z" * 64},
+    )
+    assert resp.status_code == 400
+    assert _count(client) == 0
+
+
+def test_non_string_id_rejected_400(app, client):
+    with app.app_context():
+        uid = _make_user("owner@example.com")
+    _login(client, uid)
+    resp = client.post("/api/collections", json={"name": "X", "id": 12345})
+    assert resp.status_code == 400
+    assert _count(client) == 0
+
+
 # ── Guests ─────────────────────────────────────────────────────────────────
 
 

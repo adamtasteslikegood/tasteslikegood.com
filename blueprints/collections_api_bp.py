@@ -105,6 +105,19 @@ def create_collection(user_id, guest_session_id):
         # Idempotent replay: if the caller supplied a key we already have a
         # cookbook for (in their scope), return it unchanged rather than error.
         requested_id = data.get("id") or request.headers.get("Idempotency-Key")
+        # The id / Idempotency-Key becomes Cookbook.id (String(36)). Reject an
+        # oversized or non-string value up front with a 400 — otherwise Postgres
+        # raises at commit (surfacing as an opaque 500) while SQLite silently
+        # accepts it, so behavior would diverge between prod and tests.
+        if requested_id is not None and (
+            not isinstance(requested_id, str) or not 0 < len(requested_id) <= 36
+        ):
+            return (
+                jsonify(
+                    {"error": "id / Idempotency-Key must be a string of at most 36 characters"}
+                ),
+                400,
+            )
         if requested_id:
             existing = (
                 _scope_collections_query(user_id, guest_session_id)
@@ -144,9 +157,7 @@ def create_collection(user_id, guest_session_id):
             if replay is not None:
                 return jsonify(replay.to_dict()), 200
         existing = (
-            _scope_collections_query(user_id, guest_session_id)
-            .filter_by(name=data["name"])
-            .first()
+            _scope_collections_query(user_id, guest_session_id).filter_by(name=data["name"]).first()
         )
         if existing is not None:
             return (
