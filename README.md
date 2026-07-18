@@ -156,7 +156,7 @@ recipes/            # Storage for generated recipes (JSON files)
 
 5. **Run the application**
    ```bash
-   python app.py
+   uv run python app.py
    ```
 
 6. **Access the application**
@@ -181,16 +181,16 @@ Run the test suite with pytest:
 
 ```bash
 # Run all tests
-pytest
+uv run pytest
 
 # Run with verbose output
-pytest -v
+uv run pytest -v
 
 # Run specific test file
-pytest tests/test_normalization.py
+uv run pytest tests/test_normalization.py
 
 # Run specific test function
-pytest tests/test_normalization.py::TestNormalization::test_normalize_unit
+uv run pytest tests/test_normalization.py::TestNormalization::test_normalize_unit
 ```
 
 ## CI/CD
