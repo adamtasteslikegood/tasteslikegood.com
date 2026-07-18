@@ -77,6 +77,10 @@ tests/                          # pytest
 recipe_schema.json              # canonical recipe shape
 ```
 
+### Legacy Flask HTML surface is DEV-ONLY
+
+The original server-rendered HTML UI — `/` and `/recipe/<filename>` (`recipes_bp.py`), `/generate_recipe` (`generation_bp.py`), the `/auth/*` pages, and the templates extending `templates/base.html` (`index.html`, `generate_recipe.html`, `recipe.html`, `profile.html`, `json_viewer.html`) — is **never reachable in production**: the Express proxy only forwards `/api/*`, `/r/<slug>`, `/browse`, `/sitemap.xml`, and `/static/*` to Flask. These pages exist only when running Flask directly on :5000 for local development. The production-facing SSR pages live under `templates/public/` (`base_public.html`); the app-level 404/500 error pages extend the public base for that reason. Do not add production features to the legacy surface, and do not link production pages to its routes. Deleting it entirely is a tracked follow-up (cookbook #3164).
+
 ### Authentication
 
 Gemini credential handling lives in `services/gemini_service.py:get_genai_client(session_credentials)`: it prefers caller-supplied user OAuth credentials, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works — it never reads the Flask session itself. Today both live generation call sites (`services/image_service.py` and the Pub/Sub worker in `blueprints/worker_api_bp.py`) pass `None`, so generation runs on the server key; only model refresh (`blueprints/api_bp.py` → `refresh_models_from_api`) forwards `session.get("credentials")`. Preserve that preference order.
