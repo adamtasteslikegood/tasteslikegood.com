@@ -73,11 +73,19 @@ def _minutes_to_iso_duration(value: Any) -> str | None:
 
 
 def _recipe_image_url(recipe: Recipe) -> str | None:
+    """URL of an image the site can actually serve, or ``None`` to omit it.
+
+    A recipe row can carry an ``ai_image_url`` whose bytes were never
+    persisted (the /api/recipes/<id>/image endpoint then 404s). Trusting that
+    field produced dead hero images and dead ``og:image`` URLs on live
+    recipe pages (cookbook #3164). Derive the page media from the signal the
+    image endpoint actually serves from (real GCS/base64 bytes), else an
+    external stock image — never from the unverified ``ai_image_url``.
+    The same gate feeds the Pinterest share button, so the pin media and the
+    page media can never disagree.
+    """
     data = recipe.data or {}
-    ai_image_url = data.get("ai_image_url")
-    if ai_image_url:
-        return _absolute_url(ai_image_url)
-    if data.get("ai_image_data") or data.get("ai_image_gcs"):
+    if data.get("ai_image_gcs") or data.get("ai_image_data"):
         return _canonical_url("generation_api.serve_recipe_image", recipe_id=recipe.id)
     return _absolute_url(data.get("stock_image_url"))
 
@@ -212,23 +220,11 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
     return cleaned
 
 
-def _pinnable_image_url(recipe: Recipe) -> str | None:
-    """URL of an image Pinterest can actually fetch, or ``None`` to hide the button.
-
-    A recipe row can carry an ``ai_image_url`` whose bytes were never
-    persisted (the /api/recipes/<id>/image endpoint then 404s), which makes
-    ``_recipe_image_url`` return a dead link. Pinning that produces a broken
-    pin — and a run of broken pins to a fresh domain is exactly what trips
-    Pinterest's new-account spam heuristics. Derive the pin media from the
-    signal the image endpoint actually serves from (real GCS/base64 bytes),
-    else an external stock image — the shared URL is the value that passed
-    the gate, so the two can never disagree (a stale ``ai_image_url`` next
-    to a valid stock image must pin the stock image, not the dead link).
-    """
-    data = recipe.data or {}
-    if data.get("ai_image_gcs") or data.get("ai_image_data"):
-        return _canonical_url("generation_api.serve_recipe_image", recipe_id=recipe.id)
-    return _absolute_url(data.get("stock_image_url"))
+# Pinterest pin media uses the same byte-gated URL as the page itself
+# (see _recipe_image_url): pinning a dead link creates broken pins, and a
+# run of broken pins to a fresh domain trips Pinterest's new-account spam
+# heuristics (Backend #203/#204).
+_pinnable_image_url = _recipe_image_url
 
 
 def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
@@ -301,7 +297,6 @@ def show_public_recipe(slug):
             else None
         ),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
-        save_to_cookbook_url=f"{_public_base_url()}/#kitchen",
     )
 
 

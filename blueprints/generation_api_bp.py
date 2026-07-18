@@ -227,6 +227,25 @@ def get_recipe_status(recipe_id):
     return jsonify({"status": recipe.status, "recipe": recipe.data}), 200
 
 
+def _image_mimetype(image_bytes: bytes) -> str:
+    """Sniff the real image type from the bytes' magic numbers.
+
+    Imagen has produced JPEG bytes for recipes while this endpoint hardcoded
+    ``image/png`` — a mismatch that breaks strict crawlers/CDNs and the
+    audit's content-type check (cookbook #3164). Defaults to PNG for
+    unrecognized payloads (the endpoint's historical behavior).
+    """
+    if image_bytes.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if image_bytes[:4] == b"RIFF" and image_bytes[8:12] == b"WEBP":
+        return "image/webp"
+    if image_bytes.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif"
+    return "image/png"
+
+
 @generation_api_bp.route("/recipes/<recipe_id>/image", methods=["GET"])
 def serve_recipe_image(recipe_id):
     """
@@ -238,6 +257,13 @@ def serve_recipe_image(recipe_id):
     Access rules:
         - If the recipe is public (``is_public=True``) anyone may fetch the image.
         - Otherwise the recipe must belong to the current user or guest session.
+
+    Response hygiene (cookbook #3164): public-recipe responses are meant to be
+    CDN/browser cacheable, so this endpoint is exempted from the app-wide
+    session touch (no ``Set-Cookie``/``Vary: Cookie`` — see
+    ``ensure_session_id`` in app.py) and CORS headers are stripped in
+    ``create_app`` (images are consumed same-origin through the Express
+    proxy; ACAO on them defeated shared caching).
     """
     # Public recipes bypass ownership scoping so unauthenticated SSR pages
     # and crawlers can still load the image.
@@ -266,7 +292,7 @@ def serve_recipe_image(recipe_id):
     if cached_bytes is not None:
         return Response(
             cached_bytes,
-            mimetype="image/png",
+            mimetype=_image_mimetype(cached_bytes),
             headers={"Cache-Control": http_cache_control},
         )
 
@@ -296,7 +322,7 @@ def serve_recipe_image(recipe_id):
 
     return Response(
         image_bytes,
-        mimetype="image/png",
+        mimetype=_image_mimetype(image_bytes),
         headers={"Cache-Control": http_cache_control},
     )
 

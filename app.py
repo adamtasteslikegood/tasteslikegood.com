@@ -233,6 +233,26 @@ def create_app(**config_overrides):
         ]
     )
 
+    # Recipe images are consumed same-origin through the Express proxy and
+    # must be cacheable by shared caches (CDN/browser). Flask-CORS decorates
+    # every response app-wide, which stamped Access-Control-Allow-Origin
+    # (reflecting whatever dev origin was allowed) + Vary onto image bytes and
+    # defeated caching (cookbook #3164). Strip CORS headers from that endpoint.
+    # Registered BEFORE CORS(app) on purpose: Flask runs app-level
+    # after_request functions in reverse registration order, so this runs
+    # after Flask-CORS has added its headers.
+    @app.after_request
+    def strip_cors_from_recipe_images(response):
+        if request.endpoint == "generation_api.serve_recipe_image":
+            for header in (
+                "Access-Control-Allow-Origin",
+                "Access-Control-Allow-Credentials",
+                "Access-Control-Expose-Headers",
+                "Vary",
+            ):
+                response.headers.pop(header, None)
+        return response
+
     CORS(
         app,
         origins=cors_origins,
@@ -252,6 +272,14 @@ def create_app(**config_overrides):
         """
         # Skip session creation for static files to avoid unnecessary overhead
         if request.endpoint and "static" in request.endpoint:
+            return None
+
+        # Skip the recipe-image endpoint: touching the session there attached
+        # Set-Cookie + Vary: Cookie to every image response, making the
+        # public, cacheable images uncacheable by any shared cache (cookbook
+        # #3164). Private-image access control still reads the existing
+        # session cookie inside the endpoint itself.
+        if request.endpoint == "generation_api.serve_recipe_image":
             return None
 
         # Ensure session has an ID for tracking

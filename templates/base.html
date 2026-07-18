@@ -1,9 +1,21 @@
 <!doctype html>
+{#
+  LEGACY / DEV-ONLY SURFACE — never reachable in production.
+
+  This base (and the pages extending it: index.html, generate_recipe.html,
+  recipe.html, profile.html, the /auth/* pages) is Flask's original HTML UI.
+  In production the Express proxy only forwards /api/*, /r/<slug>, /browse,
+  /sitemap.xml and /static/* to Flask, so the routes linked below
+  (/, /generate_recipe, /auth/*) exist only when running Flask directly on
+  :5000 for local development. The production-facing SSR pages extend
+  templates/public/base_public.html instead. Deleting this surface is a
+  tracked follow-up (cookbook #3164); do not add new production features here.
+#}
 <html lang="en">
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-        <title>{% block title %}TastesLikeGood.com{% endblock %}</title>
+        <title>{% block title %}TastesLikeGood.org{% endblock %}</title>
         <link
             rel="icon"
             href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🥗</text></svg>"
