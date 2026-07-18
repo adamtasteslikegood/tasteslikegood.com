@@ -15,6 +15,7 @@ import uuid
 from datetime import datetime
 
 from flask import Blueprint, jsonify, request, session
+from sqlalchemy.exc import IntegrityError
 
 from extensions import db
 from models import Cookbook
@@ -90,14 +91,31 @@ def create_collection(user_id, guest_session_id):
     Create a new cookbook.
 
     Request body: {"name": "...", "description": "...", "id": "<optional-uuid>"}
+
+    Idempotency: a client may pass a stable ``id`` in the body (also accepted
+    as an ``Idempotency-Key`` header). Replaying a request with an id we already
+    hold returns the existing cookbook (200) instead of creating a duplicate.
+    Duplicate names within the caller's scope are rejected with 409.
     """
     try:
         data = request.get_json()
         if not data or not data.get("name"):
             return jsonify({"error": "name is required"}), 400
 
+        # Idempotent replay: if the caller supplied a key we already have a
+        # cookbook for (in their scope), return it unchanged rather than error.
+        requested_id = data.get("id") or request.headers.get("Idempotency-Key")
+        if requested_id:
+            existing = (
+                _scope_collections_query(user_id, guest_session_id)
+                .filter_by(id=requested_id)
+                .first()
+            )
+            if existing is not None:
+                return jsonify(existing.to_dict()), 200
+
         cookbook = Cookbook(
-            id=data.get("id") or str(uuid.uuid4()),
+            id=requested_id or str(uuid.uuid4()),
             user_id=user_id,
             guest_session_id=None if user_id is not None else guest_session_id,
             name=data["name"],
@@ -108,6 +126,28 @@ def create_collection(user_id, guest_session_id):
         db.session.add(cookbook)
         db.session.commit()
         return jsonify(cookbook.to_dict()), 201
+    except IntegrityError:
+        # Lost a race: either the same id was inserted concurrently (idempotent
+        # replay → 200) or a cookbook with this name already exists in scope
+        # (unique index → 409). Resolve against the now-committed row.
+        db.session.rollback()
+        if requested_id:
+            replay = (
+                _scope_collections_query(user_id, guest_session_id)
+                .filter_by(id=requested_id)
+                .first()
+            )
+            if replay is not None:
+                return jsonify(replay.to_dict()), 200
+        existing = (
+            _scope_collections_query(user_id, guest_session_id)
+            .filter_by(name=data.get("name"))
+            .first()
+        )
+        payload = {"error": "You already have a cookbook with that name"}
+        if existing is not None:
+            payload["collection"] = existing.to_dict()
+        return jsonify(payload), 409
     except Exception as e:
         logger.error(f"Error creating collection: {e}")
         db.session.rollback()
