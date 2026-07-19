@@ -20,7 +20,10 @@ ENV DD_SITE=us5.datadoghq.com
 ENV DD_LOGS_ENABLED=true
 ENV DD_LOGS_INJECTION=true
 ENV DD_SOURCE=python
-ENV DD_PROFILING_ENABLED=true
+# Continuous profiler disabled: its resident-memory overhead (sampling buffers +
+# extra threads) is the largest Datadog cost in-process and isn't worth it at
+# single-user scale. APM traces (ddtrace-run) and log injection stay on.
+ENV DD_PROFILING_ENABLED=false
 ENV DD_APPSEC_ENABLED=true
 
 WORKDIR /app
@@ -43,4 +46,7 @@ ENTRYPOINT ["/app/datadog-init"]
 # Gunicorn, never `python app.py`: the __main__ path runs Werkzeug's debug
 # server (app.run(debug=True)), which must not serve production traffic.
 # Cloud Run injects PORT; 5000 matches the old local-run default.
-CMD ["sh", "-c", "exec ddtrace-run gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 8 --timeout 0 app:app"]
+# --max-requests recycles the worker every ~1000 requests (±100 jitter) so any
+# slow memory growth is reclaimed; needed because --timeout 0 (kept for long
+# Gemini/Imagen calls) otherwise means the worker never restarts on its own.
+CMD ["sh", "-c", "exec ddtrace-run gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 8 --timeout 0 --max-requests 1000 --max-requests-jitter 100 app:app"]
