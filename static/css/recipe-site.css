@@ -555,8 +555,18 @@ img {
     grid-template-columns: 1fr;
   }
 
+  /* On phones the 16/9 hero image is only ~190px tall while the title wraps
+     to 2–3 lines, so the bottom-anchored absolute overlay grows taller than
+     the image and its top (eyebrow + first title line) is clipped by the
+     hero's overflow:hidden. Stack the title block BELOW the image instead —
+     normal flow, surface background, inherited dark text — mirroring the
+     no-image .public-recipe-title-block path so nothing is ever clipped. */
   .public-recipe-hero-overlay {
+    position: static;
     padding: var(--space-4);
+    color: inherit;
+    background: var(--bg-surface);
+    border-top: var(--ar-border);
   }
 
   .public-recipe-toolbar {
