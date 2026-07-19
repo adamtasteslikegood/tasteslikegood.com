@@ -9,6 +9,7 @@ Ref: https://cloud.google.com/memorystore/docs/valkey/manage-iam-auth
 """
 
 import logging
+import os
 import threading
 import time
 
@@ -44,11 +45,21 @@ def _build_client(host: str, port: int) -> redis.StrictRedis:
         logger.info("Creating Valkey client with fresh IAM token (sa=%s)", email)
     else:
         logger.info("Creating Valkey client with fresh IAM token (user credentials)")
+
+    # Memorystore server certs chain to a Google-managed private CA that the
+    # container's default trust store can't verify. Trust it explicitly via the
+    # VALKEY_CA_CERT PEM (from Secret Manager); without it the TLS handshake
+    # fails CERTIFICATE_VERIFY_FAILED and the caller silently degrades to an
+    # in-process backend. ssl_ca_data=None means "use the system trust store"
+    # (local/dev), so keep TLS verification on either way. Mirrors
+    # server/valkey.ts (the Express side already does this correctly).
+    ca_cert = os.environ.get("VALKEY_CA_CERT")
     return redis.StrictRedis(
         host=host,
         port=port,
         password=token,
         ssl=True,
+        ssl_ca_data=ca_cert,
         decode_responses=False,
     )
 
@@ -56,10 +67,10 @@ def _build_client(host: str, port: int) -> redis.StrictRedis:
 def _refresh_token_in_place() -> bool:
     """Refresh the IAM token on the EXISTING client's connection pool.
 
-    This is critical because Flask-Session and Flask-Caching hold references
-    to the original client object. Creating a new client doesn't help — we
-    must update the password on the pool they're already using, then drop
-    stale connections so new ones authenticate with the fresh token.
+    This is critical because Flask-Caching holds a reference to the original
+    client object. Creating a new client doesn't help — we must update the
+    password on the pool it is already using, then drop stale connections so
+    new ones authenticate with the fresh token.
 
     Returns:
         bool: True if a client was present and successfully refreshed,
