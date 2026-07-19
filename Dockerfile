@@ -46,7 +46,8 @@ ENTRYPOINT ["/app/datadog-init"]
 # Gunicorn, never `python app.py`: the __main__ path runs Werkzeug's debug
 # server (app.run(debug=True)), which must not serve production traffic.
 # Cloud Run injects PORT; 5000 matches the old local-run default.
-# --max-requests recycles the worker every ~1000 requests (±100 jitter) so any
-# slow memory growth is reclaimed; needed because --timeout 0 (kept for long
-# Gemini/Imagen calls) otherwise means the worker never restarts on its own.
+# --max-requests recycles the worker every 1000-1100 requests (1000 + a random
+# 0-100 jitter, per gunicorn's randint(0, jitter)) so any slow memory growth is
+# reclaimed; needed because --timeout 0 (kept for long Gemini/Imagen calls)
+# otherwise means the worker never restarts on its own.
 CMD ["sh", "-c", "exec ddtrace-run gunicorn --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 8 --timeout 0 --max-requests 1000 --max-requests-jitter 100 app:app"]
