@@ -31,6 +31,9 @@ env/
 .codex/
 .claude/
 
+# Agent skill bundles duplicated into .github/ (rest of .github/ stays tracked — CI, dependabot, copilot config)
+.github/skills/
+
 # Flask
 instance/
 *.db
