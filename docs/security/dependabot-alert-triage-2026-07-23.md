@@ -104,3 +104,20 @@ blanket `git rm -r --cached`). Recommend a follow-up PR against KAN-64 that:
 - **1 code-scanning alert** (`py/unused-global-variable`, `services/gcs_service.py`) —
   real but minor; unrelated to this cleanup.
 - **0 secret-scanning alerts.**
+
+## Follow-up (completed 2026-07-23)
+
+The follow-up recommended above shipped as a second PR off this same commit
+(after #229 merged): `git rm -r --cached` for `.github/skills/`,
+`.codex/skills/`, `.claude/skills/`, `.agent/skills/`, and the stray file
+under `.cursor/skills/` — 2,261 files. `.codex/`, `.claude/`, `.agent/`, and
+`.cursor/` were already fully `.gitignore`d as whole directories (they hold
+no other content), so no gitignore edit was needed for those three; `.github/`
+holds real CI/workflow/dependabot/copilot content that must stay tracked, so
+that PR added a scoped `.github/skills/` entry to `.gitignore` rather than
+ignoring `.github/` wholesale. Verified before untracking that
+`.claude/agents/prompt-optimizer.md` and `.agent/workflows/*.md` (real,
+intentional files, not skill-bundle noise) were left untouched. All six
+skill-bundle paths now show 0 tracked files; the remaining ~62 alerts
+(`uv.lock` + stale `requirements.txt`) are unaffected and still need the
+normal triage process described above.
