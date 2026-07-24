@@ -57,7 +57,6 @@ app.py                          # create_app() — registers blueprints, extensi
 config.py                       # env-driven config (DATABASE_URL, OAuth, secrets)
 extensions.py                   # SQLAlchemy, Migrate, Cache singletons
 auth.py                         # legacy OAuth helpers (still used by blueprints)
-utils.py                        # recipe data normalization (units, fractions, fuzzy keys)
 
 blueprints/
   auth_api_bp.py                # /api/auth/* — OAuth flow, sessions, profile
@@ -68,12 +67,34 @@ blueprints/
   worker_api_bp.py              # Pub/Sub push handlers (OIDC-verified)
   public_bp.py                  # SSR public recipe routes (slug-based)
 
-services/                       # business logic (gemini_service, image_service, ...)
+services/
+  gemini_service.py             # Gemini text generation + client factory
+  image_service.py              # Imagen image generation
+  gcs_service.py                # Google Cloud Storage (recipe images)
+  model_service.py              # Gemini model list refresh
+  pubsub_service.py             # Pub/Sub message publishing
+  stock_image_service.py        # fallback stock image lookup
+  migration_service.py          # slug backfill + data migration helpers
+  reporting_service.py          # admin reporting
+
+utils/
+  normalization.py              # recipe data normalization (units, fractions, fuzzy keys)
+  slug_utils.py                 # slug generation with collision handling
+  session_utils.py              # Flask session helpers
+  cache_utils.py                # cache key builders + decorators
+  log_sanitizer.py              # sanitize user input in log output
+  valkey_auth.py                # Valkey IAM token refresh for Memorystore
+  admin_auth.py                 # admin API token validation
+  logging_config.py             # structured logging setup
+
 repositories/                   # data access with file locking + DB
 validators/                     # JSON Schema Draft 7 (recipe_schema.json)
 models/                         # SQLAlchemy: User, Recipe, Cookbook
 migrations/                     # Alembic via Flask-Migrate
-tests/                          # pytest
+templates/public/               # SSR templates (base_public.html, recipe.html, browse.html)
+static/                         # CSS tokens, images, JS for SSR pages
+tests/                          # pytest (~28 test files)
+scripts/                        # one-off migration/debug scripts (backfill_slugs.py, etc.)
 recipe_schema.json              # canonical recipe shape
 ```
 
@@ -144,6 +165,31 @@ uv run flask db merge -m "..." A B  # unify branched heads
 
 In production all secrets come from Google Secret Manager via Cloud Run `--set-secrets`.
 
+## CI pipeline
+
+Backend CI (`.github/workflows/ci.yml`) runs on every push/PR to `main` or `dev`:
+
+| Job | What it checks |
+|---|---|
+| `Lint (Black + Flake8)` | Code formatting and style |
+| `Type Check (mypy)` | Static type analysis |
+| `Test (pytest)` | Full test suite with coverage report |
+| `Build (docker)` | Validates the production Docker image builds |
+| `Security Scan (pip-audit)` | Audits pinned deps for known CVEs (advisory) |
+
+Additional workflows: `codeql.yml` (CodeQL analysis — required status check via branch protection), `claude-review.yml` / `gemini-review.yml` (AI code review on PRs).
+
+## Testing
+
+pytest (`uv run pytest`). ~28 test files in `tests/`. Coverage reported via `pytest-cov`.
+
+Key test patterns:
+- SSR routes: `tests/test_public_ssr.py` — the reference for correct app/DB test setup
+- Auth: `tests/test_auth_api.py`, `tests/test_auth.py`
+- Generation: `tests/test_gemini_service.py`, `tests/test_image_service.py`, `tests/test_async_generation_api.py`
+- Data: `tests/test_normalization.py`, `tests/test_recipe_validation.py`
+- Worker: `tests/test_worker_oidc.py`, `tests/test_worker_generation_retry.py`
+
 ## Common gotchas
 
 - **Two migration heads** — see "Multi-PR head conflicts" above. Symptom: `flask db upgrade` runs but production schema is incomplete; `recipe.status missing` style errors at runtime.
@@ -178,6 +224,64 @@ root, so credentials still come from the cookbook `.env`
 `GOOGLE_APPLICATION_CREDENTIALS` for gcp-monitor) — see the cookbook
 `CLAUDE.md` § Startup. In a standalone checkout (no cookbook superproject) the
 wrapper exits with a clear error and the servers are simply unavailable.
+
+## GBrain code search (agent sessions)
+
+If gbrain is configured on the machine, this repo is indexed as its own source,
+`gstack-code-backend` — separate from the cookbook worktree's source and **not
+federated**. Two consequences for anyone working in here:
+
+**1. Every query needs an explicit `--source`.** `code-def`, `code-refs`,
+`code-callers`, `code-callees`, `search`, and `query` all default to the
+cookbook worktree's pinned source, which contains no Backend Python. Without
+the flag they return nothing and give no indication anything was missed:
+
+```bash
+gbrain code-def get_genai_client --source gstack-code-backend
+gbrain search "OAuth PKCE code verifier" --source gstack-code-backend
+```
+
+There is no `.gbrain-source` pin in this directory to make that automatic —
+the pin is a cookbook-worktree mechanism, and this repo is a submodule
+(a gitlink), so it does not get one.
+
+**2. Never run a bare `/sync-gbrain` from inside `Backend/`.** It does not
+no-op here. Because there is no pin, the orchestrator's code stage falls back
+to registering the cwd as a *new* federated source
+(`gstack-code-com-<hash> --path .../Backend`), re-indexing the whole repo
+alongside the pages already held by `gstack-code-backend`. The nested-path
+guard does not catch
+it: `gstack-code-backend` lives in gbrain's own managed clone directory rather
+than at the `Backend/` path, so there is no path overlap to detect. Verified
+via `gstack-gbrain-sync.ts --dry-run` on 2026-07-24.
+
+Refresh this repo's index with the explicit form instead — it fast-forwards
+gbrain's managed clone from Backend `dev`:
+
+```bash
+gbrain sync --source gstack-code-backend --strategy code
+```
+
+If you want the memory + brain-sync stages while sitting in `Backend/`, run
+`gstack-gbrain-sync.ts --no-code`. From this directory, always `--dry-run`
+first and read the `would:` line before letting the code stage run.
+
+Related: the `/sync-gbrain` skill rewrites its `## GBrain Search Guidance`
+block from a fixed template asserting the worktree is pinned via
+`.gbrain-source`. That assertion is false here, so do not let the skill write
+that block into this file. The cookbook `CLAUDE.md` § GBrain Search Guidance
+carries the authoritative cross-repo version.
+
+## Behavioral Guidelines
+
+Follow the four Karpathy principles when writing or modifying code in this project:
+
+1. **Think Before Coding** — understand the problem fully before writing. Read existing code, check for prior art, verify assumptions.
+2. **Simplicity First** — prefer the simplest solution that works. Avoid premature abstraction, speculative features, and unnecessary indirection.
+3. **Surgical Changes** — make the smallest diff that solves the problem. Don't refactor surrounding code, add unrelated improvements, or "clean up while you're there."
+4. **Goal-Driven Execution** — every action should move toward a verifiable success criterion. State what "done" looks like before starting.
+
+For the full reference, see the `karpathy-check` slash command / `karpathy-coder` skill / `cs-karpathy-reviewer` agent under the **optional** `alirez-claude-skills/` submodule (not initialized by default).
 
 ## Related docs
 
