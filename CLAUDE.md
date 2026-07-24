@@ -234,7 +234,7 @@ Follow the four Karpathy principles when writing or modifying code in this proje
 3. **Surgical Changes** — make the smallest diff that solves the problem. Don't refactor surrounding code, add unrelated improvements, or "clean up while you're there."
 4. **Goal-Driven Execution** — every action should move toward a verifiable success criterion. State what "done" looks like before starting.
 
-See the `karpathy-guidelines` skill for the full reference.
+For the full reference, see the `karpathy-check` slash command / `karpathy-coder` skill / `cs-karpathy-reviewer` agent under the **optional** `alirez-claude-skills/` submodule (not initialized by default).
 
 ## Related docs
 
