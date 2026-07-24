@@ -54,6 +54,48 @@ class CanonicalRecipeError(ValueError):
     """Publish-state, slug, or delete changes to a canonical recipe are locked."""
 
 
+# Also returned verbatim by the API routes (fixed string, same rationale as
+# PUBLIC_SLUG_REQUIRED_ERROR above).
+MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
+    "Manually entered recipes cannot be published. Only generated recipes "
+    "can have a public page."
+)
+
+# 'manual' gates publishing; the others exist so curation can query by
+# provenance. NULL = legacy/unknown, treated as publishable.
+_ALLOWED_ORIGINS = frozenset({"manual", "generated", "saved"})
+
+
+class ManualRecipeError(ValueError):
+    """Manually entered recipes cannot be published (KAN-140)."""
+
+
+def _resolve_origin(current_origin: Optional[str], recipe_data: Dict[str, Any]) -> Optional[str]:
+    """Column value for origin: settable while NULL, immutable once set.
+
+    Once a recipe is labeled, a later payload cannot relabel it — otherwise
+    a 'manual' recipe could launder itself into 'generated' and slip past
+    the publish gate. Unknown labels are dropped rather than stored.
+    """
+    if current_origin:
+        return current_origin
+    candidate = recipe_data.get("origin")
+    return candidate if candidate in _ALLOWED_ORIGINS else None
+
+
+def _gate_manual_publish(origin: Optional[str], recipe_data: Dict[str, Any]) -> None:
+    """Reject publication of manually entered recipes (KAN-140).
+
+    The manual-entry form is free-text content with no AI mediation; the
+    public /r/<slug> surface must not become an open publishing endpoint.
+    Raises (a 400 at the API) instead of silently forcing the flag off, so
+    the SPA's revert-and-toast path fires rather than diverging from the
+    server state.
+    """
+    if origin == "manual" and recipe_data.get("is_public") is True:
+        raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
+
+
 def _guard_canonical(recipe: Recipe, recipe_data: Dict[str, Any]) -> None:
     """Reject payloads that would unpublish or re-slug a canonical recipe.
 
@@ -558,6 +600,12 @@ def create_recipe(
                 else:
                     merged.pop("slug", None)
             recipe_data_with_id = _gate_is_public(merged, user_id)
+            next_origin = _resolve_origin(existing.origin, recipe_data)
+            _gate_manual_publish(next_origin, recipe_data_with_id)
+            if next_origin is not None:
+                recipe_data_with_id["origin"] = next_origin
+            else:
+                recipe_data_with_id.pop("origin", None)
             recipe_name = recipe_data.get("name", existing.name)
             next_status = existing.status if existing.status in _ACTIVE_RECIPE_STATUSES else status
 
@@ -566,6 +614,7 @@ def create_recipe(
                 existing.slug = data.get("slug")
                 existing.is_public = data.get("is_public", False)
                 existing.source_slug = data.get("sourceSlug")
+                existing.origin = next_origin
                 existing.data = data
                 existing.status = next_status
                 existing.updated_at = datetime.utcnow()
@@ -579,6 +628,12 @@ def create_recipe(
         recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
         # A client cannot mint its own canonical lock.
         recipe_data_with_id.pop("is_canonical", None)
+        origin_value = _resolve_origin(None, recipe_data)
+        _gate_manual_publish(origin_value, recipe_data_with_id)
+        if origin_value is not None:
+            recipe_data_with_id["origin"] = origin_value
+        else:
+            recipe_data_with_id.pop("origin", None)
 
         def stage_new(data: Dict[str, Any]) -> Recipe:
             recipe = Recipe(
@@ -589,6 +644,7 @@ def create_recipe(
                 slug=data.get("slug"),
                 is_public=data.get("is_public", False),
                 source_slug=data.get("sourceSlug"),
+                origin=origin_value,
                 data=data,
                 status=status,
             )
@@ -604,7 +660,7 @@ def create_recipe(
         )
         return recipe
 
-    except (RecipeSlugError, CanonicalRecipeError):
+    except (RecipeSlugError, CanonicalRecipeError, ManualRecipeError):
         raise
     except Exception as e:
         logger.error("Error creating recipe: %s", sanitize_log_value(e))
@@ -688,11 +744,19 @@ def update_recipe(
             else:
                 recipe_data_with_id.pop("slug", None)
 
+        next_origin = _resolve_origin(recipe.origin, recipe_data)
+        _gate_manual_publish(next_origin, recipe_data_with_id)
+        if next_origin is not None:
+            recipe_data_with_id["origin"] = next_origin
+        else:
+            recipe_data_with_id.pop("origin", None)
+
         def stage_update(data: Dict[str, Any]) -> Recipe:
             recipe.name = recipe_data.get("name", recipe.name)
             recipe.slug = data.get("slug")
             recipe.is_public = data["is_public"]
             recipe.source_slug = data.get("sourceSlug")
+            recipe.origin = next_origin
             recipe.data = data
             if status is not None:
                 recipe.status = status
@@ -706,7 +770,7 @@ def update_recipe(
         logger.info("Updated recipe %s", sanitize_log_value(recipe_id))
         return updated
 
-    except (RecipeSlugError, CanonicalRecipeError):
+    except (RecipeSlugError, CanonicalRecipeError, ManualRecipeError):
         raise
     except Exception as e:
         logger.error(
