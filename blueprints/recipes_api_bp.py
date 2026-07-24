@@ -69,8 +69,14 @@ def list_recipes(user_id, guest_session_id):
                             "id": recipe.id,
                             "name": recipe.name,
                             "data": recipe.data,
+                            # Column values are authoritative over the blob's
+                            # copies, which can lag on rows written before the
+                            # blob-sync era — the SPA prefers these (KAN-139).
+                            "slug": recipe.slug,
+                            "is_public": recipe.is_public,
                             "is_canonical": recipe.is_canonical,
                             "source_slug": recipe.source_slug,
+                            "origin": recipe.origin,
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
@@ -131,6 +137,8 @@ def create_recipe(user_id, guest_session_id):
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
     except db_recipe_repository.CanonicalRecipeError:
         return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
+    except db_recipe_repository.ManualRecipeError:
+        return jsonify({"error": db_recipe_repository.MANUAL_RECIPE_UNPUBLISHABLE_ERROR}), 400
     except Exception as e:
         logger.error(f"Error creating recipe: {e}")
         return jsonify({"error": "Failed to create recipe"}), 500
@@ -194,6 +202,8 @@ def update_recipe(user_id, guest_session_id, recipe_id):
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
     except db_recipe_repository.CanonicalRecipeError:
         return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
+    except db_recipe_repository.ManualRecipeError:
+        return jsonify({"error": db_recipe_repository.MANUAL_RECIPE_UNPUBLISHABLE_ERROR}), 400
     except Exception as e:
         logger.error(
             "Error updating recipe %s: %s",
