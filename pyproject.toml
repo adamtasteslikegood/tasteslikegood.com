@@ -33,10 +33,10 @@ dependencies = [
     "flask-caching==2.4.1",
     "sqlalchemy>=2.0.51", # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
-    "google-genai==2.11.0",
+    "google-genai==2.14.0",
     "google-generativeai==0.8.6",
     "google-ai-generativelanguage==0.6.15",
-    "google-auth==2.56.0",
+    "google-auth==2.56.2",
     "google-auth-oauthlib==1.4.0",
     "google-api-python-client==2.198.0",
     "googleapis-common-protos==1.75.0",
@@ -58,7 +58,7 @@ dependencies = [
     "requests==2.34.2",
     "requests-oauthlib==2.0.0",
     "urllib3==2.7.0",
-    "certifi==2026.6.17",
+    "certifi==2026.7.22",
     "charset-normalizer==3.4.9",
     "idna==3.18",
     # Utilities
@@ -70,13 +70,13 @@ dependencies = [
     "typing-extensions==4.16.0",
     "tenacity==9.1.4",
     "websockets==16.1.1",
-    "cachetools==7.1.4",
+    "cachetools==7.1.6",
     # Cryptography & Security
     "pyasn1==0.6.4",
     "pyasn1-modules==0.4.2",
     "rsa==4.9.1",
     "flask-cors==6.0.5",
-    "pandas>=3.0.3",
+    "pandas>=3.0.5",
     "ddtrace>=4.11.1",
     "gunicorn>=26.0.0",
 ]
