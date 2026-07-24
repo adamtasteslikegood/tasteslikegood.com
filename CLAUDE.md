@@ -225,6 +225,52 @@ root, so credentials still come from the cookbook `.env`
 `CLAUDE.md` § Startup. In a standalone checkout (no cookbook superproject) the
 wrapper exits with a clear error and the servers are simply unavailable.
 
+## GBrain code search (agent sessions)
+
+If gbrain is configured on the machine, this repo is indexed as its own source,
+`gstack-code-backend` — separate from the cookbook worktree's source and **not
+federated**. Two consequences for anyone working in here:
+
+**1. Every query needs an explicit `--source`.** `code-def`, `code-refs`,
+`code-callers`, `code-callees`, `search`, and `query` all default to the
+cookbook worktree's pinned source, which contains no Backend Python. Without
+the flag they return nothing and give no indication anything was missed:
+
+```bash
+gbrain code-def get_genai_client --source gstack-code-backend
+gbrain search "OAuth PKCE code verifier" --source gstack-code-backend
+```
+
+There is no `.gbrain-source` pin in this directory to make that automatic —
+the pin is a cookbook-worktree mechanism, and this repo is a submodule
+(a gitlink), so it does not get one.
+
+**2. Never run a bare `/sync-gbrain` from inside `Backend/`.** It does not
+no-op here. Because there is no pin, the orchestrator's code stage falls back
+to registering the cwd as a *new* federated source
+(`gstack-code-com-<hash> --path .../Backend`), duplicating the ~200 pages
+already indexed as `gstack-code-backend`. The nested-path guard does not catch
+it: `gstack-code-backend` lives in gbrain's own managed clone directory rather
+than at the `Backend/` path, so there is no path overlap to detect. Verified
+via `gstack-gbrain-sync.ts --dry-run` on 2026-07-24.
+
+Refresh this repo's index with the explicit form instead — it fast-forwards
+gbrain's managed clone from Backend `dev`:
+
+```bash
+gbrain sync --source gstack-code-backend --strategy code
+```
+
+If you want the memory + brain-sync stages while sitting in `Backend/`, run
+`gstack-gbrain-sync.ts --no-code`. From this directory, always `--dry-run`
+first and read the `would:` line before letting the code stage run.
+
+Related: the `/sync-gbrain` skill rewrites its `## GBrain Search Guidance`
+block from a fixed template asserting the worktree is pinned via
+`.gbrain-source`. That assertion is false here, so do not let the skill write
+that block into this file. The cookbook `CLAUDE.md` § GBrain Search Guidance
+carries the authoritative cross-repo version.
+
 ## Behavioral Guidelines
 
 Follow the four Karpathy principles when writing or modifying code in this project:
