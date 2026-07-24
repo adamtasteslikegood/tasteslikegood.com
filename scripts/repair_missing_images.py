@@ -45,19 +45,30 @@ def _is_imageless(data: dict) -> bool:
 
 
 def select_candidates(limit: int):
-    """Imageless, generation-idle recipes, most publicly visible first."""
+    """Imageless, generation-idle recipes, most publicly visible first.
+
+    Streams rows in priority order and stops as soon as ``limit`` imageless
+    candidates are collected — a ``.all()`` load would pull the whole
+    ready-recipe table into memory just to keep the first few.
+    """
     from models import Recipe
 
-    rows = (
+    stream = (
         Recipe.query.filter(Recipe.status == "ready")
         .order_by(
             Recipe.is_canonical.desc(),
             Recipe.is_public.desc(),
             Recipe.created_at.asc(),
         )
-        .all()
+        .yield_per(200)
     )
-    return [r for r in rows if _is_imageless(r.data or {})][:limit]
+    picked = []
+    for recipe in stream:
+        if _is_imageless(recipe.data or {}):
+            picked.append(recipe)
+            if len(picked) >= limit:
+                break
+    return picked
 
 
 def enqueue(recipe) -> bool:
