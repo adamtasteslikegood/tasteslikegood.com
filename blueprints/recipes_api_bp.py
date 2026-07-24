@@ -69,6 +69,8 @@ def list_recipes(user_id, guest_session_id):
                             "id": recipe.id,
                             "name": recipe.name,
                             "data": recipe.data,
+                            "is_canonical": recipe.is_canonical,
+                            "source_slug": recipe.source_slug,
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
@@ -127,6 +129,8 @@ def create_recipe(user_id, guest_session_id):
     except db_recipe_repository.RecipeSlugError:
         # Fixed message, not str(e): exception text must never reach clients.
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
+    except db_recipe_repository.CanonicalRecipeError:
+        return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
     except Exception as e:
         logger.error(f"Error creating recipe: {e}")
         return jsonify({"error": "Failed to create recipe"}), 500
@@ -188,6 +192,8 @@ def update_recipe(user_id, guest_session_id, recipe_id):
     except db_recipe_repository.RecipeSlugError:
         # Fixed message, not str(e): exception text must never reach clients.
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
+    except db_recipe_repository.CanonicalRecipeError:
+        return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
     except Exception as e:
         logger.error(
             "Error updating recipe %s: %s",
@@ -213,6 +219,8 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
 
         return jsonify({"message": "Recipe deleted successfully"}), 200
 
+    except db_recipe_repository.CanonicalRecipeError:
+        return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
     except Exception as e:
         logger.error(
             "Error deleting recipe %s: %s",
