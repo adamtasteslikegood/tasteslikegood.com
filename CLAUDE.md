@@ -57,7 +57,6 @@ app.py                          # create_app() — registers blueprints, extensi
 config.py                       # env-driven config (DATABASE_URL, OAuth, secrets)
 extensions.py                   # SQLAlchemy, Migrate, Cache singletons
 auth.py                         # legacy OAuth helpers (still used by blueprints)
-utils.py                        # recipe data normalization (units, fractions, fuzzy keys)
 
 blueprints/
   auth_api_bp.py                # /api/auth/* — OAuth flow, sessions, profile
@@ -68,12 +67,34 @@ blueprints/
   worker_api_bp.py              # Pub/Sub push handlers (OIDC-verified)
   public_bp.py                  # SSR public recipe routes (slug-based)
 
-services/                       # business logic (gemini_service, image_service, ...)
+services/
+  gemini_service.py             # Gemini text generation + client factory
+  image_service.py              # Imagen image generation
+  gcs_service.py                # Google Cloud Storage (recipe images)
+  model_service.py              # Gemini model list refresh
+  pubsub_service.py             # Pub/Sub message publishing
+  stock_image_service.py        # fallback stock image lookup
+  migration_service.py          # slug backfill + data migration helpers
+  reporting_service.py          # admin reporting
+
+utils/
+  normalization.py              # recipe data normalization (units, fractions, fuzzy keys)
+  slug_utils.py                 # slug generation with collision handling
+  session_utils.py              # Flask session helpers
+  cache_utils.py                # cache key builders + decorators
+  log_sanitizer.py              # sanitize user input in log output
+  valkey_auth.py                # Valkey IAM token refresh for Memorystore
+  admin_auth.py                 # admin API token validation
+  logging_config.py             # structured logging setup
+
 repositories/                   # data access with file locking + DB
 validators/                     # JSON Schema Draft 7 (recipe_schema.json)
 models/                         # SQLAlchemy: User, Recipe, Cookbook
 migrations/                     # Alembic via Flask-Migrate
-tests/                          # pytest
+templates/public/               # SSR templates (base_public.html, recipe.html, browse.html)
+static/                         # CSS tokens, images, JS for SSR pages
+tests/                          # pytest (~28 test files)
+scripts/                        # one-off migration/debug scripts (backfill_slugs.py, etc.)
 recipe_schema.json              # canonical recipe shape
 ```
 
@@ -144,6 +165,31 @@ uv run flask db merge -m "..." A B  # unify branched heads
 
 In production all secrets come from Google Secret Manager via Cloud Run `--set-secrets`.
 
+## CI pipeline
+
+Backend CI (`.github/workflows/ci.yml`) runs on every push/PR to `main` or `dev`:
+
+| Job | What it checks |
+|---|---|
+| `Lint (Black + Flake8)` | Code formatting and style |
+| `Type Check (mypy)` | Static type analysis |
+| `Test (pytest)` | Full test suite with coverage report |
+| `Build (docker)` | Validates the production Docker image builds |
+| `Security Scan (pip-audit)` | Audits pinned deps for known CVEs (advisory) |
+
+Additional workflows: `codeql.yml` (CodeQL analysis — required status check via branch protection), `claude-review.yml` / `gemini-review.yml` (AI code review on PRs).
+
+## Testing
+
+pytest (`uv run pytest`). ~28 test files in `tests/`. Coverage reported via `pytest-cov`.
+
+Key test patterns:
+- SSR routes: `tests/test_public_ssr.py` — the reference for correct app/DB test setup
+- Auth: `tests/test_auth_api.py`, `tests/test_auth.py`
+- Generation: `tests/test_gemini_service.py`, `tests/test_image_service.py`, `tests/test_async_generation_api.py`
+- Data: `tests/test_normalization.py`, `tests/test_recipe_validation.py`
+- Worker: `tests/test_worker_oidc.py`, `tests/test_worker_generation_retry.py`
+
 ## Common gotchas
 
 - **Two migration heads** — see "Multi-PR head conflicts" above. Symptom: `flask db upgrade` runs but production schema is incomplete; `recipe.status missing` style errors at runtime.
@@ -178,6 +224,17 @@ root, so credentials still come from the cookbook `.env`
 `GOOGLE_APPLICATION_CREDENTIALS` for gcp-monitor) — see the cookbook
 `CLAUDE.md` § Startup. In a standalone checkout (no cookbook superproject) the
 wrapper exits with a clear error and the servers are simply unavailable.
+
+## Behavioral Guidelines
+
+Follow the four Karpathy principles when writing or modifying code in this project:
+
+1. **Think Before Coding** — understand the problem fully before writing. Read existing code, check for prior art, verify assumptions.
+2. **Simplicity First** — prefer the simplest solution that works. Avoid premature abstraction, speculative features, and unnecessary indirection.
+3. **Surgical Changes** — make the smallest diff that solves the problem. Don't refactor surrounding code, add unrelated improvements, or "clean up while you're there."
+4. **Goal-Driven Execution** — every action should move toward a verifiable success criterion. State what "done" looks like before starting.
+
+See the `karpathy-guidelines` skill for the full reference.
 
 ## Related docs
 
