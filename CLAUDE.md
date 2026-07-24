@@ -248,8 +248,9 @@ the pin is a cookbook-worktree mechanism, and this repo is a submodule
 **2. Never run a bare `/sync-gbrain` from inside `Backend/`.** It does not
 no-op here. Because there is no pin, the orchestrator's code stage falls back
 to registering the cwd as a *new* federated source
-(`gstack-code-com-<hash> --path .../Backend`), duplicating the ~200 pages
-already indexed as `gstack-code-backend`. The nested-path guard does not catch
+(`gstack-code-com-<hash> --path .../Backend`), re-indexing the whole repo
+alongside the pages already held by `gstack-code-backend`. The nested-path
+guard does not catch
 it: `gstack-code-backend` lives in gbrain's own managed clone directory rather
 than at the `Backend/` path, so there is no path overlap to detect. Verified
 via `gstack-gbrain-sync.ts --dry-run` on 2026-07-24.
