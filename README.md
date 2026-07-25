@@ -216,7 +216,7 @@ uv run pytest --cov=.
 
 - **[API.md](API.md)** - Detailed API endpoint documentation
 - **[CLAUDE.md](CLAUDE.md)** - Developer guide for working with this codebase
-- **[agents.md](agents.md)** - Agent configuration template
+- **[AGENTS.md](AGENTS.md)** - Agent instructions for this repository
 - **[gemini.md](gemini.md)** - Gemini agent configuration notes
 
 ## Contributing
