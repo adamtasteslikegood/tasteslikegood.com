@@ -106,7 +106,7 @@ cat .env  # Check the file contents
 
 - 📖 Read [README.md](README.md) for full documentation
 - 🛠️ Check [CONTRIBUTING.md](CONTRIBUTING.md) to start developing
-- 🤖 Learn about [agents.md](agents.md) for AI details
+- 🤖 Learn about [AGENTS.md](AGENTS.md) for AI details
 - 💻 See [CLAUDE.md](CLAUDE.md) for developer deep-dive
 
 ## Development Mode Features
