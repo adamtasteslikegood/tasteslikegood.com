@@ -128,7 +128,11 @@ def _refresh_loop():
             time.sleep(_TOKEN_REFRESH_INTERVAL)
         else:
             backoff = min(_RETRY_BASE * (2 ** (consecutive_failures - 1)), _RETRY_MAX)
-            logger.info("Valkey token refresh retry in %ds (attempt %d)", backoff, consecutive_failures + 1)
+            logger.info(
+                "Valkey token refresh retry in %ds (attempt %d)",
+                backoff,
+                consecutive_failures + 1,
+            )
             time.sleep(backoff)
 
         try:
@@ -139,7 +143,11 @@ def _refresh_loop():
             consecutive_failures = 0
         except Exception as e:
             consecutive_failures += 1
-            logger.warning("Valkey token refresh failed (attempt %d, will retry): %s", consecutive_failures, e)
+            logger.warning(
+                "Valkey token refresh failed (attempt %d, will retry): %s",
+                consecutive_failures,
+                e,
+            )
 
 
 def get_valkey_client() -> redis.StrictRedis | None:

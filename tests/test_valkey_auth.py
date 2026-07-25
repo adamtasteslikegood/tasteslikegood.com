@@ -10,7 +10,6 @@ import ssl as ssl_mod
 import sys
 import time
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -99,8 +98,6 @@ def test_refresh_loop_retries_on_failure(monkeypatch):
         return True
 
     monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", fake_refresh)
-
-    original_sleep = time.sleep
 
     def fake_sleep(seconds):
         sleeps.append(seconds)
