@@ -1,19 +1,16 @@
-"""Regression tests for Valkey IAM client TLS trust (Memorystore CA).
+"""Regression tests for Valkey IAM authentication (Memorystore).
 
-flask-backend silently fell back to in-process SimpleCache on every boot since
-v0.3.5: _build_client() opened the TLS connection with ssl=True but never
-trusted Memorystore's Google-managed private CA, so the handshake failed with
-CERTIFICATE_VERIFY_FAILED, create_iam_redis_client() returned None, and the
-Flask-Caching response cache degraded to a per-worker in-process SimpleCache.
-
-The fix mirrors the working Express reference (server/valkey.ts): read the CA
-PEM from VALKEY_CA_CERT and hand it to redis-py as ssl_ca_data, without ever
-disabling certificate verification.
+Covers:
+- TLS CA trust (VALKEY_CA_CERT → ssl_ca_data)
+- RESP2 protocol enforcement (avoids redis-py 8.x RESP3 "default" username injection)
+- Token refresh retry with exponential backoff on failure
 """
 
 import ssl as ssl_mod
 import sys
+import time
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -75,3 +72,50 @@ def test_build_client_without_ca_cert_keeps_tls_on_system_trust(monkeypatch):
     # No CA override -> None (or absent) -> redis-py uses the system trust store.
     assert not captured.get("ssl_ca_data")
     assert captured.get("ssl_cert_reqs", "required") not in _INSECURE_CERT_REQS
+
+
+def test_build_client_forces_resp2_protocol(monkeypatch):
+    """redis-py 8.x defaults to RESP3 which injects 'default' as username.
+    Memorystore IAM auth rejects the 'default' username, causing AuthenticationError.
+    """
+    captured = _capture_strictredis(monkeypatch)
+    monkeypatch.setenv("VALKEY_CA_CERT", _FAKE_PEM)
+
+    valkey_auth._build_client("10.128.0.11", 6379)
+
+    assert captured.get("protocol") == 2, "Must force RESP2 to avoid 'default' username injection"
+
+
+def test_refresh_loop_retries_on_failure(monkeypatch):
+    """On token refresh failure, the loop should retry with backoff, not sleep 45 min."""
+    call_count = 0
+    sleeps = []
+
+    def fake_refresh():
+        nonlocal call_count
+        call_count += 1
+        if call_count <= 2:
+            raise ConnectionError("token refresh failed")
+        return True
+
+    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", fake_refresh)
+
+    original_sleep = time.sleep
+
+    def fake_sleep(seconds):
+        sleeps.append(seconds)
+        if len(sleeps) >= 3:
+            raise StopIteration("stop the loop")
+
+    monkeypatch.setattr(time, "sleep", fake_sleep)
+
+    try:
+        valkey_auth._refresh_loop()
+    except StopIteration:
+        pass
+
+    # First sleep is the normal 45-min interval
+    assert sleeps[0] == valkey_auth._TOKEN_REFRESH_INTERVAL
+    # After failure, retry backoff should be much shorter than 45 min
+    assert sleeps[1] == valkey_auth._RETRY_BASE  # 30s first retry
+    assert sleeps[2] == valkey_auth._RETRY_BASE * 2  # 60s second retry

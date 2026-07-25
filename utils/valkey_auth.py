@@ -20,6 +20,11 @@ logger = logging.getLogger(__name__)
 # Token refresh interval (45 minutes — tokens last 60 min, refresh early)
 _TOKEN_REFRESH_INTERVAL = 45 * 60
 
+# Retry backoff after a failed token refresh (seconds). Starts at 30s,
+# doubles on each consecutive failure, capped at the normal interval.
+_RETRY_BASE = 30
+_RETRY_MAX = _TOKEN_REFRESH_INTERVAL
+
 
 def _get_iam_token():
     """Obtain a fresh IAM access token from the default service account."""
@@ -54,6 +59,10 @@ def _build_client(host: str, port: int) -> redis.StrictRedis:
     # (local/dev), so keep TLS verification on either way. Mirrors
     # server/valkey.ts (the Express side already does this correctly).
     ca_cert = os.environ.get("VALKEY_CA_CERT")
+
+    # Force RESP2 protocol: redis-py 8.x defaults to RESP3 which sends
+    # HELLO 3 AUTH default <token> — the injected "default" username is
+    # rejected by Memorystore IAM auth which expects password-only AUTH.
     return redis.StrictRedis(
         host=host,
         port=port,
@@ -61,6 +70,7 @@ def _build_client(host: str, port: int) -> redis.StrictRedis:
         ssl=True,
         ssl_ca_data=ca_cert,
         decode_responses=False,
+        protocol=2,
     )
 
 
@@ -106,16 +116,30 @@ def _refresh_token_in_place() -> bool:
 
 
 def _refresh_loop():
-    """Background thread that refreshes the Valkey token before it expires."""
+    """Background thread that refreshes the Valkey token before it expires.
+
+    On failure, retries with exponential backoff (30s, 60s, 120s, ...)
+    instead of waiting the full 45-minute interval, so the stale-token
+    window stays as short as possible.
+    """
+    consecutive_failures = 0
     while True:
-        time.sleep(_TOKEN_REFRESH_INTERVAL)
+        if consecutive_failures == 0:
+            time.sleep(_TOKEN_REFRESH_INTERVAL)
+        else:
+            backoff = min(_RETRY_BASE * (2 ** (consecutive_failures - 1)), _RETRY_MAX)
+            logger.info("Valkey token refresh retry in %ds (attempt %d)", backoff, consecutive_failures + 1)
+            time.sleep(backoff)
+
         try:
             refreshed = _refresh_token_in_place()
             if not refreshed:
                 return  # no client to manage; stop the thread
             logger.info("Valkey token refreshed in-place successfully")
+            consecutive_failures = 0
         except Exception as e:
-            logger.warning("Valkey token refresh failed (will retry next cycle): %s", e)
+            consecutive_failures += 1
+            logger.warning("Valkey token refresh failed (attempt %d, will retry): %s", consecutive_failures, e)
 
 
 def get_valkey_client() -> redis.StrictRedis | None:
