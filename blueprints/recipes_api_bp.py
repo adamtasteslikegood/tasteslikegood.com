@@ -132,6 +132,11 @@ def create_recipe(user_id, guest_session_id):
 
         return jsonify(recipe.to_dict()), 201
 
+    except db_recipe_repository.RecipeOwnershipError:
+        # KAN-155: 409, not 500. The row exists and is owned by someone else —
+        # a deliberate refusal, not an internal failure. Answering 500 here is
+        # what made the UI tell the user to check their connection.
+        return jsonify({"error": db_recipe_repository.RECIPE_OWNERSHIP_ERROR}), 409
     except db_recipe_repository.RecipeSlugError:
         # Fixed message, not str(e): exception text must never reach clients.
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
