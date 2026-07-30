@@ -7,9 +7,11 @@ supply to an agent: who actually owns the row in production.
 
 There are exactly two dispositions, and they are opposite:
 
-* ``user`` — the row belongs to a real, separately-registered account. Distinct
-  Google emails are distinct users even when the display names match; that is
-  intentional and is **not** a duplicate-account defect. The refusal is
+* ``user`` — the row belongs to a real, separately-registered account. **The
+  Google email is the identity. ``User.name`` is a display convenience and
+  carries no identity meaning for any user.** Two accounts sharing a name are
+  two different people as far as this system is concerned, and one person may
+  hold several accounts; neither is a duplicate-account defect. The refusal is
   correct, there is nothing to repair, and reassigning the row would be the
   cross-account write KAN-155's own risk register exists to prevent.
 * ``orphaned guest`` — ``user_id IS NULL``. This is the only repairable case:
@@ -72,8 +74,8 @@ def describe(recipe_id):
             lines.append(
                 "DISPOSITION       : owned by a registered account. If this email differs "
                 "from the acting user's, the refusal is CORRECT and there is nothing to "
-                "repair — separate emails are separate users by policy, matching display "
-                "names notwithstanding."
+                "repair. Identity is the Google email; the name above is display-only and "
+                "means nothing for ownership — never compare names to decide this."
             )
     else:
         lines.append(
