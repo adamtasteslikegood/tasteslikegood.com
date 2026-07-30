@@ -70,6 +70,25 @@ class ManualRecipeError(ValueError):
     """Manually entered recipes cannot be published (KAN-140)."""
 
 
+# Also returned verbatim by the API routes (fixed string, same rationale as
+# PUBLIC_SLUG_REQUIRED_ERROR above).
+RECIPE_OWNERSHIP_ERROR = (
+    "This recipe belongs to a different account or guest session, so it "
+    "cannot be saved or published from here."
+)
+
+
+class RecipeOwnershipError(ValueError):
+    """The row exists but is owned by someone else — refuse the write (KAN-155).
+
+    This refusal is deliberate and load-bearing: it is what stops one account's
+    write from landing on another account's row. See KAN-181 INV-4, verified in
+    production 2026-07-29. Do not relax the ownership test to make this stop
+    firing — the defect this exception fixes is that the refusal was
+    indistinguishable from a server error, not that the refusal happened.
+    """
+
+
 def _resolve_origin(current_origin: Optional[str], recipe_data: Dict[str, Any]) -> Optional[str]:
     """Column value for origin: settable while NULL, immutable once set.
 
@@ -583,7 +602,11 @@ def create_recipe(
                     sanitize_log_value(user_id),
                     sanitize_log_value(guest_session_id),
                 )
-                return None
+                # KAN-155: the refusal itself is correct and unchanged. What was
+                # wrong is that returning bare None made it indistinguishable
+                # from an internal failure, so the route answered 500 and the UI
+                # blamed the user's connection for a deliberate refusal.
+                raise RecipeOwnershipError(RECIPE_OWNERSHIP_ERROR)
 
             _guard_canonical(existing, recipe_data)
 
@@ -660,7 +683,7 @@ def create_recipe(
         )
         return recipe
 
-    except (RecipeSlugError, CanonicalRecipeError, ManualRecipeError):
+    except (RecipeSlugError, CanonicalRecipeError, ManualRecipeError, RecipeOwnershipError):
         raise
     except Exception as e:
         logger.error("Error creating recipe: %s", sanitize_log_value(e))
