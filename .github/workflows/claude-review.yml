@@ -134,7 +134,7 @@ jobs:
 
       - name: Review + fix + comment
         if: steps.auth.outputs.present == 'true'
-        uses: anthropics/claude-code-action@e0cf66d1d257526b5d07f141838c338921cb8455 # ratchet:anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@be7b93b1907a4abad570368f3c74b6fe3807510b # ratchet:anthropics/claude-code-action@v1
         with:
           # OAuth token (subscription) is primary; the action prefers it when set and
           # falls back to the API key when the OAuth secret is empty/unset.
