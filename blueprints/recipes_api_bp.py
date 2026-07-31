@@ -132,11 +132,20 @@ def create_recipe(user_id, guest_session_id):
 
         return jsonify(recipe.to_dict()), 201
 
-    except db_recipe_repository.RecipeOwnershipError:
+    except db_recipe_repository.RecipeOwnershipError as e:
         # KAN-155: 409, not 500. The row exists and is owned by someone else —
         # a deliberate refusal, not an internal failure. Answering 500 here is
         # what made the UI tell the user to check their connection.
-        return jsonify({"error": db_recipe_repository.RECIPE_OWNERSHIP_ERROR}), 409
+        #
+        # `code` rides alongside the fixed message so the SPA can give the right
+        # remedy: two of the three refusals are recoverable by the user (log in),
+        # and the single prose string cannot say that without being wrong for the
+        # third. e.code is a module constant, never user input or exception text
+        # — the fixed-string rule (py/stack-trace-exposure) still holds.
+        return (
+            jsonify({"error": db_recipe_repository.RECIPE_OWNERSHIP_ERROR, "code": e.code}),
+            409,
+        )
     except db_recipe_repository.RecipeSlugError:
         # Fixed message, not str(e): exception text must never reach clients.
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400

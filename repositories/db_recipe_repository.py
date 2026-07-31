@@ -77,6 +77,29 @@ RECIPE_OWNERSHIP_ERROR = (
     "cannot be saved or published from here."
 )
 
+# Machine-readable discriminators for the refusal, sent alongside the message as
+# `code` (KAN-155). One 409 was carrying three situations with opposite remedies,
+# and the client cannot tell them apart from the prose: "belongs to a different
+# account or guest session" reads as final, but two of the three are recoverable
+# by the user right now. Only the server knows which one fired — it is the only
+# party that has looked at the stored row.
+#
+#   OTHER_ACCOUNT       the row belongs to a real, different account. Final; the
+#                       acting user cannot resolve this. INV-4's core case.
+#   OTHER_GUEST_SESSION both sides are guests, different sessions. RCP-61's stale
+#                       tab: the user very likely owns this row under a session
+#                       the page no longer holds. Logging in resolves it.
+#   ORPHANED_GUEST_ROW  the row has no user_id and the caller IS authenticated —
+#                       a guest row that was never claimed at login-merge. This
+#                       is KAN-155's known-incomplete case, called out in #256 as
+#                       still failing; the repair policy is Adam's open call.
+#
+# These are a superset of the message, never a replacement: the prose stays the
+# fallback for any client that does not read `code`.
+OWNERSHIP_CODE_OTHER_ACCOUNT = "OWNERSHIP_OTHER_ACCOUNT"
+OWNERSHIP_CODE_OTHER_GUEST_SESSION = "OWNERSHIP_OTHER_GUEST_SESSION"
+OWNERSHIP_CODE_ORPHANED_GUEST_ROW = "OWNERSHIP_ORPHANED_GUEST_ROW"
+
 
 class RecipeOwnershipError(ValueError):
     """The row exists but is owned by someone else — refuse the write (KAN-155).
@@ -86,7 +109,15 @@ class RecipeOwnershipError(ValueError):
     production 2026-07-29. Do not relax the ownership test to make this stop
     firing — the defect this exception fixes is that the refusal was
     indistinguishable from a server error, not that the refusal happened.
+
+    `code` narrows WHICH refusal fired (see the OWNERSHIP_CODE_* constants). It
+    changes what the client can honestly tell the user; it does not change the
+    decision. Every code still refuses, and still writes nothing.
     """
+
+    def __init__(self, message: str, code: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 def _resolve_origin(current_origin: Optional[str], recipe_data: Dict[str, Any]) -> Optional[str]:
@@ -596,17 +627,40 @@ def create_recipe(
                 and existing.guest_session_id == guest_session_id
             )
             if not same_owner:
-                logger.warning(
-                    "Recipe ID collision for id=%s (user_id=%s, guest_session_id=%s)",
-                    sanitize_log_value(recipe_id),
-                    sanitize_log_value(user_id),
-                    sanitize_log_value(guest_session_id),
-                )
                 # KAN-155: the refusal itself is correct and unchanged. What was
                 # wrong is that returning bare None made it indistinguishable
                 # from an internal failure, so the route answered 500 and the UI
                 # blamed the user's connection for a deliberate refusal.
-                raise RecipeOwnershipError(RECIPE_OWNERSHIP_ERROR)
+                #
+                # The code narrows which refusal this is. Order matters: check
+                # the row's user_id first, because "existing.user_id is None"
+                # means something different depending on whether the CALLER is
+                # authenticated (unclaimed guest row the caller may well own) or
+                # a guest (someone else's live guest session).
+                if existing.user_id is not None:
+                    code = OWNERSHIP_CODE_OTHER_ACCOUNT
+                elif user_id is not None:
+                    code = OWNERSHIP_CODE_ORPHANED_GUEST_ROW
+                else:
+                    code = OWNERSHIP_CODE_OTHER_GUEST_SESSION
+                # Classify BEFORE logging, so the log carries the discriminator.
+                # This is not just ops garnish: KAN-155's remaining open item is
+                # the ownership-repair policy (reassign orphaned guest rows at
+                # login-merge vs a one-off backfill), and choosing between those
+                # depends on how often ORPHANED_GUEST_ROW actually fires against
+                # OTHER_ACCOUNT in production. There is no staging environment
+                # (KAN-182), so this log line is the only place that question can
+                # be answered. Without the code every refusal reads identically
+                # and the data does not exist. `code` is a module constant, so it
+                # needs no sanitizing — unlike the caller-supplied values below.
+                logger.warning(
+                    "Recipe ID collision (%s) for id=%s (user_id=%s, guest_session_id=%s)",
+                    code,
+                    sanitize_log_value(recipe_id),
+                    sanitize_log_value(user_id),
+                    sanitize_log_value(guest_session_id),
+                )
+                raise RecipeOwnershipError(RECIPE_OWNERSHIP_ERROR, code)
 
             _guard_canonical(existing, recipe_data)
 
