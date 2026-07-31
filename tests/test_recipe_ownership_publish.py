@@ -23,6 +23,7 @@ So the fix changes the **signal**, not the **decision**:
   signal — a distinct exception and a 409, never a 500.
 """
 
+import logging
 import sys
 from pathlib import Path
 
@@ -242,6 +243,27 @@ def test_route_sends_the_code_alongside_the_message(app, owner, intruder):
     assert body["code"] == db_recipe_repository.OWNERSHIP_CODE_OTHER_ACCOUNT
     # The prose stays the fallback for any client that does not read `code`.
     assert body["error"] == db_recipe_repository.RECIPE_OWNERSHIP_ERROR
+
+
+def test_the_refusal_log_carries_the_discriminator(app, owner, caplog):
+    """The log is the ONLY place the repair-policy question can be answered.
+
+    KAN-155's open item is reassign-at-login-merge vs one-off backfill, and that
+    choice depends on how often ORPHANED_GUEST_ROW fires against OTHER_ACCOUNT in
+    production. There is no staging environment (KAN-182), so prod logs are the
+    only observation channel. Before this, all three refusals logged the same
+    "Recipe ID collision" string and the data simply did not exist.
+    """
+    db_recipe_repository.create_recipe(_recipe_data(), guest_session_id="orphan-session")
+
+    with caplog.at_level(logging.WARNING, logger=db_recipe_repository.__name__):
+        with pytest.raises(db_recipe_repository.RecipeOwnershipError):
+            db_recipe_repository.create_recipe(_recipe_data(), user_id=owner.id)
+
+    assert db_recipe_repository.OWNERSHIP_CODE_ORPHANED_GUEST_ROW in caplog.text
+    # Not merely "a code appeared" — the RIGHT one. A log that always says
+    # OTHER_ACCOUNT would pass a weaker assertion and answer nothing.
+    assert db_recipe_repository.OWNERSHIP_CODE_OTHER_ACCOUNT not in caplog.text
 
 
 def test_every_code_still_refuses_and_writes_nothing(app, owner):

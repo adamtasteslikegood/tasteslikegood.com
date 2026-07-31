@@ -627,12 +627,6 @@ def create_recipe(
                 and existing.guest_session_id == guest_session_id
             )
             if not same_owner:
-                logger.warning(
-                    "Recipe ID collision for id=%s (user_id=%s, guest_session_id=%s)",
-                    sanitize_log_value(recipe_id),
-                    sanitize_log_value(user_id),
-                    sanitize_log_value(guest_session_id),
-                )
                 # KAN-155: the refusal itself is correct and unchanged. What was
                 # wrong is that returning bare None made it indistinguishable
                 # from an internal failure, so the route answered 500 and the UI
@@ -649,6 +643,23 @@ def create_recipe(
                     code = OWNERSHIP_CODE_ORPHANED_GUEST_ROW
                 else:
                     code = OWNERSHIP_CODE_OTHER_GUEST_SESSION
+                # Classify BEFORE logging, so the log carries the discriminator.
+                # This is not just ops garnish: KAN-155's remaining open item is
+                # the ownership-repair policy (reassign orphaned guest rows at
+                # login-merge vs a one-off backfill), and choosing between those
+                # depends on how often ORPHANED_GUEST_ROW actually fires against
+                # OTHER_ACCOUNT in production. There is no staging environment
+                # (KAN-182), so this log line is the only place that question can
+                # be answered. Without the code every refusal reads identically
+                # and the data does not exist. `code` is a module constant, so it
+                # needs no sanitizing — unlike the caller-supplied values below.
+                logger.warning(
+                    "Recipe ID collision (%s) for id=%s (user_id=%s, guest_session_id=%s)",
+                    code,
+                    sanitize_log_value(recipe_id),
+                    sanitize_log_value(user_id),
+                    sanitize_log_value(guest_session_id),
+                )
                 raise RecipeOwnershipError(RECIPE_OWNERSHIP_ERROR, code)
 
             _guard_canonical(existing, recipe_data)
