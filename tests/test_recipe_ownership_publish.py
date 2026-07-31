@@ -23,6 +23,7 @@ So the fix changes the **signal**, not the **decision**:
   signal — a distinct exception and a 409, never a 500.
 """
 
+import logging
 import sys
 from pathlib import Path
 
@@ -165,3 +166,120 @@ def test_route_answers_409_not_500(app, owner, intruder):
         "500 here is what made the SPA blame the user's connection."
     )
     assert resp.get_json()["error"] == db_recipe_repository.RECIPE_OWNERSHIP_ERROR
+
+
+# ─── Which refusal: one 409 was carrying three situations ────────────────
+#
+# The message says "a different account or guest session", which reads as final.
+# Two of the three are recoverable by the user right now, and only the server has
+# seen the stored row — so only the server can say which fired. These tests pin
+# the discrimination, not new behaviour: every case below still refuses.
+
+
+def test_foreign_account_row_reports_other_account(app, owner, intruder):
+    """A real, different account owns it. Final — the user cannot fix this."""
+    db_recipe_repository.create_recipe(_recipe_data(), user_id=owner.id)
+
+    with pytest.raises(db_recipe_repository.RecipeOwnershipError) as excinfo:
+        db_recipe_repository.create_recipe(_recipe_data(), user_id=intruder.id)
+
+    assert excinfo.value.code == db_recipe_repository.OWNERSHIP_CODE_OTHER_ACCOUNT
+
+
+def test_other_guest_session_reports_other_guest_session(app):
+    """RCP-61's stale tab: both guests, different sessions.
+
+    The user very likely owns this row under a session the page no longer holds,
+    so 'log in and try again' is the honest remedy. Reporting this as
+    OTHER_ACCOUNT would tell them to give up on their own recipe.
+    """
+    db_recipe_repository.create_recipe(_recipe_data(), guest_session_id="guest-a")
+
+    with pytest.raises(db_recipe_repository.RecipeOwnershipError) as excinfo:
+        db_recipe_repository.create_recipe(_recipe_data(), guest_session_id="guest-b")
+
+    assert excinfo.value.code == db_recipe_repository.OWNERSHIP_CODE_OTHER_GUEST_SESSION
+
+
+def test_orphaned_guest_row_reports_orphaned_guest_row(app, owner):
+    """KAN-155's known-incomplete case, called out in #256 as still failing.
+
+    An unclaimed guest row (user_id NULL) and an AUTHENTICATED caller. Distinct
+    from OTHER_GUEST_SESSION precisely because the caller is logged in: this is
+    the row the login-merge should have claimed, and it is the case the
+    ownership-repair policy will act on. It must not be indistinguishable from
+    someone else's live guest session.
+    """
+    db_recipe_repository.create_recipe(_recipe_data(), guest_session_id="orphan-session")
+
+    with pytest.raises(db_recipe_repository.RecipeOwnershipError) as excinfo:
+        db_recipe_repository.create_recipe(_recipe_data(), user_id=owner.id)
+
+    assert excinfo.value.code == db_recipe_repository.OWNERSHIP_CODE_ORPHANED_GUEST_ROW
+
+
+def test_the_three_codes_are_distinct(app):
+    """A discriminator that collapses to one value discriminates nothing."""
+    codes = {
+        db_recipe_repository.OWNERSHIP_CODE_OTHER_ACCOUNT,
+        db_recipe_repository.OWNERSHIP_CODE_OTHER_GUEST_SESSION,
+        db_recipe_repository.OWNERSHIP_CODE_ORPHANED_GUEST_ROW,
+    }
+    assert len(codes) == 3
+
+
+def test_route_sends_the_code_alongside_the_message(app, owner, intruder):
+    """The code must reach the client — the repository knowing it is not enough."""
+    db_recipe_repository.create_recipe(_recipe_data(), user_id=owner.id)
+
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = intruder.id
+
+    resp = client.post("/api/recipes", json=_recipe_data(name="Hijacked"))
+    body = resp.get_json()
+
+    assert resp.status_code == 409
+    assert body["code"] == db_recipe_repository.OWNERSHIP_CODE_OTHER_ACCOUNT
+    # The prose stays the fallback for any client that does not read `code`.
+    assert body["error"] == db_recipe_repository.RECIPE_OWNERSHIP_ERROR
+
+
+def test_the_refusal_log_carries_the_discriminator(app, owner, caplog):
+    """The log is the ONLY place the repair-policy question can be answered.
+
+    KAN-155's open item is reassign-at-login-merge vs one-off backfill, and that
+    choice depends on how often ORPHANED_GUEST_ROW fires against OTHER_ACCOUNT in
+    production. There is no staging environment (KAN-182), so prod logs are the
+    only observation channel. Before this, all three refusals logged the same
+    "Recipe ID collision" string and the data simply did not exist.
+    """
+    db_recipe_repository.create_recipe(_recipe_data(), guest_session_id="orphan-session")
+
+    with caplog.at_level(logging.WARNING, logger=db_recipe_repository.__name__):
+        with pytest.raises(db_recipe_repository.RecipeOwnershipError):
+            db_recipe_repository.create_recipe(_recipe_data(), user_id=owner.id)
+
+    assert db_recipe_repository.OWNERSHIP_CODE_ORPHANED_GUEST_ROW in caplog.text
+    # Not merely "a code appeared" — the RIGHT one. A log that always says
+    # OTHER_ACCOUNT would pass a weaker assertion and answer nothing.
+    assert db_recipe_repository.OWNERSHIP_CODE_OTHER_ACCOUNT not in caplog.text
+
+
+def test_every_code_still_refuses_and_writes_nothing(app, owner):
+    """INV-4 is unchanged by the split. Narrowing the signal must not soften
+    the decision — the row is untouched in all three cases."""
+    db_recipe_repository.create_recipe(_recipe_data(), guest_session_id="orphan-session")
+
+    with pytest.raises(db_recipe_repository.RecipeOwnershipError):
+        db_recipe_repository.create_recipe(
+            _recipe_data(name="Hijacked", is_public=True), user_id=owner.id
+        )
+
+    db.session.expire_all()
+    row = Recipe.query.filter_by(id="r-owned").first()
+    assert row is not None
+    assert row.name == "English Breakfast"
+    assert row.is_public is False
+    assert row.user_id is None
+    assert row.guest_session_id == "orphan-session"
