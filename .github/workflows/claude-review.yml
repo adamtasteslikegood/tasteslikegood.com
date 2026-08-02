@@ -36,10 +36,14 @@ name: Claude Review (independent model)
 
 on:
   pull_request:
-    # Auto once per PR (opened / un-drafted) + on-demand via the `claude-review`
-    # label. Deliberately NOT `synchronize` — one review per PR keeps cost bounded;
-    # re-request by re-applying the label. To review every push, add `synchronize`.
-    types: [opened, ready_for_review, labeled]
+    # Auto on PR open / un-draft AND on every push (`synchronize`) so commits
+    # pushed after the first review are reviewed too (TAS-3006 / KAN-183) — the PR
+    # lifecycle in CLAUDE.md ("monitor it, answer every comment, loop until
+    # merged") depends on the review loop covering later pushes, not just the first.
+    # Also on-demand via the `claude-review` label. The bot's own `--fix` pushes do
+    # NOT re-trigger (the `if:` guard below skips `github.event.sender.type == 'Bot'`),
+    # and `concurrency: cancel-in-progress` collapses rapid pushes to one review.
+    types: [opened, ready_for_review, labeled, synchronize]
     branches: [main, dev, 'dev/**']
   workflow_dispatch:
     inputs:
