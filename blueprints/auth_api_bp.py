@@ -62,8 +62,41 @@ def _dedupe_cookbook_name(name, taken):
         n += 1
 
 
+def _recipe_identity_keys(recipe):
+    """Return the slugs that identify which public recipe a row was saved from.
+
+    Mirrors the client-side duplicate check (INV-1) in the cookbook SPA
+    (``src/services/ssr-entry.service.ts``), which matches a candidate against
+    ``r.sourceSlug === slug || r.slug === slug``. Both columns are consulted for
+    the same reason: a row saved from ``/r/<slug>`` carries the public slug in
+    ``source_slug``, while a row that *is* the published copy carries it in
+    ``slug``. Empty values never match — ``None == None`` must not make two
+    unrelated locally-authored recipes look like the same recipe.
+    """
+    return {value for value in (recipe.source_slug, recipe.slug) if value}
+
+
 def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
     """Reassign a guest session's recipes and cookbooks to an authenticated user.
+
+    Recipes are carried over **one row at a time, through a duplicate check**
+    (KAN-186). A recipe saved during a guest session frequently duplicates one
+    the account already owns: the user opens a public recipe, clicks "add to
+    cookbook" before auth resolves, then logs in. Reassigning unconditionally
+    silently created a second row, and publish-time confirmation (INV-3) is the
+    last line of defense rather than the first — by the time it fires the
+    duplicate already exists. Guest rows that match an owned recipe are dropped
+    in favour of the copy the account already has, which is what a duplicate
+    authenticated save does today.
+
+    Two guards on that deletion, both deliberate:
+
+    * A **public** guest row is reassigned rather than deleted. Deleting it
+      would take a live public page down; a duplicate row is the lesser harm
+      and remains visible to the user to resolve.
+    * Cookbook membership is **remapped, not dropped**. ``Cookbook.recipe_ids``
+      is a JSON list of ids, so deleting a row without rewriting the lists that
+      reference it would merge a cookbook full of dangling ids.
 
     Cookbook names are unique per owner (``uq_cookbook_user_name``), so a guest
     cookbook whose name already exists under the target user would collide on
@@ -83,10 +116,38 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
 
     for attempt in range(max_retries):
         try:
-            Recipe.query.filter_by(user_id=None, guest_session_id=guest_session_id).update(
-                {"user_id": user.id, "guest_session_id": None},
-                synchronize_session=False,
-            )
+            owned_by_key = {}
+            for owned in Recipe.query.filter_by(user_id=user.id).all():
+                for key in _recipe_identity_keys(owned):
+                    # First writer wins: if the account somehow already holds two
+                    # rows for the same public recipe, resolve to one of them
+                    # rather than picking arbitrarily on each merge.
+                    owned_by_key.setdefault(key, owned.id)
+
+            guest_recipes = Recipe.query.filter_by(
+                user_id=None, guest_session_id=guest_session_id
+            ).all()
+
+            # Guest recipe id -> the already-owned recipe id it resolves to.
+            remapped = {}
+            for recipe in guest_recipes:
+                existing_id = next(
+                    (
+                        owned_by_key[key]
+                        for key in _recipe_identity_keys(recipe)
+                        if key in owned_by_key
+                    ),
+                    None,
+                )
+                if existing_id is not None and not recipe.is_public:
+                    remapped[recipe.id] = existing_id
+                    db.session.delete(recipe)
+                    continue
+
+                recipe.user_id = user.id
+                recipe.guest_session_id = None
+                for key in _recipe_identity_keys(recipe):
+                    owned_by_key.setdefault(key, recipe.id)
 
             guest_cookbooks = Cookbook.query.filter_by(
                 user_id=None, guest_session_id=guest_session_id
@@ -97,6 +158,8 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     for row in db.session.query(Cookbook.name).filter_by(user_id=user.id).all()
                 }
                 for cb in guest_cookbooks:
+                    if remapped:
+                        cb.recipe_ids = _remap_recipe_ids(cb.recipe_ids, remapped)
                     cb.name = _dedupe_cookbook_name(cb.name, taken)
                     cb.user_id = user.id
                     cb.guest_session_id = None
@@ -110,6 +173,20 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
             db.session.rollback()
             if attempt == max_retries - 1:
                 raise
+
+
+def _remap_recipe_ids(recipe_ids, remapped):
+    """Point a cookbook's recipe list at surviving rows, preserving order.
+
+    De-duplicates as it goes: a guest cookbook that held both the guest copy and
+    the account's existing copy must not end up listing the survivor twice.
+    """
+    result = []
+    for recipe_id in recipe_ids or []:
+        resolved = remapped.get(recipe_id, recipe_id)
+        if resolved not in result:
+            result.append(resolved)
+    return result
 
 
 def credentials_to_dict(credentials):
