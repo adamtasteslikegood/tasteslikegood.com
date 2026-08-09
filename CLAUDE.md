@@ -134,6 +134,7 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `GCP_PROJECT_ID`                 | Required for Pub/Sub publishing                                                                  |
 | `PUBSUB_INVOKER_SA`             | Required for worker push authentication                                                          |
 | `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Flask-Caching response cache. Unset = in-process SimpleCache fallback.                           |
+| `FRONTEND_URL`, `SESSION_COOKIE_DOMAIN` | OAuth redirect target + cookie scoping across the Express proxy/Flask boundary.            |
 | `DD_API_KEY`                     | **Required in prod** for Datadog `serverless-init`. Not needed locally.                          |
 
 All prod secrets from Google Secret Manager via Cloud Run `--set-secrets`.
