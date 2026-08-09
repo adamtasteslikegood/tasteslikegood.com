@@ -14,11 +14,17 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
     # partial indexes are the right shape rather than one composite constraint
     # — the same reasoning as cookbook's uq_cookbook_* pair.
     #
-    # Partial on `source_slug IS NOT NULL` by design: generated and manually
-    # entered recipes have no provenance to collide on and are the large
-    # majority of the table. A name-based constraint was rejected — two
-    # genuinely different recipes may share a title. So this closes KAN-213's
-    # class; it does not make the table duplicate-free.
+    # Partial on `source_slug IS NOT NULL` by design, and narrower than that
+    # reads: only `origin='saved'` rows carry a source_slug, so these indexes
+    # constrain COPIES A USER TOOK from someone else's public page and do not
+    # constrain a single recipe a user authored (~3% of user 1's rows).
+    #
+    # Still the right corner: a saved copy is the only case where "these two
+    # rows are the same recipe" is a machine-checkable fact. Two separately
+    # generated recipes have no such identity, and a name-based constraint was
+    # rejected — two genuinely different recipes may share a title. See
+    # migration c8f3b71d20a4 for the evidence and KAN-220 for why the covered
+    # corner is where the real duplicates come from.
     #
     # Declared on the model as well as in migration c8f3b71d20a4 so that
     # `db.create_all()` (tests, fresh local dev) builds the same indexes the

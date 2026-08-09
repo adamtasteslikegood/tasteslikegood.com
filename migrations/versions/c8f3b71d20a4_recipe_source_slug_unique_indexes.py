@@ -13,11 +13,30 @@ indexes are the correct shape rather than one composite constraint — the same
 reasoning as the cookbook pair in b7e2a9c4d1f8. Both ship together or neither
 (Sprint 6 R3): guests key on guest_session_id, which is the KAN-186 path.
 
-Partial on ``source_slug IS NOT NULL`` deliberately. Generated and manually
-entered recipes carry no source_slug and are the large majority of the table;
-they have no provenance to collide on. A name-based constraint was rejected —
-two genuinely different recipes may legitimately share a title. This closes
-KAN-213's class and does NOT make the table duplicate-free.
+Partial on ``source_slug IS NOT NULL`` deliberately, and the scope is narrower
+than "most of the table is excluded" suggests. Only ``origin = 'saved'`` rows
+carry a source_slug (the SPA sets origin and sourceSlug together when saving
+from a public page), so:
+
+    These indexes constrain only copies a user took from someone else's public
+    page. They do not constrain a single recipe a user authored.
+
+Recorded ratio: user 1 held 112 NULL-source rows against 4 rows in source_slug
+duplicate groups — roughly 3% coverage for that user.
+
+That is still the right corner, and not by rationalisation: a saved copy is the
+only case where "these two rows are the same recipe" is a machine-checkable
+fact, because the copy records what it was copied from. Two separately generated
+recipes have no such identity, and a name-based constraint was rejected — two
+genuinely different recipes may legitimately share a title.
+
+The evidence agrees the corner is where the duplicates were: all 11 public
+duplicate rows carried a source_slug, and both constraint blockers were
+source_slug pairs. KAN-220 explains why that is not luck — the ghost-session
+path (expired session silently downgraded to guest before a save from a public
+page) produces source_slug-bearing rows by construction.
+
+This closes KAN-213's class and does NOT make the table duplicate-free.
 
 --------------------------------------------------------------------------
 Why NOT ``CREATE INDEX CONCURRENTLY``

@@ -255,13 +255,21 @@ def test_two_users_may_each_save_the_same_public_recipe(client, logged_in, monke
 def test_generated_recipes_are_unconstrained(client, logged_in):
     """The documented coverage limit, pinned so it cannot regress silently.
 
-    Both indexes are partial on ``source_slug IS NOT NULL``. Generated and
-    manually entered recipes carry no sourceSlug and are the large majority of
-    the table; they have no provenance to collide on. A name-based constraint
-    was rejected because two genuinely different recipes may share a title.
+    Both indexes are partial on ``source_slug IS NOT NULL``, and only
+    ``origin='saved'`` rows carry one — so they constrain copies a user took
+    from someone else's public page and **do not constrain a single recipe a
+    user authored** (~3% of user 1's rows: 4 constrained against 112 not).
+
+    That is deliberate, not an oversight. A saved copy is the only case where
+    "these two rows are the same recipe" is a machine-checkable fact; two
+    separately generated recipes have no such identity, and a name-based
+    constraint was rejected because two genuinely different recipes may share a
+    title.
 
     So KAN-213's class is closed, and the table is NOT duplicate-free. If this
-    test ever fails, someone widened the constraint beyond what was agreed.
+    test ever fails, someone widened the constraint beyond what was agreed —
+    most likely onto authored recipes, where it cannot be correct without a
+    content hash (Sprint 7).
     """
     first = client.post("/api/recipes", json=_payload(source_slug=None))
     second = client.post("/api/recipes", json=_payload(source_slug=None))
