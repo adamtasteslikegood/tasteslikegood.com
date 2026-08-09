@@ -189,6 +189,33 @@ def test_duplicate_refusal_body_carries_a_code_and_no_exception_text(
         assert leak not in str(body), f"response leaked internals: {leak!r}"
 
 
+def test_update_that_collides_also_returns_409_not_500(client, logged_in):
+    """The PUT route must refuse the same way the POST route does.
+
+    Covers the sibling path of R1: the repository re-raises
+    RecipeDuplicateError from update_recipe, so without a handler on the PUT
+    route the refusal falls into the generic 500. Unlike the create case this
+    needs no race — editing one recipe to carry another's sourceSlug trips the
+    index directly.
+    """
+    first = client.post("/api/recipes", json=_payload()).get_json()
+    second = client.post(
+        "/api/recipes", json=_payload(name="Vegan Pot Pie", source_slug="pot-pie")
+    ).get_json()
+    assert first["id"] != second["id"]
+
+    # Point the second recipe at the first's source — now a duplicate pair.
+    response = client.put(f"/api/recipes/{second['id']}", json=_payload(name="Vegan Pot Pie"))
+
+    assert response.status_code == 409, (
+        f"expected 409, got {response.status_code} — an update that trips the "
+        "index must be a deliberate refusal, not an internal error"
+    )
+    assert "code" in response.get_json()
+    # The write must not have landed.
+    assert Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).count() == 1
+
+
 def test_guest_saves_are_constrained_too(client, guest, monkeypatch):
     """R3 — both indexes ship together or neither.
 
