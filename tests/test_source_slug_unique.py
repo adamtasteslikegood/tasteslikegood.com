@@ -216,6 +216,70 @@ def test_update_that_collides_also_returns_409_not_500(client, logged_in):
     assert Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).count() == 1
 
 
+def test_slug_race_and_duplicate_source_slug_together_still_end_in_409(
+    client, logged_in, monkeypatch
+):
+    """Settles a disagreement between two reviews on PR #273.
+
+    ``_duplicate_source_slug_owner`` is consulted only on the *non*-slug-race
+    branch of ``_commit_publish_retrying``. One review read that as: a write
+    that loses a slug race AND has a duplicate source_slug burns all
+    ``_SLUG_COMMIT_RETRIES`` and then re-raises the raw IntegrityError as a
+    500 — R1 reopened from a narrower angle. A later review read the same code
+    as self-correcting after one retry. They cannot both be right, and neither
+    wrote a test.
+
+    Tracing it: attempt 1 fails with another row owning the probed slug, so
+    ``lost_slug_race`` is True and the duplicate check is skipped. Attempt 2
+    resolves a *fresh* slug that nobody owns, so ``lost_slug_race`` is now
+    False — control reaches the duplicate check and raises
+    ``RecipeDuplicateError``. One extra retry, then 409.
+
+    This asserts that, so the claim stops being a matter of reading.
+    """
+    from repositories import db_recipe_repository
+
+    _insert_competing_row(user_id=logged_in.id)  # owner already holds SOURCE_SLUG
+
+    real_resolve = db_recipe_repository._resolve_public_slug
+    state = {"raced": False, "resolves": 0}
+
+    def racing_resolve(data, recipe_id, current_slug=None, skip=frozenset()):
+        slug = real_resolve(data, recipe_id, current_slug, skip=skip)
+        state["resolves"] += 1
+        if not state["raced"]:
+            state["raced"] = True
+            # Another writer claims the probed slug before our commit, so
+            # attempt 1 is a genuine slug race on top of the duplicate.
+            with db.engine.begin() as conn:
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO recipe (id, name, status, slug, is_public, "
+                        "is_canonical, data, created_at, updated_at) VALUES "
+                        "(:id, 'Racer', 'ready', :slug, 0, 0, '{}', "
+                        "'2026-08-09 00:00:00', '2026-08-09 00:00:00')"
+                    ),
+                    {"id": str(uuid.uuid4()), "slug": slug},
+                )
+        return slug
+
+    monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", racing_resolve)
+
+    response = client.post("/api/recipes", json={**_payload(), "is_public": True})
+
+    assert state["raced"], "the slug race never fired — test is not exercising both collisions"
+    assert response.status_code == 409, (
+        f"expected 409, got {response.status_code}. A 500 here would mean the "
+        "slug-retry branch swallows the duplicate refusal — R1 from a narrower angle."
+    )
+    # Two resolves = one race retry, not an exhausted retry budget.
+    assert state["resolves"] == 2, (
+        f"expected exactly one retry, saw {state['resolves']} slug resolutions — "
+        "the duplicate check is not short-circuiting on the second attempt"
+    )
+    assert Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).count() == 1
+
+
 def test_guest_saves_are_constrained_too(client, guest, monkeypatch):
     """R3 — both indexes ship together or neither.
 
