@@ -144,6 +144,27 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     db.session.delete(recipe)
                     continue
 
+                if existing_id is not None:
+                    # KAN-213 × KAN-186. This is the public-row exemption above:
+                    # the account already owns a row for this public recipe, but
+                    # this guest row is itself published, so it is reassigned
+                    # rather than deleted — deleting would take a live page down.
+                    #
+                    # That deliberate duplicate now collides with
+                    # uq_recipe_user_source_slug, and an IntegrityError here
+                    # rolls back the whole merge, orphaning the guest's data at
+                    # login. Clear source_slug so the row leaves the partial
+                    # index's coverage.
+                    #
+                    # This loses no identity that matters: the row is being kept
+                    # precisely because it is a published page in its own right,
+                    # and its own `slug` — not "saved from X" — is what
+                    # identifies it from here on. Same reasoning as the Cornbread
+                    # decision in the Sprint 6 runbook §5c: once a row is
+                    # published under its own slug, every code path that reads
+                    # source_slug is short-circuited.
+                    recipe.source_slug = None
+
                 recipe.user_id = user.id
                 recipe.guest_session_id = None
                 for key in _recipe_identity_keys(recipe):

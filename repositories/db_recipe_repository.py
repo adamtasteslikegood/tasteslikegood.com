@@ -11,7 +11,7 @@ import logging
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, cast
+from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
 from sqlalchemy import and_, or_
 from sqlalchemy.exc import IntegrityError
@@ -99,6 +99,40 @@ RECIPE_OWNERSHIP_ERROR = (
 OWNERSHIP_CODE_OTHER_ACCOUNT = "OWNERSHIP_OTHER_ACCOUNT"
 OWNERSHIP_CODE_OTHER_GUEST_SESSION = "OWNERSHIP_OTHER_GUEST_SESSION"
 OWNERSHIP_CODE_ORPHANED_GUEST_ROW = "OWNERSHIP_ORPHANED_GUEST_ROW"
+
+
+# Also returned verbatim by the API routes (fixed string, same rationale as
+# PUBLIC_SLUG_REQUIRED_ERROR above).
+RECIPE_DUPLICATE_ERROR = "You already have this recipe saved."
+
+# Machine-readable discriminator, sent alongside the message as `code` — same
+# contract as the OWNERSHIP_CODE_* constants. A duplicate is a *successful*
+# outcome from the user's point of view (the recipe they wanted is in their
+# cookbook), which is the opposite of the ownership refusals, so the SPA needs
+# to tell them apart to choose between an error toast and a benign one.
+DUPLICATE_CODE_ALREADY_SAVED = "RECIPE_ALREADY_SAVED"
+
+
+class RecipeDuplicateError(ValueError):
+    """This owner already has a row for this source_slug — refuse the write (KAN-213).
+
+    Raised when the database refuses the second save of the same public recipe
+    by the same owner. The refusal itself comes from a partial unique index
+    (uq_recipe_user_source_slug / uq_recipe_guest_source_slug, migration
+    c8f3b71d20a4), not from application code: a check-then-write test in the
+    SPA cannot close a two-tab race by construction, which is why six previous
+    fixes at six different layers did not hold.
+
+    This exception exists so that refusal reaches the client as a 409 rather
+    than a 500. Sprint 6 named that the dominant risk (R1): the repository
+    catches broadly and returns None, which the blueprint answers with 500, so
+    a working constraint would have looked like a server outage and told the
+    user to check their connection.
+    """
+
+    def __init__(self, message: str, code: str = DUPLICATE_CODE_ALREADY_SAVED):
+        super().__init__(message)
+        self.code = code
 
 
 class RecipeOwnershipError(ValueError):
@@ -257,11 +291,45 @@ def _resolve_public_slug(
     return candidate
 
 
+def _duplicate_source_slug_owner(
+    recipe_data: Dict[str, Any],
+    recipe_id: str,
+    owner_scope: Optional[Tuple[Optional[int], Optional[str]]],
+) -> bool:
+    """Did this write lose to an existing row on (owner, source_slug)? (KAN-213)
+
+    Called only after a rollback. Constraint names in the IntegrityError are
+    backend-specific (SQLite vs PostgreSQL), so — exactly as with the slug race
+    above — the portable signal is to ask the database who owns the key now.
+
+    Scoped to the acting owner on purpose: two different people saving the same
+    public recipe is the product working, not a duplicate, and the partial
+    indexes are per-owner for that reason.
+    """
+    if owner_scope is None:
+        return False
+    source_slug = recipe_data.get("sourceSlug")
+    if source_slug is None:
+        return False  # NULL source_slug is outside both partial indexes
+
+    user_id, guest_session_id = owner_scope
+    query = Recipe.query.filter(Recipe.source_slug == source_slug, Recipe.id != recipe_id)
+    if user_id is not None:
+        query = query.filter(Recipe.user_id == user_id)
+    elif guest_session_id is not None:
+        query = query.filter(Recipe.guest_session_id == guest_session_id)
+    else:
+        return False  # neither scope set — no partial index covers this row
+
+    return query.first() is not None
+
+
 def _commit_publish_retrying(
     stage: Callable[[Dict[str, Any]], Recipe],
     recipe_data: Dict[str, Any],
     recipe_id: str,
     current_slug: Optional[str] = None,
+    owner_scope: Optional[Tuple[Optional[int], Optional[str]]] = None,
 ) -> Recipe:
     """Stage and commit a recipe write, retrying slug collisions lost to races.
 
@@ -309,7 +377,22 @@ def _commit_publish_retrying(
                 ).first()
                 is not None
             )
-            if not lost_slug_race or attempts > _SLUG_COMMIT_RETRIES:
+            if not lost_slug_race:
+                # KAN-213: the (owner, source_slug) index refused a second save
+                # of the same public recipe. Distinguish it from a genuine
+                # integrity failure BEFORE re-raising, so it can reach the
+                # client as a 409 refusal instead of a 500 (R1). Checked only
+                # on the non-slug-race path, so the slug retry above is
+                # untouched.
+                if _duplicate_source_slug_owner(recipe_data, recipe_id, owner_scope):
+                    logger.info(
+                        "Recipe %s refused: owner already has source_slug %r",
+                        sanitize_log_value(recipe_id),
+                        sanitize_log_value(recipe_data.get("sourceSlug")),
+                    )
+                    raise RecipeDuplicateError(RECIPE_DUPLICATE_ERROR)
+                raise
+            if attempts > _SLUG_COMMIT_RETRIES:
                 raise
             skip.add(attempted_slug)
             logger.warning(
@@ -698,7 +781,11 @@ def create_recipe(
                 return existing  # type: ignore[no-any-return]
 
             return _commit_publish_retrying(
-                stage_existing, recipe_data_with_id, recipe_id, existing.slug
+                stage_existing,
+                recipe_data_with_id,
+                recipe_id,
+                existing.slug,
+                owner_scope=(existing.user_id, existing.guest_session_id),
             )
 
         recipe_name = recipe_data.get("name", "Unnamed Recipe")
@@ -728,7 +815,12 @@ def create_recipe(
             db.session.add(recipe)
             return recipe
 
-        recipe = _commit_publish_retrying(stage_new, recipe_data_with_id, recipe_id)
+        recipe = _commit_publish_retrying(
+            stage_new,
+            recipe_data_with_id,
+            recipe_id,
+            owner_scope=(user_id, None if user_id is not None else guest_session_id),
+        )
 
         logger.info(
             "Created recipe %s for user %s",
@@ -737,7 +829,13 @@ def create_recipe(
         )
         return recipe
 
-    except (RecipeSlugError, CanonicalRecipeError, ManualRecipeError, RecipeOwnershipError):
+    except (
+        RecipeSlugError,
+        CanonicalRecipeError,
+        ManualRecipeError,
+        RecipeOwnershipError,
+        RecipeDuplicateError,
+    ):
         raise
     except Exception as e:
         logger.error("Error creating recipe: %s", sanitize_log_value(e))
@@ -841,13 +939,22 @@ def update_recipe(
             return recipe
 
         updated = _commit_publish_retrying(
-            stage_update, recipe_data_with_id, recipe_id, recipe.slug
+            stage_update,
+            recipe_data_with_id,
+            recipe_id,
+            recipe.slug,
+            owner_scope=(recipe.user_id, recipe.guest_session_id),
         )
 
         logger.info("Updated recipe %s", sanitize_log_value(recipe_id))
         return updated
 
-    except (RecipeSlugError, CanonicalRecipeError, ManualRecipeError):
+    except (
+        RecipeSlugError,
+        CanonicalRecipeError,
+        ManualRecipeError,
+        RecipeDuplicateError,
+    ):
         raise
     except Exception as e:
         logger.error(

@@ -1,0 +1,309 @@
+"""KAN-213 — the duplicate invariant lives in the database, not in the client.
+
+Six duplicate-recipe tickets were filed and fixed between 2026-07-18 and
+2026-08-08 (KAN-137, -156, -157, -186, -194). Every one patched the layer the
+symptom appeared in; none touched the schema, so the bug kept coming back. The
+uniqueness rule (INV-1) lived only in SPA code
+(``src/services/ssr-entry.service.ts``), and a client-side check cannot close a
+cross-context race by construction: two tabs, or a tab and a phone, both read
+"you don't have this yet" before either writes.
+
+These tests pin the fix at the only layer that can refuse the second write —
+two partial unique indexes:
+
+    uq_recipe_user_source_slug   UNIQUE (user_id, source_slug)
+        WHERE source_slug IS NOT NULL AND user_id IS NOT NULL
+    uq_recipe_guest_source_slug  UNIQUE (guest_session_id, source_slug)
+        WHERE source_slug IS NOT NULL AND guest_session_id IS NOT NULL
+
+Both ship together or neither (Sprint 6 R3): ``user_id`` is nullable and guests
+key on ``guest_session_id``, which is the KAN-186 path.
+
+The race is injected deterministically rather than with threads — the same
+idiom as ``test_publish_gate.py``'s slug-race tests. A thread race would
+reproduce this interleaving only sometimes; monkeypatching the commit boundary
+reproduces it every run, and the competing row is written on a *separate
+connection* so it is a genuine second writer, not a same-session artifact.
+"""
+
+import sys
+import uuid
+from pathlib import Path
+
+import pytest
+import sqlalchemy as sa
+
+sys.path.append(str(Path(__file__).resolve().parent.parent))
+
+from app import create_app  # noqa: E402
+from extensions import db  # noqa: E402
+from models.recipe import Recipe  # noqa: E402
+from models.user import User  # noqa: E402
+
+SOURCE_SLUG = "vegan-cornbread"
+GUEST_SESSION = "guest-session-abc"
+
+
+@pytest.fixture
+def app(tmp_path):
+    # File-backed rather than :memory: — the race test opens a SECOND
+    # connection to play the competing writer, and separate connections to an
+    # in-memory SQLite database do not necessarily see the same data.
+    app = create_app(
+        TESTING=True,
+        SQLALCHEMY_DATABASE_URI=f"sqlite:///{tmp_path / 'kan213.db'}",
+        WTF_CSRF_ENABLED=False,
+    )
+    with app.app_context():
+        db.create_all()
+        yield app
+        db.session.remove()
+        db.drop_all()
+
+
+@pytest.fixture
+def client(app):
+    return app.test_client()
+
+
+@pytest.fixture
+def user(app):
+    u = User(email="owner@example.com", name="Owner")
+    db.session.add(u)
+    db.session.commit()
+    return u
+
+
+@pytest.fixture
+def logged_in(client, user):
+    with client.session_transaction() as sess:
+        sess["user_id"] = user.id
+    return user
+
+
+@pytest.fixture
+def guest(client):
+    # The app keys the guest scope on session["session_id"]
+    # (utils/session_utils.get_or_create_session_id), NOT "guest_session_id" —
+    # which is the name it carries once it reaches the model. Setting the wrong
+    # key mints a fresh random id instead and the test silently passes against
+    # an unconstrained pair.
+    with client.session_transaction() as sess:
+        sess["session_id"] = GUEST_SESSION
+    return GUEST_SESSION
+
+
+def _payload(name="Vegan Cornbread", source_slug=SOURCE_SLUG):
+    """The body the SPA sends when saving a public recipe to a cookbook."""
+    body = {"name": name, "ingredients": ["cornmeal"], "instructions": ["bake"]}
+    if source_slug is not None:
+        body["sourceSlug"] = source_slug
+    return body
+
+
+def _insert_competing_row(user_id=None, guest_session_id=None, source_slug=SOURCE_SLUG):
+    """Write the other tab's row on a SEPARATE connection.
+
+    Deliberately raw SQL on its own connection rather than ``db.session.add``:
+    the point of the test is a second writer that our session has not seen, and
+    staging it on the shared session would prove nothing about the index.
+    """
+    with db.engine.begin() as conn:
+        conn.execute(
+            sa.text(
+                "INSERT INTO recipe (id, user_id, guest_session_id, name, status, "
+                "slug, is_public, is_canonical, source_slug, data, created_at, updated_at) "
+                "VALUES (:id, :user_id, :guest, :name, 'ready', NULL, 0, 0, :source_slug, "
+                ":data, '2026-08-09 00:00:00', '2026-08-09 00:00:00')"
+            ),
+            {
+                "id": str(uuid.uuid4()),
+                "user_id": user_id,
+                "guest": guest_session_id,
+                "name": "Vegan Cornbread",
+                "source_slug": source_slug,
+                "data": '{"name": "Vegan Cornbread"}',
+            },
+        )
+
+
+def _race_on_commit(monkeypatch, **competitor):
+    """Land the competing row once, immediately before our first commit."""
+    real_commit = db.session.commit
+    state = {"raced": False}
+
+    def racing_commit():
+        if not state["raced"]:
+            state["raced"] = True
+            _insert_competing_row(**competitor)
+        return real_commit()
+
+    monkeypatch.setattr(db.session, "commit", racing_commit)
+    return state
+
+
+# ─── The anchor gate (Sprint 6 D1) ───────────────────────────────────────────
+
+
+def test_concurrent_saves_of_same_source_slug_persist_one_row_and_return_409(
+    client, logged_in, monkeypatch
+):
+    """Two concurrent POSTs with the same sourceSlug: one row, and the loser
+    gets a 409 — not a 500.
+
+    This is Sprint 6's definition of done. The 409 half is as load-bearing as
+    the one-row half: R1 named "the new constraint surfaces as a raw 500" as
+    the dominant risk, because the repository catches IntegrityError broadly and
+    returns None, which the blueprint answers with 500. A 500 tells the SPA to
+    show "check your connection" for what is really "you already have this".
+    """
+    state = _race_on_commit(monkeypatch, user_id=logged_in.id)
+
+    response = client.post("/api/recipes", json=_payload())
+
+    assert state["raced"], "the competing writer never ran — test is not exercising the race"
+    assert response.status_code == 409, (
+        f"expected 409 (deliberate refusal), got {response.status_code}. "
+        "A 500 here is R1: the constraint fired but the API reported an internal error."
+    )
+
+    rows = Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).all()
+    assert len(rows) == 1, f"expected exactly one persisted row, found {len(rows)}"
+
+
+def test_duplicate_refusal_body_carries_a_code_and_no_exception_text(
+    client, logged_in, monkeypatch
+):
+    """The refusal must be actionable by the SPA and must not leak internals.
+
+    Same rule as the sibling refusals (KAN-155): a fixed message plus a machine
+    -readable ``code``, never ``str(e)`` — exception text must not reach clients
+    (CodeQL py/stack-trace-exposure).
+    """
+    _race_on_commit(monkeypatch, user_id=logged_in.id)
+
+    body = client.post("/api/recipes", json=_payload()).get_json()
+
+    assert "code" in body, "SPA cannot distinguish this refusal without a code"
+    for leak in ("Traceback", "IntegrityError", "UNIQUE constraint", "INSERT INTO"):
+        assert leak not in str(body), f"response leaked internals: {leak!r}"
+
+
+def test_guest_saves_are_constrained_too(client, guest, monkeypatch):
+    """R3 — both indexes ship together or neither.
+
+    Guests key on ``guest_session_id`` with ``user_id`` NULL, so the
+    authenticated index does not cover them. This is the KAN-186 path, and
+    leaving it unconstrained would reopen the bug for exactly the users who hit
+    it most: someone saving a recipe before signing in.
+    """
+    state = _race_on_commit(monkeypatch, guest_session_id=guest)
+
+    response = client.post("/api/recipes", json=_payload())
+
+    assert state["raced"]
+    assert response.status_code == 409
+    rows = Recipe.query.filter_by(guest_session_id=guest, source_slug=SOURCE_SLUG).all()
+    assert len(rows) == 1
+
+
+# ─── The constraint must be narrow: these are NOT duplicates ─────────────────
+
+
+def test_two_users_may_each_save_the_same_public_recipe(client, logged_in, monkeypatch):
+    """The index is scoped per owner. Two people saving the same public recipe
+    is the product working, not a duplicate — a global unique index on
+    source_slug would break the core save flow."""
+    other = User(email="other@example.com", name="Other")
+    db.session.add(other)
+    db.session.commit()
+    _insert_competing_row(user_id=other.id)
+
+    response = client.post("/api/recipes", json=_payload())
+
+    assert response.status_code == 201
+    assert Recipe.query.filter_by(source_slug=SOURCE_SLUG).count() == 2
+
+
+def test_generated_recipes_are_unconstrained(client, logged_in):
+    """The documented coverage limit, pinned so it cannot regress silently.
+
+    Both indexes are partial on ``source_slug IS NOT NULL``. Generated and
+    manually entered recipes carry no sourceSlug and are the large majority of
+    the table; they have no provenance to collide on. A name-based constraint
+    was rejected because two genuinely different recipes may share a title.
+
+    So KAN-213's class is closed, and the table is NOT duplicate-free. If this
+    test ever fails, someone widened the constraint beyond what was agreed.
+    """
+    first = client.post("/api/recipes", json=_payload(source_slug=None))
+    second = client.post("/api/recipes", json=_payload(source_slug=None))
+
+    assert (first.status_code, second.status_code) == (201, 201)
+    assert Recipe.query.filter_by(source_slug=None).count() == 2
+
+
+def test_same_user_may_save_two_different_public_recipes(client, logged_in):
+    """Sanity floor: the constraint keys on (owner, source_slug), not owner."""
+    assert client.post("/api/recipes", json=_payload()).status_code == 201
+    second = client.post("/api/recipes", json=_payload(name="Vegan Pot Pie", source_slug="pot-pie"))
+
+    assert second.status_code == 201
+    assert Recipe.query.filter_by(user_id=logged_in.id).count() == 2
+
+
+# ─── KAN-213 × KAN-186: the guest-merge public-row exemption ─────────────────
+
+
+def test_guest_merge_reassigns_a_published_duplicate_without_tripping_the_index(app, user):
+    """Logging in must not fail because of the new constraint.
+
+    KAN-186's merge deletes a guest row that duplicates one the account owns —
+    *except* when the guest row is published, which is reassigned instead
+    because deleting it would take a live public page down. That exemption
+    deliberately creates a duplicate (owner, source_slug) pair, which the new
+    index refuses.
+
+    An IntegrityError there is not a contained failure: it rolls back the whole
+    merge, so the guest's recipes and cookbooks are orphaned at the moment of
+    login. The merge clears ``source_slug`` on the reassigned row instead — it
+    is kept because it is a published page in its own right, so its own slug is
+    what identifies it.
+
+    Pinned here rather than only in test_guest_merge_dedup.py because the two
+    behaviours are only correct together; a future widening of either one has to
+    fail a test that names the interaction.
+    """
+    from blueprints.auth_api_bp import _merge_guest_session_into_user
+
+    owned = Recipe(
+        id="owned",
+        user_id=user.id,
+        name="Pizza Dough",
+        source_slug="vegan-fried-pizza-dough",
+        is_public=False,
+        data={"name": "Pizza Dough"},
+    )
+    published_guest_copy = Recipe(
+        id="guest-published",
+        guest_session_id=GUEST_SESSION,
+        name="Pizza Dough",
+        slug="vegan-fried-pizza-dough-2",
+        source_slug="vegan-fried-pizza-dough",
+        is_public=True,
+        data={"name": "Pizza Dough"},
+    )
+    db.session.add_all([owned, published_guest_copy])
+    db.session.commit()
+
+    _merge_guest_session_into_user(user, GUEST_SESSION)
+
+    rows = Recipe.query.filter_by(user_id=user.id).all()
+    assert len(rows) == 2, "the live public page was dropped by the merge"
+    survivor = next(r for r in rows if r.id == "guest-published")
+    assert survivor.is_public is True, "the public page must stay live"
+    assert survivor.slug == "vegan-fried-pizza-dough-2", "its own address is unchanged"
+    assert survivor.source_slug is None, (
+        "the reassigned row must leave the partial index's coverage, "
+        "or the whole merge rolls back at login"
+    )

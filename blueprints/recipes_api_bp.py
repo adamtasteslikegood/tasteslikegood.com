@@ -146,6 +146,17 @@ def create_recipe(user_id, guest_session_id):
             jsonify({"error": db_recipe_repository.RECIPE_OWNERSHIP_ERROR, "code": e.code}),
             409,
         )
+    except db_recipe_repository.RecipeDuplicateError as e:
+        # KAN-213: 409, not 500. The database refused a second save of the same
+        # public recipe by the same owner — a deliberate refusal from the
+        # partial unique index, not an internal failure. Sprint 6 R1 named
+        # exactly this: a working constraint reported as 500 would tell the user
+        # to check their connection when the real answer is "you already have
+        # this". Same fixed-string + `code` contract as the ownership refusal.
+        return (
+            jsonify({"error": db_recipe_repository.RECIPE_DUPLICATE_ERROR, "code": e.code}),
+            409,
+        )
     except db_recipe_repository.RecipeSlugError:
         # Fixed message, not str(e): exception text must never reach clients.
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400

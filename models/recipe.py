@@ -1,12 +1,48 @@
 from datetime import datetime
 
 from sqlalchemy import JSON as GenericJSON
+from sqlalchemy import Index, text
 from sqlalchemy.ext.mutable import MutableDict
 
 from extensions import db
 
 
 class Recipe(db.Model):  # type: ignore[name-defined, misc]
+    # KAN-213 — the duplicate invariant lives here, not in the SPA.
+    #
+    # Exactly one of (user_id, guest_session_id) is non-NULL on a row, so two
+    # partial indexes are the right shape rather than one composite constraint
+    # — the same reasoning as cookbook's uq_cookbook_* pair.
+    #
+    # Partial on `source_slug IS NOT NULL` by design: generated and manually
+    # entered recipes have no provenance to collide on and are the large
+    # majority of the table. A name-based constraint was rejected — two
+    # genuinely different recipes may share a title. So this closes KAN-213's
+    # class; it does not make the table duplicate-free.
+    #
+    # Declared on the model as well as in migration c8f3b71d20a4 so that
+    # `db.create_all()` (tests, fresh local dev) builds the same indexes the
+    # migration builds in production. Without this the suite would pass against
+    # a schema that cannot refuse anything.
+    __table_args__ = (
+        Index(
+            "uq_recipe_user_source_slug",
+            "user_id",
+            "source_slug",
+            unique=True,
+            postgresql_where=text("source_slug IS NOT NULL AND user_id IS NOT NULL"),
+            sqlite_where=text("source_slug IS NOT NULL AND user_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_recipe_guest_source_slug",
+            "guest_session_id",
+            "source_slug",
+            unique=True,
+            postgresql_where=text("source_slug IS NOT NULL AND guest_session_id IS NOT NULL"),
+            sqlite_where=text("source_slug IS NOT NULL AND guest_session_id IS NOT NULL"),
+        ),
+    )
+
     id = db.Column(db.String(36), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     guest_session_id = db.Column(db.String(64), nullable=True, index=True)
