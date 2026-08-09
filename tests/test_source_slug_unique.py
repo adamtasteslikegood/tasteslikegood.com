@@ -496,3 +496,41 @@ def test_saving_your_own_published_recipe_again_is_refused(client, logged_in):
         "for one recipe, which is the duplicate this PR is meant to refuse"
     )
     assert Recipe.query.filter_by(user_id=logged_in.id).count() == 1
+
+
+@pytest.mark.xfail(
+    reason="KAN-221: known dual-identity gap. A row holding BOTH source_slug and "
+    "slug (a saved copy that was later published) is indexed only by its "
+    "source_slug, so saving that row's own public URL is accepted. A unique "
+    "index keys one value per row and cannot express 'alias sets must be "
+    "disjoint', so there is no index-shaped fix. The two alternatives both cost "
+    "more than the gap: clearing source_slug on publish would shrink the row's "
+    "alias set and break KAN-186's guest-merge dedup, and a recipe_identity "
+    "side table is exactly what KAN-221 deletes when it replaces mutable slugs "
+    "with a stable source-recipe id. Documented rather than patched.",
+    strict=True,
+)
+def test_saving_your_own_published_copy_is_not_yet_refused(client, logged_in):
+    """The third hole in the same model — recorded so it cannot be forgotten.
+
+    Found by Copilot on PR #273 after the COALESCE fix closed the second one.
+    Three rounds found three holes in one identity model, which is the finding:
+    ``source_slug`` is a mutable string standing in for a relationship, so every
+    index over it has an aliasing hole. KAN-221 replaces it.
+    """
+    copy_then_published = Recipe(
+        id="copy-published",
+        user_id=logged_in.id,
+        name="Vegan Cornbread",
+        source_slug="someone-elses-original",
+        slug="my-copy",
+        is_public=True,
+        data={"name": "Vegan Cornbread"},
+    )
+    db.session.add(copy_then_published)
+    db.session.commit()
+
+    # The owner saves their OWN published copy's page.
+    response = client.post("/api/recipes", json=_payload(source_slug="my-copy"))
+
+    assert response.status_code == 409
