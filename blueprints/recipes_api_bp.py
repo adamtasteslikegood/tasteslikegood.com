@@ -222,6 +222,16 @@ def update_recipe(user_id, guest_session_id, recipe_id):
 
         return jsonify(recipe.to_dict()), 200
 
+    except db_recipe_repository.RecipeDuplicateError as e:
+        # KAN-213: same R1 refusal as create_recipe — an update that trips the
+        # (owner, source_slug) partial unique index must reach the client as a
+        # deliberate 409 instead of a generic 500. The repository already
+        # re-raises RecipeDuplicateError from update_recipe; catching it here
+        # keeps the PUT contract symmetric with the POST route above.
+        return (
+            jsonify({"error": db_recipe_repository.RECIPE_DUPLICATE_ERROR, "code": e.code}),
+            409,
+        )
     except db_recipe_repository.RecipeSlugError:
         # Fixed message, not str(e): exception text must never reach clients.
         return jsonify({"error": db_recipe_repository.PUBLIC_SLUG_REQUIRED_ERROR}), 400
