@@ -255,24 +255,40 @@ def test_same_user_may_save_two_different_public_recipes(client, logged_in):
 # ─── KAN-213 × KAN-186: the guest-merge public-row exemption ─────────────────
 
 
-def test_guest_merge_reassigns_a_published_duplicate_without_tripping_the_index(app, user):
-    """Logging in must not fail because of the new constraint.
+def test_guest_cannot_create_the_row_that_would_collide(client, guest):
+    """The reason the merge exemption is not a live conflict with this index.
 
-    KAN-186's merge deletes a guest row that duplicates one the account owns —
+    KAN-186's merge deletes a guest row that duplicates an owned recipe —
     *except* when the guest row is published, which is reassigned instead
-    because deleting it would take a live public page down. That exemption
-    deliberately creates a duplicate (owner, source_slug) pair, which the new
-    index refuses.
+    because deleting would take a live page down. Reassigning a duplicate is
+    exactly what the new index refuses, so that reads like a conflict.
 
-    An IntegrityError there is not a contained failure: it rolls back the whole
-    merge, so the guest's recipes and cookbooks are orphaned at the moment of
-    login. The merge clears ``source_slug`` on the reassigned row instead — it
-    is kept because it is a published page in its own right, so its own slug is
-    what identifies it.
+    It is not, because **a guest cannot publish at all.** The SPA replaces the
+    publish toggle with a "log in to publish" link, and the server does not
+    trust the SPA: ``_gate_is_public`` forces ``is_public=False`` whenever
+    ``user_id is None``. Asserted here through the API rather than the ORM —
+    constructing the row directly with ``Recipe(is_public=True, ...)`` bypasses
+    the gate and would "prove" a state the product cannot reach.
+    """
+    response = client.post("/api/recipes", json={**_payload(), "is_public": True})
 
-    Pinned here rather than only in test_guest_merge_dedup.py because the two
-    behaviours are only correct together; a future widening of either one has to
-    fail a test that names the interaction.
+    assert response.status_code == 201
+    row = Recipe.query.filter_by(guest_session_id=guest).one()
+    assert row.is_public is False, "a guest published a recipe — the gate is gone"
+    assert row.data["is_public"] is False, "blob and column must not disagree"
+
+
+def test_legacy_public_guest_row_cannot_roll_back_a_login_merge(app, user):
+    """Defence for rows predating the publish gate — not a live path.
+
+    Migration e91b47a2c5d3 (2026-07-07) reassigned or unpublished the
+    guest-published rows that existed before ``_gate_is_public``, so production
+    holds none. This builds one directly through the ORM *on purpose*, to prove
+    what happens if one ever reappears: without the ``source_slug`` clear, the
+    reassignment raises IntegrityError, which rolls back the ENTIRE merge and
+    orphans the guest's recipes and cookbooks at the moment of login.
+
+    A single legacy row must not be able to cost someone their data.
     """
     from blueprints.auth_api_bp import _merge_guest_session_into_user
 

@@ -145,24 +145,29 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     continue
 
                 if existing_id is not None:
-                    # KAN-213 × KAN-186. This is the public-row exemption above:
-                    # the account already owns a row for this public recipe, but
-                    # this guest row is itself published, so it is reassigned
-                    # rather than deleted — deleting would take a live page down.
+                    # Reached only by a PUBLIC guest row that duplicates an
+                    # owned recipe — the exemption in the branch above.
                     #
-                    # That deliberate duplicate now collides with
-                    # uq_recipe_user_source_slug, and an IntegrityError here
-                    # rolls back the whole merge, orphaning the guest's data at
-                    # login. Clear source_slug so the row leaves the partial
-                    # index's coverage.
+                    # No current path can produce that row. Guests cannot
+                    # publish: the SPA replaces the publish toggle with a
+                    # "log in to publish" link, and the server does not rely on
+                    # that — _gate_is_public() forces is_public=False whenever
+                    # user_id is None, on create and update alike. Rows that
+                    # predate the gate were reassigned or unpublished by
+                    # migration e91b47a2c5d3 (2026-07-07).
                     #
-                    # This loses no identity that matters: the row is being kept
-                    # precisely because it is a published page in its own right,
-                    # and its own `slug` — not "saved from X" — is what
-                    # identifies it from here on. Same reasoning as the Cornbread
-                    # decision in the Sprint 6 runbook §5c: once a row is
-                    # published under its own slug, every code path that reads
-                    # source_slug is short-circuited.
+                    # So this is a legacy-data guard, NOT a live conflict with
+                    # KAN-213's uq_recipe_user_source_slug. Stated plainly
+                    # because the reverse was claimed on review: if such a row
+                    # somehow existed, reassigning it would raise IntegrityError
+                    # and roll back the ENTIRE merge, orphaning the guest's
+                    # recipes and cookbooks at the moment of login. Clearing
+                    # source_slug takes it out of the partial index's coverage
+                    # so a single legacy row cannot cost someone their data.
+                    #
+                    # Nothing of value is lost: the row is kept precisely
+                    # because it is a published page in its own right, so its
+                    # own `slug` identifies it from here on.
                     recipe.source_slug = None
 
                 recipe.user_id = user.id
