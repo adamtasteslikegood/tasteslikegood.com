@@ -30,22 +30,36 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
     # `db.create_all()` (tests, fresh local dev) builds the same indexes the
     # migration builds in production. Without this the suite would pass against
     # a schema that cannot refuse anything.
+    # The key is COALESCE(source_slug, slug), not source_slug alone. A recipe's
+    # identity is `{source_slug, slug}` everywhere else in the codebase —
+    # auth_api_bp._recipe_identity_keys() and the SPA's INV-1
+    # (`r.sourceSlug === slug || r.slug === slug`). Keying on source_slug alone
+    # left a reachable hole: an owner who holds the PUBLISHED row itself
+    # (slug='x', source_slug NULL) and saves /r/x again gets a copy with
+    # source_slug='x' that collides with nothing, because the published row sits
+    # outside a source_slug-only partial index. Caught by Codex review on #273.
+    #
+    # COALESCE puts both rows on the same key. Two rows cannot collide via the
+    # slug side alone — `slug` is already globally unique — so every collision
+    # this catches involves at least one saved copy, which is the intent.
+    _IDENTITY = "coalesce(source_slug, slug)"
+
     __table_args__ = (
         Index(
-            "uq_recipe_user_source_slug",
-            "user_id",
-            "source_slug",
+            "uq_recipe_user_recipe_identity",
+            text("user_id"),
+            text(_IDENTITY),
             unique=True,
-            postgresql_where=text("source_slug IS NOT NULL AND user_id IS NOT NULL"),
-            sqlite_where=text("source_slug IS NOT NULL AND user_id IS NOT NULL"),
+            postgresql_where=text(f"{_IDENTITY} IS NOT NULL AND user_id IS NOT NULL"),
+            sqlite_where=text(f"{_IDENTITY} IS NOT NULL AND user_id IS NOT NULL"),
         ),
         Index(
-            "uq_recipe_guest_source_slug",
-            "guest_session_id",
-            "source_slug",
+            "uq_recipe_guest_recipe_identity",
+            text("guest_session_id"),
+            text(_IDENTITY),
             unique=True,
-            postgresql_where=text("source_slug IS NOT NULL AND guest_session_id IS NOT NULL"),
-            sqlite_where=text("source_slug IS NOT NULL AND guest_session_id IS NOT NULL"),
+            postgresql_where=text(f"{_IDENTITY} IS NOT NULL AND guest_session_id IS NOT NULL"),
+            sqlite_where=text(f"{_IDENTITY} IS NOT NULL AND guest_session_id IS NOT NULL"),
         ),
     )
 

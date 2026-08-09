@@ -422,3 +422,77 @@ def test_legacy_public_guest_row_cannot_roll_back_a_login_merge(app, user):
         "the reassigned row must leave the partial index's coverage, "
         "or the whole merge rolls back at login"
     )
+
+
+# ─── Codex review findings, PR #273 — reproduced before fixing ──────────────
+
+
+def test_clearing_the_column_survives_a_later_partial_update(client, logged_in):
+    """P2 — the column clear must not be undone by the mirrored JSON blob.
+
+    ``source_slug`` is a mirror of ``data['sourceSlug']``. Both the migration
+    pre-pass and the guest-merge legacy guard clear only the **column**.
+    ``update_recipe`` then rebuilds the blob as
+    ``{**(recipe.data or {}), **recipe_data}`` and ``stage_update`` restages
+    ``recipe.source_slug = data.get('sourceSlug')`` — so the next ordinary
+    partial PUT pulls the stale value back out of the untouched blob and writes
+    it to the column.
+
+    That resurrects the duplicate the clear just removed, and the row then trips
+    the unique index on a write the user did not intend as a save.
+    """
+    created = client.post("/api/recipes", json=_payload()).get_json()
+    row = db.session.get(Recipe, created["id"])
+    assert row.data.get("sourceSlug") == SOURCE_SLUG, "precondition: blob mirrors the column"
+
+    # What the migration pre-pass and the merge guard do today.
+    row.source_slug = None
+    db.session.commit()
+
+    # An ordinary partial PUT that says nothing about sourceSlug.
+    response = client.put(f"/api/recipes/{created['id']}", json={"name": "Renamed"})
+    assert response.status_code == 200
+
+    refreshed = db.session.get(Recipe, created["id"])
+    assert refreshed.source_slug is None, (
+        "the stale data['sourceSlug'] was restaged onto the column — the clear "
+        "is not durable, so the migration pre-pass undoes itself on the next PUT"
+    )
+
+
+def test_saving_your_own_published_recipe_again_is_refused(client, logged_in):
+    """P1 — the index must cover the identity the rest of the codebase uses.
+
+    ``_recipe_identity_keys`` (``auth_api_bp.py``) and the SPA's INV-1 both
+    treat a recipe's identity as ``{source_slug, slug}`` —
+    ``r.sourceSlug === slug || r.slug === slug``. The indexes key only on
+    ``source_slug``.
+
+    So when a user already owns the **published row itself**
+    (``slug='x'``, ``source_slug`` NULL) and saves ``/r/x`` again, the copy gets
+    ``source_slug='x'`` and collides with nothing: the published row is outside
+    the partial index entirely. The database accepts a duplicate that this PR's
+    own helper would classify as the same recipe — which is the exact case the
+    PR claims to close, reachable by any caller that bypasses the SPA or holds a
+    stale recipe list.
+    """
+    published = Recipe(
+        id="own-published",
+        user_id=logged_in.id,
+        name="Vegan Cornbread",
+        slug=SOURCE_SLUG,
+        source_slug=None,
+        is_public=True,
+        data={"name": "Vegan Cornbread", "slug": SOURCE_SLUG, "is_public": True},
+    )
+    db.session.add(published)
+    db.session.commit()
+
+    # The author opens their own /r/vegan-cornbread and saves it.
+    response = client.post("/api/recipes", json=_payload())
+
+    assert response.status_code == 409, (
+        f"expected 409, got {response.status_code} — the owner now holds two rows "
+        "for one recipe, which is the duplicate this PR is meant to refuse"
+    )
+    assert Recipe.query.filter_by(user_id=logged_in.id).count() == 1

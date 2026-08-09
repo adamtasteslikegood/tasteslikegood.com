@@ -1,7 +1,8 @@
 """Tests for the de-duplication pre-pass in migration c8f3b71d20a4 (KAN-213).
 
 The migration must clear ``source_slug`` on pre-existing duplicate
-(scope, source_slug) rows before it can create the unique indexes — otherwise
+(scope, COALESCE(source_slug, slug)) rows before it can create the unique
+indexes — otherwise
 ``flask db upgrade`` fails on dirty data, which aborts the flask-backend-migrate
 job and blocks the deploy while the old Flask revision keeps serving.
 
@@ -47,38 +48,52 @@ def _bare_recipe_engine(tmp_path):
                 "CREATE TABLE recipe ("
                 "id TEXT PRIMARY KEY, user_id INTEGER, guest_session_id TEXT, "
                 "name TEXT NOT NULL, slug TEXT, is_public INTEGER DEFAULT 0, "
-                "source_slug TEXT, created_at TEXT)"
+                "source_slug TEXT, data TEXT NOT NULL DEFAULT '{}', created_at TEXT)"
             )
         )
     return engine
 
 
 def _insert(conn, rows):
-    for rid, user_id, guest, source_slug, created in rows:
+    """Rows are (id, user_id, guest_session_id, source_slug, created_at[, slug]).
+
+    The blob mirrors source_slug, as production rows do — the pre-pass has to
+    clear both or the next partial PUT restages the stale value.
+    """
+    for row in rows:
+        rid, user_id, guest, source_slug, created = row[:5]
+        slug = row[5] if len(row) > 5 else None
+        blob = '{"sourceSlug": "%s"}' % source_slug if source_slug else "{}"
         conn.execute(
             sa.text(
-                "INSERT INTO recipe (id, user_id, guest_session_id, name, source_slug, created_at) "
-                "VALUES (:id, :u, :g, 'R', :s, :c)"
+                "INSERT INTO recipe (id, user_id, guest_session_id, name, source_slug, "
+                "slug, data, created_at) VALUES (:id, :u, :g, 'R', :s, :sl, :d, :c)"
             ),
-            {"id": rid, "u": user_id, "g": guest, "s": source_slug, "c": created},
+            {
+                "id": rid,
+                "u": user_id,
+                "g": guest,
+                "s": source_slug,
+                "sl": slug,
+                "d": blob,
+                "c": created,
+            },
         )
 
 
 def _build_indexes(conn):
     """The statements the migration issues after the pre-pass."""
-    conn.execute(
-        sa.text(
-            "CREATE UNIQUE INDEX uq_recipe_user_source_slug ON recipe (user_id, source_slug) "
-            "WHERE source_slug IS NOT NULL AND user_id IS NOT NULL"
+    for name, scope in (
+        ("uq_recipe_user_recipe_identity", "user_id"),
+        ("uq_recipe_guest_recipe_identity", "guest_session_id"),
+    ):
+        conn.execute(
+            sa.text(
+                f"CREATE UNIQUE INDEX {name} ON recipe "
+                f"({scope}, coalesce(source_slug, slug)) "
+                f"WHERE coalesce(source_slug, slug) IS NOT NULL AND {scope} IS NOT NULL"
+            )
         )
-    )
-    conn.execute(
-        sa.text(
-            "CREATE UNIQUE INDEX uq_recipe_guest_source_slug "
-            "ON recipe (guest_session_id, source_slug) "
-            "WHERE source_slug IS NOT NULL AND guest_session_id IS NOT NULL"
-        )
-    )
 
 
 def test_keeps_earliest_row_and_clears_the_later_duplicates(tmp_path):
@@ -94,7 +109,7 @@ def test_keeps_earliest_row_and_clears_the_later_duplicates(tmp_path):
                 ("d", 2, None, "vegan-cornbread", "2026-01-01"),
             ],
         )
-        cleared = mig._clear_duplicate_source_slugs(conn, "user_id")
+        cleared = mig._clear_duplicate_identities(conn, "user_id")
 
         kept = conn.execute(
             sa.text("SELECT id FROM recipe WHERE source_slug IS NOT NULL ORDER BY id")
@@ -122,8 +137,8 @@ def test_guest_scope_is_deduped_independently(tmp_path):
                 ("g3", None, "sess-b", "vegan-cornbread", "2026-01-01"),
             ],
         )
-        assert mig._clear_duplicate_source_slugs(conn, "user_id") == 0
-        assert mig._clear_duplicate_source_slugs(conn, "guest_session_id") == 1
+        assert mig._clear_duplicate_identities(conn, "user_id") == 0
+        assert mig._clear_duplicate_identities(conn, "guest_session_id") == 1
 
         kept = conn.execute(
             sa.text("SELECT id FROM recipe WHERE source_slug IS NOT NULL ORDER BY id")
@@ -151,8 +166,8 @@ def test_clean_data_is_a_no_op(tmp_path):
                 ("d", 1, None, None, "2026-01-04"),
             ],
         )
-        cleared = mig._clear_duplicate_source_slugs(conn, "user_id")
-        cleared += mig._clear_duplicate_source_slugs(conn, "guest_session_id")
+        cleared = mig._clear_duplicate_identities(conn, "user_id")
+        cleared += mig._clear_duplicate_identities(conn, "guest_session_id")
 
         remaining = conn.execute(
             sa.text("SELECT count(*) AS n FROM recipe WHERE source_slug IS NOT NULL")
@@ -189,3 +204,61 @@ def test_indexes_actually_refuse_a_duplicate_after_the_migration(tmp_path):
         _insert(conn, [("d", 1, None, None, "2026-01-03")])
         _insert(conn, [("e", 1, None, None, "2026-01-04")])
         assert conn.execute(sa.text("SELECT count(*) FROM recipe")).scalar() == 4
+
+
+def test_published_original_wins_over_a_saved_copy_of_itself(tmp_path):
+    """The identity case Codex found on PR #273.
+
+    An owner who holds the published row itself (``slug='x'``,
+    ``source_slug`` NULL) and also a copy saved from ``/r/x``
+    (``source_slug='x'``) has two rows for one recipe. Keying on
+    ``source_slug`` alone missed it entirely — the published row sits outside
+    that index. Under ``COALESCE(source_slug, slug)`` both rows share a key.
+
+    The survivor must be the published original, regardless of dates: the loser
+    is resolved by clearing its ``source_slug``, and a row whose key comes from
+    ``slug`` has none to clear. Ordering encodes that, which is why the copy
+    here is deliberately the OLDER row.
+    """
+    mig = _load_migration()
+    engine = _bare_recipe_engine(tmp_path)
+    with engine.begin() as conn:
+        _insert(
+            conn,
+            [
+                ("copy", 1, None, "vegan-cornbread", "2026-01-01"),
+                ("published", 1, None, None, "2026-01-02", "vegan-cornbread"),
+            ],
+        )
+        cleared = mig._clear_duplicate_identities(conn, "user_id")
+
+        rows = dict(conn.execute(sa.text("SELECT id, source_slug FROM recipe")).fetchall())
+        blob = conn.execute(sa.text("SELECT data FROM recipe WHERE id = 'copy'")).scalar()
+
+    assert cleared == 1
+    assert rows["published"] is None, "the published original must be untouched"
+    assert rows["copy"] is None, "the saved copy's source_slug must be cleared"
+    assert "sourceSlug" not in blob, (
+        "the mirrored blob key must be cleared too, or the next partial PUT "
+        "restages the stale value onto the column"
+    )
+
+    with engine.begin() as conn:
+        _build_indexes(conn)
+
+
+def test_index_refuses_a_copy_of_your_own_published_recipe(tmp_path):
+    """The refusal itself, for the identity case — seen to fire."""
+    engine = _bare_recipe_engine(tmp_path)
+    with engine.begin() as conn:
+        _build_indexes(conn)
+        _insert(conn, [("published", 1, None, None, "2026-01-01", "vegan-cornbread")])
+
+    with pytest.raises(sa.exc.IntegrityError):
+        with engine.begin() as conn:
+            _insert(conn, [("copy", 1, None, "vegan-cornbread", "2026-01-02")])
+
+    with engine.begin() as conn:
+        # Another owner saving that same public recipe is still fine.
+        _insert(conn, [("other", 2, None, "vegan-cornbread", "2026-01-02")])
+        assert conn.execute(sa.text("SELECT count(*) FROM recipe")).scalar() == 2

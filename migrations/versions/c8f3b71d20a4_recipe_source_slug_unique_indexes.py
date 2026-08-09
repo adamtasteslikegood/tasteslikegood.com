@@ -1,12 +1,22 @@
-"""Enforce one saved copy per (owner, source_slug)
+"""Enforce one row per (owner, recipe identity)
 
 KAN-213. Adds two partial unique indexes so the database, not the SPA, refuses
 a duplicate saved recipe:
 
-    uq_recipe_user_source_slug   UNIQUE (user_id, source_slug)
-        WHERE source_slug IS NOT NULL AND user_id IS NOT NULL
-    uq_recipe_guest_source_slug  UNIQUE (guest_session_id, source_slug)
-        WHERE source_slug IS NOT NULL AND guest_session_id IS NOT NULL
+    uq_recipe_user_recipe_identity   UNIQUE (user_id, COALESCE(source_slug, slug))
+    uq_recipe_guest_recipe_identity  UNIQUE (guest_session_id, COALESCE(source_slug, slug))
+    both WHERE COALESCE(source_slug, slug) IS NOT NULL AND <scope> IS NOT NULL
+
+The key is COALESCE(source_slug, slug), not source_slug alone. A recipe's
+identity is `{source_slug, slug}` everywhere else in the codebase —
+auth_api_bp._recipe_identity_keys() and the SPA's INV-1
+(`r.sourceSlug === slug || r.slug === slug`). Keying on source_slug alone left a
+reachable hole, found by Codex review on PR #273: an owner holding the PUBLISHED
+row itself (slug='x', source_slug NULL) who saves /r/x again gets a copy with
+source_slug='x' that collides with nothing, because the published row sits
+outside a source_slug-only partial index. Two rows cannot collide via the slug
+side alone -- `slug` is already globally unique -- so every collision this
+catches involves at least one saved copy, which is the intent.
 
 Exactly one of (user_id, guest_session_id) is non-NULL per row, so two partial
 indexes are the correct shape rather than one composite constraint — the same
@@ -92,31 +102,66 @@ depends_on = None
 
 logger = logging.getLogger("alembic.runtime.migration")
 
+# A recipe's identity: the public recipe it was saved from, or its own page when
+# it is the original. Matches models/recipe.py, _recipe_identity_keys(), and the
+# SPA's INV-1 (`r.sourceSlug === slug || r.slug === slug`).
+_IDENTITY = "coalesce(source_slug, slug)"
 
-def _clear_duplicate_source_slugs(bind, scope_col):
-    """Keep the earliest row per (scope, source_slug); NULL source_slug on the rest.
 
-    Returns the number of rows cleared, so the caller can log a real number
+def _clear_blob_key_sql(dialect_name):
+    """Dialect-specific SQL to drop ``sourceSlug`` from the ``data`` JSON blob.
+
+    Clearing the column alone is not durable: ``update_recipe`` rebuilds the
+    blob as ``{**(recipe.data or {}), **recipe_data}`` and then restages
+    ``recipe.source_slug = data.get("sourceSlug")``. A partial PUT that says
+    nothing about sourceSlug therefore pulls the stale value back out of the
+    untouched blob and writes it to the column — resurrecting the very duplicate
+    this pre-pass just cleared, and tripping the new index on the next write.
+    """
+    if dialect_name == "postgresql":
+        return "data = data - 'sourceSlug'"
+    return "data = json_remove(data, '$.sourceSlug')"
+
+
+def _clear_duplicate_identities(bind, scope_col):
+    """Keep one row per (scope, identity); clear ``source_slug`` on the rest.
+
+    Identity is ``COALESCE(source_slug, slug)`` — the same key the new indexes
+    use, and the same one ``_recipe_identity_keys`` and the SPA's INV-1 use.
+
+    Ordering encodes the survivor rule: ``source_slug IS NULL`` first, so the
+    author's own published row wins over a saved copy of it, then oldest first.
+    That matches runbook §4 rule 2 and is also the only workable choice — the
+    loser is resolved by clearing its ``source_slug``, which a slug-derived row
+    does not have. Two rows can never collide via the slug side alone, because
+    ``slug`` is already globally unique, so a survivor always exists.
+
+    Returns the number of rows cleared so the caller can log a real number
     rather than claiming success blindly.
     """
     rows = bind.execute(
         sa.text(
-            f"SELECT id, {scope_col} AS scope, source_slug "  # noqa: S608 - fixed literal
+            f"SELECT id, {scope_col} AS scope, "  # noqa: S608 - fixed literal
+            "COALESCE(source_slug, slug) AS identity "
             "FROM recipe "
-            f"WHERE source_slug IS NOT NULL AND {scope_col} IS NOT NULL "
-            f"ORDER BY {scope_col}, source_slug, created_at, id"
+            f"WHERE COALESCE(source_slug, slug) IS NOT NULL AND {scope_col} IS NOT NULL "
+            f"ORDER BY {scope_col}, COALESCE(source_slug, slug), "
+            "CASE WHEN source_slug IS NULL THEN 0 ELSE 1 END, created_at, id"
         )
     ).fetchall()
 
+    blob_clear = _clear_blob_key_sql(bind.dialect.name)
     seen: set = set()
     cleared = 0
     for row in rows:
-        key = (row.scope, row.source_slug)
+        key = (row.scope, row.identity)
         if key not in seen:
             seen.add(key)
-            continue  # earliest row for this (scope, source_slug) — keep it
+            continue  # survivor for this (scope, identity) — leave it alone
         bind.execute(
-            sa.text("UPDATE recipe SET source_slug = NULL WHERE id = :id"),
+            sa.text(  # noqa: S608 - blob_clear is one of two fixed literals
+                f"UPDATE recipe SET source_slug = NULL, {blob_clear} WHERE id = :id"
+            ),
             {"id": row.id},
         )
         cleared += 1
@@ -132,8 +177,8 @@ def upgrade():
     if bind.dialect.name == "postgresql":
         op.execute("LOCK TABLE recipe IN ACCESS EXCLUSIVE MODE")
 
-    cleared = _clear_duplicate_source_slugs(bind, "user_id")
-    cleared += _clear_duplicate_source_slugs(bind, "guest_session_id")
+    cleared = _clear_duplicate_identities(bind, "user_id")
+    cleared += _clear_duplicate_identities(bind, "guest_session_id")
     if cleared:
         # Expected to be 0 in production (purged by hand, gates verified empty).
         # A non-zero count here means duplicates appeared after that purge and
@@ -144,24 +189,20 @@ def upgrade():
             cleared,
         )
 
-    op.create_index(
-        "uq_recipe_user_source_slug",
-        "recipe",
-        ["user_id", "source_slug"],
-        unique=True,
-        postgresql_where=sa.text("source_slug IS NOT NULL AND user_id IS NOT NULL"),
-        sqlite_where=sa.text("source_slug IS NOT NULL AND user_id IS NOT NULL"),
-    )
-    op.create_index(
-        "uq_recipe_guest_source_slug",
-        "recipe",
-        ["guest_session_id", "source_slug"],
-        unique=True,
-        postgresql_where=sa.text("source_slug IS NOT NULL AND guest_session_id IS NOT NULL"),
-        sqlite_where=sa.text("source_slug IS NOT NULL AND guest_session_id IS NOT NULL"),
-    )
+    for name, scope in (
+        ("uq_recipe_user_recipe_identity", "user_id"),
+        ("uq_recipe_guest_recipe_identity", "guest_session_id"),
+    ):
+        op.create_index(
+            name,
+            "recipe",
+            [sa.text(scope), sa.text(_IDENTITY)],
+            unique=True,
+            postgresql_where=sa.text(f"{_IDENTITY} IS NOT NULL AND {scope} IS NOT NULL"),
+            sqlite_where=sa.text(f"{_IDENTITY} IS NOT NULL AND {scope} IS NOT NULL"),
+        )
 
 
 def downgrade():
-    op.drop_index("uq_recipe_guest_source_slug", table_name="recipe")
-    op.drop_index("uq_recipe_user_source_slug", table_name="recipe")
+    op.drop_index("uq_recipe_guest_recipe_identity", table_name="recipe")
+    op.drop_index("uq_recipe_user_recipe_identity", table_name="recipe")

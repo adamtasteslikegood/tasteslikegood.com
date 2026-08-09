@@ -168,7 +168,21 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     # Nothing of value is lost: the row is kept precisely
                     # because it is a published page in its own right, so its
                     # own `slug` identifies it from here on.
+                    #
+                    # Clear the MIRRORED BLOB KEY TOO, not just the column.
+                    # `source_slug` mirrors `data['sourceSlug']`, and
+                    # update_recipe rebuilds the blob as
+                    # {**(recipe.data or {}), **recipe_data} before restaging
+                    # `recipe.source_slug = data.get('sourceSlug')`. Clearing
+                    # only the column means the next ordinary partial PUT (say
+                    # {"name": "..."}) pulls the stale value back out of the
+                    # untouched blob and writes it to the column — resurrecting
+                    # the duplicate and making the row un-editable behind a 409.
+                    # Caught by Codex review on PR #273; reproduced by
+                    # test_clearing_the_column_survives_a_later_partial_update.
                     recipe.source_slug = None
+                    if recipe.data and "sourceSlug" in recipe.data:
+                        del recipe.data["sourceSlug"]
 
                 recipe.user_id = user.id
                 recipe.guest_session_id = None

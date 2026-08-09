@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple, cast
 
-from sqlalchemy import and_, or_
+from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from extensions import db
@@ -291,6 +291,36 @@ def _resolve_public_slug(
     return candidate
 
 
+def _pin_source_slug_to_column(
+    merged: Dict[str, Any], recipe_data: Dict[str, Any], existing: Recipe
+) -> None:
+    """Keep ``sourceSlug`` in the merged blob honest when the payload omits it.
+
+    Exactly the rule already applied to ``slug`` above, for the same reason.
+    ``source_slug`` is a column mirroring ``data['sourceSlug']``, and writes
+    rebuild the blob as ``{**(existing.data or {}), **recipe_data}`` before
+    restaging ``recipe.source_slug = data.get("sourceSlug")``. So anything that
+    clears the column without also clearing the blob — the KAN-213 migration's
+    pre-pass, the guest-merge legacy guard — is silently undone by the next
+    partial PUT, which pulls the stale value out of the untouched blob and
+    writes it back to the column. That resurrects a cleared duplicate and then
+    trips the unique index on a write the user never meant as a save.
+
+    The column is authoritative. Key presence, not truthiness: a payload that
+    explicitly sends ``sourceSlug: null`` is the caller clearing it, and that
+    value goes through unchanged.
+
+    Found by Codex review on PR #273 — reproduced by
+    ``test_clearing_the_column_survives_a_later_partial_update``.
+    """
+    if "sourceSlug" in recipe_data:
+        return
+    if existing.source_slug is not None:
+        merged["sourceSlug"] = existing.source_slug
+    else:
+        merged.pop("sourceSlug", None)
+
+
 def _duplicate_source_slug_owner(
     recipe_data: Dict[str, Any],
     recipe_id: str,
@@ -308,12 +338,17 @@ def _duplicate_source_slug_owner(
     """
     if owner_scope is None:
         return False
-    source_slug = recipe_data.get("sourceSlug")
-    if source_slug is None:
-        return False  # NULL source_slug is outside both partial indexes
+    # Mirrors the index key COALESCE(source_slug, slug): a row's identity is the
+    # public recipe it points at, or its own page when it is the original.
+    identity = recipe_data.get("sourceSlug") or recipe_data.get("slug")
+    if identity is None:
+        return False  # no identity — outside both partial indexes
 
     user_id, guest_session_id = owner_scope
-    query = Recipe.query.filter(Recipe.source_slug == source_slug, Recipe.id != recipe_id)
+    query = Recipe.query.filter(
+        func.coalesce(Recipe.source_slug, Recipe.slug) == identity,
+        Recipe.id != recipe_id,
+    )
     if user_id is not None:
         query = query.filter(Recipe.user_id == user_id)
     elif guest_session_id is not None:
@@ -759,6 +794,7 @@ def create_recipe(
                     merged["slug"] = existing.slug
                 else:
                     merged.pop("slug", None)
+            _pin_source_slug_to_column(merged, recipe_data, existing)
             recipe_data_with_id = _gate_is_public(merged, user_id)
             next_origin = _resolve_origin(existing.origin, recipe_data)
             _gate_manual_publish(next_origin, recipe_data_with_id)
@@ -918,6 +954,8 @@ def update_recipe(
                 recipe_data_with_id["slug"] = recipe.slug
             else:
                 recipe_data_with_id.pop("slug", None)
+
+        _pin_source_slug_to_column(recipe_data_with_id, recipe_data, recipe)
 
         next_origin = _resolve_origin(recipe.origin, recipe_data)
         _gate_manual_publish(next_origin, recipe_data_with_id)
