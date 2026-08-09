@@ -1,12 +1,68 @@
 from datetime import datetime
 
 from sqlalchemy import JSON as GenericJSON
+from sqlalchemy import Index, text
 from sqlalchemy.ext.mutable import MutableDict
 
 from extensions import db
 
 
 class Recipe(db.Model):  # type: ignore[name-defined, misc]
+    # KAN-213 — the duplicate invariant lives here, not in the SPA.
+    #
+    # Exactly one of (user_id, guest_session_id) is non-NULL on a row, so two
+    # partial indexes are the right shape rather than one composite constraint
+    # — the same reasoning as cookbook's uq_cookbook_* pair.
+    #
+    # Partial on `source_slug IS NOT NULL` by design, and narrower than that
+    # reads: only `origin='saved'` rows carry a source_slug, so these indexes
+    # constrain COPIES A USER TOOK from someone else's public page and do not
+    # constrain a single recipe a user authored (~3% of user 1's rows).
+    #
+    # Still the right corner: a saved copy is the only case where "these two
+    # rows are the same recipe" is a machine-checkable fact. Two separately
+    # generated recipes have no such identity, and a name-based constraint was
+    # rejected — two genuinely different recipes may share a title. See
+    # migration c8f3b71d20a4 for the evidence and KAN-220 for why the covered
+    # corner is where the real duplicates come from.
+    #
+    # Declared on the model as well as in migration c8f3b71d20a4 so that
+    # `db.create_all()` (tests, fresh local dev) builds the same indexes the
+    # migration builds in production. Without this the suite would pass against
+    # a schema that cannot refuse anything.
+    # The key is COALESCE(source_slug, slug), not source_slug alone. A recipe's
+    # identity is `{source_slug, slug}` everywhere else in the codebase —
+    # auth_api_bp._recipe_identity_keys() and the SPA's INV-1
+    # (`r.sourceSlug === slug || r.slug === slug`). Keying on source_slug alone
+    # left a reachable hole: an owner who holds the PUBLISHED row itself
+    # (slug='x', source_slug NULL) and saves /r/x again gets a copy with
+    # source_slug='x' that collides with nothing, because the published row sits
+    # outside a source_slug-only partial index. Caught by Codex review on #273.
+    #
+    # COALESCE puts both rows on the same key. Two rows cannot collide via the
+    # slug side alone — `slug` is already globally unique — so every collision
+    # this catches involves at least one saved copy, which is the intent.
+    _IDENTITY = "coalesce(source_slug, slug)"
+
+    __table_args__ = (
+        Index(
+            "uq_recipe_user_recipe_identity",
+            text("user_id"),
+            text(_IDENTITY),
+            unique=True,
+            postgresql_where=text(f"{_IDENTITY} IS NOT NULL AND user_id IS NOT NULL"),
+            sqlite_where=text(f"{_IDENTITY} IS NOT NULL AND user_id IS NOT NULL"),
+        ),
+        Index(
+            "uq_recipe_guest_recipe_identity",
+            text("guest_session_id"),
+            text(_IDENTITY),
+            unique=True,
+            postgresql_where=text(f"{_IDENTITY} IS NOT NULL AND guest_session_id IS NOT NULL"),
+            sqlite_where=text(f"{_IDENTITY} IS NOT NULL AND guest_session_id IS NOT NULL"),
+        ),
+    )
+
     id = db.Column(db.String(36), primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     guest_session_id = db.Column(db.String(64), nullable=True, index=True)

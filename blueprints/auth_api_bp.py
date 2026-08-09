@@ -144,6 +144,46 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     db.session.delete(recipe)
                     continue
 
+                if existing_id is not None:
+                    # Reached only by a PUBLIC guest row that duplicates an
+                    # owned recipe — the exemption in the branch above.
+                    #
+                    # No current path can produce that row. Guests cannot
+                    # publish: the SPA replaces the publish toggle with a
+                    # "log in to publish" link, and the server does not rely on
+                    # that — _gate_is_public() forces is_public=False whenever
+                    # user_id is None, on create and update alike. Rows that
+                    # predate the gate were reassigned or unpublished by
+                    # migration e91b47a2c5d3 (2026-07-07).
+                    #
+                    # So this is a legacy-data guard, NOT a live conflict with
+                    # KAN-213's uq_recipe_user_source_slug. Stated plainly
+                    # because the reverse was claimed on review: if such a row
+                    # somehow existed, reassigning it would raise IntegrityError
+                    # and roll back the ENTIRE merge, orphaning the guest's
+                    # recipes and cookbooks at the moment of login. Clearing
+                    # source_slug takes it out of the partial index's coverage
+                    # so a single legacy row cannot cost someone their data.
+                    #
+                    # Nothing of value is lost: the row is kept precisely
+                    # because it is a published page in its own right, so its
+                    # own `slug` identifies it from here on.
+                    #
+                    # Clear the MIRRORED BLOB KEY TOO, not just the column.
+                    # `source_slug` mirrors `data['sourceSlug']`, and
+                    # update_recipe rebuilds the blob as
+                    # {**(recipe.data or {}), **recipe_data} before restaging
+                    # `recipe.source_slug = data.get('sourceSlug')`. Clearing
+                    # only the column means the next ordinary partial PUT (say
+                    # {"name": "..."}) pulls the stale value back out of the
+                    # untouched blob and writes it to the column — resurrecting
+                    # the duplicate and making the row un-editable behind a 409.
+                    # Caught by Codex review on PR #273; reproduced by
+                    # test_clearing_the_column_survives_a_later_partial_update.
+                    recipe.source_slug = None
+                    if recipe.data and "sourceSlug" in recipe.data:
+                        del recipe.data["sourceSlug"]
+
                 recipe.user_id = user.id
                 recipe.guest_session_id = None
                 for key in _recipe_identity_keys(recipe):
