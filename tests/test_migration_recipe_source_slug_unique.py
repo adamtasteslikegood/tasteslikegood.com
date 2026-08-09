@@ -262,3 +262,29 @@ def test_index_refuses_a_copy_of_your_own_published_recipe(tmp_path):
         # Another owner saving that same public recipe is still fine.
         _insert(conn, [("other", 2, None, "vegan-cornbread", "2026-01-02")])
         assert conn.execute(sa.text("SELECT count(*) FROM recipe")).scalar() == 2
+
+
+def test_postgres_blob_clear_casts_through_jsonb():
+    """`recipe.data` is PostgreSQL json, not jsonb — the `-` operator is jsonb-only.
+
+    SQLite cannot catch this: the whole suite runs on SQLite, where the blob
+    clear is `json_remove`. On PostgreSQL, `data - 'sourceSlug'` raises
+    *operator does not exist* and aborts the migration, taking the deploy with
+    it (migration b8896f552679 creates `data` as `sa.JSON()`, which SQLAlchemy
+    compiles to `JSON`).
+
+    Worse, the UPDATE only runs when a duplicate exists. Production has none, so
+    it would have passed there and failed in exactly the dirty environment the
+    pre-pass exists to serve — a guard broken only on the day it is needed.
+    Asserting the emitted SQL is weak coverage, but it is the coverage available
+    without a PostgreSQL fixture, and it fails if someone drops the casts.
+    """
+    mig = _load_migration()
+
+    pg = mig._clear_blob_key_sql("postgresql")
+    assert (
+        "::jsonb" in pg and "::json" in pg
+    ), f"PostgreSQL blob clear must cast through jsonb, got: {pg}"
+    assert "- 'sourceSlug'" in pg
+
+    assert mig._clear_blob_key_sql("sqlite") == "data = json_remove(data, '$.sourceSlug')"

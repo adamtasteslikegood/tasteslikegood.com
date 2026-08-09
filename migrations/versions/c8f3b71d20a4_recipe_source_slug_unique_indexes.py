@@ -117,9 +117,21 @@ def _clear_blob_key_sql(dialect_name):
     nothing about sourceSlug therefore pulls the stale value back out of the
     untouched blob and writes it to the column — resurrecting the very duplicate
     this pre-pass just cleared, and tripping the new index on the next write.
+
+    ``recipe.data`` is PostgreSQL **json**, not **jsonb** (migration
+    b8896f552679 line 37 creates it as ``sa.JSON()``, which SQLAlchemy compiles
+    to ``JSON`` on PostgreSQL). The key-deletion ``-`` operator is defined only
+    for ``jsonb``, so ``data - 'sourceSlug'`` raises *operator does not exist*
+    and aborts the migration — which would abort the deploy. Cast through
+    ``jsonb`` and back.
+
+    Worth noting where this would have bitten: the UPDATE only runs when a
+    duplicate exists, and production has none. It would have passed in
+    production and failed in exactly the dirty environment the pre-pass exists
+    to serve. Caught by Copilot review on PR #273.
     """
     if dialect_name == "postgresql":
-        return "data = data - 'sourceSlug'"
+        return "data = (data::jsonb - 'sourceSlug')::json"
     return "data = json_remove(data, '$.sourceSlug')"
 
 
