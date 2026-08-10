@@ -173,10 +173,16 @@ def test_guest_own_slug_collision_is_left_unreassigned_not_rolled_back(app, user
     detects the still-colliding identity before reassigning and leaves this
     one row under its guest session instead.
     """
-    _recipe("Cornbread copy", owner=user, source_slug="cornbread")
+    owned = _recipe("Cornbread copy", owner=user, source_slug="cornbread")
     guest_original = _recipe("Cornbread", guest=GUEST_SESSION, slug="cornbread", public=True)
     db.session.commit()
-    guest_original_id = guest_original.id
+    owned_id, guest_original_id = owned.id, guest_original.id
+
+    # A guest cookbook holding the skipped recipe must not be reassigned to the
+    # user with a dangling id — get_recipe refuses cross-owner access, so a
+    # user cookbook pointing at a guest-owned recipe id 404s in the SPA.
+    _cookbook("Weeknight", [guest_original_id], guest=GUEST_SESSION)
+    db.session.commit()
 
     _merge_guest_session_into_user(user, GUEST_SESSION)  # must not raise
 
@@ -188,6 +194,14 @@ def test_guest_own_slug_collision_is_left_unreassigned_not_rolled_back(app, user
     assert (
         left_behind.guest_session_id == GUEST_SESSION
     ), "left under the guest session, not lost, not partially merged"
+
+    cb = Cookbook.query.filter_by(user_id=user.id).one()
+    assert cb.recipe_ids == [owned_id], (
+        "cookbook must be remapped to the owned copy, not left pointing at "
+        "the guest-owned recipe (dangling reference)"
+    )
+    live_ids = {r.id for r in Recipe.query.filter_by(user_id=user.id).all()}
+    assert set(cb.recipe_ids) <= live_ids, "cookbook references a recipe the user does not own"
 
 
 def test_cookbook_membership_is_remapped_to_the_surviving_row(app, user):

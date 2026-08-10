@@ -211,6 +211,16 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                             sanitize_log_value(recipe.id),
                             sanitize_log_value(recipe.slug),
                         )
+                        # Point guest cookbooks holding this recipe id at the
+                        # owned copy that occupies the same identity. Without
+                        # this, the cookbook gets reassigned to the user with
+                        # a reference to a recipe still owned by the guest
+                        # session — and get_recipe refuses cross-owner access,
+                        # so the SPA sees a dangling id. The existing
+                        # invariant ``set(cb.recipe_ids) <= live_ids`` (see
+                        # test_cookbook_membership_is_remapped_to_the_surviving_row)
+                        # is exactly what breaks otherwise.
+                        remapped[recipe.id] = existing_id
                         continue
 
                 recipe.user_id = user.id
