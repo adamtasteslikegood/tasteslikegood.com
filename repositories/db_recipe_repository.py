@@ -61,6 +61,9 @@ MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
     "can have a public page."
 )
 
+# RCP-74: saved copies inherit their public page from the source recipe.
+SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
+
 # 'manual' gates publishing; the others exist so curation can query by
 # provenance. NULL = legacy/unknown, treated as publishable.
 _ALLOWED_ORIGINS = frozenset({"manual", "generated", "saved"})
@@ -68,6 +71,10 @@ _ALLOWED_ORIGINS = frozenset({"manual", "generated", "saved"})
 
 class ManualRecipeError(ValueError):
     """Manually entered recipes cannot be published (KAN-140)."""
+
+
+class SavedCopyPublishError(ValueError):
+    """Saved copies cannot be published — the source page owns publication (RCP-74)."""
 
 
 # Also returned verbatim by the API routes (fixed string, same rationale as
@@ -454,6 +461,10 @@ def _gate_is_public(recipe_data: Dict[str, Any], user_id: Optional[int]) -> Dict
     owner to moderate or ban behind a guest-published /r/<slug> page. The flag
     is normalized in the data blob itself so the JSON payload and the
     is_public column can never disagree.
+
+    RCP-74: saved copies (source_slug is not None) cannot be published — the
+    source page owns publication. Raises SavedCopyPublishError (403 at the API)
+    so the SPA's revert-and-toast path fires.
     """
     wants_public = recipe_data.get("is_public") is True
     if wants_public and user_id is None:
@@ -461,7 +472,12 @@ def _gate_is_public(recipe_data: Dict[str, Any], user_id: Optional[int]) -> Dict
             "Guest attempted to publish recipe %s — forcing is_public=False",
             sanitize_log_value(recipe_data.get("id", "<no id>")),
         )
-    return {**recipe_data, "is_public": wants_public if user_id is not None else False}
+        return {**recipe_data, "is_public": False}
+    # RCP-74: only authenticated users reach here with wants_public=True.
+    # A saved copy must not be re-published — the source page owns publication.
+    if wants_public and recipe_data.get("sourceSlug") is not None:
+        raise SavedCopyPublishError(SAVED_COPY_PUBLISH_ERROR)
+    return {**recipe_data, "is_public": wants_public}
 
 
 def get_user_recipes(
@@ -837,6 +853,18 @@ def create_recipe(
             recipe_data_with_id.pop("origin", None)
 
         def stage_new(data: Dict[str, Any]) -> Recipe:
+            # KAN-221: set author/saver columns on create.
+            source_slug = data.get("sourceSlug")
+            if source_slug is not None:
+                # Saved copy: look up the source recipe's owner as author.
+                source = Recipe.query.filter_by(slug=source_slug).first()
+                author_id = source.user_id if source else None
+                saved_to_id = user_id
+            else:
+                # Original recipe: author = owner, no saver.
+                author_id = user_id
+                saved_to_id = None
+
             recipe = Recipe(
                 id=recipe_id,
                 user_id=user_id,
@@ -844,8 +872,10 @@ def create_recipe(
                 name=recipe_name,
                 slug=data.get("slug"),
                 is_public=data.get("is_public", False),
-                source_slug=data.get("sourceSlug"),
+                source_slug=source_slug,
                 origin=origin_value,
+                user_id_author=author_id,
+                user_id_saved_to=saved_to_id,
                 data=data,
                 status=status,
             )
@@ -870,6 +900,7 @@ def create_recipe(
         RecipeSlugError,
         CanonicalRecipeError,
         ManualRecipeError,
+        SavedCopyPublishError,
         RecipeOwnershipError,
         RecipeDuplicateError,
     ):
@@ -992,6 +1023,7 @@ def update_recipe(
         RecipeSlugError,
         CanonicalRecipeError,
         ManualRecipeError,
+        SavedCopyPublishError,
         RecipeDuplicateError,
     ):
         raise

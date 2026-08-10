@@ -236,6 +236,11 @@ def test_slug_race_and_duplicate_source_slug_together_still_end_in_409(
     ``RecipeDuplicateError``. One extra retry, then 409.
 
     This asserts that, so the claim stops being a matter of reading.
+
+    RCP-74 UPDATE: saved copies (sourceSlug IS NOT NULL) can no longer be
+    published — _gate_is_public raises SavedCopyPublishError before slug
+    resolution. The slug race + duplicate interaction is still testable on
+    non-saved recipes that share a slug via the publish path.
     """
     from repositories import db_recipe_repository
 
@@ -265,18 +270,16 @@ def test_slug_race_and_duplicate_source_slug_together_still_end_in_409(
 
     monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", racing_resolve)
 
+    # RCP-74: saved copies cannot be published, so this now gets 403 from
+    # the SavedCopyPublishError guard before slug resolution fires.
     response = client.post("/api/recipes", json={**_payload(), "is_public": True})
 
-    assert state["raced"], "the slug race never fired — test is not exercising both collisions"
-    assert response.status_code == 409, (
-        f"expected 409, got {response.status_code}. A 500 here would mean the "
-        "slug-retry branch swallows the duplicate refusal — R1 from a narrower angle."
-    )
-    # Two resolves = one race retry, not an exhausted retry budget.
-    assert state["resolves"] == 2, (
-        f"expected exactly one retry, saw {state['resolves']} slug resolutions — "
-        "the duplicate check is not short-circuiting on the second attempt"
-    )
+    assert (
+        response.status_code == 403
+    ), f"expected 403 (saved copy cannot publish, RCP-74), got {response.status_code}"
+    assert not state[
+        "raced"
+    ], "slug race should not fire — the saved-copy publish guard rejects before slug resolution"
     assert Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).count() == 1
 
 

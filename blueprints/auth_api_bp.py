@@ -240,6 +240,14 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
 
                 recipe.user_id = user.id
                 recipe.guest_session_id = None
+                # KAN-221: carry author/saver columns through login-merge.
+                # user_id_saved_to follows user_id (saver is the acting user).
+                # user_id_author follows user_id only for originals (guest IS
+                # the author); for saved copies it stays immutable.
+                if recipe.user_id_saved_to is not None:
+                    recipe.user_id_saved_to = user.id
+                if recipe.source_slug is None and recipe.user_id_author is None:
+                    recipe.user_id_author = user.id
                 for key in _recipe_identity_keys(recipe):
                     owned_by_key.setdefault(key, recipe.id)
 

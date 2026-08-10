@@ -164,6 +164,8 @@ def create_recipe(user_id, guest_session_id):
         return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
     except db_recipe_repository.ManualRecipeError:
         return jsonify({"error": db_recipe_repository.MANUAL_RECIPE_UNPUBLISHABLE_ERROR}), 400
+    except db_recipe_repository.SavedCopyPublishError:
+        return jsonify({"error": db_recipe_repository.SAVED_COPY_PUBLISH_ERROR}), 403
     except Exception as e:
         logger.error(f"Error creating recipe: {e}")
         return jsonify({"error": "Failed to create recipe"}), 500
@@ -239,6 +241,8 @@ def update_recipe(user_id, guest_session_id, recipe_id):
         return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
     except db_recipe_repository.ManualRecipeError:
         return jsonify({"error": db_recipe_repository.MANUAL_RECIPE_UNPUBLISHABLE_ERROR}), 400
+    except db_recipe_repository.SavedCopyPublishError:
+        return jsonify({"error": db_recipe_repository.SAVED_COPY_PUBLISH_ERROR}), 403
     except Exception as e:
         logger.error(
             "Error updating recipe %s: %s",

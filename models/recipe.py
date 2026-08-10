@@ -84,6 +84,13 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
     # (KAN-140) — free-text content with no AI mediation must not reach the
     # public /r/<slug> surface. Settable while NULL, immutable once set.
     origin = db.Column(db.String(20), nullable=True)
+    # KAN-221: split user_id into explicit author and saver identities.
+    # user_id_author = the user who created/generated the recipe (immutable).
+    # user_id_saved_to = the user who saved a copy from a public page (NULL
+    # for originals). Existing user_id retains its meaning ("the account that
+    # holds this row") — these columns add precision without removing anything.
+    user_id_author = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    user_id_saved_to = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     # MutableDict ensures in-place JSON updates are tracked (important for SQLite dev).
     data = db.Column(MutableDict.as_mutable(GenericJSON), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -91,7 +98,7 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
         db.DateTime, nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow
     )
 
-    user = db.relationship("User", backref=db.backref("recipes", lazy=True))
+    user = db.relationship("User", foreign_keys=[user_id], backref=db.backref("recipes", lazy=True))
 
     def to_dict(self):
         return {
@@ -105,6 +112,8 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
             "is_canonical": self.is_canonical,
             "source_slug": self.source_slug,
             "origin": self.origin,
+            "user_id_author": self.user_id_author,
+            "user_id_saved_to": self.user_id_saved_to,
             "data": self.data,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
