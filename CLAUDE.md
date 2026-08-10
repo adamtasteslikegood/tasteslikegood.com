@@ -78,14 +78,14 @@ validators/          # JSON Schema Draft 7 (recipe_schema.json)
 utils/               # normalization, slugs, sessions, cache, logging, Valkey auth
 migrations/          # Alembic via Flask-Migrate
 templates/public/    # SSR templates (base_public.html, recipe.html, browse.html)
-tests/               # pytest (~28 test files)
+tests/               # pytest
 ```
 
 ### Key architectural facts
 
 - **Legacy HTML surface is DEV-ONLY** — the original server-rendered UI (`/`, `/recipe/<filename>`, `/generate_recipe`) is never reachable in production; Express only proxies `/api/*`, `/r/<slug>`, `/browse`, `/sitemap.xml`, `/static/*`. Do not add production features there.
 - **Auth:** `get_genai_client(session_credentials)` prefers user OAuth creds, falls back to server `GOOGLE_API_KEY`. Both live generation sites pass `None`, so generation runs on the server key. OAuth flow + PKCE in `blueprints/auth_api_bp.py`.
-- **Async generation:** `worker_api_bp.py` handles Pub/Sub push with OIDC verification. Fails closed with 503 when `PUBSUB_INVOKER_SA` unset.
+- **Async generation:** `worker_api_bp.py` handles Pub/Sub push with OIDC verification. Fails closed with 503 when `PUBSUB_INVOKER_SA` unset (bypass with `PUBSUB_AUTH_OPTIONAL=1` for local/test).
 - **ProxyFix** trusts `X-Forwarded-*` from Express for correct `url_for(_external=True)`.
 
 ## Commands
@@ -126,14 +126,14 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | Var                              | Purpose                                                                                          |
 | -------------------------------- | ------------------------------------------------------------------------------------------------ |
 | `DATABASE_URL`                   | PostgreSQL in prod, `sqlite:///tasteslikegood.db` in dev. `postgres://` auto-rewritten.          |
-| `GOOGLE_CLIENT_ID/SECRET`        | OAuth                                                                                            |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth                                                                                   |
 | `GOOGLE_API_KEY`                 | Gemini fallback when user has no OAuth                                                           |
 | `FLASK_SECRET_KEY`               | Session signing. **Required in prod** — fails fast if missing.                                   |
 | `FLASK_ENV`                      | `production` activates guards + secret-key fail-fast.                                            |
 | `GCS_BUCKET_NAME`               | Recipe image storage (`tasteslikegood-recipe-images` in prod)                                    |
 | `GCP_PROJECT_ID`                 | Required for Pub/Sub publishing                                                                  |
 | `PUBSUB_INVOKER_SA`             | Required for worker push authentication                                                          |
-| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Flask-Caching response cache. Unset = in-process SimpleCache fallback.                           |
+| `VALKEY_HOST`, `VALKEY_AUTH_MODE` | Flask-Caching response cache. Priority: `VALKEY_HOST` > `REDIS_URL` > in-process SimpleCache.    |
 | `FRONTEND_URL`, `SESSION_COOKIE_DOMAIN` | OAuth redirect target + cookie scoping across the Express proxy/Flask boundary.            |
 | `DD_API_KEY`                     | **Required in prod** for Datadog `serverless-init`. Not needed locally.                          |
 
@@ -143,7 +143,7 @@ All prod secrets from Google Secret Manager via Cloud Run `--set-secrets`.
 
 CI (`.github/workflows/ci.yml`) runs on every push/PR to `main` or `dev`: Black+Flake8 lint, mypy type check, pytest, Docker build, pip-audit (advisory). Additional: CodeQL (required), AI reviews.
 
-pytest (`uv run pytest`). ~28 test files in `tests/`. Reference test setup pattern: `tests/test_public_ssr.py`.
+pytest (`uv run pytest`). Reference test setup pattern: `tests/test_public_ssr.py`.
 
 ## Common gotchas
 
@@ -151,6 +151,7 @@ pytest (`uv run pytest`). ~28 test files in `tests/`. Reference test setup patte
 - **`config.py` reads `DATABASE_URL` at import time** — overriding via shell after import does nothing.
 - **No `requirements.txt`** — `uv.lock` is the single source of truth; Dockerfile runs `uv export --frozen` at build time.
 - **mypy config lives only in `pyproject.toml`** — a `setup.cfg` `[mypy]` section is silently shadowed. `explicit_package_bases = true` required because `scripts/` has no `__init__.py`.
+- **`GEMINI_CLI_TRUST_WORKSPACE: 'true'`** — required in every `run-gemini-cli` workflow job; without it gemini-cli refuses to run in an untrusted directory.
 
 ## MCP servers (agent sessions)
 
