@@ -17,6 +17,8 @@ from flask import Blueprint, jsonify, redirect, request, session, url_for
 from google_auth_oauthlib.flow import Flow
 from sqlalchemy.exc import IntegrityError
 
+from utils.log_sanitizer import sanitize_log_value
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -165,9 +167,12 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     # source_slug takes it out of the partial index's coverage
                     # so a single legacy row cannot cost someone their data.
                     #
-                    # Nothing of value is lost: the row is kept precisely
+                    # Usually nothing of value is lost: the row is kept
                     # because it is a published page in its own right, so its
-                    # own `slug` identifies it from here on.
+                    # own `slug` identifies it from here on — UNLESS that slug
+                    # is itself what matched `existing_id` (see the KAN-223
+                    # check below), in which case clearing source_slug alone
+                    # doesn't remove the collision.
                     #
                     # Clear the MIRRORED BLOB KEY TOO, not just the column.
                     # `source_slug` mirrors `data['sourceSlug']`, and
@@ -183,6 +188,30 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     recipe.source_slug = None
                     if recipe.data and "sourceSlug" in recipe.data:
                         del recipe.data["sourceSlug"]
+
+                    # KAN-223: the clear above only removes the collision if
+                    # it came through `source_slug`. `_recipe_identity_keys()`
+                    # matches on `slug` too, and clearing `source_slug`
+                    # doesn't touch that — so if THIS row's own `slug` is what
+                    # matched `existing_id` (not its `source_slug`), the
+                    # post-clear identity (COALESCE(NULL, recipe.slug) ==
+                    # recipe.slug) is exactly the value that collided in the
+                    # first place. Reassigning it would still raise
+                    # IntegrityError and roll back the ENTIRE merge over one
+                    # legacy row, taking every other guest recipe and
+                    # cookbook down with it — check first, and leave this one
+                    # row under its guest session instead.
+                    if recipe.slug and recipe.slug in owned_by_key:
+                        logger.warning(
+                            "KAN-213/KAN-223: guest recipe %s left under its "
+                            "guest session at login — its slug %s still "
+                            "collides with an owned recipe after clearing "
+                            "source_slug (legacy public-row path; should be "
+                            "unreachable via _gate_is_public)",
+                            sanitize_log_value(recipe.id),
+                            sanitize_log_value(recipe.slug),
+                        )
+                        continue
 
                 recipe.user_id = user.id
                 recipe.guest_session_id = None

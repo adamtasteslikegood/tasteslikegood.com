@@ -155,6 +155,41 @@ def test_public_guest_duplicate_is_reassigned_not_deleted(app, user):
     assert {r.slug for r in rows} == {None, "vegan-fried-pizza-dough-2"}
 
 
+def test_guest_own_slug_collision_is_left_unreassigned_not_rolled_back(app, user):
+    """KAN-223: the legacy public-row clear only handles a source_slug-side match.
+
+    Owned row X is a saved copy pointing at public page "cornbread"
+    (``source_slug="cornbread"``). The guest's public row IS that page
+    (``slug="cornbread"``) — so ``_recipe_identity_keys()`` matches
+    ``existing_id`` via the guest row's own ``slug``, not its ``source_slug``.
+    Clearing ``source_slug`` (which is already None here) does nothing: the
+    post-clear identity is still ``COALESCE(None, "cornbread") == "cornbread"``,
+    the exact value that collided.
+
+    Before the fix this raised IntegrityError on commit — every retry hit the
+    same collision — and the exception propagated out of
+    ``_merge_guest_session_into_user``, which would have taken every other
+    guest recipe and cookbook in the same login merge down with it. The fix
+    detects the still-colliding identity before reassigning and leaves this
+    one row under its guest session instead.
+    """
+    _recipe("Cornbread copy", owner=user, source_slug="cornbread")
+    guest_original = _recipe("Cornbread", guest=GUEST_SESSION, slug="cornbread", public=True)
+    db.session.commit()
+    guest_original_id = guest_original.id
+
+    _merge_guest_session_into_user(user, GUEST_SESSION)  # must not raise
+
+    owned_rows = Recipe.query.filter_by(user_id=user.id).all()
+    assert len(owned_rows) == 1, "the still-colliding row must not have been reassigned"
+
+    left_behind = Recipe.query.filter_by(id=guest_original_id).one()
+    assert left_behind.user_id is None
+    assert (
+        left_behind.guest_session_id == GUEST_SESSION
+    ), "left under the guest session, not lost, not partially merged"
+
+
 def test_cookbook_membership_is_remapped_to_the_surviving_row(app, user):
     """Cookbook.recipe_ids is a JSON id list — it must not keep a dangling id."""
     owned = _recipe("Pizza Dough", owner=user, source_slug="vegan-fried-pizza-dough")

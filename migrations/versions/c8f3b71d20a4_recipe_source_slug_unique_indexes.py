@@ -150,6 +150,11 @@ def _clear_duplicate_identities(bind, scope_col):
 
     Returns the number of rows cleared so the caller can log a real number
     rather than claiming success blindly.
+
+    One pass, not a fixed point: clearing a loser's ``source_slug`` moves its
+    identity to its own ``slug`` (COALESCE's fallback side), which this
+    snapshot never re-evaluates. Callers MUST loop this to a fixed point
+    (KAN-223) — see ``upgrade()`` below.
     """
     rows = bind.execute(
         sa.text(
@@ -189,8 +194,20 @@ def upgrade():
     if bind.dialect.name == "postgresql":
         op.execute("LOCK TABLE recipe IN ACCESS EXCLUSIVE MODE")
 
-    cleared = _clear_duplicate_identities(bind, "user_id")
-    cleared += _clear_duplicate_identities(bind, "guest_session_id")
+    # Loop each scope to a fixed point (KAN-223). A single pass can clear a
+    # loser onto an identity (its own `slug`) that then collides with a row
+    # the snapshot never re-examined. Guaranteed to terminate: a cleared row
+    # (source_slug NULL) can never lose again — `slug` is globally unique, so
+    # at most one NULL-source row exists per (scope, identity) group, and it
+    # always sorts first — so the count of NOT-NULL-source rows strictly
+    # decreases every round that clears anything.
+    cleared = 0
+    for scope_col in ("user_id", "guest_session_id"):
+        while True:
+            round_cleared = _clear_duplicate_identities(bind, scope_col)
+            cleared += round_cleared
+            if not round_cleared:
+                break
     if cleared:
         # Expected to be 0 in production (purged by hand, gates verified empty).
         # A non-zero count here means duplicates appeared after that purge and
