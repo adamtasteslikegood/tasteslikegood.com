@@ -40,8 +40,8 @@ def _load_migration():
     return mod
 
 
-def _bare_recipe_engine(tmp_path):
-    engine = sa.create_engine(f"sqlite:///{tmp_path / 'mig.db'}")
+def _bare_recipe_engine(tmp_path, name="mig.db"):
+    engine = sa.create_engine(f"sqlite:///{tmp_path / name}")
     with engine.begin() as conn:
         conn.execute(
             sa.text(
@@ -269,16 +269,15 @@ def test_single_pass_misses_a_chained_collision_that_looping_resolves(tmp_path):
     fixed point in general, not just for this one extra round.
     """
     mig = _load_migration()
+    chained_rows = [
+        ("a", 1, None, "orig", "2026-01-01"),
+        ("b", 1, None, "orig", "2026-01-02", "copy"),
+        ("c", 1, None, "copy", "2026-01-03"),
+    ]
+
     engine = _bare_recipe_engine(tmp_path)
     with engine.begin() as conn:
-        _insert(
-            conn,
-            [
-                ("a", 1, None, "orig", "2026-01-01"),
-                ("b", 1, None, "orig", "2026-01-02", "copy"),
-                ("c", 1, None, "copy", "2026-01-03"),
-            ],
-        )
+        _insert(conn, chained_rows)
         first_pass = mig._clear_duplicate_identities(conn, "user_id")
         residual = conn.execute(
             sa.text(
@@ -296,10 +295,14 @@ def test_single_pass_misses_a_chained_collision_that_looping_resolves(tmp_path):
     )
 
     # The fix: loop the same call, per scope, until it clears nothing. Calls
-    # the exact helper upgrade() calls (Copilot review on PR #277) — a
-    # hand-rolled loop here wouldn't notice if upgrade() regressed to a
-    # single pass.
-    with engine.begin() as conn:
+    # the exact helper upgrade() calls, on a FRESH copy of the chained-collision
+    # state — reusing the engine above would only need one more round to reach
+    # the fixed point regardless of whether the helper loops, since the first
+    # round already ran against it. A fresh table forces this single call to
+    # perform both rounds itself (Copilot review on PR #277).
+    loop_engine = _bare_recipe_engine(tmp_path, name="mig_loop.db")
+    with loop_engine.begin() as conn:
+        _insert(conn, chained_rows)
         mig._clear_scope_to_fixed_point(conn, "user_id")
         rows = dict(conn.execute(sa.text("SELECT id, source_slug FROM recipe")).fetchall())
 
@@ -308,7 +311,7 @@ def test_single_pass_misses_a_chained_collision_that_looping_resolves(tmp_path):
     assert rows["c"] is None, "C lost 'copy' to B once B's post-clear identity was re-evaluated"
 
     # The whole point: the indexes can now be built without a residual collision.
-    with engine.begin() as conn:
+    with loop_engine.begin() as conn:
         _build_indexes(conn)
 
 

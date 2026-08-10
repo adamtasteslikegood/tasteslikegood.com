@@ -23,6 +23,7 @@ import pytest
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
+import blueprints.auth_api_bp as auth_api_bp_module  # noqa: E402
 from app import create_app  # noqa: E402
 from blueprints.auth_api_bp import _merge_guest_session_into_user  # noqa: E402
 from extensions import db  # noqa: E402
@@ -204,7 +205,7 @@ def test_guest_own_slug_collision_is_left_unreassigned_not_rolled_back(app, user
     assert set(cb.recipe_ids) <= live_ids, "cookbook references a recipe the user does not own"
 
 
-def test_guest_own_slug_collision_remaps_to_the_row_that_still_collides(app, user):
+def test_guest_own_slug_collision_remaps_to_the_row_that_still_collides(app, user, monkeypatch):
     """KAN-223 continued (Copilot on PR #277): existing_id can be ambiguous.
 
     The legacy public row here matches an owned recipe via TWO different
@@ -216,7 +217,19 @@ def test_guest_own_slug_collision_remaps_to_the_row_that_still_collides(app, use
     "cornbread". Remapping to a stale ``existing_id`` that happened to resolve
     via the "pizza-dough" side would point the cookbook at the wrong recipe
     entirely: silent data substitution, not just a dangling id.
+
+    ``_recipe_identity_keys`` normally returns a ``set``, whose iteration
+    order depends on hash randomization — reverting the fix would only fail
+    this test under whichever hash seeds happen to yield "pizza-dough" before
+    "cornbread". Force that ordering deterministically so a revert always
+    fails, regardless of seed (Copilot review on PR #277).
     """
+    monkeypatch.setattr(
+        auth_api_bp_module,
+        "_recipe_identity_keys",
+        lambda recipe: [v for v in (recipe.source_slug, recipe.slug) if v],
+    )
+
     other_original = _recipe("Pizza Dough", owner=user, source_slug="pizza-dough")
     cornbread_original = _recipe("Cornbread copy", owner=user, source_slug="cornbread")
     guest_original = _recipe(
