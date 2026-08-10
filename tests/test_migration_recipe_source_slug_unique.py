@@ -295,10 +295,12 @@ def test_single_pass_misses_a_chained_collision_that_looping_resolves(tmp_path):
         "this is the bug: building the indexes here would still fail"
     )
 
-    # The fix: loop the same call, per scope, until it clears nothing.
+    # The fix: loop the same call, per scope, until it clears nothing. Calls
+    # the exact helper upgrade() calls (Copilot review on PR #277) — a
+    # hand-rolled loop here wouldn't notice if upgrade() regressed to a
+    # single pass.
     with engine.begin() as conn:
-        while mig._clear_duplicate_identities(conn, "user_id"):
-            pass
+        mig._clear_scope_to_fixed_point(conn, "user_id")
         rows = dict(conn.execute(sa.text("SELECT id, source_slug FROM recipe")).fetchall())
 
     assert rows["a"] == "orig", "A is untouched — it won its group outright"

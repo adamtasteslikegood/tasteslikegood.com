@@ -212,15 +212,30 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                             sanitize_log_value(recipe.slug),
                         )
                         # Point guest cookbooks holding this recipe id at the
-                        # owned copy that occupies the same identity. Without
-                        # this, the cookbook gets reassigned to the user with
-                        # a reference to a recipe still owned by the guest
-                        # session — and get_recipe refuses cross-owner access,
-                        # so the SPA sees a dangling id. The existing
-                        # invariant ``set(cb.recipe_ids) <= live_ids`` (see
+                        # owned copy that occupies `recipe.slug` specifically
+                        # — NOT the already-computed `existing_id`. When this
+                        # row's source_slug and slug both matched a different
+                        # owned row each, `existing_id` was resolved by
+                        # iterating `_recipe_identity_keys()`'s *set*, so it
+                        # may hold whichever of the two owned rows was
+                        # matched via the now-cleared source_slug side, not
+                        # the one that owns the identity still colliding here
+                        # (recipe.slug, just tested above). Remapping to the
+                        # stale existing_id would silently substitute the
+                        # wrong recipe into the user's cookbook — worse than
+                        # the dangling-id case this branch also guards,
+                        # because it doesn't 404, it just shows the wrong
+                        # recipe. Caught by Copilot review on PR #277.
+                        #
+                        # Without remapping at all, the cookbook gets
+                        # reassigned to the user with a reference to a recipe
+                        # still owned by the guest session — and get_recipe
+                        # refuses cross-owner access, so the SPA sees a
+                        # dangling id. The existing invariant
+                        # ``set(cb.recipe_ids) <= live_ids`` (see
                         # test_cookbook_membership_is_remapped_to_the_surviving_row)
                         # is exactly what breaks otherwise.
-                        remapped[recipe.id] = existing_id
+                        remapped[recipe.id] = owned_by_key[recipe.slug]
                         continue
 
                 recipe.user_id = user.id
