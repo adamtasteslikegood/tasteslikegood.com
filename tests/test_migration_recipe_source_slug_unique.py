@@ -247,6 +247,71 @@ def test_published_original_wins_over_a_saved_copy_of_itself(tmp_path):
         _build_indexes(conn)
 
 
+def test_single_pass_misses_a_chained_collision_that_looping_resolves(tmp_path):
+    """KAN-223: clearing a loser can expose a new collision the snapshot never re-checks.
+
+    Same user scope, three rows:
+      A: source_slug='orig'              (a saved copy pointing at /r/orig)
+      B: source_slug='orig', slug='copy' (a saved copy of /r/orig, later
+                                           published at its own /r/copy)
+      C: source_slug='copy'              (a saved copy pointing at /r/copy — i.e. of B)
+
+    One call groups strictly by the pre-call snapshot: {A, B} collide on
+    identity 'orig' (B loses, cleared), {C} is alone on 'copy' — the snapshot
+    was taken before B's clear, so it never saw that B's post-clear identity
+    (COALESCE(NULL, 'copy') = 'copy') now collides with C. Building the
+    indexes on that residual state still fails.
+
+    A second call (fresh SELECT) sees B's now-NULL source_slug and correctly
+    re-groups {B, C} on 'copy' — and B rightly wins: it is the actual page at
+    /r/copy (case=0, NULL-source first), C is a copy of it (case=1). Looping
+    per scope until a call clears nothing (``upgrade()``'s fix) reaches this
+    fixed point in general, not just for this one extra round.
+    """
+    mig = _load_migration()
+    engine = _bare_recipe_engine(tmp_path)
+    with engine.begin() as conn:
+        _insert(
+            conn,
+            [
+                ("a", 1, None, "orig", "2026-01-01"),
+                ("b", 1, None, "orig", "2026-01-02", "copy"),
+                ("c", 1, None, "copy", "2026-01-03"),
+            ],
+        )
+        first_pass = mig._clear_duplicate_identities(conn, "user_id")
+        residual = conn.execute(
+            sa.text(
+                "SELECT count(*) FROM ("
+                "  SELECT coalesce(source_slug, slug) AS identity, count(*) AS n"
+                "  FROM recipe WHERE user_id = 1 GROUP BY identity"
+                ") t WHERE t.n > 1"
+            )
+        ).scalar()
+
+    assert first_pass == 1, "one pass only resolves the collision the pre-call snapshot saw"
+    assert residual == 1, (
+        "a single pass leaves B's newly-exposed collision with C unresolved — "
+        "this is the bug: building the indexes here would still fail"
+    )
+
+    # The fix: loop the same call, per scope, until it clears nothing. Calls
+    # the exact helper upgrade() calls (Copilot review on PR #277) — a
+    # hand-rolled loop here wouldn't notice if upgrade() regressed to a
+    # single pass.
+    with engine.begin() as conn:
+        mig._clear_scope_to_fixed_point(conn, "user_id")
+        rows = dict(conn.execute(sa.text("SELECT id, source_slug FROM recipe")).fetchall())
+
+    assert rows["a"] == "orig", "A is untouched — it won its group outright"
+    assert rows["b"] is None, "B lost 'orig' to A, then won 'copy' outright (it's the real page)"
+    assert rows["c"] is None, "C lost 'copy' to B once B's post-clear identity was re-evaluated"
+
+    # The whole point: the indexes can now be built without a residual collision.
+    with engine.begin() as conn:
+        _build_indexes(conn)
+
+
 def test_index_refuses_a_copy_of_your_own_published_recipe(tmp_path):
     """The refusal itself, for the identity case — seen to fire."""
     engine = _bare_recipe_engine(tmp_path)

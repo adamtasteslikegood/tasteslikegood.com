@@ -17,6 +17,8 @@ from flask import Blueprint, jsonify, redirect, request, session, url_for
 from google_auth_oauthlib.flow import Flow
 from sqlalchemy.exc import IntegrityError
 
+from utils.log_sanitizer import sanitize_log_value
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -165,9 +167,12 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     # source_slug takes it out of the partial index's coverage
                     # so a single legacy row cannot cost someone their data.
                     #
-                    # Nothing of value is lost: the row is kept precisely
+                    # Usually nothing of value is lost: the row is kept
                     # because it is a published page in its own right, so its
-                    # own `slug` identifies it from here on.
+                    # own `slug` identifies it from here on — UNLESS that slug
+                    # is itself what matched `existing_id` (see the KAN-223
+                    # check below), in which case clearing source_slug alone
+                    # doesn't remove the collision.
                     #
                     # Clear the MIRRORED BLOB KEY TOO, not just the column.
                     # `source_slug` mirrors `data['sourceSlug']`, and
@@ -183,6 +188,55 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     recipe.source_slug = None
                     if recipe.data and "sourceSlug" in recipe.data:
                         del recipe.data["sourceSlug"]
+
+                    # KAN-223: the clear above only removes the collision if
+                    # it came through `source_slug`. `_recipe_identity_keys()`
+                    # matches on `slug` too, and clearing `source_slug`
+                    # doesn't touch that — so if THIS row's own `slug` is what
+                    # matched `existing_id` (not its `source_slug`), the
+                    # post-clear identity (COALESCE(NULL, recipe.slug) ==
+                    # recipe.slug) is exactly the value that collided in the
+                    # first place. Reassigning it would still raise
+                    # IntegrityError and roll back the ENTIRE merge over one
+                    # legacy row, taking every other guest recipe and
+                    # cookbook down with it — check first, and leave this one
+                    # row under its guest session instead.
+                    if recipe.slug and recipe.slug in owned_by_key:
+                        logger.warning(
+                            "KAN-213/KAN-223: guest recipe %s left under its "
+                            "guest session at login — its slug %s still "
+                            "collides with an owned recipe after clearing "
+                            "source_slug (legacy public-row path; should be "
+                            "unreachable via _gate_is_public)",
+                            sanitize_log_value(recipe.id),
+                            sanitize_log_value(recipe.slug),
+                        )
+                        # Point guest cookbooks holding this recipe id at the
+                        # owned copy that occupies `recipe.slug` specifically
+                        # — NOT the already-computed `existing_id`. When this
+                        # row's source_slug and slug both matched a different
+                        # owned row each, `existing_id` was resolved by
+                        # iterating `_recipe_identity_keys()`'s *set*, so it
+                        # may hold whichever of the two owned rows was
+                        # matched via the now-cleared source_slug side, not
+                        # the one that owns the identity still colliding here
+                        # (recipe.slug, just tested above). Remapping to the
+                        # stale existing_id would silently substitute the
+                        # wrong recipe into the user's cookbook — worse than
+                        # the dangling-id case this branch also guards,
+                        # because it doesn't 404, it just shows the wrong
+                        # recipe. Caught by Copilot review on PR #277.
+                        #
+                        # Without remapping at all, the cookbook gets
+                        # reassigned to the user with a reference to a recipe
+                        # still owned by the guest session — and get_recipe
+                        # refuses cross-owner access, so the SPA sees a
+                        # dangling id. The existing invariant
+                        # ``set(cb.recipe_ids) <= live_ids`` (see
+                        # test_cookbook_membership_is_remapped_to_the_surviving_row)
+                        # is exactly what breaks otherwise.
+                        remapped[recipe.id] = owned_by_key[recipe.slug]
+                        continue
 
                 recipe.user_id = user.id
                 recipe.guest_session_id = None
