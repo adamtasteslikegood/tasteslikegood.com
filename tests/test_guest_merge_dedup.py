@@ -155,6 +155,100 @@ def test_public_guest_duplicate_is_reassigned_not_deleted(app, user):
     assert {r.slug for r in rows} == {None, "vegan-fried-pizza-dough-2"}
 
 
+def test_guest_own_slug_collision_is_left_unreassigned_not_rolled_back(app, user):
+    """KAN-223: the legacy public-row clear only handles a source_slug-side match.
+
+    Owned row X is a saved copy pointing at public page "cornbread"
+    (``source_slug="cornbread"``). The guest's public row IS that page
+    (``slug="cornbread"``) — so ``_recipe_identity_keys()`` matches
+    ``existing_id`` via the guest row's own ``slug``, not its ``source_slug``.
+    Clearing ``source_slug`` (which is already None here) does nothing: the
+    post-clear identity is still ``COALESCE(None, "cornbread") == "cornbread"``,
+    the exact value that collided.
+
+    Before the fix this raised IntegrityError on commit — every retry hit the
+    same collision — and the exception propagated out of
+    ``_merge_guest_session_into_user``, which would have taken every other
+    guest recipe and cookbook in the same login merge down with it. The fix
+    detects the still-colliding identity before reassigning and leaves this
+    one row under its guest session instead.
+    """
+    owned = _recipe("Cornbread copy", owner=user, source_slug="cornbread")
+    guest_original = _recipe("Cornbread", guest=GUEST_SESSION, slug="cornbread", public=True)
+    db.session.commit()
+    owned_id, guest_original_id = owned.id, guest_original.id
+
+    # A guest cookbook holding the skipped recipe must not be reassigned to the
+    # user with a dangling id — get_recipe refuses cross-owner access, so a
+    # user cookbook pointing at a guest-owned recipe id 404s in the SPA.
+    _cookbook("Weeknight", [guest_original_id], guest=GUEST_SESSION)
+    db.session.commit()
+
+    _merge_guest_session_into_user(user, GUEST_SESSION)  # must not raise
+
+    owned_rows = Recipe.query.filter_by(user_id=user.id).all()
+    assert len(owned_rows) == 1, "the still-colliding row must not have been reassigned"
+
+    left_behind = Recipe.query.filter_by(id=guest_original_id).one()
+    assert left_behind.user_id is None
+    assert (
+        left_behind.guest_session_id == GUEST_SESSION
+    ), "left under the guest session, not lost, not partially merged"
+
+    cb = Cookbook.query.filter_by(user_id=user.id).one()
+    assert cb.recipe_ids == [owned_id], (
+        "cookbook must be remapped to the owned copy, not left pointing at "
+        "the guest-owned recipe (dangling reference)"
+    )
+    live_ids = {r.id for r in Recipe.query.filter_by(user_id=user.id).all()}
+    assert set(cb.recipe_ids) <= live_ids, "cookbook references a recipe the user does not own"
+
+
+def test_guest_own_slug_collision_remaps_to_the_row_that_still_collides(app, user):
+    """KAN-223 continued (Copilot on PR #277): existing_id can be ambiguous.
+
+    The legacy public row here matches an owned recipe via TWO different
+    identity keys at once: its ``source_slug`` matches "pizza-dough" (owned by
+    ``other_original``) and its own ``slug`` matches "cornbread" (owned by
+    ``cornbread_original``). ``existing_id`` is resolved by iterating
+    ``_recipe_identity_keys()``'s *set*, so it may hold either match — but
+    once ``source_slug`` is cleared, the identity that still collides is only
+    "cornbread". Remapping to a stale ``existing_id`` that happened to resolve
+    via the "pizza-dough" side would point the cookbook at the wrong recipe
+    entirely: silent data substitution, not just a dangling id.
+    """
+    other_original = _recipe("Pizza Dough", owner=user, source_slug="pizza-dough")
+    cornbread_original = _recipe("Cornbread copy", owner=user, source_slug="cornbread")
+    guest_original = _recipe(
+        "Cornbread",
+        guest=GUEST_SESSION,
+        source_slug="pizza-dough",
+        slug="cornbread",
+        public=True,
+    )
+    db.session.commit()
+    other_original_id = other_original.id
+    cornbread_original_id = cornbread_original.id
+    guest_original_id = guest_original.id
+
+    _cookbook("Weeknight", [guest_original_id], guest=GUEST_SESSION)
+    db.session.commit()
+
+    _merge_guest_session_into_user(user, GUEST_SESSION)  # must not raise
+
+    cb = Cookbook.query.filter_by(user_id=user.id).one()
+    assert cb.recipe_ids == [cornbread_original_id], (
+        "must remap to the row occupying 'cornbread' — the identity that "
+        "still collides after source_slug is cleared — not the row matched "
+        "via the already-cleared 'pizza-dough' side"
+    )
+    assert other_original_id not in cb.recipe_ids
+
+    left_behind = Recipe.query.filter_by(id=guest_original_id).one()
+    assert left_behind.user_id is None
+    assert left_behind.guest_session_id == GUEST_SESSION
+
+
 def test_cookbook_membership_is_remapped_to_the_surviving_row(app, user):
     """Cookbook.recipe_ids is a JSON id list — it must not keep a dangling id."""
     owned = _recipe("Pizza Dough", owner=user, source_slug="vegan-fried-pizza-dough")
