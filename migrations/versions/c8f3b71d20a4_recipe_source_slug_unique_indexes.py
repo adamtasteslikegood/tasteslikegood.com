@@ -23,7 +23,7 @@ indexes are the correct shape rather than one composite constraint — the same
 reasoning as the cookbook pair in b7e2a9c4d1f8. Both ship together or neither
 (Sprint 6 R3): guests key on guest_session_id, which is the KAN-186 path.
 
-Partial on ``source_slug IS NOT NULL`` deliberately, and the scope is narrower
+Partial on ``COALESCE(source_slug, slug) IS NOT NULL``, and the scope is narrower
 than "most of the table is excluded" suggests. Only ``origin = 'saved'`` rows
 carry a source_slug (the SPA sets origin and sourceSlug together when saving
 from a public page), so:

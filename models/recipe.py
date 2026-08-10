@@ -14,10 +14,11 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
     # partial indexes are the right shape rather than one composite constraint
     # — the same reasoning as cookbook's uq_cookbook_* pair.
     #
-    # Partial on `source_slug IS NOT NULL` by design, and narrower than that
-    # reads: only `origin='saved'` rows carry a source_slug, so these indexes
-    # constrain COPIES A USER TOOK from someone else's public page and do not
-    # constrain a single recipe a user authored (~3% of user 1's rows).
+    # Partial on `COALESCE(source_slug, slug) IS NOT NULL`, but narrower than
+    # that reads: only `origin='saved'` rows carry a source_slug, and `slug`
+    # is already globally unique, so these indexes constrain COPIES A USER TOOK
+    # from someone else's public page and do not constrain a single recipe a
+    # user authored (~3% of user 1's rows).
     #
     # Still the right corner: a saved copy is the only case where "these two
     # rows are the same recipe" is a machine-checkable fact. Two separately
