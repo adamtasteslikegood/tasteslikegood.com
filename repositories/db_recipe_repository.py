@@ -340,7 +340,8 @@ def _duplicate_source_slug_owner(
         return False
     # Mirrors the index key COALESCE(source_slug, slug): a row's identity is the
     # public recipe it points at, or its own page when it is the original.
-    identity = recipe_data.get("sourceSlug") or recipe_data.get("slug")
+    source = recipe_data.get("sourceSlug")
+    identity = source if source is not None else recipe_data.get("slug")
     if identity is None:
         return False  # no identity — outside both partial indexes
 

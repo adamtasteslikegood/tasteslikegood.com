@@ -11,10 +11,10 @@ cross-context race by construction: two tabs, or a tab and a phone, both read
 These tests pin the fix at the only layer that can refuse the second write —
 two partial unique indexes:
 
-    uq_recipe_user_source_slug   UNIQUE (user_id, source_slug)
-        WHERE source_slug IS NOT NULL AND user_id IS NOT NULL
-    uq_recipe_guest_source_slug  UNIQUE (guest_session_id, source_slug)
-        WHERE source_slug IS NOT NULL AND guest_session_id IS NOT NULL
+    uq_recipe_user_recipe_identity   UNIQUE (user_id, COALESCE(source_slug, slug))
+        WHERE COALESCE(source_slug, slug) IS NOT NULL AND user_id IS NOT NULL
+    uq_recipe_guest_recipe_identity  UNIQUE (guest_session_id, COALESCE(source_slug, slug))
+        WHERE COALESCE(source_slug, slug) IS NOT NULL AND guest_session_id IS NOT NULL
 
 Both ship together or neither (Sprint 6 R3): ``user_id`` is nullable and guests
 key on ``guest_session_id``, which is the KAN-186 path.
