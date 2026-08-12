@@ -134,6 +134,8 @@ def create_app(**config_overrides):
     # Valkey degrades to SimpleCache instead of failing startup; per-call
     # failures are absorbed by utils/cache_utils safe_get/safe_set.
     # Tests may pre-set CACHE_TYPE via config_overrides to skip this block.
+    # All Valkey env reads live in utils/valkey_config (KAN-160); config.py
+    # re-exports the import-time snapshot that tests monkeypatch.
     if "CACHE_TYPE" not in app.config:
         from config import REDIS_URL, VALKEY_AUTH_MODE, VALKEY_HOST, VALKEY_PORT
 
@@ -146,11 +148,15 @@ def create_app(**config_overrides):
             else:
                 import redis
 
+                from utils.valkey_config import resolve_valkey_config
+
                 try:
                     cache_client = redis.StrictRedis(
                         host=VALKEY_HOST,
                         port=VALKEY_PORT,
-                        password=os.environ.get("VALKEY_PASSWORD"),
+                        # Resolved here, not at import time — same timing as
+                        # the inline os.environ read this replaced.
+                        password=resolve_valkey_config().password,
                         decode_responses=False,
                     )
                     cache_client.ping()
