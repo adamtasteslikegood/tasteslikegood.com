@@ -9,11 +9,12 @@ Ref: https://cloud.google.com/memorystore/docs/valkey/manage-iam-auth
 """
 
 import logging
-import os
 import threading
 import time
 
 import redis
+
+from utils.valkey_config import resolve_valkey_config
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,9 @@ def _build_client(host: str, port: int) -> redis.StrictRedis:
     # in-process backend. ssl_ca_data=None means "use the system trust store"
     # (local/dev), so keep TLS verification on either way. Mirrors
     # server/valkey.ts (the Express side already does this correctly).
-    ca_cert = os.environ.get("VALKEY_CA_CERT")
+    # Read via the shared factory at client-build time (same timing as the
+    # inline os.environ read this replaced — KAN-160).
+    ca_cert = resolve_valkey_config().ca_cert
 
     # Force RESP2 protocol: redis-py 8.x defaults to RESP3 which sends
     # HELLO 3 AUTH default <token> — the injected "default" username is

@@ -61,6 +61,9 @@ MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
     "can have a public page."
 )
 
+# RCP-74: saved copies inherit their public page from the source recipe.
+SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
+
 # 'manual' gates publishing; the others exist so curation can query by
 # provenance. NULL = legacy/unknown, treated as publishable.
 _ALLOWED_ORIGINS = frozenset({"manual", "generated", "saved"})
@@ -68,6 +71,10 @@ _ALLOWED_ORIGINS = frozenset({"manual", "generated", "saved"})
 
 class ManualRecipeError(ValueError):
     """Manually entered recipes cannot be published (KAN-140)."""
+
+
+class SavedCopyPublishError(ValueError):
+    """Saved copies cannot be published — the source page owns publication (RCP-74)."""
 
 
 # Also returned verbatim by the API routes (fixed string, same rationale as
@@ -306,19 +313,57 @@ def _pin_source_slug_to_column(
     writes it back to the column. That resurrects a cleared duplicate and then
     trips the unique index on a write the user never meant as a save.
 
-    The column is authoritative. Key presence, not truthiness: a payload that
-    explicitly sends ``sourceSlug: null`` is the caller clearing it, and that
-    value goes through unchanged.
-
-    Found by Codex review on PR #273 — reproduced by
-    ``test_clearing_the_column_survives_a_later_partial_update``.
+    The column is authoritative — in BOTH directions. When the payload omits
+    the key, the column value is restored into the blob (the Codex #273 case,
+    reproduced by ``test_clearing_the_column_survives_a_later_partial_update``).
+    And when the payload sends ANY value (null or non-null) against a row
+    whose column is already non-NULL, the persisted value wins: provenance
+    is NOT client-mutable once set. Before this rule, one
+    ``PUT {"is_public": true, "sourceSlug": null}`` wiped the provenance and
+    published the copy in a single call (Copilot B1 on PR #279); and a
+    ``PUT {"sourceSlug": "other-slug"}`` repointed the copy, creating a
+    disagreement between ``source_slug`` and the immutable
+    ``source_recipe_id`` (Copilot/claude review round 2). Only server-side
+    paths (login-merge legacy guard, migration pre-passes) clear the column.
     """
     if "sourceSlug" in recipe_data:
+        if existing.source_slug is not None:
+            merged["sourceSlug"] = existing.source_slug
         return
     if existing.source_slug is not None:
         merged["sourceSlug"] = existing.source_slug
     else:
         merged.pop("sourceSlug", None)
+
+
+def _resolve_source_recipe_id(
+    current: Optional[str], source_slug: Optional[str], recipe_id: str
+) -> Optional[str]:
+    """Column value for source_recipe_id: resolved while NULL, immutable once set.
+
+    KAN-221: the stable provenance key. Set from the source row whose slug the
+    copy points at, exactly once — a later payload cannot re-point a copy at a
+    different source (the same immutability rule as ``origin``), and no client
+    value ever reaches this column. An unresolvable pointer (source deleted, or
+    a slug that never existed) stays NULL; the row still carries source_slug,
+    so it stays a saved copy for the publish guard and falls back to the slug
+    key in the identity indexes.
+    """
+    if current is not None:
+        return current
+    if source_slug is None:
+        return None
+    # no_autoflush: this runs inside the stage functions with the row already
+    # dirty — a flush here would hit the unique indexes mid-stage, outside
+    # _commit_publish_retrying's IntegrityError handling. The lookup needs no
+    # pending state; it resolves against committed rows only.
+    with db.session.no_autoflush:
+        source = Recipe.query.filter(
+            Recipe.slug == source_slug,
+            Recipe.is_public.is_(True),
+            Recipe.id != recipe_id,
+        ).first()
+    return source.id if source is not None else None
 
 
 def _duplicate_source_slug_owner(
@@ -338,16 +383,23 @@ def _duplicate_source_slug_owner(
     """
     if owner_scope is None:
         return False
-    # Mirrors the index key COALESCE(source_slug, slug): a row's identity is the
-    # public recipe it points at, or its own page when it is the original.
+    # Mirrors the index key COALESCE(source_recipe_id, source_slug, id)
+    # (KAN-221). Only a write that carries a source pointer can lose to the
+    # index: rows without one key on their own unique id, which cannot collide.
     source = recipe_data.get("sourceSlug")
-    identity = source if source is not None else recipe_data.get("slug")
-    if identity is None:
-        return False  # no identity — outside both partial indexes
+    if source is None:
+        return False
+    # The staged row's identity is the resolved source id, or the slug pointer
+    # when the source does not resolve — the same resolution the stage
+    # functions apply before commit.
+    source_row = Recipe.query.filter(
+        Recipe.slug == source, Recipe.is_public.is_(True), Recipe.id != recipe_id
+    ).first()
+    identity = source_row.id if source_row is not None else source
 
     user_id, guest_session_id = owner_scope
     query = Recipe.query.filter(
-        func.coalesce(Recipe.source_slug, Recipe.slug) == identity,
+        func.coalesce(Recipe.source_recipe_id, Recipe.source_slug, Recipe.id) == identity,
         Recipe.id != recipe_id,
     )
     if user_id is not None:
@@ -447,13 +499,28 @@ def _apply_recipe_scope(query, user_id: Optional[int], guest_session_id: Optiona
     return query.filter_by(user_id=None, guest_session_id=None)
 
 
-def _gate_is_public(recipe_data: Dict[str, Any], user_id: Optional[int]) -> Dict[str, Any]:
+def _gate_is_public(
+    recipe_data: Dict[str, Any],
+    user_id: Optional[int],
+    existing: Optional[Recipe] = None,
+) -> Dict[str, Any]:
     """Only authenticated users may publish: guests get is_public forced False.
 
     A guest_session_id is a throwaway browser token — there is no accountable
     owner to moderate or ban behind a guest-published /r/<slug> page. The flag
     is normalized in the data blob itself so the JSON payload and the
     is_public column can never disagree.
+
+    RCP-74 / KAN-221: saved copies cannot be published — the source page owns
+    publication, permanently, with no author exception. For an existing row
+    the refusal keys on the PERSISTED provenance columns (``source_slug``,
+    ``source_recipe_id``), never on what the payload claims: a payload is the
+    caller's story, and ``PUT {"is_public": true, "sourceSlug": null}`` was a
+    working bypass while the guard trusted it (Copilot B1 on PR #279). For a
+    row being created, the staged blob IS what will be persisted, so the check
+    on it is a check on the columns being written. Raises
+    SavedCopyPublishError (403 at the API) so the SPA's revert-and-toast path
+    fires.
     """
     wants_public = recipe_data.get("is_public") is True
     if wants_public and user_id is None:
@@ -461,7 +528,19 @@ def _gate_is_public(recipe_data: Dict[str, Any], user_id: Optional[int]) -> Dict
             "Guest attempted to publish recipe %s — forcing is_public=False",
             sanitize_log_value(recipe_data.get("id", "<no id>")),
         )
-    return {**recipe_data, "is_public": wants_public if user_id is not None else False}
+        return {**recipe_data, "is_public": False}
+    # RCP-74: only authenticated users reach here with wants_public=True.
+    if wants_public:
+        is_saved_copy = recipe_data.get("sourceSlug") is not None
+        if existing is not None:
+            is_saved_copy = (
+                is_saved_copy
+                or existing.source_slug is not None
+                or existing.source_recipe_id is not None
+            )
+        if is_saved_copy:
+            raise SavedCopyPublishError(SAVED_COPY_PUBLISH_ERROR)
+    return {**recipe_data, "is_public": wants_public}
 
 
 def get_user_recipes(
@@ -796,7 +875,7 @@ def create_recipe(
                 else:
                     merged.pop("slug", None)
             _pin_source_slug_to_column(merged, recipe_data, existing)
-            recipe_data_with_id = _gate_is_public(merged, user_id)
+            recipe_data_with_id = _gate_is_public(merged, user_id, existing)
             next_origin = _resolve_origin(existing.origin, recipe_data)
             _gate_manual_publish(next_origin, recipe_data_with_id)
             if next_origin is not None:
@@ -811,6 +890,9 @@ def create_recipe(
                 existing.slug = data.get("slug")
                 existing.is_public = data.get("is_public", False)
                 existing.source_slug = data.get("sourceSlug")
+                existing.source_recipe_id = _resolve_source_recipe_id(
+                    existing.source_recipe_id, data.get("sourceSlug"), recipe_id
+                )
                 existing.origin = next_origin
                 existing.data = data
                 existing.status = next_status
@@ -837,6 +919,25 @@ def create_recipe(
             recipe_data_with_id.pop("origin", None)
 
         def stage_new(data: Dict[str, Any]) -> Recipe:
+            # KAN-221: set author/saver columns and the stable provenance key
+            # on create.
+            source_slug = data.get("sourceSlug")
+            if source_slug is not None:
+                # Saved copy: look up the source recipe — its owner is the
+                # author, its id is the immutable provenance key. Only public
+                # sources resolve (matches migration backfill predicate).
+                source = Recipe.query.filter(
+                    Recipe.slug == source_slug, Recipe.is_public.is_(True)
+                ).first()
+                author_id = source.user_id if source else None
+                source_recipe_id = source.id if source else None
+                saved_to_id = user_id
+            else:
+                # Original recipe: author = owner, no saver, no source.
+                author_id = user_id
+                source_recipe_id = None
+                saved_to_id = None
+
             recipe = Recipe(
                 id=recipe_id,
                 user_id=user_id,
@@ -844,8 +945,11 @@ def create_recipe(
                 name=recipe_name,
                 slug=data.get("slug"),
                 is_public=data.get("is_public", False),
-                source_slug=data.get("sourceSlug"),
+                source_slug=source_slug,
+                source_recipe_id=source_recipe_id,
                 origin=origin_value,
+                user_id_author=author_id,
+                user_id_saved_to=saved_to_id,
                 data=data,
                 status=status,
             )
@@ -870,6 +974,7 @@ def create_recipe(
         RecipeSlugError,
         CanonicalRecipeError,
         ManualRecipeError,
+        SavedCopyPublishError,
         RecipeOwnershipError,
         RecipeDuplicateError,
     ):
@@ -935,7 +1040,11 @@ def update_recipe(
             # stale blob value.
             merged["is_public"] = recipe.is_public
 
-        recipe_data_with_id = _gate_is_public(merged, user_id)
+        # Pin BEFORE the gate, so the gate never reads a stale blob value the
+        # column has disowned (or a payload null the column overrides).
+        _pin_source_slug_to_column(merged, recipe_data, recipe)
+
+        recipe_data_with_id = _gate_is_public(merged, user_id, recipe)
 
         if "name" not in recipe_data_with_id and recipe.name:
             # Publish-only partial updates keep the persisted name (see
@@ -956,8 +1065,6 @@ def update_recipe(
             else:
                 recipe_data_with_id.pop("slug", None)
 
-        _pin_source_slug_to_column(recipe_data_with_id, recipe_data, recipe)
-
         next_origin = _resolve_origin(recipe.origin, recipe_data)
         _gate_manual_publish(next_origin, recipe_data_with_id)
         if next_origin is not None:
@@ -970,6 +1077,9 @@ def update_recipe(
             recipe.slug = data.get("slug")
             recipe.is_public = data["is_public"]
             recipe.source_slug = data.get("sourceSlug")
+            recipe.source_recipe_id = _resolve_source_recipe_id(
+                recipe.source_recipe_id, data.get("sourceSlug"), recipe_id
+            )
             recipe.origin = next_origin
             recipe.data = data
             if status is not None:
@@ -992,6 +1102,7 @@ def update_recipe(
         RecipeSlugError,
         CanonicalRecipeError,
         ManualRecipeError,
+        SavedCopyPublishError,
         RecipeDuplicateError,
     ):
         raise

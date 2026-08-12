@@ -15,6 +15,8 @@ from typing import Dict, Any, Optional
 from jsonschema import Draft7Validator
 import logging
 
+from utils.valkey_config import resolve_valkey_config
+
 logger = logging.getLogger(__name__)
 
 # Load environment variables
@@ -41,15 +43,15 @@ WORKER_CLAIM_STALE_SECONDS = max(
     int(os.getenv("WORKER_CLAIM_STALE_SECONDS", "600")),
 )
 
-# Valkey/Redis response cache
-# VALKEY_HOST: Memorystore private IP (e.g. 10.128.0.11)
-# VALKEY_PORT: defaults to 6379
-# VALKEY_AUTH_MODE: 'iam' for GCP IAM auth (prod default), 'password' for static password, or unset
-# REDIS_URL: legacy — full redis:// URL for local dev; used only when VALKEY_HOST is unset
-VALKEY_HOST = os.getenv("VALKEY_HOST")
-VALKEY_PORT = int(os.getenv("VALKEY_PORT", "6379"))
-VALKEY_AUTH_MODE = os.getenv("VALKEY_AUTH_MODE", "iam")
-REDIS_URL = os.getenv("REDIS_URL")
+# Valkey/Redis response cache — every VALKEY_*/REDIS_URL env read lives in
+# utils/valkey_config (KAN-160); see its docstring for what each var means.
+# Resolved once at import time (same semantics as every other setting here);
+# these module-level names are the ones tests monkeypatch.
+_VALKEY = resolve_valkey_config()
+VALKEY_HOST = _VALKEY.host
+VALKEY_PORT = _VALKEY.port
+VALKEY_AUTH_MODE = _VALKEY.auth_mode
+REDIS_URL = _VALKEY.redis_url
 
 # Default Model Configuration
 DEFAULT_MODEL = "gemini-3.1-pro-preview"
