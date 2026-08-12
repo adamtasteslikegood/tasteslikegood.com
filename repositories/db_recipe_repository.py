@@ -316,18 +316,18 @@ def _pin_source_slug_to_column(
     The column is authoritative — in BOTH directions. When the payload omits
     the key, the column value is restored into the blob (the Codex #273 case,
     reproduced by ``test_clearing_the_column_survives_a_later_partial_update``).
-    And when the payload explicitly sends ``sourceSlug: null`` against a row
-    whose column is non-NULL, the null is overridden with the column value:
-    persisted provenance is NOT client-clearable. Before this rule, one
+    And when the payload sends ANY value (null or non-null) against a row
+    whose column is already non-NULL, the persisted value wins: provenance
+    is NOT client-mutable once set. Before this rule, one
     ``PUT {"is_public": true, "sourceSlug": null}`` wiped the provenance and
-    published the copy in a single call (Copilot B1 on PR #279) — the write
-    that erases the evidence must not be the same write the guard trusts.
-    A payload carrying a non-null value still goes through unchanged; only
-    server-side paths (login-merge legacy guard, migration pre-passes) clear
-    the column.
+    published the copy in a single call (Copilot B1 on PR #279); and a
+    ``PUT {"sourceSlug": "other-slug"}`` repointed the copy, creating a
+    disagreement between ``source_slug`` and the immutable
+    ``source_recipe_id`` (Copilot/claude review round 2). Only server-side
+    paths (login-merge legacy guard, migration pre-passes) clear the column.
     """
     if "sourceSlug" in recipe_data:
-        if recipe_data["sourceSlug"] is None and existing.source_slug is not None:
+        if existing.source_slug is not None:
             merged["sourceSlug"] = existing.source_slug
         return
     if existing.source_slug is not None:
@@ -358,7 +358,11 @@ def _resolve_source_recipe_id(
     # _commit_publish_retrying's IntegrityError handling. The lookup needs no
     # pending state; it resolves against committed rows only.
     with db.session.no_autoflush:
-        source = Recipe.query.filter(Recipe.slug == source_slug, Recipe.id != recipe_id).first()
+        source = Recipe.query.filter(
+            Recipe.slug == source_slug,
+            Recipe.is_public.is_(True),
+            Recipe.id != recipe_id,
+        ).first()
     return source.id if source is not None else None
 
 
@@ -388,7 +392,9 @@ def _duplicate_source_slug_owner(
     # The staged row's identity is the resolved source id, or the slug pointer
     # when the source does not resolve — the same resolution the stage
     # functions apply before commit.
-    source_row = Recipe.query.filter(Recipe.slug == source, Recipe.id != recipe_id).first()
+    source_row = Recipe.query.filter(
+        Recipe.slug == source, Recipe.is_public.is_(True), Recipe.id != recipe_id
+    ).first()
     identity = source_row.id if source_row is not None else source
 
     user_id, guest_session_id = owner_scope
@@ -918,8 +924,11 @@ def create_recipe(
             source_slug = data.get("sourceSlug")
             if source_slug is not None:
                 # Saved copy: look up the source recipe — its owner is the
-                # author, its id is the immutable provenance key.
-                source = Recipe.query.filter_by(slug=source_slug).first()
+                # author, its id is the immutable provenance key. Only public
+                # sources resolve (matches migration backfill predicate).
+                source = Recipe.query.filter(
+                    Recipe.slug == source_slug, Recipe.is_public.is_(True)
+                ).first()
                 author_id = source.user_id if source else None
                 source_recipe_id = source.id if source else None
                 saved_to_id = user_id

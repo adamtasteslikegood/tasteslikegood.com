@@ -75,7 +75,7 @@ def _recipe_identity_keys(recipe):
     ``slug``. Empty values never match — ``None == None`` must not make two
     unrelated locally-authored recipes look like the same recipe.
     """
-    return {value for value in (recipe.source_slug, recipe.slug) if value}
+    return {value for value in (recipe.source_recipe_id, recipe.source_slug, recipe.slug) if value}
 
 
 def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
@@ -263,13 +263,13 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                         if source is None and recipe.source_slug is not None:
                             source = Recipe.query.filter(
                                 Recipe.slug == recipe.source_slug,
+                                Recipe.is_public.is_(True),
                                 Recipe.id != recipe.id,
                             ).first()
                         recipe.user_id_author = source.user_id if source is not None else None
                 else:
                     if recipe.user_id_author is None:
                         recipe.user_id_author = user.id
-                    recipe.user_id_saved_to = user.id
                 for key in _recipe_identity_keys(recipe):
                     owned_by_key.setdefault(key, recipe.id)
 

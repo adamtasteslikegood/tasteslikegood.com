@@ -371,7 +371,12 @@ def test_merge_guest_saved_copy_sets_author_from_source_and_saver_to_new_user(
 
 
 def test_merge_guest_generated_original_sets_author_and_saver_to_new_user(app, saver):
-    """Locked rule: guest-GENERATED original -> author = saved_to = new user."""
+    """Locked rule: guest-GENERATED original -> author = new user, saved_to = NULL.
+
+    Originals have no saver — the user IS the author, not someone who saved
+    another user's work. Matches the authenticated-create path (saved_to_id=None
+    for originals) and the migration backfill.
+    """
     from blueprints.auth_api_bp import _merge_guest_session_into_user
 
     guest = _guest_client(app)
@@ -389,4 +394,4 @@ def test_merge_guest_generated_original_sets_author_and_saver_to_new_user(app, s
     row = db.session.get(Recipe, recipe_id)
     assert row.user_id == saver.id
     assert row.user_id_author == saver.id, "the guest IS the author — the new user claims it"
-    assert row.user_id_saved_to == saver.id
+    assert row.user_id_saved_to is None, "originals have no saver — matches authenticated create"

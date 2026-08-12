@@ -192,14 +192,14 @@ def test_duplicate_refusal_body_carries_a_code_and_no_exception_text(
         assert leak not in str(body), f"response leaked internals: {leak!r}"
 
 
-def test_update_that_collides_also_returns_409_not_500(client, logged_in):
-    """The PUT route must refuse the same way the POST route does.
+def test_update_cannot_repoint_source_slug_to_collide(client, logged_in):
+    """Provenance is immutable once set — a PUT carrying a different sourceSlug
+    has the value pinned to the persisted column, so the collision scenario that
+    required repointing (old test: 409 on PUT) is structurally unreachable.
 
-    Covers the sibling path of R1: the repository re-raises
-    RecipeDuplicateError from update_recipe, so without a handler on the PUT
-    route the refusal falls into the generic 500. Unlike the create case this
-    needs no race — editing one recipe to carry another's sourceSlug trips the
-    index directly.
+    Before the pin, ``PUT {"sourceSlug": "<other-recipe's-slug>"}`` changed the
+    provenance and tripped the per-owner identity index. Now the pin preserves
+    the original, the row keeps its own source, and the update succeeds.
     """
     first = client.post("/api/recipes", json=_payload()).get_json()
     second = client.post(
@@ -207,15 +207,15 @@ def test_update_that_collides_also_returns_409_not_500(client, logged_in):
     ).get_json()
     assert first["id"] != second["id"]
 
-    # Point the second recipe at the first's source — now a duplicate pair.
+    # Attempt to repoint the second recipe at the first's source.
     response = client.put(f"/api/recipes/{second['id']}", json=_payload(name="Vegan Pot Pie"))
 
-    assert response.status_code == 409, (
-        f"expected 409, got {response.status_code} — an update that trips the "
-        "index must be a deliberate refusal, not an internal error"
+    assert response.status_code == 200, (
+        f"expected 200 — provenance pin should absorb the repointing attempt, "
+        f"got {response.status_code}"
     )
-    assert "code" in response.get_json()
-    # The write must not have landed.
+    row = Recipe.query.get(second["id"])
+    assert row.source_slug == "pot-pie", "provenance pinned to the persisted value"
     assert Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).count() == 1
 
 
