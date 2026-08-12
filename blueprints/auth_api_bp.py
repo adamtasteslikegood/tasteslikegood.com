@@ -252,8 +252,11 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                 #     creation already resolved it; an unresolvable source
                 #     (deleted, never existed) leaves it NULL, matching the
                 #     orphan rule in migration d680a4b61194.
-                #   guest-GENERATED original: the guest IS the author —
-                #     author = saved_to = the user logging in.
+                #   guest-GENERATED original: the guest IS the author, and
+                #     originals have no saver — author = the user logging in;
+                #     saved_to stays NULL, matching the authenticated-create
+                #     path in db_recipe_repository.stage_new and the migration
+                #     backfill for source_slug IS NULL.
                 if recipe.source_slug is not None or recipe.source_recipe_id is not None:
                     recipe.user_id_saved_to = user.id
                     if recipe.user_id_author is None:
