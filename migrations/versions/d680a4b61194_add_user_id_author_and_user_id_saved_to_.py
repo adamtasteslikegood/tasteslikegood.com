@@ -26,18 +26,9 @@ branch_labels = None
 depends_on = None
 
 
-def upgrade():
-    with op.batch_alter_table("recipe", schema=None) as batch_op:
-        batch_op.add_column(sa.Column("user_id_author", sa.Integer(), nullable=True))
-        batch_op.add_column(sa.Column("user_id_saved_to", sa.Integer(), nullable=True))
-        batch_op.create_foreign_key("fk_recipe_user_id_author", "user", ["user_id_author"], ["id"])
-        batch_op.create_foreign_key(
-            "fk_recipe_user_id_saved_to", "user", ["user_id_saved_to"], ["id"]
-        )
-
-    # --- Backfill ---
-    conn = op.get_bind()
-
+def _backfill_author_saver(conn):
+    """The backfill, on a bare connection so tests can execute the real thing
+    (the pattern set by c8f3b71d20a4's helpers + its migration test)."""
     # 1. Originals (source_slug IS NULL): author = owner, saved_to = NULL
     conn.execute(sa.text("UPDATE recipe SET user_id_author = user_id " "WHERE source_slug IS NULL"))
 
@@ -66,6 +57,18 @@ def upgrade():
             "AND user_id_saved_to IS NULL"
         )
     )
+
+
+def upgrade():
+    with op.batch_alter_table("recipe", schema=None) as batch_op:
+        batch_op.add_column(sa.Column("user_id_author", sa.Integer(), nullable=True))
+        batch_op.add_column(sa.Column("user_id_saved_to", sa.Integer(), nullable=True))
+        batch_op.create_foreign_key("fk_recipe_user_id_author", "user", ["user_id_author"], ["id"])
+        batch_op.create_foreign_key(
+            "fk_recipe_user_id_saved_to", "user", ["user_id_saved_to"], ["id"]
+        )
+
+    _backfill_author_saver(op.get_bind())
 
     # Optional index for author lookups
     op.create_index(

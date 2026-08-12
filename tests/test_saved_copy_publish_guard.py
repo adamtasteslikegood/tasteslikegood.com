@@ -205,3 +205,129 @@ def test_api_saved_copy_publish_returns_403(app, saver, published_recipe):
     assert resp.status_code == 403
     data = resp.get_json()
     assert data["error"] == db_recipe_repository.SAVED_COPY_PUBLISH_ERROR
+
+
+# ─── KAN-221: the guard keys on PERSISTED provenance, which is not ──────
+# ─── client-clearable (Copilot B1 on PR #279) ───────────────────────────
+
+
+def _client_for(app, user):
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        sess["user_id"] = user.id
+    return client
+
+
+def _save_copy_via_api(app, user, source_slug, name="Chili"):
+    """Create a saved copy the way the SPA does — through the API, never the
+    ORM (KAN-213 lesson: an ORM-built row can 'prove' a state the product
+    cannot reach)."""
+    client = _client_for(app, user)
+    resp = client.post(
+        "/api/recipes",
+        json={"name": name, "sourceSlug": source_slug, "origin": "saved"},
+    )
+    assert resp.status_code == 201, resp.get_json()
+    return client, resp.get_json()
+
+
+def test_put_null_source_slug_cannot_bypass_the_guard_or_wipe_provenance(
+    app, saver, published_recipe
+):
+    """THE bypass this re-key exists to close.
+
+    While the guard keyed on the payload, ``PUT {"is_public": true,
+    "sourceSlug": null}`` wiped the provenance and published the copy in one
+    call. It must now 403, and BOTH provenance columns must survive intact.
+    """
+    client, created = _save_copy_via_api(app, saver, published_recipe.slug)
+
+    resp = client.put(
+        f"/api/recipes/{created['id']}",
+        json={"is_public": True, "sourceSlug": None},
+    )
+
+    assert resp.status_code == 403, (
+        f"expected 403, got {resp.status_code} — a null sourceSlug in the "
+        "payload must not blind a guard keyed on the persisted columns"
+    )
+    row = db.session.get(Recipe, created["id"])
+    assert row.source_slug == published_recipe.slug, "source_slug was wiped by the refused PUT"
+    assert row.source_recipe_id == published_recipe.id, "source_recipe_id was wiped"
+    assert row.is_public is False
+    assert row.data.get("sourceSlug") == published_recipe.slug, "blob must stay honest too"
+
+
+def test_put_null_source_slug_alone_cannot_clear_provenance(app, saver, published_recipe):
+    """Even without publishing, a client PUT can never null persisted provenance.
+
+    Otherwise the bypass just becomes two calls: clear first, publish second.
+    """
+    client, created = _save_copy_via_api(app, saver, published_recipe.slug)
+
+    resp = client.put(
+        f"/api/recipes/{created['id']}",
+        json={"name": "Renamed", "sourceSlug": None},
+    )
+
+    assert resp.status_code == 200
+    row = db.session.get(Recipe, created["id"])
+    assert row.source_slug == published_recipe.slug
+    assert row.source_recipe_id == published_recipe.id
+
+    # And the two-call publish attempt still fails.
+    resp = client.put(f"/api/recipes/{created['id']}", json={"is_public": True})
+    assert resp.status_code == 403
+
+
+def test_saved_copy_resolves_source_recipe_id_at_create(app, saver, published_recipe):
+    """The stable provenance key is resolved server-side when the copy is saved."""
+    _, created = _save_copy_via_api(app, saver, published_recipe.slug)
+
+    row = db.session.get(Recipe, created["id"])
+    assert row.source_recipe_id == published_recipe.id
+    assert row.source_slug == published_recipe.slug
+
+
+def test_source_deleted_copy_stays_blocked(app, author, saver, published_recipe):
+    """Locked rule: deleting the source does not free its copies for publishing."""
+    client, created = _save_copy_via_api(app, saver, published_recipe.slug)
+
+    assert db_recipe_repository.delete_recipe(published_recipe.id, user_id=author.id)
+
+    resp = client.put(f"/api/recipes/{created['id']}", json={"is_public": True})
+    assert resp.status_code == 403, "a copy whose source is gone must stay unpublishable"
+    row = db.session.get(Recipe, created["id"])
+    assert row.is_public is False
+    assert row.source_slug == published_recipe.slug, "the pointer text survives the delete"
+
+
+def test_pre_guard_published_copy_cannot_republish_after_unpublish(app, saver, published_recipe):
+    """Rows published BEFORE the guard existed are covered too.
+
+    The guard keys on persisted provenance, so a legacy is_public=True saved
+    copy that gets unpublished can never come back — no author exception, no
+    payload trick. Built via the ORM deliberately: the API can no longer
+    create this row, which is the point of testing it.
+    """
+    legacy = Recipe(
+        id="legacy-published-copy",
+        user_id=saver.id,
+        name="Chili",
+        slug="chili-2",
+        source_slug=published_recipe.slug,
+        source_recipe_id=published_recipe.id,
+        is_public=True,
+        data={"name": "Chili", "sourceSlug": published_recipe.slug, "is_public": True},
+    )
+    db.session.add(legacy)
+    db.session.commit()
+
+    client = _client_for(app, saver)
+    assert client.put(f"/api/recipes/{legacy.id}", json={"is_public": False}).status_code == 200
+
+    resp = client.put(f"/api/recipes/{legacy.id}", json={"is_public": True})
+    assert resp.status_code == 403
+    row = db.session.get(Recipe, legacy.id)
+    assert row.is_public is False
+    assert row.source_recipe_id == published_recipe.id

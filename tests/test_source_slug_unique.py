@@ -9,12 +9,15 @@ cross-context race by construction: two tabs, or a tab and a phone, both read
 "you don't have this yet" before either writes.
 
 These tests pin the fix at the only layer that can refuse the second write —
-two partial unique indexes:
+two partial unique indexes (re-keyed by KAN-221 / migration a3c9e1f4b7d2 from
+COALESCE(source_slug, slug) onto the stable source-recipe id):
 
-    uq_recipe_user_recipe_identity   UNIQUE (user_id, COALESCE(source_slug, slug))
-        WHERE COALESCE(source_slug, slug) IS NOT NULL AND user_id IS NOT NULL
-    uq_recipe_guest_recipe_identity  UNIQUE (guest_session_id, COALESCE(source_slug, slug))
-        WHERE COALESCE(source_slug, slug) IS NOT NULL AND guest_session_id IS NOT NULL
+    uq_recipe_user_recipe_identity
+        UNIQUE (user_id, COALESCE(source_recipe_id, source_slug, id))
+        WHERE user_id IS NOT NULL
+    uq_recipe_guest_recipe_identity
+        UNIQUE (guest_session_id, COALESCE(source_recipe_id, source_slug, id))
+        WHERE guest_session_id IS NOT NULL
 
 Both ship together or neither (Sprint 6 R3): ``user_id`` is nullable and guests
 key on ``guest_session_id``, which is the KAN-186 path.
@@ -216,71 +219,58 @@ def test_update_that_collides_also_returns_409_not_500(client, logged_in):
     assert Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).count() == 1
 
 
-def test_slug_race_and_duplicate_source_slug_together_still_end_in_409(
+def test_publish_of_saved_copy_is_refused_before_slug_resolution_can_race(
     client, logged_in, monkeypatch
 ):
-    """Settles a disagreement between two reviews on PR #273.
+    """RCP-74 made the PR #273 slug-race x duplicate interaction unreachable.
 
-    ``_duplicate_source_slug_owner`` is consulted only on the *non*-slug-race
-    branch of ``_commit_publish_retrying``. One review read that as: a write
-    that loses a slug race AND has a duplicate source_slug burns all
-    ``_SLUG_COMMIT_RETRIES`` and then re-raises the raw IntegrityError as a
-    500 — R1 reopened from a narrower angle. A later review read the same code
-    as self-correcting after one retry. They cannot both be right, and neither
-    wrote a test.
+    HISTORY: this test used to prove that a write which lost a slug race AND
+    carried a duplicate source_slug still ended in 409 rather than burning all
+    retries into a raw 500 (a disagreement between two #273 reviews; the answer
+    was "one extra retry, then 409"). That interleaving required *publishing* a
+    row that carries a sourceSlug — exactly what the RCP-74 guard now refuses
+    up front, so the scenario the old test name promised can no longer execute
+    (Copilot B4 on PR #279).
 
-    Tracing it: attempt 1 fails with another row owning the probed slug, so
-    ``lost_slug_race`` is True and the duplicate check is skipped. Attempt 2
-    resolves a *fresh* slug that nobody owns, so ``lost_slug_race`` is now
-    False — control reaches the duplicate check and raises
-    ``RecipeDuplicateError``. One extra retry, then 409.
+    The interaction is structurally gone, not just untested:
 
-    This asserts that, so the claim stops being a matter of reading.
+    - Publishing is the only path into ``_resolve_public_slug``, and
+      ``_gate_is_public`` raises before ``_commit_publish_retrying`` is ever
+      entered when the write carries provenance (persisted or staged). No
+      publish, no slug probe, no slug race.
+    - A publishable row (no provenance) cannot trip the duplicate index at
+      all under the KAN-221 key: it is indexed by its own unique id, so the
+      slug-race retry loop and the duplicate refusal no longer share a
+      reachable write.
 
-    RCP-74 UPDATE: saved copies (sourceSlug IS NOT NULL) can no longer be
-    published — _gate_is_public raises SavedCopyPublishError before slug
-    resolution. The slug race + duplicate interaction is still testable on
-    non-saved recipes that share a slug via the publish path.
+    What this test now pins is the boundary itself: the refusal fires BEFORE
+    slug resolution runs, the response is the deliberate 403 (not a 500 or a
+    retry storm), and neither the competing row nor its provenance is touched.
     """
     from repositories import db_recipe_repository
 
     _insert_competing_row(user_id=logged_in.id)  # owner already holds SOURCE_SLUG
 
     real_resolve = db_recipe_repository._resolve_public_slug
-    state = {"raced": False, "resolves": 0}
+    state = {"resolves": 0}
 
-    def racing_resolve(data, recipe_id, current_slug=None, skip=frozenset()):
-        slug = real_resolve(data, recipe_id, current_slug, skip=skip)
+    def counting_resolve(data, recipe_id, current_slug=None, skip=frozenset()):
         state["resolves"] += 1
-        if not state["raced"]:
-            state["raced"] = True
-            # Another writer claims the probed slug before our commit, so
-            # attempt 1 is a genuine slug race on top of the duplicate.
-            with db.engine.begin() as conn:
-                conn.execute(
-                    sa.text(
-                        "INSERT INTO recipe (id, name, status, slug, is_public, "
-                        "is_canonical, data, created_at, updated_at) VALUES "
-                        "(:id, 'Racer', 'ready', :slug, 0, 0, '{}', "
-                        "'2026-08-09 00:00:00', '2026-08-09 00:00:00')"
-                    ),
-                    {"id": str(uuid.uuid4()), "slug": slug},
-                )
-        return slug
+        return real_resolve(data, recipe_id, current_slug, skip=skip)
 
-    monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", racing_resolve)
+    monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", counting_resolve)
 
-    # RCP-74: saved copies cannot be published, so this now gets 403 from
-    # the SavedCopyPublishError guard before slug resolution fires.
     response = client.post("/api/recipes", json={**_payload(), "is_public": True})
 
     assert (
         response.status_code == 403
     ), f"expected 403 (saved copy cannot publish, RCP-74), got {response.status_code}"
-    assert not state[
-        "raced"
-    ], "slug race should not fire — the saved-copy publish guard rejects before slug resolution"
-    assert Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).count() == 1
+    assert state["resolves"] == 0, (
+        "slug resolution ran — the guard must refuse before "
+        "_commit_publish_retrying can enter the slug-race window"
+    )
+    rows = Recipe.query.filter_by(user_id=logged_in.id, source_slug=SOURCE_SLUG).all()
+    assert len(rows) == 1, "the refused write must not have persisted anything"
 
 
 def test_guest_saves_are_constrained_too(client, guest, monkeypatch):
@@ -502,15 +492,16 @@ def test_saving_your_own_published_recipe_again_is_refused(client, logged_in):
 
 
 @pytest.mark.xfail(
-    reason="KAN-221: known dual-identity gap. A row holding BOTH source_slug and "
-    "slug (a saved copy that was later published) is indexed only by its "
-    "source_slug, so saving that row's own public URL is accepted. A unique "
-    "index keys one value per row and cannot express 'alias sets must be "
-    "disjoint', so there is no index-shaped fix. The two alternatives both cost "
-    "more than the gap: clearing source_slug on publish would shrink the row's "
-    "alias set and break KAN-186's guest-merge dedup, and a recipe_identity "
-    "side table is exactly what KAN-221 deletes when it replaces mutable slugs "
-    "with a stable source-recipe id. Documented rather than patched.",
+    reason="Known dual-identity gap, still open after the KAN-221 re-key. A row "
+    "holding BOTH a source pointer and its own published page (a saved copy "
+    "that was later published) is indexed only by its source pointer "
+    "(COALESCE picks source_recipe_id/source_slug over the id arm), so saving "
+    "that row's own public URL is accepted. A unique index keys one value per "
+    "row and cannot express 'alias sets must be disjoint' — that needs a "
+    "side table, which is out of KAN-221's scope. Note the ROW ITSELF is now "
+    "largely historical: the RCP-74 guard refuses publishing saved copies, so "
+    "new copy-then-published rows can no longer be created through the API. "
+    "Documented rather than patched.",
     strict=True,
 )
 def test_saving_your_own_published_copy_is_not_yet_refused(client, logged_in):
@@ -518,8 +509,10 @@ def test_saving_your_own_published_copy_is_not_yet_refused(client, logged_in):
 
     Found by Copilot on PR #273 after the COALESCE fix closed the second one.
     Three rounds found three holes in one identity model, which is the finding:
-    ``source_slug`` is a mutable string standing in for a relationship, so every
-    index over it has an aliasing hole. KAN-221 replaces it.
+    a single-valued key cannot cover a row aliased by two identities. The
+    KAN-221 re-key moved the key to the stable source id (closing the slug-
+    mutation holes); this dual-alias corner is the one it leaves, and the
+    RCP-74 publish guard is what starves it of new rows.
     """
     copy_then_published = Recipe(
         id="copy-published",

@@ -76,6 +76,7 @@ def list_recipes(user_id, guest_session_id):
                             "is_public": recipe.is_public,
                             "is_canonical": recipe.is_canonical,
                             "source_slug": recipe.source_slug,
+                            "source_recipe_id": recipe.source_recipe_id,
                             "origin": recipe.origin,
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
