@@ -240,14 +240,36 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
 
                 recipe.user_id = user.id
                 recipe.guest_session_id = None
-                # KAN-221: carry author/saver columns through login-merge.
-                # user_id_saved_to follows user_id (saver is the acting user).
-                # user_id_author follows user_id only for originals (guest IS
-                # the author); for saved copies it stays immutable.
-                if recipe.user_id_saved_to is not None:
+                # KAN-221: carry author/saver columns through login-merge, per
+                # the locked merge rules. Branch on PERSISTED provenance — the
+                # previous condition (`user_id_saved_to is not None`) was never
+                # true for guest rows, because the create path sets saved_to to
+                # user_id, which is None for every guest (Copilot B2 on #279).
+                #
+                #   guest-SAVED copy (provenance non-null): the guest is the
+                #     saver, not the author — author = the source row's owner,
+                #     saved_to = the user logging in. Author stays immutable if
+                #     creation already resolved it; an unresolvable source
+                #     (deleted, never existed) leaves it NULL, matching the
+                #     orphan rule in migration d680a4b61194.
+                #   guest-GENERATED original: the guest IS the author —
+                #     author = saved_to = the user logging in.
+                if recipe.source_slug is not None or recipe.source_recipe_id is not None:
                     recipe.user_id_saved_to = user.id
-                if recipe.source_slug is None and recipe.user_id_author is None:
-                    recipe.user_id_author = user.id
+                    if recipe.user_id_author is None:
+                        source = None
+                        if recipe.source_recipe_id is not None:
+                            source = db.session.get(Recipe, recipe.source_recipe_id)
+                        if source is None and recipe.source_slug is not None:
+                            source = Recipe.query.filter(
+                                Recipe.slug == recipe.source_slug,
+                                Recipe.id != recipe.id,
+                            ).first()
+                        recipe.user_id_author = source.user_id if source is not None else None
+                else:
+                    if recipe.user_id_author is None:
+                        recipe.user_id_author = user.id
+                    recipe.user_id_saved_to = user.id
                 for key in _recipe_identity_keys(recipe):
                     owned_by_key.setdefault(key, recipe.id)
 

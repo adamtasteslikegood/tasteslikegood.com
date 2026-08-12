@@ -331,3 +331,62 @@ def test_pre_guard_published_copy_cannot_republish_after_unpublish(app, saver, p
     row = db.session.get(Recipe, legacy.id)
     assert row.is_public is False
     assert row.source_recipe_id == published_recipe.id
+
+
+# ─── KAN-221: locked guest→user merge rules (Copilot B2 on PR #279) ─────
+
+
+def _guest_client(app, session_id="guest-merge-session"):
+    client = app.test_client()
+    with client.session_transaction() as sess:
+        # The app keys the guest scope on session["session_id"]
+        # (utils/session_utils.get_or_create_session_id).
+        sess["session_id"] = session_id
+    return client
+
+
+def test_merge_guest_saved_copy_sets_author_from_source_and_saver_to_new_user(
+    app, author, saver, published_recipe
+):
+    """Locked rule: guest-SAVED copy -> author = source owner, saved_to = new user."""
+    from blueprints.auth_api_bp import _merge_guest_session_into_user
+
+    guest = _guest_client(app)
+    resp = guest.post(
+        "/api/recipes",
+        json={"name": "Chili", "sourceSlug": published_recipe.slug, "origin": "saved"},
+    )
+    assert resp.status_code == 201
+    recipe_id = resp.get_json()["id"]
+    row = db.session.get(Recipe, recipe_id)
+    assert row.user_id_saved_to is None, "precondition: guests have no user id to save to"
+
+    _merge_guest_session_into_user(saver, "guest-merge-session")
+
+    row = db.session.get(Recipe, recipe_id)
+    assert row.user_id == saver.id
+    assert row.user_id_author == author.id, "author must be the SOURCE row's owner"
+    assert row.user_id_saved_to == saver.id, "saver must be the user logging in"
+    assert row.source_recipe_id == published_recipe.id
+
+
+def test_merge_guest_generated_original_sets_author_and_saver_to_new_user(app, saver):
+    """Locked rule: guest-GENERATED original -> author = saved_to = new user."""
+    from blueprints.auth_api_bp import _merge_guest_session_into_user
+
+    guest = _guest_client(app)
+    resp = guest.post(
+        "/api/recipes",
+        json={"name": "Guest Soup", "origin": "generated"},
+    )
+    assert resp.status_code == 201
+    recipe_id = resp.get_json()["id"]
+    row = db.session.get(Recipe, recipe_id)
+    assert row.user_id_author is None, "precondition: guest originals have no author id"
+
+    _merge_guest_session_into_user(saver, "guest-merge-session")
+
+    row = db.session.get(Recipe, recipe_id)
+    assert row.user_id == saver.id
+    assert row.user_id_author == saver.id, "the guest IS the author — the new user claims it"
+    assert row.user_id_saved_to == saver.id
