@@ -33,10 +33,10 @@ dependencies = [
     "flask-caching==2.4.1",
     "sqlalchemy>=2.0.51", # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
-    "google-genai==2.16.0",
+    "google-genai==2.17.0",
     "google-generativeai==0.8.6",
     "google-ai-generativelanguage==0.6.15",
-    "google-auth==2.56.2",
+    "google-auth==2.56.3",
     "google-auth-oauthlib==1.4.0",
     "google-api-python-client==2.198.0",
     "googleapis-common-protos==1.75.0",
@@ -45,7 +45,7 @@ dependencies = [
     # the uv.lock -> requirements.txt export carries them (July 2026 incident:
     # a Dependabot uv-group bump regenerated requirements.txt without them and
     # the production image lost half its runtime deps).
-    "google-cloud-storage==3.13.0",
+    "google-cloud-storage==3.13.1",
     "google-cloud-pubsub>=2.19.0",
     "redis==8.1.0",
     # Data Validation
@@ -77,7 +77,7 @@ dependencies = [
     "rsa==4.9.1",
     "flask-cors==6.0.5",
     "pandas>=3.0.5",
-    "ddtrace>=4.12.2",
+    "ddtrace>=4.13.0",
     "gunicorn>=26.0.0",
 ]
 
