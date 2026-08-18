@@ -319,7 +319,10 @@ def show_public_recipe(slug):
     data = recipe.data or {}
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
     image_url = _recipe_image_url(recipe)
-    pinterest_image_url = _pinnable_image_url(recipe)
+    # _pinnable_image_url is a module-level alias for _recipe_image_url
+    # (see the alias definition above _pinterest_share_url); calling it again
+    # would re-issue the saved-copy source lookup for no gain.
+    pinterest_image_url = image_url
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
