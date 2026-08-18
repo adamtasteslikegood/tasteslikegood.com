@@ -853,8 +853,10 @@ def test_saved_copy_no_fallback_when_source_deleted(app, client):
     resp = client.get("/r/orphaned-copy")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    # No image shown, page still renders
+    # Page renders without crashing
     assert "Orphaned Copy" in body
+    # No og:image emitted — the template omits it when image_url is None
+    assert 'og:image' not in body
 
 
 def test_saved_copy_no_fallback_when_source_unpublished(app, client):
