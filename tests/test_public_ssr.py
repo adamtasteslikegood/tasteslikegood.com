@@ -856,7 +856,7 @@ def test_saved_copy_no_fallback_when_source_deleted(app, client):
     # Page renders without crashing
     assert "Orphaned Copy" in body
     # No og:image emitted — the template omits it when image_url is None
-    assert 'og:image' not in body
+    assert "og:image" not in body
 
 
 def test_saved_copy_no_fallback_when_source_unpublished(app, client):
