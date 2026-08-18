@@ -89,17 +89,24 @@ def _own_image_url(recipe: Recipe) -> str | None:
 def _resolve_source_for_image(recipe: Recipe) -> Recipe | None:
     """Look up the source recipe for image fallback.
 
-    Returns ``None`` when the recipe is not a saved copy or when the source
-    has been deleted.  Prefers the immutable ``source_recipe_id`` FK; falls
-    back to ``source_slug`` for legacy copies whose FK was never backfilled.
+    Returns ``None`` when the recipe is not a saved copy, when the source
+    has been deleted, or when the source is no longer public.  Both paths
+    require ``is_public`` — without that gate a private source's image URL
+    would leak into a public page's ``<meta og:image>`` and Pinterest pin.
+
+    Prefers the immutable ``source_recipe_id`` FK; falls back to
+    ``source_slug`` for legacy copies whose FK was never backfilled.
     """
     if recipe.source_recipe_id:
-        return db.session.get(Recipe, recipe.source_recipe_id)
+        source = db.session.get(Recipe, recipe.source_recipe_id)
+        if source is not None and source.is_public:
+            return source
+        return None
     if recipe.source_slug:
-        source: Recipe | None = Recipe.query.filter(
+        source_by_slug: Recipe | None = Recipe.query.filter(
             Recipe.slug == recipe.source_slug, Recipe.is_public.is_(True)
         ).first()
-        return source
+        return source_by_slug
     return None
 
 

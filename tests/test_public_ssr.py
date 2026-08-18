@@ -855,3 +855,95 @@ def test_saved_copy_no_fallback_when_source_deleted(app, client):
     body = resp.get_data(as_text=True)
     # No image shown, page still renders
     assert "Orphaned Copy" in body
+
+
+def test_saved_copy_no_fallback_when_source_unpublished(app, client):
+    """A private source's image must NOT leak into a public copy's og:image.
+
+    If the source is unpublished after copies were made, _resolve_source_for_image
+    must return None — otherwise the copy's page emits a /api/recipes/<source>/image
+    URL that 404s for anonymous visitors (and leaks a stock_image_url for a
+    private recipe).
+    """
+    with app.app_context():
+        source = Recipe(
+            id=str(uuid.uuid4()),
+            name="Now-Private Source",
+            slug="now-private-source",
+            is_public=False,  # unpublished after the copy was saved
+            data={
+                "name": "Now-Private Source",
+                "description": "Was public, now private.",
+                "ai_image_gcs": "gs://bucket/private/img.png",
+                "stock_image_url": "https://img.example/private-stock.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Now-Private Source",
+            slug="copy-of-now-private",
+            is_public=True,
+            source_slug="now-private-source",
+            source_recipe_id=source.id,  # FK resolves, but source is private
+            data={"name": "Now-Private Source", "description": "Copy."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+        source_id = source.id
+
+    resp = client.get("/r/copy-of-now-private")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The source's image endpoint must NOT appear
+    assert f"/api/recipes/{source_id}/image" not in body
+    # The source's stock_image_url must NOT leak either
+    assert "https://img.example/private-stock.jpg" not in body
+    # Page still renders the recipe content
+    assert "Now-Private Source" in body
+
+
+def test_save_flow_copies_stock_image_url_from_source(app):
+    """The repository's stage_new path copies stock_image_url from the source.
+
+    Exercises the save-time copy in db_recipe_repository.create_recipe rather
+    than just the read-time fallback. Per KAN-215: stock_image_url is safe to
+    copy (external URL, not deleted on regeneration) unlike ai_image_gcs.
+    """
+    from repositories import db_recipe_repository
+
+    with app.app_context():
+        # Create a public source with a stock image
+        source = Recipe(
+            id="src-stock-001",
+            name="Stock Source",
+            slug="stock-source",
+            is_public=True,
+            data={
+                "name": "Stock Source",
+                "description": "Has stock image.",
+                "stock_image_url": "https://img.example/stock-original.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.commit()
+
+        # Save a copy via the repository (the real save flow)
+        copy_data = {
+            "id": "copy-stock-001",
+            "name": "Stock Source",
+            "sourceSlug": "stock-source",
+        }
+        owner = User(email="saver@example.com", name="Saver")
+        db.session.add(owner)
+        db.session.commit()
+
+        recipe = db_recipe_repository.create_recipe(copy_data, user_id=owner.id)
+
+        assert recipe is not None
+        # The copy's data blob must now contain the source's stock_image_url
+        assert recipe.data.get("stock_image_url") == "https://img.example/stock-original.jpg"
+        # The source_recipe_id FK must be set
+        assert recipe.source_recipe_id == "src-stock-001"
