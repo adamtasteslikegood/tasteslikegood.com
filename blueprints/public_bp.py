@@ -23,6 +23,7 @@ from xml.etree.ElementTree import Element, SubElement, tostring
 from flask import Blueprint, Response, abort, jsonify, render_template, request, url_for
 from sqlalchemy.orm import joinedload
 
+from extensions import db
 from models import Recipe
 
 logger = logging.getLogger(__name__)
@@ -72,22 +73,57 @@ def _minutes_to_iso_duration(value: Any) -> str | None:
     return f"PT{minutes}M"
 
 
-def _recipe_image_url(recipe: Recipe) -> str | None:
-    """URL of an image the site can actually serve, or ``None`` to omit it.
+def _own_image_url(recipe: Recipe) -> str | None:
+    """Image URL from the recipe's own data blob — no source fallback.
 
-    A recipe row can carry an ``ai_image_url`` whose bytes were never
-    persisted (the /api/recipes/<id>/image endpoint then 404s). Trusting that
-    field produced dead hero images and dead ``og:image`` URLs on live
-    recipe pages (cookbook #3164). Derive the page media from the signal the
-    image endpoint actually serves from (real GCS/base64 bytes), else an
-    external stock image — never from the unverified ``ai_image_url``.
-    The same gate feeds the Pinterest share button, so the pin media and the
-    page media can never disagree.
+    Derives the page media from the signal the image endpoint actually serves
+    from (real GCS/base64 bytes), else an external stock image — never from
+    the unverified ``ai_image_url`` (cookbook #3164).
     """
     data = recipe.data or {}
     if data.get("ai_image_gcs") or data.get("ai_image_data"):
         return _canonical_url("generation_api.serve_recipe_image", recipe_id=recipe.id)
     return _absolute_url(data.get("stock_image_url"))
+
+
+def _resolve_source_for_image(recipe: Recipe) -> Recipe | None:
+    """Look up the source recipe for image fallback.
+
+    Returns ``None`` when the recipe is not a saved copy or when the source
+    has been deleted.  Prefers the immutable ``source_recipe_id`` FK; falls
+    back to ``source_slug`` for legacy copies whose FK was never backfilled.
+    """
+    if recipe.source_recipe_id:
+        return db.session.get(Recipe, recipe.source_recipe_id)
+    if recipe.source_slug:
+        source: Recipe | None = Recipe.query.filter(
+            Recipe.slug == recipe.source_slug, Recipe.is_public.is_(True)
+        ).first()
+        return source
+    return None
+
+
+def _recipe_image_url(recipe: Recipe) -> str | None:
+    """URL of an image the site can actually serve, or ``None`` to omit it.
+
+    KAN-215: saved copies (recipes with ``source_recipe_id`` or
+    ``source_slug``) often lack their own image data because the SPA save
+    flow does not propagate ``ai_image_gcs`` / ``ai_image_data``.  When the
+    recipe's own data has no serveable image, fall back to the source
+    recipe's image — resolving its *current* state so the pointer is always
+    live (no stale GCS URI if the source regenerates).
+
+    The same gate feeds the Pinterest share button, so the pin media and the
+    page media can never disagree.
+    """
+    url = _own_image_url(recipe)
+    if url is not None:
+        return url
+    # Saved copy with no image of its own — resolve from source.
+    source = _resolve_source_for_image(recipe)
+    if source is not None:
+        return _own_image_url(source)
+    return None
 
 
 def _format_ingredient(ingredient: Mapping[str, Any]) -> str:

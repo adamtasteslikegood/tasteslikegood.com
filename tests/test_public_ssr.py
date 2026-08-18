@@ -685,3 +685,173 @@ def test_public_recipe_page_links_save_cta_to_spa_save_url(app, client):
     resp = client.get("/r/thai-peanut-noodles")
     body = resp.get_data(as_text=True)
     assert "/?save=thai-peanut-noodles#kitchen" in body
+
+
+# ---------------------------------------------------------------------------
+# KAN-215: saved-copy image fallback from source recipe
+# ---------------------------------------------------------------------------
+
+
+def test_saved_copy_inherits_source_ai_image_via_fallback(app, client):
+    """A published saved copy with no image of its own falls back to the
+    source recipe's AI image (via source_recipe_id) on /r/<slug>."""
+    with app.app_context():
+        source = _make_recipe(
+            "Original Curry",
+            "original-curry",
+            data={
+                "name": "Original Curry",
+                "description": "Has an AI image.",
+                "ai_image_gcs": "gs://bucket/curry/v1.png",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Original Curry",
+            slug="my-original-curry-copy",
+            is_public=True,
+            source_slug="original-curry",
+            source_recipe_id=source.id,
+            data={"name": "Original Curry", "description": "Saved copy."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+        source_id = source.id
+
+    resp = client.get("/r/my-original-curry-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The og:image and hero should use the source's image endpoint
+    expected_url = f"/api/recipes/{source_id}/image"
+    assert expected_url in body
+
+
+def test_saved_copy_inherits_source_stock_image_via_fallback(app, client):
+    """A published saved copy falls back to the source's stock_image_url."""
+    with app.app_context():
+        source = _make_recipe(
+            "Stock Photo Stew",
+            "stock-photo-stew",
+            data={
+                "name": "Stock Photo Stew",
+                "description": "Has a stock image.",
+                "stock_image_url": "https://img.example/stew.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Stock Photo Stew",
+            slug="my-stock-stew-copy",
+            is_public=True,
+            source_slug="stock-photo-stew",
+            source_recipe_id=source.id,
+            data={"name": "Stock Photo Stew", "description": "Saved copy."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/my-stock-stew-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "https://img.example/stew.jpg" in body
+
+
+def test_saved_copy_with_own_image_does_not_fall_back(app, client):
+    """A copy that already has its own image must use it, not the source's."""
+    with app.app_context():
+        source = _make_recipe(
+            "Source Dish",
+            "source-dish",
+            data={
+                "name": "Source Dish",
+                "description": "Source.",
+                "stock_image_url": "https://img.example/source.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Source Dish",
+            slug="my-source-dish-copy",
+            is_public=True,
+            source_slug="source-dish",
+            source_recipe_id=source.id,
+            data={
+                "name": "Source Dish",
+                "description": "Copy with own image.",
+                "stock_image_url": "https://img.example/copy-own.jpg",
+            },
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/my-source-dish-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "https://img.example/copy-own.jpg" in body
+    assert "https://img.example/source.jpg" not in body
+
+
+def test_saved_copy_falls_back_via_source_slug_when_no_fk(app, client):
+    """Legacy copies with source_slug but no source_recipe_id still resolve."""
+    with app.app_context():
+        source = _make_recipe(
+            "Legacy Source",
+            "legacy-source",
+            data={
+                "name": "Legacy Source",
+                "description": "Has image.",
+                "ai_image_gcs": "gs://bucket/legacy/v1.png",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Legacy Source",
+            slug="legacy-copy",
+            is_public=True,
+            source_slug="legacy-source",
+            source_recipe_id=None,  # FK never backfilled
+            data={"name": "Legacy Source", "description": "Legacy copy."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+        source_id = source.id
+
+    resp = client.get("/r/legacy-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    expected_url = f"/api/recipes/{source_id}/image"
+    assert expected_url in body
+
+
+def test_saved_copy_no_fallback_when_source_deleted(app, client):
+    """When the source recipe is gone, the copy shows no image (not crash)."""
+    with app.app_context():
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Orphaned Copy",
+            slug="orphaned-copy",
+            is_public=True,
+            source_slug="deleted-source",
+            source_recipe_id=None,  # source deleted, FK set NULL
+            data={"name": "Orphaned Copy", "description": "Source gone."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/orphaned-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # No image shown, page still renders
+    assert "Orphaned Copy" in body
