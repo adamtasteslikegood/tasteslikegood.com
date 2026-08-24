@@ -11,6 +11,7 @@ from flask import session
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from services.image_service import (
+    extract_image_bytes,
     generate_ai_image,
     save_image_file,
     update_recipe_with_image,
@@ -141,6 +142,55 @@ class TestImageServiceHelpers(unittest.TestCase):
             recipe_data["ai_metadata"]["image_generation"]["image_path"],
             "static/images/ai_test.png",
         )
+
+
+class TestExtractImageBytes(unittest.TestCase):
+    def test_normal_inline_image(self):
+        part = MagicMock()
+        part.inline_data.data = b"image-bytes"
+        candidate = MagicMock()
+        candidate.content.parts = [part]
+        response = MagicMock()
+        response.candidates = [candidate]
+
+        self.assertEqual(extract_image_bytes(response), b"image-bytes")
+
+    def test_no_candidates(self):
+        response = MagicMock()
+        response.candidates = []
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_content_is_none(self):
+        candidate = MagicMock()
+        candidate.content = None
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_parts_is_none(self):
+        candidate = MagicMock()
+        candidate.content.parts = None
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_no_inline_data_in_parts(self):
+        part = MagicMock()
+        part.inline_data = None
+        candidate = MagicMock()
+        candidate.content.parts = [part]
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_empty_data_in_inline_data(self):
+        part = MagicMock()
+        part.inline_data.data = b""
+        candidate = MagicMock()
+        candidate.content.parts = [part]
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
 
 
 if __name__ == "__main__":
