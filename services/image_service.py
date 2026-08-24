@@ -57,7 +57,7 @@ def _image_filename(filename):
 
 def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
     """
-    Generate an AI image for a recipe using Gemini Imagen.
+    Generate an AI image for a recipe using the configured Gemini image model.
 
     This function combines the logic of both generate_recipe_image and regenerate_recipe_image
     into a single, reusable function.
@@ -81,8 +81,8 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
     if force_regenerate and "ai_image_url" in recipe_data:
         del recipe_data["ai_image_url"]
 
-    # Imagen is a server-side operation. Identity-only OAuth credentials are
-    # insufficient for image generation, so always use the configured server
+    # Image generation is a server-side operation. Identity-only OAuth
+    # credentials are insufficient for it, so always use the configured server
     # credential instead of a signed-in user's session token.
     client = get_genai_client(None)
 
@@ -117,12 +117,7 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
             ),
         )
 
-        image_bytes = None
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.data:
-                    image_bytes = part.inline_data.data
-                    break
+        image_bytes = _extract_image_bytes(response)
         if not image_bytes:
             return None, {"error": "No images generated", "status": 500}
 
@@ -157,6 +152,25 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
             f.write(f"\nLast Error (Image Gen): {repr(e)}\nTraceback:\n{traceback_str}\n")
 
         return None, {"error": "Image generation failed", "status": 500}
+
+
+def _extract_image_bytes(response):
+    """Return the first image blob from a generate_content response, or None.
+
+    Mirrors the SDK's own defensive walk (see
+    ``GenerateContentResponse._get_text`` in ``google.genai.types``): every
+    field in ``response.candidates[0].content.parts`` is ``Optional`` and can
+    be ``None`` on safety blocks or text-only refusals.
+    """
+    if not response.candidates:
+        return None
+    content = response.candidates[0].content
+    if not content or not content.parts:
+        return None
+    for part in content.parts:
+        if part.inline_data and part.inline_data.data:
+            return part.inline_data.data
+    return None
 
 
 def save_image_bytes(image_data, filename):

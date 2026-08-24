@@ -19,6 +19,7 @@ from blueprints.generation_bp import attempt_recipe_generation, build_generation
 from utils.cache_utils import invalidate_recipe, invalidate_recipe_image
 from utils.log_sanitizer import sanitize_log_value
 from services.gemini_service import get_genai_client
+from services.image_service import _extract_image_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -642,12 +643,7 @@ def process_image():
                 ),
             )
 
-            image_bytes = None
-            if response.candidates:
-                for part in response.candidates[0].content.parts:
-                    if part.inline_data and part.inline_data.data:
-                        image_bytes = part.inline_data.data
-                        break
+            image_bytes = _extract_image_bytes(response)
             if not image_bytes:
                 raise RetryableImageError("No images generated")
             image_url = f"/api/recipes/{recipe_id}/image"
