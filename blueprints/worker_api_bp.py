@@ -8,6 +8,7 @@ from functools import wraps
 from flask import Blueprint, request, jsonify, abort
 
 from google.auth.transport import requests as g_requests
+from google.genai import types as genai_types
 from google.genai.errors import APIError, ServerError
 from google.oauth2 import id_token
 from httpx import TransportError
@@ -633,8 +634,6 @@ def process_image():
         uploaded_gcs_uri = None
         image_persisted = False
         try:
-            from google.genai import types as genai_types
-
             response = client.models.generate_content(
                 model=IMAGE_MODEL,
                 contents=image_prompt,

@@ -20,6 +20,9 @@ import traceback
 from flask import has_request_context, url_for
 from werkzeug.utils import secure_filename
 
+from google.genai import types as genai_types
+
+from config import IMAGE_MODEL
 from services.gemini_service import get_genai_client
 from utils.session_utils import get_user_metadata
 
@@ -95,9 +98,6 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
         else:
             user_metadata = _anonymous_user_metadata()
         _ = user_metadata["user_id"]  # noqa: F841
-
-        from config import IMAGE_MODEL
-        from google.genai import types as genai_types
 
         model_to_use = IMAGE_MODEL
         image_prompt = (
