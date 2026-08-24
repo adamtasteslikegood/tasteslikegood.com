@@ -60,19 +60,23 @@ class TestImageService(unittest.TestCase):
 
     @patch("services.image_service.get_genai_client")
     @patch("services.image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
-    @patch("services.image_service.save_image_file")
+    @patch("services.image_service.save_image_bytes")
     @patch("services.image_service.update_recipe_with_image")
     @patch("builtins.open", new_callable=mock_open)
     def test_successful_generation(
         self, mock_file_open, mock_update, mock_save, mock_meta, mock_client
     ):
         """Should complete the entire generation pipeline and save the JSON."""
-        # Setup mock client and response
         mock_gen_client = MagicMock()
         mock_client.return_value = mock_gen_client
+
+        mock_part = MagicMock()
+        mock_part.inline_data.data = b"fake-image-bytes"
+        mock_candidate = MagicMock()
+        mock_candidate.content.parts = [mock_part]
         mock_response = MagicMock()
-        mock_response.generated_images = [MagicMock()]
-        mock_gen_client.models.generate_images.return_value = mock_response
+        mock_response.candidates = [mock_candidate]
+        mock_gen_client.models.generate_content.return_value = mock_response
 
         mock_save.return_value = "/static/images/ai_test.png"
         recipe_data = {"name": "Test Recipe"}
@@ -81,13 +85,10 @@ class TestImageService(unittest.TestCase):
             "path/test.json", recipe_data, "test.json", force_regenerate=True
         )
 
-        # Verify it saved and returned the url
         self.assertEqual(url, "/static/images/ai_test.png")
         self.assertIsNone(err)
         mock_save.assert_called_once()
         mock_update.assert_called_once()
-
-        # Verify file write for the JSON was called
         mock_file_open().write.assert_called()
 
     @patch("services.image_service.get_genai_client")

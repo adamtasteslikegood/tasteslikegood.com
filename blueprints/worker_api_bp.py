@@ -12,7 +12,7 @@ from google.genai.errors import APIError, ServerError
 from google.oauth2 import id_token
 from httpx import TransportError
 
-from config import GENAI_HTTP_TIMEOUT_MS, GCS_BUCKET_NAME, WORKER_CLAIM_STALE_SECONDS
+from config import GENAI_HTTP_TIMEOUT_MS, GCS_BUCKET_NAME, IMAGE_MODEL, WORKER_CLAIM_STALE_SECONDS
 from repositories import db_recipe_repository
 from blueprints.generation_bp import attempt_recipe_generation, build_generation_prompt
 from utils.cache_utils import invalidate_recipe, invalidate_recipe_image
@@ -238,7 +238,7 @@ def _image_generation_metadata(
     timestamp = datetime.datetime.now().isoformat()
     metadata = {
         "image_generation": {
-            "model": "imagen-4.0-generate-001",
+            "model": IMAGE_MODEL,
             "user_id": user_id,
             "user_display_name": "Background Worker",
             "is_authenticated": user_id is not None,
@@ -633,16 +633,24 @@ def process_image():
         uploaded_gcs_uri = None
         image_persisted = False
         try:
-            response = client.models.generate_images(
-                model="imagen-4.0-generate-001",
-                prompt=image_prompt,
-                config={"number_of_images": 1},
+            from google.genai import types as genai_types
+
+            response = client.models.generate_content(
+                model=IMAGE_MODEL,
+                contents=image_prompt,
+                config=genai_types.GenerateContentConfig(
+                    response_modalities=["IMAGE"],
+                ),
             )
 
-            if not response.generated_images:
+            image_bytes = None
+            if response.candidates:
+                for part in response.candidates[0].content.parts:
+                    if part.inline_data and part.inline_data.data:
+                        image_bytes = part.inline_data.data
+                        break
+            if not image_bytes:
                 raise RetryableImageError("No images generated")
-
-            image_bytes = response.generated_images[0].image.image_bytes
             image_url = f"/api/recipes/{recipe_id}/image"
             image_patch = {"ai_image_url": image_url}
             remove_data_fields: tuple[str, ...] = ()
