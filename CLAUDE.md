@@ -128,6 +128,8 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `DATABASE_URL`                   | PostgreSQL in prod, `sqlite:///tasteslikegood.db` in dev. `postgres://` auto-rewritten.          |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | OAuth                                                                                   |
 | `GOOGLE_API_KEY`                 | Gemini fallback when user has no OAuth                                                           |
+| `GEMINI_DEFAULT_MODEL`           | Overrides the default generation model. Defaults to `gemini-3.1-pro-preview` when unset/empty.   |
+| `GEMINI_IMAGE_MODEL`             | Overrides the image generation model. Defaults to `gemini-3.1-flash-image` when unset/empty.     |
 | `FLASK_SECRET_KEY`               | Session signing. **Required in prod** — fails fast if missing.                                   |
 | `FLASK_ENV`                      | `production` activates guards + secret-key fail-fast.                                            |
 | `GCS_BUCKET_NAME`               | Recipe image storage (`tasteslikegood-recipe-images` in prod)                                    |

@@ -309,16 +309,22 @@ def test_image_worker_persists_generated_image(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -364,7 +370,7 @@ def test_image_worker_records_generation_failure(app, client):
         db.session.commit()
 
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
             raise RuntimeError("Imagen unavailable")
 
     class FakeClient:
@@ -395,7 +401,7 @@ def test_image_worker_records_terminal_generation_failure(app, client):
         _make_pending_recipe(recipe_id, status="ready")
 
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
             raise ValueError("Invalid image request")
 
     class FakeClient:
@@ -416,7 +422,7 @@ def test_image_worker_retries_http_transport_failure(app, client):
         _make_pending_recipe(recipe_id, status="ready")
 
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
             raise ReadTimeout("Imagen timed out", request=Request("POST", "https://example.test"))
 
     class FakeClient:
@@ -442,16 +448,22 @@ def test_legacy_image_delivery_completes_pending_non_force_request(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -538,16 +550,22 @@ def test_image_worker_uploads_to_gcs_when_configured(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -625,16 +643,22 @@ def test_image_worker_uses_owner_after_guest_login(app, client):
         db.session.commit()
         owner_id = user.id
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -884,14 +908,8 @@ def test_superseded_image_worker_cannot_commit_generated_bytes(app, client):
     with app.app_context():
         _make_pending_recipe(recipe_id, status="ready")
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"superseded-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **_kwargs):
+        def generate_content(self, **_kwargs):
             nonlocal replacement_claim
             recipe = db.session.get(Recipe, recipe_id)
             recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
@@ -903,8 +921,20 @@ def test_superseded_image_worker_cannot_commit_generated_bytes(app, client):
                 stale_after_seconds=120,
             )
 
+            class InlineData:
+                data = b"superseded-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -946,14 +976,8 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **_kwargs):
+        def generate_content(self, **_kwargs):
             updated = db_recipe_repository.update_recipe(
                 recipe_id,
                 {
@@ -971,8 +995,20 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
             )
             assert updated is not None
 
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -1053,14 +1089,8 @@ def test_superseded_gcs_worker_deletes_its_versioned_orphan(app, client):
     with app.app_context():
         _make_pending_recipe(recipe_id, status="ready")
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"superseded-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **_kwargs):
+        def generate_content(self, **_kwargs):
             nonlocal replacement_claim
             recipe = db.session.get(Recipe, recipe_id)
             recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
@@ -1072,8 +1102,20 @@ def test_superseded_gcs_worker_deletes_its_versioned_orphan(app, client):
                 stale_after_seconds=120,
             )
 
+            class InlineData:
+                data = b"superseded-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
