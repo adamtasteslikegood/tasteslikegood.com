@@ -37,6 +37,22 @@ def _anonymous_user_metadata():
     }
 
 
+def extract_image_bytes(response):
+    """Extract image bytes from a generate_content response, or None."""
+    if not response.candidates:
+        return None
+    candidate = response.candidates[0]
+    if not getattr(candidate, "content", None):
+        return None
+    parts = getattr(candidate.content, "parts", None)
+    if not parts:
+        return None
+    for part in parts:
+        if part.inline_data and part.inline_data.data:
+            return part.inline_data.data
+    return None
+
+
 def _image_filename(filename):
     """Map a recipe filename to its AI image filename inside static/images/.
 
@@ -117,12 +133,7 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
             ),
         )
 
-        image_bytes = None
-        if response.candidates:
-            for part in response.candidates[0].content.parts:
-                if part.inline_data and part.inline_data.data:
-                    image_bytes = part.inline_data.data
-                    break
+        image_bytes = extract_image_bytes(response)
         if not image_bytes:
             return None, {"error": "No images generated", "status": 500}
 
