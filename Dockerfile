@@ -4,7 +4,7 @@
 # (v0.3.0 migrate job died on ModuleNotFoundError: flask_cors; see
 # docs/ci/CI-AUDIT-REPORT.md). --frozen means the lockfile is used exactly as
 # committed, never re-resolved at build time.
-FROM ghcr.io/astral-sh/uv:0.12.3-python3.13-trixie-slim AS export
+FROM ghcr.io/astral-sh/uv:0.12.5-python3.13-trixie-slim AS export
 WORKDIR /export
 COPY pyproject.toml uv.lock ./
 RUN uv export --format requirements-txt --no-dev --extra postgres \
