@@ -1,11 +1,11 @@
 """
-AI image generation service using Gemini Imagen.
+AI image generation service using the Gemini image model.
 
 Deduplicates the previously separate generate_recipe_image and regenerate_recipe_image functions
 into a single, flexible image generation workflow.
 
 Handles:
-- AI image generation via Imagen model
+- AI image generation via generate_content with IMAGE_MODEL
 - Image file saving to static/images/
 - Recipe metadata updates
 - Error logging with traceback
@@ -197,7 +197,7 @@ def update_recipe_with_image(
     if "ai_metadata" not in recipe_data:
         recipe_data["ai_metadata"] = {}
 
-    # Same helper as save_image_file() so the recorded path matches the file
+    # Same helper as save_image_bytes() so the recorded path matches the file
     image_filename = _image_filename(filename)
     image_path = os.path.join("static", "images", image_filename)
 
