@@ -11,6 +11,7 @@ from flask import session
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from services.image_service import (
+    extract_image_bytes,
     generate_ai_image,
     save_image_file,
     update_recipe_with_image,
@@ -60,19 +61,23 @@ class TestImageService(unittest.TestCase):
 
     @patch("services.image_service.get_genai_client")
     @patch("services.image_service.get_user_metadata", return_value=MOCK_USER_METADATA)
-    @patch("services.image_service.save_image_file")
+    @patch("services.image_service.save_image_bytes")
     @patch("services.image_service.update_recipe_with_image")
     @patch("builtins.open", new_callable=mock_open)
     def test_successful_generation(
         self, mock_file_open, mock_update, mock_save, mock_meta, mock_client
     ):
         """Should complete the entire generation pipeline and save the JSON."""
-        # Setup mock client and response
         mock_gen_client = MagicMock()
         mock_client.return_value = mock_gen_client
+
+        mock_part = MagicMock()
+        mock_part.inline_data.data = b"fake-image-bytes"
+        mock_candidate = MagicMock()
+        mock_candidate.content.parts = [mock_part]
         mock_response = MagicMock()
-        mock_response.generated_images = [MagicMock()]
-        mock_gen_client.models.generate_images.return_value = mock_response
+        mock_response.candidates = [mock_candidate]
+        mock_gen_client.models.generate_content.return_value = mock_response
 
         mock_save.return_value = "/static/images/ai_test.png"
         recipe_data = {"name": "Test Recipe"}
@@ -81,13 +86,10 @@ class TestImageService(unittest.TestCase):
             "path/test.json", recipe_data, "test.json", force_regenerate=True
         )
 
-        # Verify it saved and returned the url
         self.assertEqual(url, "/static/images/ai_test.png")
         self.assertIsNone(err)
         mock_save.assert_called_once()
         mock_update.assert_called_once()
-
-        # Verify file write for the JSON was called
         mock_file_open().write.assert_called()
 
     @patch("services.image_service.get_genai_client")
@@ -140,6 +142,55 @@ class TestImageServiceHelpers(unittest.TestCase):
             recipe_data["ai_metadata"]["image_generation"]["image_path"],
             "static/images/ai_test.png",
         )
+
+
+class TestExtractImageBytes(unittest.TestCase):
+    def test_normal_inline_image(self):
+        part = MagicMock()
+        part.inline_data.data = b"image-bytes"
+        candidate = MagicMock()
+        candidate.content.parts = [part]
+        response = MagicMock()
+        response.candidates = [candidate]
+
+        self.assertEqual(extract_image_bytes(response), b"image-bytes")
+
+    def test_no_candidates(self):
+        response = MagicMock()
+        response.candidates = []
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_content_is_none(self):
+        candidate = MagicMock()
+        candidate.content = None
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_parts_is_none(self):
+        candidate = MagicMock()
+        candidate.content.parts = None
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_no_inline_data_in_parts(self):
+        part = MagicMock()
+        part.inline_data = None
+        candidate = MagicMock()
+        candidate.content.parts = [part]
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
+
+    def test_empty_data_in_inline_data(self):
+        part = MagicMock()
+        part.inline_data.data = b""
+        candidate = MagicMock()
+        candidate.content.parts = [part]
+        response = MagicMock()
+        response.candidates = [candidate]
+        self.assertIsNone(extract_image_bytes(response))
 
 
 if __name__ == "__main__":
