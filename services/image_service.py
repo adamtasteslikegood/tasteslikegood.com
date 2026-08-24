@@ -73,7 +73,7 @@ def _image_filename(filename):
 
 def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
     """
-    Generate an AI image for a recipe using Gemini Imagen.
+    Generate an AI image for a recipe using the Gemini image model.
 
     This function combines the logic of both generate_recipe_image and regenerate_recipe_image
     into a single, reusable function.
@@ -97,9 +97,9 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
     if force_regenerate and "ai_image_url" in recipe_data:
         del recipe_data["ai_image_url"]
 
-    # Imagen is a server-side operation. Identity-only OAuth credentials are
-    # insufficient for image generation, so always use the configured server
-    # credential instead of a signed-in user's session token.
+    # Image generation is a server-side operation. Identity-only OAuth
+    # credentials are insufficient for image generation, so always use the
+    # configured server credential instead of a signed-in user's session token.
     client = get_genai_client(None)
 
     if not client:
