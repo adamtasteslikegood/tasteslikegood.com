@@ -908,12 +908,12 @@ def test_saved_copy_no_fallback_when_source_unpublished(app, client):
     assert "Now-Private Source" in body
 
 
-def test_save_flow_does_not_copy_stock_image_url_from_source(app):
-    """The repository's stage_new path copies stock_image_url from the source.
+def test_save_flow_does_not_persist_inherited_stock_image_url(app):
+    """The repository strips the source stock URL sent by the SPA save flow.
 
-    Exercises the save-time copy in db_recipe_repository.create_recipe rather
-    than just the read-time fallback. Per KAN-215: stock_image_url is safe to
-    copy (external URL, not deleted on regeneration) unlike ai_image_gcs.
+    The frontend maps the public recipe's stock_image_url into the saved-copy
+    payload. Merely avoiding a second server-side copy is insufficient: the
+    inherited value must be removed before the new recipe data is persisted.
     """
     from repositories import db_recipe_repository
 
@@ -938,6 +938,9 @@ def test_save_flow_does_not_copy_stock_image_url_from_source(app):
             "id": "copy-stock-001",
             "name": "Stock Source",
             "sourceSlug": "stock-source",
+            # Mirrors buildSavedRecipeFromPublic: the source stock image is
+            # already present in the client payload.
+            "stock_image_url": "https://img.example/stock-original.jpg",
         }
         owner = User(email="saver@example.com", name="Saver")
         db.session.add(owner)
