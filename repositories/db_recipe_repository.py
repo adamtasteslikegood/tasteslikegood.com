@@ -932,17 +932,17 @@ def create_recipe(
                 author_id = source.user_id if source else None
                 source_recipe_id = source.id if source else None
                 saved_to_id = user_id
-                # KAN-215: copy stock_image_url from the source so the copy
-                # has its own image pointer.  ai_image_gcs / ai_image_data are
-                # NOT copied — if the source regenerates, the old GCS object
-                # is deleted (_delete_replaced_gcs_image), which would break a
-                # shared pointer.  The read-time fallback in public_bp
-                # _recipe_image_url handles AI images by resolving the
-                # source's current state at render time.
-                if source is not None:
-                    source_data = source.data or {}
-                    if source_data.get("stock_image_url") and not data.get("stock_image_url"):
-                        data["stock_image_url"] = source_data["stock_image_url"]
+                # KAN-215: the source's stock_image_url is deliberately NOT
+                # copied onto the copy.  Persisting it made an inherited URL
+                # indistinguishable from one the copy genuinely owns, so
+                # public_bp._recipe_image_url returned it before ever
+                # resolving the source — pinning the copy to the stock image
+                # permanently, including after the source gained an AI image
+                # (AI generation preserves stock_image_url, so a source
+                # carrying both is a normal state).  That defeated the
+                # read-time fallback this ticket exists to add.  Neither
+                # image field is copied now; public_bp resolves the source's
+                # current state at render time instead.
             else:
                 # Original recipe: author = owner, no saver, no source.
                 author_id = user_id

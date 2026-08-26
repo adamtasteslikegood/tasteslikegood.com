@@ -153,6 +153,13 @@ def _recipe_image_url(recipe: Recipe) -> str | None:
 
     The same gate feeds the Pinterest share button, so the pin media and the
     page media can never disagree.
+
+    A copy's own image always wins.  That is only sound because nothing
+    copies the source's ``stock_image_url`` onto the copy at save time — if
+    anything did, the inherited URL would be indistinguishable from an image
+    the copy genuinely owns, would be returned here before the source was
+    ever resolved, and would pin the copy to the stock image permanently,
+    including after the source gained an AI image.  Resolve live instead.
     """
     url = _own_image_url(recipe)
     if url is not None:

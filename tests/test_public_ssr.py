@@ -908,7 +908,7 @@ def test_saved_copy_no_fallback_when_source_unpublished(app, client):
     assert "Now-Private Source" in body
 
 
-def test_save_flow_copies_stock_image_url_from_source(app):
+def test_save_flow_does_not_copy_stock_image_url_from_source(app):
     """The repository's stage_new path copies stock_image_url from the source.
 
     Exercises the save-time copy in db_recipe_repository.create_recipe rather
@@ -946,9 +946,14 @@ def test_save_flow_copies_stock_image_url_from_source(app):
         recipe = db_recipe_repository.create_recipe(copy_data, user_id=owner.id)
 
         assert recipe is not None
-        # The copy's data blob must now contain the source's stock_image_url
-        assert recipe.data.get("stock_image_url") == "https://img.example/stock-original.jpg"
-        # The source_recipe_id FK must be set
+        # The source's stock_image_url must NOT be copied onto the copy.
+        # Persisting it made an inherited URL indistinguishable from one the
+        # copy genuinely owns, so _recipe_image_url returned it before ever
+        # resolving the source — pinning the copy to the stock image even
+        # after the source gained an AI image.
+        assert recipe.data.get("stock_image_url") is None
+        # The source_recipe_id FK must still be set — provenance is the part
+        # the save flow does persist.
         assert recipe.source_recipe_id == "src-stock-001"
 
 
