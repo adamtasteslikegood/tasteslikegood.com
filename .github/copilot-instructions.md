@@ -48,7 +48,7 @@ All browser traffic arrives through the cookbook repo's Express proxy. `ProxyFix
 
 ### Gemini auth is dual-credential
 
-`services/gemini_service.py:get_genai_client(session_credentials)` prefers caller-supplied user OAuth credentials, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works — it never reads the Flask session itself. Today the generation call sites (`image_service`, the Pub/Sub worker) pass `None`, so generation runs on the server key; only model refresh (`api_bp` → `refresh_models_from_api`) forwards `session.get("credentials")`. Preserve that preference order. Model IDs from the model-list API carry the `models/` prefix — filter listings by `generateContent` in `supported_generation_methods` — while `config.py:DEFAULT_MODEL` and the generation paths use bare IDs (`gemini-3.1-pro-preview`). Both forms are in active use; don't flag either as wrong.
+`services/gemini_service.py:get_genai_client(session_credentials)` prefers caller-supplied user OAuth credentials, falls back to the server `GOOGLE_API_KEY`, and returns `None` if neither works — it never reads the Flask session itself. Today the generation call sites (`image_service`, the Pub/Sub worker) pass `None`, so generation runs on the server key; only model refresh (`api_bp` → `refresh_models_from_api`) forwards `session.get("credentials")`. Preserve that preference order. Model IDs from the model-list API carry the `models/` prefix — filter listings by `generateContent` in `supported_generation_methods` — while `config.py:DEFAULT_MODEL` and the generation paths use bare IDs (`gemini-3.7-flash`). Both forms are in active use; don't flag either as wrong.
 
 ### Caching
 
