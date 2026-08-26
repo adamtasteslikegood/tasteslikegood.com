@@ -813,6 +813,11 @@ def test_saved_copy_falls_back_via_source_slug_when_no_fk(app, client):
                 "ai_image_gcs": "gs://bucket/legacy/v1.png",
             },
         )
+        # Pin created_at explicitly: the slug arm of _resolve_source_for_image
+        # requires source.created_at strictly < copy.created_at, so relying on
+        # the default=datetime.utcnow ordering makes this test race the
+        # microsecond clock.
+        source.created_at = datetime(2026, 1, 1, 12, 0, 0)
         db.session.add(source)
         db.session.flush()
 
@@ -824,6 +829,7 @@ def test_saved_copy_falls_back_via_source_slug_when_no_fk(app, client):
             source_slug="legacy-source",
             source_recipe_id=None,  # FK never backfilled
             data={"name": "Legacy Source", "description": "Legacy copy."},
+            created_at=datetime(2026, 6, 1, 12, 0, 0),
         )
         db.session.add(copy)
         db.session.commit()

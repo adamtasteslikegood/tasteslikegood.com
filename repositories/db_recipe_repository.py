@@ -897,8 +897,12 @@ def create_recipe(
             _preserve_worker_metadata(existing.data or {}, merged)
             # KAN-215: a payload echo must not re-pin a saved copy to a stock
             # image inherited from its source. Same reasoning as is_canonical
-            # below — enforced on every write path, not just create.
-            if _is_saved_copy(existing):
+            # below — enforced on every write path, not just create. Guard on
+            # the RESULTING state, not the pre-update state: a payload that
+            # first-turns a non-copy row into a saved copy (by supplying
+            # ``sourceSlug``) would otherwise slip past a pre-update check and
+            # persist the inherited URL on the very write that made it a copy.
+            if _is_saved_copy(existing) or recipe_data.get("sourceSlug"):
                 _strip_inherited_stock_image(merged)
             # The is_canonical column is never writable through the API; pin
             # the blob to the column so a payload echo can't fake a lock.
@@ -1078,8 +1082,12 @@ def update_recipe(
         _preserve_worker_metadata(recipe.data or {}, merged)
         # KAN-215: a payload echo must not re-pin a saved copy to a stock image
         # inherited from its source. Same reasoning as is_canonical below —
-        # enforced on every write path, not just create.
-        if _is_saved_copy(recipe):
+        # enforced on every write path, not just create. Guard on the RESULTING
+        # state, not the pre-update state: a payload that first-turns a
+        # non-copy row into a saved copy (by supplying ``sourceSlug``) would
+        # otherwise slip past a pre-update check and persist the inherited URL
+        # on the very write that made it a copy.
+        if _is_saved_copy(recipe) or recipe_data.get("sourceSlug"):
             _strip_inherited_stock_image(merged)
         # Never writable through the API — pin the blob to the column.
         merged["is_canonical"] = recipe.is_canonical
