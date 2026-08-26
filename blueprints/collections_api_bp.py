@@ -19,6 +19,16 @@ from sqlalchemy.exc import IntegrityError
 
 from extensions import db
 from models import Cookbook
+from utils.cache_utils import (
+    MAX_JSON_CACHE_BYTES,
+    TTL_MEDIUM,
+    TTL_SHORT,
+    collection_key,
+    collections_list_key,
+    invalidate_collection,
+    safe_get,
+    safe_set,
+)
 from utils.log_sanitizer import sanitize_log_value
 from utils.session_utils import get_or_create_session_id
 
@@ -64,21 +74,23 @@ def _require_auth_or_guest(f):
 def list_collections(user_id, guest_session_id):
     """List all cookbooks owned by the current user (or anonymous)."""
     try:
+        ck = collections_list_key(user_id, guest_session_id)
+        cached = safe_get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         cookbooks = (
             _scope_collections_query(user_id, guest_session_id)
             .order_by(Cookbook.created_at.desc())
             .all()
         )
-        return (
-            jsonify(
-                {
-                    "collections": [cb.to_dict() for cb in cookbooks],
-                    "user_id": user_id,
-                    "guest_session_id": guest_session_id,
-                }
-            ),
-            200,
-        )
+        payload = {
+            "collections": [cb.to_dict() for cb in cookbooks],
+            "user_id": user_id,
+            "guest_session_id": guest_session_id,
+        }
+        safe_set(ck, payload, timeout=TTL_SHORT, max_bytes=MAX_JSON_CACHE_BYTES)
+        return jsonify(payload), 200
     except Exception as e:
         logger.error(f"Error listing collections: {e}")
         return jsonify({"error": "Failed to fetch collections"}), 500
@@ -138,6 +150,7 @@ def create_collection(user_id, guest_session_id):
         )
         db.session.add(cookbook)
         db.session.commit()
+        invalidate_collection(user_id, guest_session_id, cookbook.id)
         return jsonify(cookbook.to_dict()), 201
     except IntegrityError:
         # Lost a race: either the same id was inserted concurrently (idempotent
@@ -181,12 +194,21 @@ def create_collection(user_id, guest_session_id):
 def get_collection(user_id, guest_session_id, collection_id):
     """Get a specific cookbook by ID."""
     try:
+        # Owner-scoped key; see the note in recipes_api_bp.get_recipe for why the
+        # read may precede the scoped query here.
+        ck = collection_key(user_id, guest_session_id, collection_id)
+        cached = safe_get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         cookbook = (
             _scope_collections_query(user_id, guest_session_id).filter_by(id=collection_id).first()
         )
         if not cookbook:
             return jsonify({"error": "Collection not found"}), 404
-        return jsonify(cookbook.to_dict()), 200
+        payload = cookbook.to_dict()
+        safe_set(ck, payload, timeout=TTL_MEDIUM, max_bytes=MAX_JSON_CACHE_BYTES)
+        return jsonify(payload), 200
     except Exception as e:
         logger.error(
             "Error fetching collection %s: %s",
@@ -208,6 +230,8 @@ def delete_collection(user_id, guest_session_id, collection_id):
             return jsonify({"error": "Collection not found"}), 404
         db.session.delete(cookbook)
         db.session.commit()
+        # Clears both the object key and the list it appeared in.
+        invalidate_collection(user_id, guest_session_id, collection_id)
         return jsonify({"message": "Collection deleted"}), 200
     except Exception as e:
         logger.error(
@@ -246,6 +270,9 @@ def add_recipe_to_collection(user_id, guest_session_id, collection_id):
             cookbook.updated_at = datetime.utcnow()
             db.session.commit()
 
+        # recipeIds rides on both the object payload and every row of the list
+        # payload, so membership changes invalidate both.
+        invalidate_collection(user_id, guest_session_id, collection_id)
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
         logger.error(
@@ -273,6 +300,7 @@ def remove_recipe_from_collection(user_id, guest_session_id, collection_id, reci
         cookbook.updated_at = datetime.utcnow()
         db.session.commit()
 
+        invalidate_collection(user_id, guest_session_id, collection_id)
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
         logger.error(

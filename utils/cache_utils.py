@@ -7,6 +7,7 @@ All cache operations are fault-tolerant — failures log warnings
 and fall through to the database, never crash the request.
 """
 
+import json
 import logging
 
 from extensions import cache
@@ -18,6 +19,15 @@ logger = logging.getLogger(__name__)
 TTL_SHORT = 300  # 5 minutes — recipe stats, collections list
 TTL_MEDIUM = 600  # 10 minutes — individual recipes, collections
 TTL_IMAGE = 86400  # 24 hours — recipe images (rarely change)
+
+# Ceiling for cached JSON response payloads. Recipe rows written before the
+# GCS migration can still carry a base64 image under data["ai_image_data"]
+# (generation_api_bp still reads that fallback), so an unguarded set would put
+# multi-MB blobs in Valkey once per owner. Oversized payloads are simply not
+# cached — a miss returns exactly what a hit would have, so skipping is
+# always safe. Image bytes are cached through safe_set without this guard,
+# since being large is the whole point there.
+MAX_JSON_CACHE_BYTES = 256 * 1024
 
 
 # ── Safe cache operations (never raise) ───────────────────────────────────────
@@ -36,9 +46,28 @@ def safe_get(key):
         return None
 
 
-def safe_set(key, value, timeout=None):
-    """Set in cache. Silently ignores failures."""
+def safe_set(key, value, timeout=None, max_bytes=None):
+    """Set in cache. Silently ignores failures.
+
+    When ``max_bytes`` is given, a payload whose JSON encoding exceeds it is
+    skipped rather than stored. Skipping is not a correctness concern: the
+    handler returns the freshly built response either way.
+    """
     try:
+        if max_bytes is not None:
+            try:
+                size = len(json.dumps(value, default=str).encode("utf-8"))
+            except (TypeError, ValueError):
+                # Not JSON-encodable — do not guess at its size, just skip.
+                return
+            if size > max_bytes:
+                logger.info(
+                    "Cache SET skipped for %s: payload %d bytes exceeds %d",
+                    sanitize_log_value(key),
+                    size,
+                    max_bytes,
+                )
+                return
         cache.set(key, value, timeout=timeout)
     except Exception as e:
         logger.warning(
@@ -101,6 +130,28 @@ def invalidate_collection(user_id, guest_session_id, collection_id=None):
     keys = [collections_list_key(user_id, guest_session_id)]
     if collection_id:
         keys.append(collection_key(user_id, guest_session_id, collection_id))
+    _delete_keys(keys)
+
+
+def invalidate_identity(user_id, guest_session_id, recipe_ids=(), collection_ids=()):
+    """Invalidate every cache entry owned by one identity.
+
+    Used by the guest-to-account merge, which reassigns recipe and cookbook
+    rows between two owner scopes at once. Both the source (guest) and target
+    (user) scopes must be cleared: the target gains rows it has already cached
+    a stats/list answer for, and the source keys would otherwise survive until
+    TTL against a session that no longer owns anything.
+
+    Key builders are per-owner, and Valkey key scanning is deliberately avoided
+    here (KEYS/SCAN across a shared instance is a foot-gun), so callers pass
+    the specific ids they touched.
+    """
+    keys = [
+        recipe_stats_key(user_id, guest_session_id),
+        collections_list_key(user_id, guest_session_id),
+    ]
+    keys.extend(recipe_key(user_id, guest_session_id, rid) for rid in recipe_ids)
+    keys.extend(collection_key(user_id, guest_session_id, cid) for cid in collection_ids)
     _delete_keys(keys)
 
 
