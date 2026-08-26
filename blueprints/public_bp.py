@@ -301,13 +301,6 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
     return cleaned
 
 
-# Pinterest pin media uses the same byte-gated URL as the page itself
-# (see _recipe_image_url): pinning a dead link creates broken pins, and a
-# run of broken pins to a fresh domain trips Pinterest's new-account spam
-# heuristics (Backend #203/#204).
-_pinnable_image_url = _recipe_image_url
-
-
 def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
     params = {
         "url": canonical_url,
@@ -357,9 +350,11 @@ def show_public_recipe(slug):
     data = recipe.data or {}
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
     image_url = _recipe_image_url(recipe)
-    # _pinnable_image_url is a module-level alias for _recipe_image_url
-    # (see the alias definition above _pinterest_share_url); calling it again
-    # would re-issue the saved-copy source lookup for no gain.
+    # Pinterest pin media reuses the page's own byte-gated URL: pinning a dead
+    # link creates broken pins, and a run of broken pins from a fresh domain
+    # trips Pinterest's new-account spam heuristics (Backend #203/#204).
+    # Reused rather than recomputed — a second call would re-issue the
+    # saved-copy source lookup for no gain.
     pinterest_image_url = image_url
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
     instructions = _recipe_instructions(data)

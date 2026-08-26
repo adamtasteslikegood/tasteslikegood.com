@@ -960,6 +960,57 @@ def test_save_flow_does_not_persist_inherited_stock_image_url(app):
         assert recipe.source_recipe_id == "src-stock-001"
 
 
+def test_update_cannot_repersist_an_inherited_stock_image(app):
+    """A payload echo must not re-pin a saved copy to the source's stock image.
+
+    Stripping only on create would leave any later PUT that echoes the payload
+    free to write the inherited URL back onto the copy — the same regression,
+    one request later. The SPA posts the recipe data it is displaying, which
+    for a save IS the source's blob, so this is a live path rather than a
+    theoretical one.
+    """
+    from repositories import db_recipe_repository
+
+    with app.app_context():
+        source = Recipe(
+            id="src-update-001",
+            name="Update Source",
+            slug="update-source",
+            is_public=True,
+            data={
+                "name": "Update Source",
+                "description": "Source.",
+                "stock_image_url": "https://img.example/source-stock.jpg",
+            },
+        )
+        db.session.add(source)
+        owner = User(email="updater@example.com", name="Updater")
+        db.session.add(owner)
+        db.session.commit()
+
+        copy = db_recipe_repository.create_recipe(
+            {"id": "copy-update-001", "name": "Update Source", "sourceSlug": "update-source"},
+            user_id=owner.id,
+        )
+        assert copy is not None
+        assert copy.data.get("stock_image_url") is None
+
+        # The SPA echoes back the blob it is holding, stock URL included.
+        updated = db_recipe_repository.update_recipe(
+            "copy-update-001",
+            {
+                "name": "Update Source",
+                "description": "Edited.",
+                "stock_image_url": "https://img.example/source-stock.jpg",
+            },
+            user_id=owner.id,
+        )
+        assert updated is not None
+        assert updated.data.get("stock_image_url") is None
+        # The edit itself still lands.
+        assert updated.data.get("description") == "Edited."
+
+
 def test_slug_fallback_ignores_recipe_created_after_the_copy(app, client):
     """A reused slug must not attribute an unrelated recipe as the source.
 
