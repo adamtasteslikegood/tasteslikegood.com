@@ -26,6 +26,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
 from extensions import cache, db  # noqa: E402
+from models.cookbook import Cookbook  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from models.user import User  # noqa: E402
 from utils import cache_utils  # noqa: E402
@@ -253,3 +254,197 @@ def test_private_cached_image_not_served_to_strangers(app, client):
     resp = client.get(f"/api/recipes/{recipe_id}/image")
     assert resp.status_code == 404
     assert png_bytes not in resp.data
+
+
+# ── Recipe / stats / collection read paths (KAN-151) ──────────────────────────
+#
+# The reads below were dropped by merge 07123c2 and stayed gone for four months
+# because nothing failed when they vanished. Each "serves from cache" test here
+# primes the endpoint, mutates the row directly in the database, and asserts the
+# STALE value comes back. That assertion is the point: it fails if the cache is
+# bypassed, which is exactly the silence that let the original loss survive.
+
+
+def _owner(email="cacheowner@example.com"):
+    user = User(email=email, name="Cache Owner")
+    db.session.add(user)
+    db.session.commit()
+    return user.id
+
+
+def _login(client, user_id):
+    with client.session_transaction() as sess:
+        sess["user_id"] = user_id
+
+
+def _owned_recipe(recipe_id, owner_id, name="Original Name"):
+    return Recipe(
+        id=recipe_id,
+        user_id=owner_id,
+        name=name,
+        data={"name": name, "ingredients": [], "instructions": []},
+    )
+
+
+def test_recipe_get_serves_from_cache(app, client):
+    """GET /api/recipes/<id> caches. Fails if the read path is bypassed."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        owner_id = _owner()
+        db.session.add(_owned_recipe(recipe_id, owner_id))
+        db.session.commit()
+    _login(client, owner_id)
+
+    first = client.get(f"/api/recipes/{recipe_id}")
+    assert first.status_code == 200
+    assert first.get_json()["name"] == "Original Name"
+
+    with app.app_context():
+        db.session.get(Recipe, recipe_id).name = "Changed Behind The Cache"
+        db.session.commit()
+
+    second = client.get(f"/api/recipes/{recipe_id}")
+    assert second.get_json()["name"] == "Original Name"  # cache hit, not the DB
+
+
+def test_recipe_update_invalidates_cache(app, client):
+    """A PUT must not leave the pre-update payload being served."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        owner_id = _owner()
+        db.session.add(_owned_recipe(recipe_id, owner_id))
+        db.session.commit()
+    _login(client, owner_id)
+
+    client.get(f"/api/recipes/{recipe_id}")  # prime
+    resp = client.put(
+        f"/api/recipes/{recipe_id}",
+        json={"name": "Renamed", "ingredients": [], "instructions": []},
+    )
+    assert resp.status_code == 200
+
+    assert client.get(f"/api/recipes/{recipe_id}").get_json()["name"] == "Renamed"
+
+
+def test_recipe_delete_invalidates_cache(app, client):
+    """A cached recipe must not outlive its row (mirrors the image rule)."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        owner_id = _owner()
+        db.session.add(_owned_recipe(recipe_id, owner_id))
+        db.session.commit()
+    _login(client, owner_id)
+
+    assert client.get(f"/api/recipes/{recipe_id}").status_code == 200  # prime
+    assert client.delete(f"/api/recipes/{recipe_id}").status_code == 200
+    assert client.get(f"/api/recipes/{recipe_id}").status_code == 404
+
+
+def test_recipe_cache_is_owner_scoped(app, client):
+    """One owner priming a key must never expose it to another owner."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        owner_id = _owner("a@example.com")
+        stranger_id = _owner("b@example.com")
+        db.session.add(_owned_recipe(recipe_id, owner_id, name="Private Dish"))
+        db.session.commit()
+
+    _login(client, owner_id)
+    assert client.get(f"/api/recipes/{recipe_id}").status_code == 200  # primes owner key
+
+    _login(client, stranger_id)
+    resp = client.get(f"/api/recipes/{recipe_id}")
+    assert resp.status_code == 404
+    assert b"Private Dish" not in resp.data
+
+
+def test_stats_serves_from_cache_and_create_invalidates(app, client):
+    """Stats caches, and creating a recipe clears the stale count."""
+    with app.app_context():
+        owner_id = _owner()
+    _login(client, owner_id)
+
+    assert client.get("/api/recipes/stats").get_json()["total_recipes"] == 0
+
+    # Insert behind the cache: the stale zero proves the read is cached.
+    with app.app_context():
+        db.session.add(_owned_recipe(str(uuid.uuid4()), owner_id))
+        db.session.commit()
+    assert client.get("/api/recipes/stats").get_json()["total_recipes"] == 0
+
+    # Going through the API must invalidate.
+    created = client.post(
+        "/api/recipes", json={"name": "Via API", "ingredients": [], "instructions": []}
+    )
+    assert created.status_code == 201
+    assert client.get("/api/recipes/stats").get_json()["total_recipes"] == 2
+
+
+def test_collections_list_serves_from_cache_and_create_invalidates(app, client):
+    """GET /api/collections caches; creating a cookbook clears the list."""
+    with app.app_context():
+        owner_id = _owner()
+    _login(client, owner_id)
+
+    assert client.get("/api/collections").get_json()["collections"] == []
+
+    with app.app_context():
+        db.session.add(Cookbook(id=str(uuid.uuid4()), user_id=owner_id, name="Behind Cache"))
+        db.session.commit()
+    assert client.get("/api/collections").get_json()["collections"] == []  # stale = cached
+
+    assert client.post("/api/collections", json={"name": "Via API"}).status_code == 201
+    names = {c["name"] for c in client.get("/api/collections").get_json()["collections"]}
+    assert {"Behind Cache", "Via API"} == names
+
+
+def test_collection_membership_invalidates_object_and_list(app, client):
+    """recipeIds rides on both payloads, so both keys must clear."""
+    with app.app_context():
+        owner_id = _owner()
+        recipe_id = str(uuid.uuid4())
+        db.session.add(_owned_recipe(recipe_id, owner_id))
+        db.session.commit()
+    _login(client, owner_id)
+
+    cid = client.post("/api/collections", json={"name": "Shelf"}).get_json()["id"]
+    assert client.get(f"/api/collections/{cid}").get_json()["recipeIds"] == []  # prime object
+    assert client.get("/api/collections").get_json()["collections"][0]["recipeIds"] == []  # list
+
+    assert (
+        client.post(f"/api/collections/{cid}/recipes", json={"recipe_id": recipe_id}).status_code
+        == 200
+    )
+
+    assert client.get(f"/api/collections/{cid}").get_json()["recipeIds"] == [recipe_id]
+    assert client.get("/api/collections").get_json()["collections"][0]["recipeIds"] == [recipe_id]
+
+
+def test_collection_delete_invalidates(app, client):
+    """A deleted cookbook must not keep answering from cache."""
+    with app.app_context():
+        owner_id = _owner()
+    _login(client, owner_id)
+
+    cid = client.post("/api/collections", json={"name": "Doomed"}).get_json()["id"]
+    assert client.get(f"/api/collections/{cid}").status_code == 200  # prime
+    assert client.delete(f"/api/collections/{cid}").status_code == 200
+    assert client.get(f"/api/collections/{cid}").status_code == 404
+
+
+def test_oversized_payload_is_not_cached(app):
+    """The max_bytes guard keeps legacy base64 blobs out of Valkey."""
+    with app.app_context():
+        key = "vgc:test:oversized"
+        cache_utils.safe_set(
+            key,
+            {"blob": "x" * (cache_utils.MAX_JSON_CACHE_BYTES + 1)},
+            timeout=60,
+            max_bytes=cache_utils.MAX_JSON_CACHE_BYTES,
+        )
+        assert cache_utils.safe_get(key) is None
+
+        cache_utils.safe_set(
+            key, {"blob": "small"}, timeout=60, max_bytes=cache_utils.MAX_JSON_CACHE_BYTES
+        )
+        assert cache_utils.safe_get(key) == {"blob": "small"}
