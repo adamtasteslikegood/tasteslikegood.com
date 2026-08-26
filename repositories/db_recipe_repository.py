@@ -932,17 +932,15 @@ def create_recipe(
                 author_id = source.user_id if source else None
                 source_recipe_id = source.id if source else None
                 saved_to_id = user_id
-                # KAN-215: the source's stock_image_url is deliberately NOT
-                # copied onto the copy.  Persisting it made an inherited URL
-                # indistinguishable from one the copy genuinely owns, so
-                # public_bp._recipe_image_url returned it before ever
-                # resolving the source — pinning the copy to the stock image
-                # permanently, including after the source gained an AI image
-                # (AI generation preserves stock_image_url, so a source
-                # carrying both is a normal state).  That defeated the
-                # read-time fallback this ticket exists to add.  Neither
-                # image field is copied now; public_bp resolves the source's
-                # current state at render time instead.
+                # KAN-215: the SPA's saved-copy payload mirrors the source's
+                # stock_image_url. Strip that inherited value at the server
+                # boundary so it cannot masquerade as an image the copy owns.
+                # Otherwise _recipe_image_url returns it before resolving the
+                # source and pins the copy to the stock image even after the
+                # source gains an AI image. The immutable source_recipe_id
+                # retains provenance; public_bp resolves current source media
+                # at render time instead.
+                data.pop("stock_image_url", None)
             else:
                 # Original recipe: author = owner, no saver, no source.
                 author_id = user_id
