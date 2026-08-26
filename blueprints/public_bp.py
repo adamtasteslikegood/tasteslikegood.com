@@ -89,13 +89,35 @@ def _own_image_url(recipe: Recipe) -> str | None:
 def _resolve_source_for_image(recipe: Recipe) -> Recipe | None:
     """Look up the source recipe for image fallback.
 
-    Returns ``None`` when the recipe is not a saved copy, when the source
-    has been deleted, or when the source is no longer public.  Both paths
-    require ``is_public`` — without that gate a private source's image URL
-    would leak into a public page's ``<meta og:image>`` and Pinterest pin.
+    Returns ``None`` when the recipe is not a saved copy, when the source is
+    no longer public, or when no source can be identified with confidence.
+    Both paths require ``is_public`` — without that gate a private source's
+    image URL would leak into a public page's ``<meta og:image>`` and
+    Pinterest pin.
 
     Prefers the immutable ``source_recipe_id`` FK; falls back to
     ``source_slug`` for legacy copies whose FK was never backfilled.
+
+    The slug arm carries a causality guard.  ``source_recipe_id`` is
+    ``ON DELETE SET NULL`` (``models/recipe.py``), so a copy whose source was
+    deleted is indistinguishable by column state from a legacy copy the
+    a3c9e1f4b7d2 backfill could not resolve — and slugs are reusable once
+    freed.  Without the guard, an unrelated recipe that later takes the freed
+    slug is silently attributed as the source, putting its image on the
+    copy's hero, og:image, JSON-LD and Pinterest pin at once.
+
+    A source must predate the copy made from it, so a slug match that was
+    created *after* the copy cannot be that copy's source.  This resolves the
+    ambiguity from data already on the row: a persisted "was it ever
+    resolved" flag could not, because at migration time the FK-cleared and
+    never-resolved rows are already indistinguishable — the very ambiguity
+    such a flag would exist to remove — so it could only protect rows created
+    afterwards and would misclassify every historical delete-cleared row as
+    fallback-eligible.
+
+    The guard fails safe: refusing a match costs a missing image, never a
+    wrong one.  One narrow case survives — an older recipe *renamed* into the
+    freed slug still predates the copy (KAN-251).
     """
     if recipe.source_recipe_id:
         source = db.session.get(Recipe, recipe.source_recipe_id)
@@ -106,6 +128,15 @@ def _resolve_source_for_image(recipe: Recipe) -> Recipe | None:
         source_by_slug: Recipe | None = Recipe.query.filter(
             Recipe.slug == recipe.source_slug, Recipe.is_public.is_(True)
         ).first()
+        if source_by_slug is None:
+            return None
+        # Strict <: same-timestamp rows cannot be ordered, so they fail safe.
+        if (
+            recipe.created_at is None
+            or source_by_slug.created_at is None
+            or not source_by_slug.created_at < recipe.created_at
+        ):
+            return None
         return source_by_slug
     return None
 

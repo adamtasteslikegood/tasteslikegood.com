@@ -14,6 +14,7 @@ import html
 import re
 import sys
 import uuid
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -949,3 +950,98 @@ def test_save_flow_copies_stock_image_url_from_source(app):
         assert recipe.data.get("stock_image_url") == "https://img.example/stock-original.jpg"
         # The source_recipe_id FK must be set
         assert recipe.source_recipe_id == "src-stock-001"
+
+
+def test_slug_fallback_ignores_recipe_created_after_the_copy(app, client):
+    """A reused slug must not attribute an unrelated recipe as the source.
+
+    ``source_recipe_id`` is ON DELETE SET NULL and slugs are reusable once
+    freed, so after the source is deleted the copy looks exactly like a legacy
+    never-backfilled copy. If an unrelated public recipe later takes the freed
+    slug, the slug fallback would attribute its image to the copy across
+    og:image, the hero img, JSON-LD and the Pinterest pin at once.
+
+    A source must predate the copy made from it, so the newer impostor is
+    refused and the page renders with no image at all.
+    """
+    with app.app_context():
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Orphaned Copy",
+            slug="orphaned-copy",
+            is_public=True,
+            source_slug="freed-slug",
+            source_recipe_id=None,  # source deleted -> FK cleared by SET NULL
+            data={"name": "Orphaned Copy", "description": "Source is gone."},
+            created_at=datetime(2026, 1, 1, 12, 0, 0),
+        )
+        db.session.add(copy)
+
+        # Unrelated recipe that later grabbed the freed slug.
+        impostor = Recipe(
+            id=str(uuid.uuid4()),
+            name="Unrelated Later Recipe",
+            slug="freed-slug",
+            is_public=True,
+            data={
+                "name": "Unrelated Later Recipe",
+                "description": "Took the freed slug.",
+                "ai_image_gcs": "gs://bucket/impostor/img.png",
+                "stock_image_url": "https://img.example/impostor-stock.jpg",
+            },
+            created_at=datetime(2026, 6, 1, 12, 0, 0),  # AFTER the copy
+        )
+        db.session.add(impostor)
+        db.session.commit()
+        impostor_id = impostor.id
+
+    resp = client.get("/r/orphaned-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The impostor must not be attributed as the source, on any surface.
+    assert f"/api/recipes/{impostor_id}/image" not in body
+    assert "https://img.example/impostor-stock.jpg" not in body
+    assert "og:image" not in body
+    # The page itself still renders.
+    assert "Orphaned Copy" in body
+
+
+def test_slug_fallback_still_resolves_a_genuinely_older_source(app, client):
+    """The causality guard must not regress the case the fallback exists for.
+
+    A legacy copy whose FK was never backfilled still gets its image from a
+    source that genuinely predates it.
+    """
+    with app.app_context():
+        source = Recipe(
+            id=str(uuid.uuid4()),
+            name="Legacy Source",
+            slug="legacy-source",
+            is_public=True,
+            data={
+                "name": "Legacy Source",
+                "description": "The real source.",
+                "stock_image_url": "https://img.example/legacy-stock.jpg",
+            },
+            created_at=datetime(2026, 1, 1, 12, 0, 0),  # BEFORE the copy
+        )
+        db.session.add(source)
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Legacy Copy",
+            slug="legacy-copy",
+            is_public=True,
+            source_slug="legacy-source",
+            source_recipe_id=None,  # never backfilled
+            data={"name": "Legacy Copy", "description": "Copy."},
+            created_at=datetime(2026, 6, 1, 12, 0, 0),
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/legacy-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The genuine source's image IS used.
+    assert "https://img.example/legacy-stock.jpg" in body
