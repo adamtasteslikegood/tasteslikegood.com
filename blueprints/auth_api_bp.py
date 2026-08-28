@@ -17,6 +17,7 @@ from flask import Blueprint, jsonify, redirect, request, session, url_for
 from google_auth_oauthlib.flow import Flow
 from sqlalchemy.exc import IntegrityError
 
+from utils.cache_utils import invalidate_identity
 from utils.log_sanitizer import sanitize_log_value
 
 load_dotenv()
@@ -289,7 +290,23 @@ def _merge_guest_session_into_user(user, guest_session_id, max_retries=3):
                     cb.guest_session_id = None
                     taken.add(cb.name)
 
+            # KAN-151: capture ids BEFORE the commit. SQLAlchemy expires loaded
+            # instances on commit, so reading .id afterwards re-queries each row.
+            merged_recipe_ids = [r.id for r in guest_recipes]
+            merged_cookbook_ids = [cb.id for cb in guest_cookbooks]
+
             db.session.commit()
+
+            # The merge is the one operation that moves rows across owner
+            # scopes, so it is the one place a single-owner invalidation is not
+            # enough. The user's stats/list answers are stale because they just
+            # gained rows; the guest's are stale because that session no longer
+            # owns anything. Rows deliberately left under the guest session
+            # (the slug-collision branch above) are included on both sides —
+            # deleting a key that was never written is free, and guessing which
+            # side moved would be a second source of truth.
+            invalidate_identity(user.id, None, merged_recipe_ids, merged_cookbook_ids)
+            invalidate_identity(None, guest_session_id, merged_recipe_ids, merged_cookbook_ids)
             return
         except IntegrityError:
             # Rollback reverts the uncommitted recipe reassignment too, so the

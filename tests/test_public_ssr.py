@@ -14,6 +14,7 @@ import html
 import re
 import sys
 import uuid
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
@@ -141,9 +142,12 @@ def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     body = resp.get_data(as_text=True)
     assert '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
     assert '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">' in body
-    assert (
-        f'<meta property="og:image" '
-        f'content="http://localhost/api/recipes/{recipe_id}/image">' in body
+    # KAN-195: the rendered image URL carries a ?v=<marker> so a regenerated
+    # photo is not hidden behind the endpoint's 24h Cache-Control.
+    assert re.search(
+        rf'<meta property="og:image" '
+        rf'content="http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+">',
+        body,
     )
     assert '<meta name="twitter:card" content="summary_large_image">' in body
     assert 'type="application/ld+json"' in body
@@ -218,9 +222,15 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Save to Pinterest" in body
+    media = _pinterest_media_param(body)
     if expected_media == "endpoint":
-        expected_media = f"http://localhost/api/recipes/{recipe_id}/image"
-    assert _pinterest_media_param(body) == expected_media
+        # KAN-195: our own image endpoint is versioned; the stock-image case
+        # below is someone else's host and must be passed through untouched.
+        assert re.fullmatch(
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", media
+        ), media
+    else:
+        assert media == expected_media
 
 
 def test_pinterest_media_ignores_stale_ai_url_when_stock_exists(app, client):
@@ -685,3 +695,617 @@ def test_public_recipe_page_links_save_cta_to_spa_save_url(app, client):
     resp = client.get("/r/thai-peanut-noodles")
     body = resp.get_data(as_text=True)
     assert "/?save=thai-peanut-noodles#kitchen" in body
+
+
+# ---------------------------------------------------------------------------
+# KAN-215: saved-copy image fallback from source recipe
+# ---------------------------------------------------------------------------
+
+
+def test_saved_copy_inherits_source_ai_image_via_fallback(app, client):
+    """A published saved copy with no image of its own falls back to the
+    source recipe's AI image (via source_recipe_id) on /r/<slug>."""
+    with app.app_context():
+        source = _make_recipe(
+            "Original Curry",
+            "original-curry",
+            data={
+                "name": "Original Curry",
+                "description": "Has an AI image.",
+                "ai_image_gcs": "gs://bucket/curry/v1.png",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Original Curry",
+            slug="my-original-curry-copy",
+            is_public=True,
+            source_slug="original-curry",
+            source_recipe_id=source.id,
+            data={"name": "Original Curry", "description": "Saved copy."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+        source_id = source.id
+
+    resp = client.get("/r/my-original-curry-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The og:image and hero should use the source's image endpoint
+    expected_url = f"/api/recipes/{source_id}/image"
+    assert expected_url in body
+
+
+def test_saved_copy_inherits_source_stock_image_via_fallback(app, client):
+    """A published saved copy falls back to the source's stock_image_url."""
+    with app.app_context():
+        source = _make_recipe(
+            "Stock Photo Stew",
+            "stock-photo-stew",
+            data={
+                "name": "Stock Photo Stew",
+                "description": "Has a stock image.",
+                "stock_image_url": "https://img.example/stew.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Stock Photo Stew",
+            slug="my-stock-stew-copy",
+            is_public=True,
+            source_slug="stock-photo-stew",
+            source_recipe_id=source.id,
+            data={"name": "Stock Photo Stew", "description": "Saved copy."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/my-stock-stew-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "https://img.example/stew.jpg" in body
+
+
+def test_saved_copy_with_own_image_does_not_fall_back(app, client):
+    """A copy that already has its own image must use it, not the source's."""
+    with app.app_context():
+        source = _make_recipe(
+            "Source Dish",
+            "source-dish",
+            data={
+                "name": "Source Dish",
+                "description": "Source.",
+                "stock_image_url": "https://img.example/source.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Source Dish",
+            slug="my-source-dish-copy",
+            is_public=True,
+            source_slug="source-dish",
+            source_recipe_id=source.id,
+            data={
+                "name": "Source Dish",
+                "description": "Copy with own image.",
+                "stock_image_url": "https://img.example/copy-own.jpg",
+            },
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/my-source-dish-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "https://img.example/copy-own.jpg" in body
+    assert "https://img.example/source.jpg" not in body
+
+
+def test_saved_copy_falls_back_via_source_slug_when_no_fk(app, client):
+    """Legacy copies with source_slug but no source_recipe_id still resolve."""
+    with app.app_context():
+        source = _make_recipe(
+            "Legacy Source",
+            "legacy-source",
+            data={
+                "name": "Legacy Source",
+                "description": "Has image.",
+                "ai_image_gcs": "gs://bucket/legacy/v1.png",
+            },
+        )
+        # Pin created_at explicitly: the slug arm of _resolve_source_for_image
+        # requires source.created_at strictly < copy.created_at, so relying on
+        # the default=datetime.utcnow ordering makes this test race the
+        # microsecond clock.
+        source.created_at = datetime(2026, 1, 1, 12, 0, 0)
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Legacy Source",
+            slug="legacy-copy",
+            is_public=True,
+            source_slug="legacy-source",
+            source_recipe_id=None,  # FK never backfilled
+            data={"name": "Legacy Source", "description": "Legacy copy."},
+            created_at=datetime(2026, 6, 1, 12, 0, 0),
+        )
+        db.session.add(copy)
+        db.session.commit()
+        source_id = source.id
+
+    resp = client.get("/r/legacy-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    expected_url = f"/api/recipes/{source_id}/image"
+    assert expected_url in body
+
+
+def test_saved_copy_no_fallback_when_source_deleted(app, client):
+    """When the source recipe is gone, the copy shows no image (not crash)."""
+    with app.app_context():
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Orphaned Copy",
+            slug="orphaned-copy",
+            is_public=True,
+            source_slug="deleted-source",
+            source_recipe_id=None,  # source deleted, FK set NULL
+            data={"name": "Orphaned Copy", "description": "Source gone."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/orphaned-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # Page renders without crashing
+    assert "Orphaned Copy" in body
+    # No og:image emitted — the template omits it when image_url is None
+    assert "og:image" not in body
+
+
+def test_saved_copy_no_fallback_when_source_unpublished(app, client):
+    """A private source's image must NOT leak into a public copy's og:image.
+
+    If the source is unpublished after copies were made, _resolve_source_for_image
+    must return None — otherwise the copy's page emits a /api/recipes/<source>/image
+    URL that 404s for anonymous visitors (and leaks a stock_image_url for a
+    private recipe).
+    """
+    with app.app_context():
+        source = Recipe(
+            id=str(uuid.uuid4()),
+            name="Now-Private Source",
+            slug="now-private-source",
+            is_public=False,  # unpublished after the copy was saved
+            data={
+                "name": "Now-Private Source",
+                "description": "Was public, now private.",
+                "ai_image_gcs": "gs://bucket/private/img.png",
+                "stock_image_url": "https://img.example/private-stock.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.flush()
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Now-Private Source",
+            slug="copy-of-now-private",
+            is_public=True,
+            source_slug="now-private-source",
+            source_recipe_id=source.id,  # FK resolves, but source is private
+            data={"name": "Now-Private Source", "description": "Copy."},
+        )
+        db.session.add(copy)
+        db.session.commit()
+        source_id = source.id
+
+    resp = client.get("/r/copy-of-now-private")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The source's image endpoint must NOT appear
+    assert f"/api/recipes/{source_id}/image" not in body
+    # The source's stock_image_url must NOT leak either
+    assert "https://img.example/private-stock.jpg" not in body
+    # Page still renders the recipe content
+    assert "Now-Private Source" in body
+
+
+def test_save_flow_does_not_persist_inherited_stock_image_url(app):
+    """The repository strips the source stock URL sent by the SPA save flow.
+
+    The frontend maps the public recipe's stock_image_url into the saved-copy
+    payload. Merely avoiding a second server-side copy is insufficient: the
+    inherited value must be removed before the new recipe data is persisted.
+    """
+    from repositories import db_recipe_repository
+
+    with app.app_context():
+        # Create a public source with a stock image
+        source = Recipe(
+            id="src-stock-001",
+            name="Stock Source",
+            slug="stock-source",
+            is_public=True,
+            data={
+                "name": "Stock Source",
+                "description": "Has stock image.",
+                "stock_image_url": "https://img.example/stock-original.jpg",
+            },
+        )
+        db.session.add(source)
+        db.session.commit()
+
+        # Save a copy via the repository (the real save flow)
+        copy_data = {
+            "id": "copy-stock-001",
+            "name": "Stock Source",
+            "sourceSlug": "stock-source",
+            # Mirrors buildSavedRecipeFromPublic: the source stock image is
+            # already present in the client payload.
+            "stock_image_url": "https://img.example/stock-original.jpg",
+        }
+        owner = User(email="saver@example.com", name="Saver")
+        db.session.add(owner)
+        db.session.commit()
+
+        recipe = db_recipe_repository.create_recipe(copy_data, user_id=owner.id)
+
+        assert recipe is not None
+        # The source's stock_image_url must NOT be copied onto the copy.
+        # Persisting it made an inherited URL indistinguishable from one the
+        # copy genuinely owns, so _recipe_image_url returned it before ever
+        # resolving the source — pinning the copy to the stock image even
+        # after the source gained an AI image.
+        assert recipe.data.get("stock_image_url") is None
+        # The source_recipe_id FK must still be set — provenance is the part
+        # the save flow does persist.
+        assert recipe.source_recipe_id == "src-stock-001"
+
+
+def test_update_cannot_repersist_an_inherited_stock_image(app):
+    """A payload echo must not re-pin a saved copy to the source's stock image.
+
+    Stripping only on create would leave any later PUT that echoes the payload
+    free to write the inherited URL back onto the copy — the same regression,
+    one request later. The SPA posts the recipe data it is displaying, which
+    for a save IS the source's blob, so this is a live path rather than a
+    theoretical one.
+    """
+    from repositories import db_recipe_repository
+
+    with app.app_context():
+        source = Recipe(
+            id="src-update-001",
+            name="Update Source",
+            slug="update-source",
+            is_public=True,
+            data={
+                "name": "Update Source",
+                "description": "Source.",
+                "stock_image_url": "https://img.example/source-stock.jpg",
+            },
+        )
+        db.session.add(source)
+        owner = User(email="updater@example.com", name="Updater")
+        db.session.add(owner)
+        db.session.commit()
+
+        copy = db_recipe_repository.create_recipe(
+            {"id": "copy-update-001", "name": "Update Source", "sourceSlug": "update-source"},
+            user_id=owner.id,
+        )
+        assert copy is not None
+        assert copy.data.get("stock_image_url") is None
+
+        # The SPA echoes back the blob it is holding, stock URL included.
+        updated = db_recipe_repository.update_recipe(
+            "copy-update-001",
+            {
+                "name": "Update Source",
+                "description": "Edited.",
+                "stock_image_url": "https://img.example/source-stock.jpg",
+            },
+            user_id=owner.id,
+        )
+        assert updated is not None
+        assert updated.data.get("stock_image_url") is None
+        # The edit itself still lands.
+        assert updated.data.get("description") == "Edited."
+
+
+def test_slug_fallback_ignores_recipe_created_after_the_copy(app, client):
+    """A reused slug must not attribute an unrelated recipe as the source.
+
+    ``source_recipe_id`` is ON DELETE SET NULL and slugs are reusable once
+    freed, so after the source is deleted the copy looks exactly like a legacy
+    never-backfilled copy. If an unrelated public recipe later takes the freed
+    slug, the slug fallback would attribute its image to the copy across
+    og:image, the hero img, JSON-LD and the Pinterest pin at once.
+
+    A source must predate the copy made from it, so the newer impostor is
+    refused and the page renders with no image at all.
+    """
+    with app.app_context():
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Orphaned Copy",
+            slug="orphaned-copy",
+            is_public=True,
+            source_slug="freed-slug",
+            source_recipe_id=None,  # source deleted -> FK cleared by SET NULL
+            data={"name": "Orphaned Copy", "description": "Source is gone."},
+            created_at=datetime(2026, 1, 1, 12, 0, 0),
+        )
+        db.session.add(copy)
+
+        # Unrelated recipe that later grabbed the freed slug.
+        impostor = Recipe(
+            id=str(uuid.uuid4()),
+            name="Unrelated Later Recipe",
+            slug="freed-slug",
+            is_public=True,
+            data={
+                "name": "Unrelated Later Recipe",
+                "description": "Took the freed slug.",
+                "ai_image_gcs": "gs://bucket/impostor/img.png",
+                "stock_image_url": "https://img.example/impostor-stock.jpg",
+            },
+            created_at=datetime(2026, 6, 1, 12, 0, 0),  # AFTER the copy
+        )
+        db.session.add(impostor)
+        db.session.commit()
+        impostor_id = impostor.id
+
+    resp = client.get("/r/orphaned-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The impostor must not be attributed as the source, on any surface.
+    assert f"/api/recipes/{impostor_id}/image" not in body
+    assert "https://img.example/impostor-stock.jpg" not in body
+    assert "og:image" not in body
+    # The page itself still renders.
+    assert "Orphaned Copy" in body
+
+
+def test_slug_fallback_still_resolves_a_genuinely_older_source(app, client):
+    """The causality guard must not regress the case the fallback exists for.
+
+    A legacy copy whose FK was never backfilled still gets its image from a
+    source that genuinely predates it.
+    """
+    with app.app_context():
+        source = Recipe(
+            id=str(uuid.uuid4()),
+            name="Legacy Source",
+            slug="legacy-source",
+            is_public=True,
+            data={
+                "name": "Legacy Source",
+                "description": "The real source.",
+                "stock_image_url": "https://img.example/legacy-stock.jpg",
+            },
+            created_at=datetime(2026, 1, 1, 12, 0, 0),  # BEFORE the copy
+        )
+        db.session.add(source)
+
+        copy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Legacy Copy",
+            slug="legacy-copy",
+            is_public=True,
+            source_slug="legacy-source",
+            source_recipe_id=None,  # never backfilled
+            data={"name": "Legacy Copy", "description": "Copy."},
+            created_at=datetime(2026, 6, 1, 12, 0, 0),
+        )
+        db.session.add(copy)
+        db.session.commit()
+
+    resp = client.get("/r/legacy-copy")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    # The genuine source's image IS used.
+    assert "https://img.example/legacy-stock.jpg" in body
+
+
+# ── KAN-195: a regenerated photo must reach /r/<slug> without a 24h wait ──────
+#
+# /api/recipes/<id>/image answers a public recipe with
+# `Cache-Control: public, max-age=86400` (generation_api_bp), and its URL never
+# changes across regenerations — the worker writes the same
+# `/api/recipes/<id>/image` every time. So every browser and CDN that had
+# already fetched the old bytes kept serving them for up to a day: the new photo
+# was live on the server (the worker invalidates the Valkey entry) and invisible
+# on the public page.
+#
+# The fix is a `?v=<marker>` on the RENDERED url only. These tests pin the
+# properties that make it work, and the one that keeps it from re-opening the
+# KAN-243 persistence trap.
+
+
+def _og_image(body: str) -> str | None:
+    match = re.search(r'<meta property="og:image" content="([^"]+)">', body)
+    return html.unescape(match.group(1)) if match else None
+
+
+def _image_recipe(slug: str, *, timestamp: str):
+    # Return type left inferred, matching the untyped `_make_recipe` it wraps.
+    return _make_recipe(
+        f"Photo {slug}",
+        slug,
+        data={
+            "name": f"Photo {slug}",
+            "description": "Has a photo.",
+            "ai_image_gcs": "gs://bucket/recipe/v1.png",
+            "ai_metadata": {"image_generation": {"success": True, "timestamp": timestamp}},
+        },
+    )
+
+
+def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
+    """The whole point: a new photo means a new URL, so caches cannot hide it."""
+    with app.app_context():
+        recipe = _image_recipe("regen-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    before = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
+    assert before is not None
+    assert re.fullmatch(
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", before
+    ), before
+
+    # Regenerate: the worker rewrites ai_metadata.image_generation.timestamp
+    # and nothing else about the URL (worker_api_bp._image_generation_metadata).
+    with app.app_context():
+        stored = db.session.get(Recipe, recipe_id)
+        data = dict(stored.data)
+        data["ai_metadata"] = {
+            "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
+        }
+        stored.data = data
+        db.session.commit()
+
+    after = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
+    assert after != before, "regenerated image kept the old URL — caches will serve stale bytes"
+    # Same resource, different cache key.
+    assert after.split("?")[0] == before.split("?")[0]
+
+
+def test_rendered_image_url_is_stable_when_the_image_is_not_regenerated(app, client):
+    """A marker that churns on every render would defeat the 24h cache entirely."""
+    with app.app_context():
+        recipe = _image_recipe("stable-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+
+    first = _og_image(client.get("/r/stable-pie").get_data(as_text=True))
+    second = _og_image(client.get("/r/stable-pie").get_data(as_text=True))
+    assert first == second
+
+
+def test_rendered_image_url_falls_back_to_updated_at_for_legacy_rows(app, client):
+    """Rows predating ai_metadata.image_generation still get a marker."""
+    with app.app_context():
+        recipe = _make_recipe(
+            "Legacy Photo",
+            "legacy-photo",
+            data={
+                "name": "Legacy Photo",
+                "description": "Predates the generation stamp.",
+                "ai_image_gcs": "gs://bucket/recipe/v1.png",
+            },
+        )
+        recipe.updated_at = datetime(2026, 7, 1, 9, 0, 0)
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    url = _og_image(client.get("/r/legacy-photo").get_data(as_text=True))
+    assert re.fullmatch(
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", url
+    ), url
+
+
+def test_rendered_image_url_does_not_version_an_external_stock_image(app, client):
+    """Not our host, not our cache, and a param could break a signed URL."""
+    with app.app_context():
+        recipe = _make_recipe(
+            "Stock Photo",
+            "stock-photo",
+            data={
+                "name": "Stock Photo",
+                "description": "External image.",
+                "stock_image_url": "https://img.example/stock.jpg",
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    assert (
+        _og_image(client.get("/r/stock-photo").get_data(as_text=True))
+        == "https://img.example/stock.jpg"
+    )
+
+
+def test_save_payload_keeps_the_canonical_image_url(app, client):
+    """The KAN-243 trap, held shut.
+
+    /api/recipes/public/<slug> becomes the SPA's `ai_image_url`, which is
+    PERSISTED — and `saveNotes` POSTs the whole recipe back, so a display-only
+    marker written here would return as the canonical URL. Versioning is a
+    render concern; this payload must stay clean.
+    """
+    with app.app_context():
+        recipe = _image_recipe("payload-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    payload = client.get("/api/recipes/public/payload-pie").get_json()
+    assert payload["ai_image_url"] == f"http://localhost/api/recipes/{recipe_id}/image"
+    assert "?v=" not in payload["ai_image_url"]
+    assert "?v=" not in payload["image"]
+
+
+def test_versioned_url_marker_does_not_leak_the_raw_timestamp(app, client):
+    """The marker is a hash. A public URL is not where worker run times belong."""
+    with app.app_context():
+        recipe = _image_recipe("opaque-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+
+    url = _og_image(client.get("/r/opaque-pie").get_data(as_text=True))
+    assert "2026-08-01" not in url
+
+
+def test_saved_copy_versions_from_the_source_row(app, client):
+    """A copy's photo bytes belong to the SOURCE, so the marker must too.
+
+    Reading the copy's own row here would pin the URL to a marker that never
+    moves when the source regenerates — exactly the bug, one level of
+    indirection down.
+    """
+    with app.app_context():
+        source = _image_recipe("source-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(source)
+        db.session.commit()
+        source_id = source.id
+
+        copy = _make_recipe(
+            "Copy Pie",
+            "copy-pie",
+            data={"name": "Copy Pie", "description": "Saved from the source."},
+        )
+        copy.source_recipe_id = source_id
+        db.session.add(copy)
+        db.session.commit()
+
+    before = _og_image(client.get("/r/copy-pie").get_data(as_text=True))
+    assert f"/api/recipes/{source_id}/image?v=" in before
+
+    with app.app_context():
+        stored = db.session.get(Recipe, source_id)
+        data = dict(stored.data)
+        data["ai_metadata"] = {
+            "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
+        }
+        stored.data = data
+        db.session.commit()
+
+    after = _og_image(client.get("/r/copy-pie").get_data(as_text=True))
+    assert after != before

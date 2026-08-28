@@ -239,6 +239,37 @@ def _preserve_worker_metadata(current_data: Dict[str, Any], merged: Dict[str, An
         merged["ai_metadata"] = preserved_metadata
 
 
+def _strip_inherited_stock_image(data: Dict[str, Any]) -> None:
+    """Drop ``stock_image_url`` from a saved copy's blob, in place.
+
+    KAN-215.  A saved copy must not persist a stock image pointer that came
+    from its source.  Once persisted it is indistinguishable from an image the
+    copy genuinely owns, so ``public_bp._recipe_image_url`` returns it at the
+    own-image check and never resolves the source — pinning the copy to the
+    stock image permanently, including after the source gains an AI image (AI
+    generation preserves ``stock_image_url``, so a source carrying both is a
+    normal state).
+
+    Enforced at the **server boundary**, on every write path, because the
+    inherited URL does not only arrive from a server-side copy: the SPA posts
+    the recipe data it is displaying, which for a save *is* the source's blob,
+    stock URL included.  Stripping it on create alone would leave any later
+    PUT/POST that echoes the payload free to re-persist it — the same
+    regression, one request later.  Same idiom as ``is_canonical`` below:
+    a field the API is not allowed to write is pinned by the server, not
+    trusted from the payload.
+
+    The copy still renders the source's image; it is resolved live at render
+    time instead of being frozen at save time.
+    """
+    data.pop("stock_image_url", None)
+
+
+def _is_saved_copy(recipe: Recipe) -> bool:
+    """Whether a persisted row is a saved copy of another recipe."""
+    return bool(recipe.source_slug or recipe.source_recipe_id)
+
+
 def _resolve_public_slug(
     recipe_data: Dict[str, Any],
     recipe_id: str,
@@ -864,6 +895,15 @@ def create_recipe(
 
             merged = {**(existing.data or {}), **recipe_data, "id": recipe_id}
             _preserve_worker_metadata(existing.data or {}, merged)
+            # KAN-215: a payload echo must not re-pin a saved copy to a stock
+            # image inherited from its source. Same reasoning as is_canonical
+            # below — enforced on every write path, not just create. Guard on
+            # the RESULTING state, not the pre-update state: a payload that
+            # first-turns a non-copy row into a saved copy (by supplying
+            # ``sourceSlug``) would otherwise slip past a pre-update check and
+            # persist the inherited URL on the very write that made it a copy.
+            if _is_saved_copy(existing) or recipe_data.get("sourceSlug"):
+                _strip_inherited_stock_image(merged)
             # The is_canonical column is never writable through the API; pin
             # the blob to the column so a payload echo can't fake a lock.
             merged["is_canonical"] = existing.is_canonical
@@ -932,6 +972,15 @@ def create_recipe(
                 author_id = source.user_id if source else None
                 source_recipe_id = source.id if source else None
                 saved_to_id = user_id
+                # KAN-215: the SPA's saved-copy payload mirrors the source's
+                # stock_image_url. Strip that inherited value at the server
+                # boundary so it cannot masquerade as an image the copy owns.
+                # Otherwise _recipe_image_url returns it before resolving the
+                # source and pins the copy to the stock image even after the
+                # source gains an AI image. The immutable source_recipe_id
+                # retains provenance; public_bp resolves current source media
+                # at render time instead.
+                _strip_inherited_stock_image(data)
             else:
                 # Original recipe: author = owner, no saver, no source.
                 author_id = user_id
@@ -1031,6 +1080,15 @@ def update_recipe(
         # moment of publishing. Keys the payload does supply always win.
         merged = {**(recipe.data or {}), **recipe_data, "id": recipe_id}
         _preserve_worker_metadata(recipe.data or {}, merged)
+        # KAN-215: a payload echo must not re-pin a saved copy to a stock image
+        # inherited from its source. Same reasoning as is_canonical below —
+        # enforced on every write path, not just create. Guard on the RESULTING
+        # state, not the pre-update state: a payload that first-turns a
+        # non-copy row into a saved copy (by supplying ``sourceSlug``) would
+        # otherwise slip past a pre-update check and persist the inherited URL
+        # on the very write that made it a copy.
+        if _is_saved_copy(recipe) or recipe_data.get("sourceSlug"):
+            _strip_inherited_stock_image(merged)
         # Never writable through the API — pin the blob to the column.
         merged["is_canonical"] = recipe.is_canonical
 
