@@ -142,9 +142,12 @@ def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     body = resp.get_data(as_text=True)
     assert '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
     assert '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">' in body
-    assert (
-        f'<meta property="og:image" '
-        f'content="http://localhost/api/recipes/{recipe_id}/image">' in body
+    # KAN-195: the rendered image URL carries a ?v=<marker> so a regenerated
+    # photo is not hidden behind the endpoint's 24h Cache-Control.
+    assert re.search(
+        rf'<meta property="og:image" '
+        rf'content="http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+">',
+        body,
     )
     assert '<meta name="twitter:card" content="summary_large_image">' in body
     assert 'type="application/ld+json"' in body
@@ -219,9 +222,15 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "Save to Pinterest" in body
+    media = _pinterest_media_param(body)
     if expected_media == "endpoint":
-        expected_media = f"http://localhost/api/recipes/{recipe_id}/image"
-    assert _pinterest_media_param(body) == expected_media
+        # KAN-195: our own image endpoint is versioned; the stock-image case
+        # below is someone else's host and must be passed through untouched.
+        assert re.fullmatch(
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", media
+        ), media
+    else:
+        assert media == expected_media
 
 
 def test_pinterest_media_ignores_stale_ai_url_when_stock_exists(app, client):
@@ -1110,3 +1119,193 @@ def test_slug_fallback_still_resolves_a_genuinely_older_source(app, client):
     body = resp.get_data(as_text=True)
     # The genuine source's image IS used.
     assert "https://img.example/legacy-stock.jpg" in body
+
+
+# ── KAN-195: a regenerated photo must reach /r/<slug> without a 24h wait ──────
+#
+# /api/recipes/<id>/image answers a public recipe with
+# `Cache-Control: public, max-age=86400` (generation_api_bp), and its URL never
+# changes across regenerations — the worker writes the same
+# `/api/recipes/<id>/image` every time. So every browser and CDN that had
+# already fetched the old bytes kept serving them for up to a day: the new photo
+# was live on the server (the worker invalidates the Valkey entry) and invisible
+# on the public page.
+#
+# The fix is a `?v=<marker>` on the RENDERED url only. These tests pin the
+# properties that make it work, and the one that keeps it from re-opening the
+# KAN-243 persistence trap.
+
+
+def _og_image(body: str) -> str | None:
+    match = re.search(r'<meta property="og:image" content="([^"]+)">', body)
+    return html.unescape(match.group(1)) if match else None
+
+
+def _image_recipe(slug: str, *, timestamp: str):
+    # Return type left inferred, matching the untyped `_make_recipe` it wraps.
+    return _make_recipe(
+        f"Photo {slug}",
+        slug,
+        data={
+            "name": f"Photo {slug}",
+            "description": "Has a photo.",
+            "ai_image_gcs": "gs://bucket/recipe/v1.png",
+            "ai_metadata": {"image_generation": {"success": True, "timestamp": timestamp}},
+        },
+    )
+
+
+def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
+    """The whole point: a new photo means a new URL, so caches cannot hide it."""
+    with app.app_context():
+        recipe = _image_recipe("regen-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    before = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
+    assert before is not None
+    assert re.fullmatch(
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", before
+    ), before
+
+    # Regenerate: the worker rewrites ai_metadata.image_generation.timestamp
+    # and nothing else about the URL (worker_api_bp._image_generation_metadata).
+    with app.app_context():
+        stored = db.session.get(Recipe, recipe_id)
+        data = dict(stored.data)
+        data["ai_metadata"] = {
+            "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
+        }
+        stored.data = data
+        db.session.commit()
+
+    after = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
+    assert after != before, "regenerated image kept the old URL — caches will serve stale bytes"
+    # Same resource, different cache key.
+    assert after.split("?")[0] == before.split("?")[0]
+
+
+def test_rendered_image_url_is_stable_when_the_image_is_not_regenerated(app, client):
+    """A marker that churns on every render would defeat the 24h cache entirely."""
+    with app.app_context():
+        recipe = _image_recipe("stable-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+
+    first = _og_image(client.get("/r/stable-pie").get_data(as_text=True))
+    second = _og_image(client.get("/r/stable-pie").get_data(as_text=True))
+    assert first == second
+
+
+def test_rendered_image_url_falls_back_to_updated_at_for_legacy_rows(app, client):
+    """Rows predating ai_metadata.image_generation still get a marker."""
+    with app.app_context():
+        recipe = _make_recipe(
+            "Legacy Photo",
+            "legacy-photo",
+            data={
+                "name": "Legacy Photo",
+                "description": "Predates the generation stamp.",
+                "ai_image_gcs": "gs://bucket/recipe/v1.png",
+            },
+        )
+        recipe.updated_at = datetime(2026, 7, 1, 9, 0, 0)
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    url = _og_image(client.get("/r/legacy-photo").get_data(as_text=True))
+    assert re.fullmatch(
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", url
+    ), url
+
+
+def test_rendered_image_url_does_not_version_an_external_stock_image(app, client):
+    """Not our host, not our cache, and a param could break a signed URL."""
+    with app.app_context():
+        recipe = _make_recipe(
+            "Stock Photo",
+            "stock-photo",
+            data={
+                "name": "Stock Photo",
+                "description": "External image.",
+                "stock_image_url": "https://img.example/stock.jpg",
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    assert (
+        _og_image(client.get("/r/stock-photo").get_data(as_text=True))
+        == "https://img.example/stock.jpg"
+    )
+
+
+def test_save_payload_keeps_the_canonical_image_url(app, client):
+    """The KAN-243 trap, held shut.
+
+    /api/recipes/public/<slug> becomes the SPA's `ai_image_url`, which is
+    PERSISTED — and `saveNotes` POSTs the whole recipe back, so a display-only
+    marker written here would return as the canonical URL. Versioning is a
+    render concern; this payload must stay clean.
+    """
+    with app.app_context():
+        recipe = _image_recipe("payload-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    payload = client.get("/api/recipes/public/payload-pie").get_json()
+    assert payload["ai_image_url"] == f"http://localhost/api/recipes/{recipe_id}/image"
+    assert "?v=" not in payload["ai_image_url"]
+    assert "?v=" not in payload["image"]
+
+
+def test_versioned_url_marker_does_not_leak_the_raw_timestamp(app, client):
+    """The marker is a hash. A public URL is not where worker run times belong."""
+    with app.app_context():
+        recipe = _image_recipe("opaque-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(recipe)
+        db.session.commit()
+
+    url = _og_image(client.get("/r/opaque-pie").get_data(as_text=True))
+    assert "2026-08-01" not in url
+
+
+def test_saved_copy_versions_from_the_source_row(app, client):
+    """A copy's photo bytes belong to the SOURCE, so the marker must too.
+
+    Reading the copy's own row here would pin the URL to a marker that never
+    moves when the source regenerates — exactly the bug, one level of
+    indirection down.
+    """
+    with app.app_context():
+        source = _image_recipe("source-pie", timestamp="2026-08-01T10:00:00")
+        db.session.add(source)
+        db.session.commit()
+        source_id = source.id
+
+        copy = _make_recipe(
+            "Copy Pie",
+            "copy-pie",
+            data={"name": "Copy Pie", "description": "Saved from the source."},
+        )
+        copy.source_recipe_id = source_id
+        db.session.add(copy)
+        db.session.commit()
+
+    before = _og_image(client.get("/r/copy-pie").get_data(as_text=True))
+    assert f"/api/recipes/{source_id}/image?v=" in before
+
+    with app.app_context():
+        stored = db.session.get(Recipe, source_id)
+        data = dict(stored.data)
+        data["ai_metadata"] = {
+            "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
+        }
+        stored.data = data
+        db.session.commit()
+
+    after = _og_image(client.get("/r/copy-pie").get_data(as_text=True))
+    assert after != before
