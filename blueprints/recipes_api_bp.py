@@ -15,6 +15,16 @@ from flask import Blueprint, jsonify, request, session
 
 from extensions import db  # noqa: F401
 from repositories import db_recipe_repository
+from utils.cache_utils import (
+    MAX_JSON_CACHE_BYTES,
+    TTL_MEDIUM,
+    TTL_SHORT,
+    invalidate_recipe,
+    recipe_key,
+    recipe_stats_key,
+    safe_get,
+    safe_set,
+)
 from utils.log_sanitizer import sanitize_log_value
 from utils.session_utils import get_or_create_session_id
 
@@ -131,6 +141,10 @@ def create_recipe(user_id, guest_session_id):
         if not recipe:
             return jsonify({"error": "Failed to create recipe"}), 500
 
+        # A new row changes this owner's count, and the id may collide with a
+        # tombstoned key from an earlier row of the same id.
+        invalidate_recipe(user_id, guest_session_id, recipe.id)
+
         return jsonify(recipe.to_dict()), 201
 
     except db_recipe_repository.RecipeOwnershipError as e:
@@ -181,12 +195,26 @@ def get_recipe(user_id, guest_session_id, recipe_id):
     Only returns recipe if it belongs to the current user (or is anonymous for guests).
     """
     try:
+        # The key is owner-scoped (u:<id> / g:<session>) and the decorator has
+        # already established that identity, so a hit can only be an answer this
+        # same owner was previously authorized to receive. That is why the read
+        # may sit above the repository call here, unlike the image endpoint,
+        # whose key is global and therefore must re-check access on every hit.
+        # Revocation staleness is bounded by the invalidation on every write
+        # path below plus TTL_MEDIUM.
+        ck = recipe_key(user_id, guest_session_id, recipe_id)
+        cached = safe_get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
 
         if not recipe:
             return jsonify({"error": "Recipe not found"}), 404
 
-        return jsonify(recipe.to_dict()), 200
+        payload = recipe.to_dict()
+        safe_set(ck, payload, timeout=TTL_MEDIUM, max_bytes=MAX_JSON_CACHE_BYTES)
+        return jsonify(payload), 200
 
     except Exception as e:
         logger.error(
@@ -222,6 +250,10 @@ def update_recipe(user_id, guest_session_id, recipe_id):
 
         if not recipe:
             return jsonify({"error": "Recipe not found or update failed"}), 404
+
+        # Publication state (slug/is_public/status) lives on this payload, so a
+        # stale entry would keep serving the pre-publish view.
+        invalidate_recipe(user_id, guest_session_id, recipe_id)
 
         return jsonify(recipe.to_dict()), 200
 
@@ -267,6 +299,10 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
         if not success:
             return jsonify({"error": "Recipe not found or delete failed"}), 404
 
+        # Must outrank TTL: a cached row would otherwise survive its own
+        # deletion and keep answering 200 for up to TTL_MEDIUM.
+        invalidate_recipe(user_id, guest_session_id, recipe_id)
+
         return jsonify({"message": "Recipe deleted successfully"}), 200
 
     except db_recipe_repository.CanonicalRecipeError:
@@ -293,18 +329,20 @@ def get_recipe_stats(user_id, guest_session_id):
         }
     """
     try:
+        ck = recipe_stats_key(user_id, guest_session_id)
+        cached = safe_get(ck)
+        if cached is not None:
+            return jsonify(cached), 200
+
         count = db_recipe_repository.count_user_recipes(user_id, guest_session_id)
 
-        return (
-            jsonify(
-                {
-                    "total_recipes": count,
-                    "user_id": user_id,
-                    "guest_session_id": guest_session_id,
-                }
-            ),
-            200,
-        )
+        payload = {
+            "total_recipes": count,
+            "user_id": user_id,
+            "guest_session_id": guest_session_id,
+        }
+        safe_set(ck, payload, timeout=TTL_SHORT, max_bytes=MAX_JSON_CACHE_BYTES)
+        return jsonify(payload), 200
 
     except Exception as e:
         logger.error(f"Error fetching recipe stats: {e}")
