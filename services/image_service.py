@@ -1,11 +1,11 @@
 """
-AI image generation service using Gemini Imagen.
+AI image generation service using the Gemini image model.
 
 Deduplicates the previously separate generate_recipe_image and regenerate_recipe_image functions
 into a single, flexible image generation workflow.
 
 Handles:
-- AI image generation via Imagen model
+- AI image generation via generate_content with IMAGE_MODEL
 - Image file saving to static/images/
 - Recipe metadata updates
 - Error logging with traceback
@@ -20,6 +20,9 @@ import traceback
 from flask import has_request_context, url_for
 from werkzeug.utils import secure_filename
 
+from google.genai import types as genai_types
+
+from config import IMAGE_MODEL
 from services.gemini_service import get_genai_client
 from utils.session_utils import get_user_metadata
 
@@ -32,6 +35,22 @@ def _anonymous_user_metadata():
         "is_authenticated": False,
         "session_id": None,
     }
+
+
+def extract_image_bytes(response):
+    """Extract image bytes from a generate_content response, or None."""
+    if not response.candidates:
+        return None
+    candidate = response.candidates[0]
+    if not getattr(candidate, "content", None):
+        return None
+    parts = getattr(candidate.content, "parts", None)
+    if not parts:
+        return None
+    for part in parts:
+        if part.inline_data and part.inline_data.data:
+            return part.inline_data.data
+    return None
 
 
 def _image_filename(filename):
@@ -96,7 +115,7 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
             user_metadata = _anonymous_user_metadata()
         _ = user_metadata["user_id"]  # noqa: F841
 
-        model_to_use = "imagen-4.0-generate-001"
+        model_to_use = IMAGE_MODEL
         image_prompt = (
             f"A delicious, high-quality food photography shot of "
             f"{recipe_data.get('name')}. Professional lighting, appetizing."
@@ -106,16 +125,20 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
         action = "Regenerating" if force_regenerate else "Generating"
         print(f"DEBUG: {action} AI image for {recipe_data.get('name')}...")
 
-        # Generate image
-        response = client.models.generate_images(
-            model=model_to_use, prompt=image_prompt, config={"number_of_images": 1}
+        response = client.models.generate_content(
+            model=model_to_use,
+            contents=image_prompt,
+            config=genai_types.GenerateContentConfig(
+                response_modalities=["IMAGE"],
+            ),
         )
 
-        if not response.generated_images:
+        image_bytes = extract_image_bytes(response)
+        if not image_bytes:
             return None, {"error": "No images generated", "status": 500}
 
         # Save image file
-        image_url = save_image_file(response.generated_images[0], filename)
+        image_url = save_image_bytes(image_bytes, filename)
 
         # Update recipe with image metadata
         update_recipe_with_image(
@@ -147,33 +170,21 @@ def generate_ai_image(filepath, recipe_data, filename, force_regenerate=False):
         return None, {"error": "Image generation failed", "status": 500}
 
 
-def save_image_file(generated_image, filename):
-    """
-    Save the generated image bytes to a file in static/images/.
-
-    Args:
-        generated_image: Image object from Gemini response
-        filename: Recipe filename to base image filename on
-
-    Returns:
-        str: URL path to the saved image
-    """
-    image_data = generated_image.image.image_bytes
-
+def save_image_bytes(image_data, filename):
+    """Save raw image bytes to static/images/ and return the URL path."""
     image_filename = _image_filename(filename)
     image_path = os.path.join("static", "images", image_filename)
-
-    # Ensure directory exists
     os.makedirs(os.path.dirname(image_path), exist_ok=True)
-
-    # Write image bytes
     with open(image_path, "wb") as img_f:
         img_f.write(image_data)
-
-    # Return URL for template
     if has_request_context():
         return url_for("static", filename=f"images/{image_filename}")
     return f"/static/images/{image_filename}"
+
+
+def save_image_file(generated_image, filename):
+    """Legacy wrapper: extract bytes from an Imagen response object."""
+    return save_image_bytes(generated_image.image.image_bytes, filename)
 
 
 def update_recipe_with_image(
@@ -197,7 +208,7 @@ def update_recipe_with_image(
     if "ai_metadata" not in recipe_data:
         recipe_data["ai_metadata"] = {}
 
-    # Same helper as save_image_file() so the recorded path matches the file
+    # Same helper as save_image_bytes() so the recorded path matches the file
     image_filename = _image_filename(filename)
     image_path = os.path.join("static", "images", image_filename)
 

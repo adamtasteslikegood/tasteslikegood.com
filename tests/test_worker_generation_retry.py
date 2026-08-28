@@ -27,9 +27,10 @@ from httpx import ReadTimeout, Request
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
-from extensions import db  # noqa: E402
+from extensions import cache, db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from models.user import User  # noqa: E402
+from utils import cache_utils  # noqa: E402
 
 
 @pytest.fixture
@@ -309,16 +310,22 @@ def test_image_worker_persists_generated_image(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -364,7 +371,7 @@ def test_image_worker_records_generation_failure(app, client):
         db.session.commit()
 
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
             raise RuntimeError("Imagen unavailable")
 
     class FakeClient:
@@ -395,7 +402,7 @@ def test_image_worker_records_terminal_generation_failure(app, client):
         _make_pending_recipe(recipe_id, status="ready")
 
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
             raise ValueError("Invalid image request")
 
     class FakeClient:
@@ -416,7 +423,7 @@ def test_image_worker_retries_http_transport_failure(app, client):
         _make_pending_recipe(recipe_id, status="ready")
 
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
             raise ReadTimeout("Imagen timed out", request=Request("POST", "https://example.test"))
 
     class FakeClient:
@@ -442,16 +449,22 @@ def test_legacy_image_delivery_completes_pending_non_force_request(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -538,16 +551,22 @@ def test_image_worker_uploads_to_gcs_when_configured(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -625,16 +644,22 @@ def test_image_worker_uses_owner_after_guest_login(app, client):
         db.session.commit()
         owner_id = user.id
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **kwargs):
+        def generate_content(self, **kwargs):
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -884,14 +909,8 @@ def test_superseded_image_worker_cannot_commit_generated_bytes(app, client):
     with app.app_context():
         _make_pending_recipe(recipe_id, status="ready")
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"superseded-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **_kwargs):
+        def generate_content(self, **_kwargs):
             nonlocal replacement_claim
             recipe = db.session.get(Recipe, recipe_id)
             recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
@@ -903,8 +922,20 @@ def test_superseded_image_worker_cannot_commit_generated_bytes(app, client):
                 stale_after_seconds=120,
             )
 
+            class InlineData:
+                data = b"superseded-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -946,14 +977,8 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
         }
         db.session.commit()
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"generated-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **_kwargs):
+        def generate_content(self, **_kwargs):
             updated = db_recipe_repository.update_recipe(
                 recipe_id,
                 {
@@ -971,8 +996,20 @@ def test_image_worker_preserves_user_edits_made_during_generation(app, client):
             )
             assert updated is not None
 
+            class InlineData:
+                data = b"generated-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -1053,14 +1090,8 @@ def test_superseded_gcs_worker_deletes_its_versioned_orphan(app, client):
     with app.app_context():
         _make_pending_recipe(recipe_id, status="ready")
 
-    class GeneratedImage:
-        class Image:
-            image_bytes = b"superseded-image"
-
-        image = Image()
-
     class FakeModels:
-        def generate_images(self, **_kwargs):
+        def generate_content(self, **_kwargs):
             nonlocal replacement_claim
             recipe = db.session.get(Recipe, recipe_id)
             recipe.updated_at = datetime.datetime.utcnow() - datetime.timedelta(seconds=601)
@@ -1072,8 +1103,20 @@ def test_superseded_gcs_worker_deletes_its_versioned_orphan(app, client):
                 stale_after_seconds=120,
             )
 
+            class InlineData:
+                data = b"superseded-image"
+
+            class Part:
+                inline_data = InlineData()
+
+            class Content:
+                parts = [Part()]
+
+            class Candidate:
+                content = Content()
+
             class Response:
-                generated_images = [GeneratedImage()]
+                candidates = [Candidate()]
 
             return Response()
 
@@ -1101,3 +1144,59 @@ def test_superseded_gcs_worker_deletes_its_versioned_orphan(app, client):
         recipe_id,
         f"gs://recipe-images/images/{recipe_id}/{uploaded_versions[0]}.png",
     )
+
+
+# ── KAN-151: terminal worker failures must clear the cached recipe payload ────
+#
+# The success paths already invalidate (update_recipe_for_worker at the end of
+# _process_recipe_message, patch_recipe_for_worker in the image worker). The
+# failure paths did not, so a payload cached mid-generation kept answering with
+# the pre-failure status for the full TTL_MEDIUM after the work had died.
+
+
+def _prime_recipe_cache(recipe_id, payload):
+    """Seed the owner-scoped recipe key the way GET /api/recipes/<id> would."""
+    key = cache_utils.recipe_key(None, "guest-1", recipe_id)
+    cache.clear()
+    cache_utils.safe_set(key, payload, timeout=600)
+    assert cache_utils.safe_get(key) == payload
+    return key
+
+
+def test_generation_failure_invalidates_cached_recipe(app, client):
+    """A terminal 'error' status must not keep serving the cached 'processing'."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+        key = _prime_recipe_cache(recipe_id, {"id": recipe_id, "status": "processing"})
+
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            return_value=(None, None, "Model returned invalid JSON"),
+        ),
+        patch("blueprints.worker_api_bp.GENERATION_MAX_ATTEMPTS", 1),
+    ):
+        resp = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
+
+    assert resp.status_code == 200
+    with app.app_context():
+        assert db.session.get(Recipe, recipe_id).status == "error"
+        assert cache_utils.safe_get(key) is None
+
+
+def test_image_failure_invalidates_cached_recipe(app, client):
+    """_record_image_failure is terminal, so it owns the invalidation."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id, status="ready")
+        key = _prime_recipe_cache(recipe_id, {"id": recipe_id, "status": "generating_image"})
+
+    with patch("blueprints.worker_api_bp.get_genai_client", return_value=None):
+        resp = client.post("/api/worker/image", json=_image_push_envelope(recipe_id))
+
+    assert resp.status_code == 500
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.data["ai_metadata"]["image_generation"]["success"] is False
+        assert cache_utils.safe_get(key) is None

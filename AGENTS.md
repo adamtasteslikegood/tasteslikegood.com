@@ -151,7 +151,7 @@ In production all secrets come from Google Secret Manager via Cloud Run `--set-s
 - **Two migration heads** — see "Multi-PR head conflicts" above. Symptom: `flask db upgrade` runs but production schema is incomplete; `recipe.status missing` style errors at runtime.
 - **`config.py` reads `DATABASE_URL` at import time** — overriding via shell after import does nothing. Set env before invoking Flask.
 - **Flask SQLite paths resolve under `instance/`** — `sqlite:///foo.db` writes to `instance/foo.db`, not the cwd.
-- **Gemini model names include `models/` prefix** (e.g., `models/gemini-3.1-pro-preview`); filter API responses by `'generateContent' in supported_generation_methods`.
+- **Gemini model names include `models/` prefix** (e.g., `models/gemini-3.7-flash`); filter API responses by `'generateContent' in supported_generation_methods`.
 - **Tests must hit the right DB engine** — `tests/test_migration_backfill_slug.py::test_backfill_slugs_retry_loop` set `SQLALCHEMY_DATABASE_URI` after `create_app()` and ran `db.create_all()` against a stale engine. Compare against `tests/test_public_ssr.py` for the working pattern (issue #118).
 
 ## Related docs
