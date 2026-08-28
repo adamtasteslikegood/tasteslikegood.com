@@ -12,6 +12,7 @@ without executing client-side JavaScript. All other traffic (Angular SPA,
 JSON API) continues to flow through the existing blueprints.
 """
 
+import hashlib
 import logging
 import os
 from collections.abc import Mapping
@@ -73,6 +74,17 @@ def _minutes_to_iso_duration(value: Any) -> str | None:
     return f"PT{minutes}M"
 
 
+def _serves_own_image_bytes(recipe: Recipe) -> bool:
+    """True when ``/api/recipes/<id>/image`` has bytes for this recipe.
+
+    The one signal that separates "our endpoint serves this" from "this is an
+    external stock image URL" — which is what decides whether the URL is ours
+    to version (see ``_rendered_image_url``).
+    """
+    data = recipe.data or {}
+    return bool(data.get("ai_image_gcs") or data.get("ai_image_data"))
+
+
 def _own_image_url(recipe: Recipe) -> str | None:
     """Image URL from the recipe's own data blob — no source fallback.
 
@@ -80,10 +92,9 @@ def _own_image_url(recipe: Recipe) -> str | None:
     from (real GCS/base64 bytes), else an external stock image — never from
     the unverified ``ai_image_url`` (cookbook #3164).
     """
-    data = recipe.data or {}
-    if data.get("ai_image_gcs") or data.get("ai_image_data"):
+    if _serves_own_image_bytes(recipe):
         return _canonical_url("generation_api.serve_recipe_image", recipe_id=recipe.id)
-    return _absolute_url(data.get("stock_image_url"))
+    return _absolute_url((recipe.data or {}).get("stock_image_url"))
 
 
 def _resolve_source_for_image(recipe: Recipe) -> Recipe | None:
@@ -161,14 +172,89 @@ def _recipe_image_url(recipe: Recipe) -> str | None:
     ever resolved, and would pin the copy to the stock image permanently,
     including after the source gained an AI image.  Resolve live instead.
     """
+    return _recipe_image(recipe)[0]
+
+
+def _recipe_image(recipe: Recipe) -> tuple[str | None, Recipe | None]:
+    """``(url, the recipe whose bytes that url serves)``.
+
+    The owner is the half ``_recipe_image_url`` used to throw away, and
+    KAN-195 needs it: for a saved copy the bytes belong to the SOURCE, so the
+    version marker has to be read off the source's row, not the copy's.
+    Returned alongside the URL rather than resolved a second time — the
+    saved-copy source lookup is a DB round trip with a causality guard, and
+    the render path already goes out of its way not to repeat it.
+    """
     url = _own_image_url(recipe)
     if url is not None:
-        return url
+        return url, recipe
     # Saved copy with no image of its own — resolve from source.
     source = _resolve_source_for_image(recipe)
     if source is not None:
-        return _own_image_url(source)
-    return None
+        return _own_image_url(source), source
+    return None, None
+
+
+def _image_version_token(owner: Recipe) -> str | None:
+    """A short marker that changes exactly when the image bytes change.
+
+    Prefers ``ai_metadata.image_generation.timestamp``, which the Pub/Sub
+    worker rewrites on every successful (re)generation and on nothing else
+    (``worker_api_bp._image_generation_metadata``). Falls back to the row's
+    ``updated_at`` for legacy rows that predate that field — coarser (any edit
+    moves it, costing one needless re-download) but never stale.
+
+    Hashed and truncated rather than emitted raw: the timestamp is internal
+    metadata and a public URL is not the place to publish when a worker ran.
+    """
+    data = owner.data or {}
+    metadata = data.get("ai_metadata")
+    generation = metadata.get("image_generation") if isinstance(metadata, Mapping) else None
+    stamp = generation.get("timestamp") if isinstance(generation, Mapping) else None
+    if not isinstance(stamp, str) or not stamp:
+        stamp = owner.updated_at.isoformat() if owner.updated_at else None
+    if not stamp:
+        return None
+    return hashlib.sha256(stamp.encode("utf-8")).hexdigest()[:12]
+
+
+def _rendered_image_url(recipe: Recipe) -> str | None:
+    """The image URL for the PUBLIC PAGE, versioned (KAN-195).
+
+    ``/api/recipes/<id>/image`` is served with ``Cache-Control: public,
+    max-age=86400`` for a public recipe, and its URL never changes. So when a
+    user regenerated a photo, every browser and CDN that had already fetched
+    the old bytes kept serving them for up to 24 hours — the new photo was
+    live on the server (the worker invalidates the Valkey entry, see
+    ``worker_api_bp``) and invisible on ``/r/<slug>``.
+
+    A ``?v=<marker>`` query param makes the regenerated image a different
+    cache key, so it is fetched immediately, while the long ``max-age`` keeps
+    doing its job for the bytes that did not change. The SPA already solves
+    the same problem with its own display-only ``_t=`` marker
+    (``RecipeStateService``, KAN-243); this is the server-rendered half.
+
+    Two things this deliberately does NOT do:
+
+    * It does not touch the ``Cache-Control`` header. Shortening it would trade
+      a permanent CDN/browser cache for a correctness fix that a new URL
+      already delivers.
+    * It is not used by ``_save_recipe_payload``. That payload becomes the
+      SPA's ``ai_image_url``, which is persisted, and a display-only marker in
+      persisted state is exactly the trap KAN-243 documents (a later full save
+      writes it back as the canonical URL). Versioning is a render concern and
+      stays on the render path.
+
+    An external stock image is left alone: it is not served by us, appending a
+    param cannot help, and it could break a signed URL.
+    """
+    url, owner = _recipe_image(recipe)
+    if url is None or owner is None or not _serves_own_image_bytes(owner):
+        return url
+    token = _image_version_token(owner)
+    if token is None:
+        return url
+    return _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id, v=token)
 
 
 def _format_ingredient(ingredient: Mapping[str, Any]) -> str:
@@ -349,12 +435,16 @@ def show_public_recipe(slug):
 
     data = recipe.data or {}
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
-    image_url = _recipe_image_url(recipe)
+    # KAN-195: versioned, so a regenerated photo is not hidden behind the
+    # 24-hour Cache-Control on the (otherwise unchanging) image URL.
+    image_url = _rendered_image_url(recipe)
     # Pinterest pin media reuses the page's own byte-gated URL: pinning a dead
     # link creates broken pins, and a run of broken pins from a fresh domain
     # trips Pinterest's new-account spam heuristics (Backend #203/#204).
     # Reused rather than recomputed — a second call would re-issue the
-    # saved-copy source lookup for no gain.
+    # saved-copy source lookup for no gain. It gets the versioned URL too: a
+    # pin whose media is the pre-regeneration photo is the same defect wearing
+    # a different hat.
     pinterest_image_url = image_url
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
     instructions = _recipe_instructions(data)
