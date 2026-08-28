@@ -30,15 +30,15 @@ dependencies = [
     # Database (Phase 3) - psycopg2 is optional, only needed for PostgreSQL
     "flask-sqlalchemy==3.1.1",
     "flask-migrate==4.1.0",
-    "flask-caching==2.4.1",
+    "flask-caching==2.5.0",
     "sqlalchemy>=2.0.51", # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
-    "google-genai==2.18.1",
+    "google-genai==2.19.0",
     "google-generativeai==0.8.6",
     "google-ai-generativelanguage==0.6.15",
     "google-auth==2.56.3",
     "google-auth-oauthlib==1.4.0",
-    "google-api-python-client==2.198.0",
+    "google-api-python-client==2.199.0",
     "googleapis-common-protos==1.75.0",
     # GCP runtime services (image storage, async generation, Valkey IAM auth).
     # These were only ever declared in requirements.txt; they belong here so
