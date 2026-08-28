@@ -270,9 +270,13 @@ def add_recipe_to_collection(user_id, guest_session_id, collection_id):
             cookbook.updated_at = datetime.utcnow()
             db.session.commit()
 
-        # recipeIds rides on both the object payload and every row of the list
-        # payload, so membership changes invalidate both.
-        invalidate_collection(user_id, guest_session_id, collection_id)
+            # recipeIds rides on both the object payload and every row of the
+            # list payload, so a membership change invalidates both. Scoped to
+            # the branch that commits: a duplicate add writes nothing, and the
+            # response is byte-identical to the cached entry, so evicting there
+            # would only buy two needless DB reads on the next request.
+            invalidate_collection(user_id, guest_session_id, collection_id)
+
         return jsonify(cookbook.to_dict()), 200
     except Exception as e:
         logger.error(

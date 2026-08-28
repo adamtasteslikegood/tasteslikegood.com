@@ -17,6 +17,7 @@ from config import DEFAULT_MODEL, GCS_BUCKET_NAME
 from blueprints.generation_bp import validate_generation_input
 from repositories import db_recipe_repository
 from utils.cache_utils import (
+    invalidate_recipe,
     recipe_image_key,
     safe_get,
     safe_set,
@@ -87,6 +88,12 @@ def generate_recipe_json():
     if not db_recipe:
         return jsonify({"error": "Failed to save recipe to database"}), 500
 
+    # KAN-151: this is the second path that adds a row to an owner's scope, and
+    # count_user_recipes() has no status filter, so a "generating" placeholder
+    # already changes the answer GET /api/recipes/stats caches. Mirrors the
+    # invalidation recipes_api_bp.create_recipe does for the same reason.
+    invalidate_recipe(user_id, guest_session_id, recipe_id)
+
     # Publish message to Pub/Sub
     from services.pubsub_service import publish_message
 
@@ -111,6 +118,8 @@ def generate_recipe_json():
             sanitize_log_value(e),
         )
         db_recipe_repository.update_recipe_status(recipe_id, "error", user_id, guest_session_id)
+        # Terminal state: no worker will run, so nothing downstream clears this.
+        invalidate_recipe(user_id, guest_session_id, recipe_id)
         return jsonify({"error": "Failed to queue generation"}), 500
 
 
@@ -173,6 +182,10 @@ def generate_image_for_recipe():
         if db_recipe.status != "generating_image":
             return jsonify({"error": "Recipe is not ready for image generation"}), 409
         return jsonify({"status": "generating_image"}), 202
+    # status flipped to "generating_image" and ai_metadata.image_request was
+    # rewritten; both ride on to_dict(), so the cached recipe payload is stale.
+    invalidate_recipe(user_id, guest_session_id, recipe_id)
+
     if not queued.should_publish:
         return jsonify({"status": "generating_image"}), 202
 
@@ -209,6 +222,9 @@ def generate_image_for_recipe():
                 "Image queue state changed for recipe %s after publish returned an error",
                 sanitize_log_value(recipe_id),
             )
+        # The release reverted status/ai_metadata again, and no worker will run
+        # to clear the key later.
+        invalidate_recipe(user_id, guest_session_id, recipe_id)
         return jsonify({"error": "Failed to queue image generation"}), 500
 
 

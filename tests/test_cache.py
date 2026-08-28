@@ -432,6 +432,74 @@ def test_collection_delete_invalidates(app, client):
     assert client.get(f"/api/collections/{cid}").status_code == 404
 
 
+def test_duplicate_collection_add_does_not_evict(app, client):
+    """A no-op add writes nothing, so it must not throw away the cached answer.
+
+    The response is byte-identical either way; evicting would only buy two
+    needless DB reads on the next request.
+    """
+    with app.app_context():
+        owner_id = _owner()
+        recipe_id = str(uuid.uuid4())
+        db.session.add(_owned_recipe(recipe_id, owner_id))
+        db.session.commit()
+    _login(client, owner_id)
+
+    cid = client.post("/api/collections", json={"name": "Shelf"}).get_json()["id"]
+    client.post(f"/api/collections/{cid}/recipes", json={"recipe_id": recipe_id})
+    client.get(f"/api/collections/{cid}")  # prime the object key post-add
+
+    # Rename behind the cache so a surviving entry is observable.
+    with app.app_context():
+        db.session.get(Cookbook, cid).name = "Renamed Behind The Cache"
+        db.session.commit()
+
+    # Adding the same recipe again commits nothing, so the entry must survive.
+    assert (
+        client.post(f"/api/collections/{cid}/recipes", json={"recipe_id": recipe_id}).status_code
+        == 200
+    )
+    assert client.get(f"/api/collections/{cid}").get_json()["name"] == "Shelf"
+
+
+def test_async_generate_invalidates_stats(app, client, monkeypatch):
+    """POST /api/generate adds a row, so the cached recipe count is stale.
+
+    count_user_recipes() has no status filter, so the "generating" placeholder
+    already changes the answer — this is the second writer into an owner's
+    scope and it was not on the invalidation map.
+    """
+    monkeypatch.setattr("services.pubsub_service.publish_message", lambda *a, **kw: None)
+    with app.app_context():
+        owner_id = _owner()
+    _login(client, owner_id)
+
+    assert client.get("/api/recipes/stats").get_json()["total_recipes"] == 0  # prime
+
+    resp = client.post("/api/generate", json={"prompt": "a hearty vegan winter stew"})
+    assert resp.status_code == 202
+
+    assert client.get("/api/recipes/stats").get_json()["total_recipes"] == 1
+
+
+def test_image_enqueue_invalidates_cached_recipe(app, client, monkeypatch):
+    """Queuing an image flips status and rewrites ai_metadata; both are cached."""
+    monkeypatch.setattr("services.pubsub_service.publish_message", lambda *a, **kw: None)
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        owner_id = _owner()
+        db.session.add(_owned_recipe(recipe_id, owner_id))
+        db.session.commit()
+    _login(client, owner_id)
+
+    assert client.get(f"/api/recipes/{recipe_id}").get_json()["status"] != "generating_image"
+
+    resp = client.post("/api/generate_image", json={"recipe_id": recipe_id})
+    assert resp.status_code == 202
+
+    assert client.get(f"/api/recipes/{recipe_id}").get_json()["status"] == "generating_image"
+
+
 def test_oversized_payload_is_not_cached(app):
     """The max_bytes guard keeps legacy base64 blobs out of Valkey."""
     with app.app_context():

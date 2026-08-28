@@ -163,16 +163,22 @@ def _record_image_failure(
             "force_regenerate": force_regenerate,
             "timestamp": timestamp,
         }
-    return (
-        db_recipe_repository.patch_recipe_for_worker(
-            recipe_id,
-            {"ai_metadata": metadata},
-            claim_token,
-            status="ready",
-            expected_status="generating_image",
-        )
-        is not None
+    updated = db_recipe_repository.patch_recipe_for_worker(
+        recipe_id,
+        {"ai_metadata": metadata},
+        claim_token,
+        status="ready",
+        expected_status="generating_image",
     )
+    if updated is None:
+        return False
+
+    # KAN-151: this is a terminal transition (status back to "ready" carrying
+    # image_generation.success=False), so nothing downstream clears the cached
+    # recipe payload the way the success path at _process_image_message does.
+    # Invalidating in the helper covers both call sites at once.
+    invalidate_recipe(updated.user_id, updated.guest_session_id, recipe_id)
+    return True
 
 
 def _image_enqueue_pending(recipe_data):
@@ -485,6 +491,12 @@ def process_recipe():
                 release_claim=True,
             ):
                 raise RuntimeError("Recipe failure status could not be persisted")
+            # KAN-151: terminal failure. The success path below invalidates
+            # after update_recipe_for_worker; without the same call here a
+            # payload cached mid-generation keeps answering "processing" for
+            # the full TTL after the generation has actually died.
+            _, failed_user_id, failed_guest_id = _current_recipe_scope(recipe_id)
+            invalidate_recipe(failed_user_id, failed_guest_id, recipe_id)
             return jsonify({"status": "ok"}), 200
 
         recipe, user_id, guest_session_id = _current_recipe_scope(recipe_id)
