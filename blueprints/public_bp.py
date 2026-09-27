@@ -612,6 +612,12 @@ def sitemap_xml():
             "changefreq": "daily",
             "priority": "0.9",
         },
+        # KAN-272: the static About page Express serves (author + E-E-A-T).
+        {
+            "loc": f"{_public_base_url()}/about",
+            "changefreq": "monthly",
+            "priority": "0.5",
+        },
     ]
 
     for recipe in recipes:
