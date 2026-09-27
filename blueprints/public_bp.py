@@ -618,7 +618,15 @@ def _related_recipes(recipe: Recipe) -> list[Recipe]:
     chosen = [row.id for row in sorted(rows, key=rank, reverse=True)[:RELATED_RECIPE_COUNT]]
     if not chosen:
         return []
-    by_id = {related.id: related for related in Recipe.query.filter(Recipe.id.in_(chosen)).all()}
+    # Mirror the filters from the scoring query: under READ COMMITTED, a recipe
+    # unpublished (or slug-nulled) between the two queries would otherwise be
+    # linked from a public page and 404 on click.
+    by_id = {
+        related.id: related
+        for related in Recipe.query.filter(
+            Recipe.id.in_(chosen), Recipe.is_public.is_(True), Recipe.slug.isnot(None)
+        ).all()
+    }
     return [by_id[recipe_id] for recipe_id in chosen if recipe_id in by_id]
 
 
