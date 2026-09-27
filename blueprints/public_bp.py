@@ -227,10 +227,23 @@ def _image_version_token(owner: Recipe) -> str | None:
 
     Hashed and truncated rather than emitted raw: storage identifiers and image
     payloads are internal state and do not belong in a public URL.
+
+    Chooses the source with the same per-field ``isinstance(..., str)`` gate as
+    ``_serves_own_image_bytes`` — a plain ``or`` short-circuits on the first
+    truthy value regardless of type, so a legacy ``ai_image_gcs`` that is
+    truthy-but-not-a-string would win here while ``_serves_own_image_bytes``
+    still returned True from ``ai_image_data``. That divergence made
+    ``_versioned_image_url`` emit a versionless URL for an image the endpoint
+    is actively serving — the KAN-195 stale-cache defect wearing a new hat.
     """
     data = owner.data or {}
-    source = data.get("ai_image_gcs") or data.get("ai_image_data")
-    if not isinstance(source, str) or not source:
+    gcs = data.get("ai_image_gcs")
+    payload = data.get("ai_image_data")
+    if isinstance(gcs, str) and gcs:
+        source = gcs
+    elif isinstance(payload, str) and payload:
+        source = payload
+    else:
         return None
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
 
@@ -281,10 +294,19 @@ def _rendered_image(recipe: Recipe) -> tuple[str | None, dict[str, str] | None]:
 
 
 def _versioned_image_url(owner: Recipe) -> str:
-    """Absolute full-size URL of an image ``owner`` serves itself, with ``?v=``."""
+    """Absolute full-size URL of an image ``owner`` serves itself, with ``?v=``.
+
+    Callers gate on ``_serves_own_image_bytes(owner)`` first, and
+    ``_image_version_token`` uses the same per-field ``isinstance`` check, so
+    ``token`` is never ``None`` here. Fail loud rather than silently emitting a
+    versionless (permanently CDN-cached) URL — that path is the KAN-195 defect.
+    """
     token = _image_version_token(owner)
     if token is None:
-        return _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id)
+        raise RuntimeError(
+            "_versioned_image_url called for owner without an image-version token; "
+            "callers must gate on _serves_own_image_bytes."
+        )
     return _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id, v=token)
 
 
@@ -840,6 +862,10 @@ def browse_public_recipes():
         "public/browse.html",
         page_title=page_title,
         og_image_url=_versioned_image_url(og_owner) if og_owner else None,
+        # The og:image is a specific dish photo (og_owner), not a shot of the
+        # browse page — so its alt names that dish, otherwise social cards and
+        # screen readers announce "Browse N Vegan Recipes" for a plate of food.
+        og_image_alt=og_owner.name if og_owner else None,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
         collection_json_ld=_collection_json_ld(
             page_title, snippet_description, canonical_url, recipes

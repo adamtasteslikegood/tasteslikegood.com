@@ -295,6 +295,17 @@ def test_browse_title_description_and_collection_json_ld(app, client):
     og_image = re.search(r'<meta property="og:image" content="([^"]+)">', body).group(1)
     assert og_image.startswith(f"http://localhost/api/recipes/{newest_id}/image")
     assert '<meta name="twitter:card" content="summary_large_image">' in body
+    # og:image is a specific dish photo, not a shot of the browse page — so its
+    # alt names that dish, otherwise a plate of soup is announced as "Browse N
+    # Vegan Recipes · TastesLikeGood" on social cards and screen readers.
+    og_image_alt = html.unescape(
+        re.search(r'<meta property="og:image:alt" content="([^"]+)">', body).group(1)
+    )
+    assert og_image_alt == "Newest Soup"
+    twitter_image_alt = html.unescape(
+        re.search(r'<meta name="twitter:image:alt" content="([^"]+)">', body).group(1)
+    )
+    assert twitter_image_alt == "Newest Soup"
 
 
 def test_browse_without_photos_has_no_og_image(app, client):
