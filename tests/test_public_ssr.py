@@ -88,15 +88,10 @@ def _make_recipe(name, slug, *, public=True, owner=None, data=None):
     ],
 )
 def test_format_ingredient_handles_all_amount_array_lengths(amount, expected):
-    assert (
-        _format_ingredient({"amount": amount, "units": "cup", "name": "lentils"})
-        == expected
-    )
+    assert _format_ingredient({"amount": amount, "units": "cup", "name": "lentils"}) == expected
 
 
-@pytest.mark.parametrize(
-    "value", ["Infinity", "-Infinity", float("inf"), float("-inf")]
-)
+@pytest.mark.parametrize("value", ["Infinity", "-Infinity", float("inf"), float("-inf")])
 def test_safe_minutes_rejects_infinite_values(value):
     assert _safe_minutes(value) is None
 
@@ -115,9 +110,9 @@ def test_show_public_recipe_renders_html(app, client):
     assert '<script defer src="/static/js/public.js"></script>' in body
     assert "document.querySelectorAll('[data-open-kitchen]')" not in body
 
-    public_js = (
-        Path(__file__).resolve().parent.parent / "static/js/public.js"
-    ).read_text(encoding="utf-8")
+    public_js = (Path(__file__).resolve().parent.parent / "static/js/public.js").read_text(
+        encoding="utf-8"
+    )
     assert 'event.key === "Escape"' in public_js
     assert "lastFocused.focus()" in public_js
     assert 'event.key !== "Tab"' in public_js
@@ -159,13 +154,8 @@ def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     resp = client.get("/r/thai-peanut-noodles")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert (
-        '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
-    )
-    assert (
-        '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">'
-        in body
-    )
+    assert '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
+    assert '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">' in body
     # KAN-195: the rendered image URL carries a ?v=<marker> so a regenerated
     # photo is not hidden behind the endpoint's 24h Cache-Control.
     assert re.search(
@@ -205,9 +195,7 @@ def test_pinterest_button_hidden_when_recipe_has_no_image(app, client):
 
 
 def _pinterest_media_param(body: str) -> str:
-    match = re.search(
-        r'href="(https://www\.pinterest\.com/pin/create/button/\?[^"]+)"', body
-    )
+    match = re.search(r'href="(https://www\.pinterest\.com/pin/create/button/\?[^"]+)"', body)
     assert match, "no Pinterest share link in page"
     href = html.unescape(match.group(1))
     return parse_qs(urlsplit(href).query)["media"][0]
@@ -236,9 +224,7 @@ def _pinterest_media_param(body: str) -> str:
         ),
     ],
 )
-def test_pinterest_button_shown_when_recipe_has_image(
-    app, client, image_field, expected_media
-):
+def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, expected_media):
     with app.app_context():
         recipe = _make_recipe(
             "Pinnable Pie",
@@ -371,9 +357,7 @@ def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
     assert resp.status_code == 200
     # Expect a small, fixed number of SELECTs — count(*) + recipes+user join.
     # Anything above 5 means eager loading regressed and rows are loading users one-by-one.
-    assert (
-        select_count <= 5
-    ), f"expected ≤5 SELECTs, got {select_count} (N+1 regression)"
+    assert select_count <= 5, f"expected ≤5 SELECTs, got {select_count} (N+1 regression)"
 
 
 def test_partial_recipe_omits_blank_metadata_and_formats_amount_ranges(app, client):
@@ -564,9 +548,7 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
 
     assert resp.status_code == 200
     recipe_queries = [
-        (statement, params)
-        for statement, params in statements
-        if "FROM recipe" in statement
+        (statement, params) for statement, params in statements if "FROM recipe" in statement
     ]
     assert recipe_queries
     # KAN-274: the hub entries read exactly one JSON path (the tags) out of
@@ -574,8 +556,7 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
     tag_path = "JSON_EXTRACT(recipe.data, ?)"
     assert sum(statement.count(tag_path) for statement, _ in recipe_queries) == 1
     assert all(
-        "recipe.data" not in statement.replace(tag_path, "")
-        for statement, _ in recipe_queries
+        "recipe.data" not in statement.replace(tag_path, "") for statement, _ in recipe_queries
     )
     json_path_params = [
         param
@@ -1216,9 +1197,7 @@ def _image_recipe(slug: str, *, timestamp: str):
             "name": f"Photo {slug}",
             "description": "Has a photo.",
             "ai_image_gcs": "gs://bucket/recipe/v1.png",
-            "ai_metadata": {
-                "image_generation": {"success": True, "timestamp": timestamp}
-            },
+            "ai_metadata": {"image_generation": {"success": True, "timestamp": timestamp}},
         },
     )
 
@@ -1251,9 +1230,7 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
         db.session.commit()
 
     after = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
-    assert (
-        after != before
-    ), "regenerated image kept the old URL — caches will serve stale bytes"
+    assert after != before, "regenerated image kept the old URL — caches will serve stale bytes"
     # Same resource, different cache key.
     assert after.split("?")[0] == before.split("?")[0]
 
@@ -1384,9 +1361,7 @@ def test_saved_copy_versions_from_the_source_row(app, client):
     assert after != before
 
 
-def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(
-    app, client
-):
+def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(app, client):
     """Guards the _serves_own_image_bytes / _image_version_token invariant.
 
     A legacy/corrupt row whose ``ai_image_gcs`` is truthy-but-not-a-string (e.g.
