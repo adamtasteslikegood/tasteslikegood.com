@@ -33,6 +33,16 @@
             High-contrast, fast-loading public recipes. Showing {{ recipes|length }} of {{ total }}
             published recipes.
         </p>
+        {# KAN-274: the indexable category hubs, linked from their parent page. #}
+        {% if hubs %}
+        <nav class="public-hub-links" aria-label="Recipe categories">
+            <ul>
+                {% for hub in hubs %}
+                <li><a href="{{ hub.url }}" class="public-tag">{{ hub.title }}</a></li>
+                {% endfor %}
+            </ul>
+        </nav>
+        {% endif %}
     </header>
 
     {% if recipes %}

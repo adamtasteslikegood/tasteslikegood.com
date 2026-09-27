@@ -536,7 +536,10 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
     assert resp.status_code == 200
     recipe_queries = [statement for statement in statements if "FROM recipe" in statement]
     assert recipe_queries
-    assert all("recipe.data" not in statement for statement in recipe_queries)
+    # KAN-274: the hub entries read one JSON path (the tags) out of data; that
+    # is the only reference to the column allowed, never the full blob.
+    tag_path = "JSON_EXTRACT(recipe.data, ?)"
+    assert all("recipe.data" not in statement.replace(tag_path, "") for statement in recipe_queries)
 
 
 def test_public_recipe_image_served_without_session(app, client):

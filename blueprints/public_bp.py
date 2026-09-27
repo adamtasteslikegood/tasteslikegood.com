@@ -38,6 +38,13 @@ from sqlalchemy.orm import joinedload
 from extensions import db
 from models import Recipe
 from services.image_variants import VARIANT_WIDTHS
+from services.tag_hubs import (
+    HUBS_BY_SLUG,
+    MIN_INDEXABLE_RECIPES,
+    TAG_HUBS,
+    TagHub,
+    hubs_for_tags,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -559,23 +566,42 @@ def _meta_description(text: str) -> str:
 RELATED_RECIPE_COUNT = 6
 
 
-def _related_recipes(recipe: Recipe) -> list[Recipe]:
+def _catalog_tag_rows() -> list[Any]:
+    """``(id, created_at, updated_at, tags)`` for every public recipe.
+
+    The one catalog scan the related-recipes block and the tag hubs share. It
+    reads ``data -> 'tags'`` only — never the full ``data`` blob, which can still
+    carry legacy base64 images.
+    """
+    rows: list[Any] = (
+        Recipe.query.with_entities(
+            Recipe.id,
+            Recipe.created_at,
+            Recipe.updated_at,
+            Recipe.data["tags"].label("tags"),
+        )
+        .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
+        .all()
+    )
+    return rows
+
+
+def _row_tags(row: Any) -> list[Any]:
+    return row.tags if isinstance(row.tags, list) else []
+
+
+def _related_recipes(recipe: Recipe, catalog: list[Any]) -> list[Recipe]:
     """Public recipes that share the most tags with ``recipe``, newest first on ties.
 
     Recipe pages linked to no other recipe, so link equity stopped at every page
-    (SEO audit O2). Scoring reads only id/created_at/tags for the whole public
-    catalog — never the full ``data`` blob, which can still carry legacy base64
-    images — then loads the chosen few in full for their cards.
+    (SEO audit O2). Scoring uses the lightweight catalog rows, then loads the
+    chosen few in full for their cards.
     """
     own_tags = {tag.lower() for tag in _recipe_tags(recipe.data or {})}
-    rows = (
-        Recipe.query.with_entities(Recipe.id, Recipe.created_at, Recipe.data["tags"].label("tags"))
-        .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None), Recipe.id != recipe.id)
-        .all()
-    )
+    rows = [row for row in catalog if row.id != recipe.id]
 
     def rank(row: Any) -> tuple[int, datetime]:
-        tags = row.tags if isinstance(row.tags, list) else []
+        tags = _row_tags(row)
         shared = own_tags & {tag.strip().lower() for tag in tags if isinstance(tag, str)}
         return len(shared), row.created_at or datetime.min
 
@@ -586,12 +612,31 @@ def _related_recipes(recipe: Recipe) -> list[Recipe]:
     return [by_id[recipe_id] for recipe_id in chosen if recipe_id in by_id]
 
 
-def _breadcrumbs(recipe: Recipe | None = None) -> list[dict[str, str]]:
-    """Home → Browse [→ recipe]: the visible trail and its BreadcrumbList."""
+def _hub_counts(catalog: list[Any]) -> dict[str, int]:
+    counts = {hub.slug: 0 for hub in TAG_HUBS}
+    for row in catalog:
+        for hub in hubs_for_tags(_row_tags(row)):
+            counts[hub.slug] += 1
+    return counts
+
+
+def _linkable_hubs(counts: dict[str, int]) -> list[TagHub]:
+    """Hubs big enough to index, and so to link, list and put in the sitemap (KAN-274)."""
+    return [hub for hub in TAG_HUBS if counts[hub.slug] >= MIN_INDEXABLE_RECIPES]
+
+
+def _hub_url(hub: TagHub) -> str:
+    return _canonical_url("public.show_tag_hub", hub_slug=hub.slug)
+
+
+def _breadcrumbs(recipe: Recipe | None = None, hub: TagHub | None = None) -> list[dict[str, str]]:
+    """Home → Browse [→ hub] [→ recipe]: the visible trail and its BreadcrumbList."""
     crumbs = [
         {"name": "Home", "url": f"{_public_base_url()}/"},
         {"name": "Browse", "url": _canonical_url("public.browse_public_recipes")},
     ]
+    if hub is not None:
+        crumbs.append({"name": hub.title, "url": _hub_url(hub)})
     if recipe is not None:
         crumbs.append(
             {
@@ -706,7 +751,11 @@ def show_public_recipe(slug):
     description = data.get("description") or "A vegan recipe from TastesLikeGood."
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
-    breadcrumbs = _breadcrumbs(recipe)
+    catalog = _catalog_tag_rows()
+    linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
+    # KAN-274: the trail runs through the recipe's first indexable hub.
+    category = next((hub for hub in hubs_for_tags(tags) if hub.slug in linkable), None)
+    breadcrumbs = _breadcrumbs(recipe, category)
 
     return render_template(
         "public/recipe.html",
@@ -717,7 +766,7 @@ def show_public_recipe(slug):
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
         related_recipes=[
             {"recipe": related, "image": _card_image(related)}
-            for related in _related_recipes(recipe)
+            for related in _related_recipes(recipe, catalog)
         ],
         card_image_sizes=CARD_IMAGE_SIZES,
         canonical_url=canonical_url,
@@ -801,6 +850,7 @@ def browse_public_recipes():
     )
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
     breadcrumbs = _breadcrumbs()
+    hubs = _linkable_hubs(_hub_counts(_catalog_tag_rows()))
 
     return render_template(
         "public/browse.html",
@@ -809,6 +859,7 @@ def browse_public_recipes():
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
         collection_json_ld=_collection_json_ld(page_title, description, canonical_url, recipes),
         recipes=recipes,
+        hubs=[{"title": hub.title, "url": _hub_url(hub)} for hub in hubs],
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
         card_image_sizes=CARD_IMAGE_SIZES,
         page=page,
@@ -818,6 +869,66 @@ def browse_public_recipes():
         canonical_url=canonical_url,
         description=description,
     )
+
+
+HUB_PAGE_LIMIT = 60
+
+
+@public_bp.route("/browse/tag/<hub_slug>", methods=["GET"])
+def show_tag_hub(hub_slug):
+    """A curated category hub: intro copy + every public recipe in it (KAN-274).
+
+    Only allow-listed hubs exist (``services.tag_hubs``); anything else is a
+    404, so arbitrary tag filters never become indexable pages. A hub below
+    ``MIN_INDEXABLE_RECIPES`` still renders but is ``noindex``.
+    """
+    hub = HUBS_BY_SLUG.get(hub_slug)
+    if hub is None:
+        abort(404)
+
+    catalog = _catalog_tag_rows()
+    counts = _hub_counts(catalog)
+    members = sorted(
+        (row for row in catalog if hub in hubs_for_tags(_row_tags(row))),
+        key=lambda row: row.created_at or datetime.min,
+        reverse=True,
+    )[:HUB_PAGE_LIMIT]
+    ids = [row.id for row in members]
+    by_id = {r.id: r for r in Recipe.query.filter(Recipe.id.in_(ids)).all()} if ids else {}
+    recipes = [by_id[recipe_id] for recipe_id in ids if recipe_id in by_id]
+
+    canonical_url = _hub_url(hub)
+    page_title = _page_title(hub.title)
+    description = _meta_description(hub.intro)
+    breadcrumbs = _breadcrumbs(hub=hub)
+    og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
+
+    return render_template(
+        "public/tag_hub.html",
+        hub=hub,
+        page_title=page_title,
+        description=description,
+        canonical_url=canonical_url,
+        indexable=counts[hub.slug] >= MIN_INDEXABLE_RECIPES,
+        recipes=recipes,
+        card_images={recipe.id: _card_image(recipe) for recipe in recipes},
+        card_image_sizes=CARD_IMAGE_SIZES,
+        og_image_url=_versioned_image_url(og_owner) if og_owner else None,
+        breadcrumbs=breadcrumbs,
+        breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
+        collection_json_ld=_collection_json_ld(page_title, description, canonical_url, recipes),
+        other_hubs=[
+            {"title": other.title, "url": _hub_url(other)}
+            for other in _linkable_hubs(counts)
+            if other.slug != hub.slug
+        ],
+    )
+
+
+@public_bp.route("/browse/tag/<hub_slug>/", methods=["GET"])
+def redirect_trailing_slash_hub(hub_slug):
+    """``/browse/tag/<slug>/`` → 301 to the canonical hub URL."""
+    return redirect(_canonical_url("public.show_tag_hub", hub_slug=hub_slug), code=301)
 
 
 @public_bp.route("/sitemap.xml", methods=["GET"])
@@ -853,6 +964,24 @@ def sitemap_xml():
             "priority": "0.9",
         },
     ]
+
+    # KAN-274: indexable hubs, lastmod from their newest-changed member. Tags
+    # only — the catalog scan never reads the full data blob.
+    catalog = _catalog_tag_rows()
+    for hub in _linkable_hubs(_hub_counts(catalog)):
+        stamps = [
+            row.updated_at or row.created_at
+            for row in catalog
+            if hub in hubs_for_tags(_row_tags(row)) and (row.updated_at or row.created_at)
+        ]
+        entries.append(
+            {
+                "loc": _hub_url(hub),
+                "lastmod": max(stamps).date().isoformat() if stamps else None,
+                "changefreq": "weekly",
+                "priority": "0.7",
+            }
+        )
 
     for recipe in recipes:
         last_modified = recipe.updated_at or recipe.created_at

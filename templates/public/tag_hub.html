@@ -1,0 +1,92 @@
+{% extends "public/base_public.html" %}
+
+{# Curated category hub (KAN-274): services/tag_hubs.py defines the hubs and
+   their intros; membership comes from recipe tags. #}
+
+{% block title %}{{ page_title }}{% endblock %}
+
+{% block head %}
+<meta name="description" content="{{ description }}">
+<meta name="robots" content="{{ 'index,follow' if indexable else 'noindex,follow' }}">
+<link rel="canonical" href="{{ canonical_url }}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ page_title }}">
+<meta property="og:description" content="{{ description }}">
+<meta property="og:url" content="{{ canonical_url }}">
+<meta property="og:site_name" content="TastesLikeGood">
+{% if og_image_url %}
+<meta property="og:image" content="{{ og_image_url }}">
+{% endif %}
+<meta name="twitter:card" content="{{ 'summary_large_image' if og_image_url else 'summary' }}">
+<meta name="twitter:title" content="{{ page_title }}">
+<meta name="twitter:description" content="{{ description }}">
+{% if og_image_url %}
+<meta name="twitter:image" content="{{ og_image_url }}">
+{% endif %}
+<script type="application/ld+json">{{ collection_json_ld | tojson(indent=2) }}</script>
+<script type="application/ld+json">{{ breadcrumb_json_ld | tojson(indent=2) }}</script>
+{% endblock %}
+
+{% block content %}
+<section class="public-browse">
+    <header class="public-browse-header">
+        <nav class="public-eyebrow public-breadcrumb" aria-label="Breadcrumb">
+            <ol>
+                {% for crumb in breadcrumbs[:-1] %}
+                <li><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+                {% endfor %}
+            </ol>
+        </nav>
+        <h1>{{ hub.title }}</h1>
+        <p class="public-hub-intro">{{ hub.intro }}</p>
+    </header>
+
+    {% if recipes %}
+    <ul class="public-browse-list">
+        {% for recipe in recipes %}
+        {% set data = recipe.data or {} %}
+        {% set card_image = card_images.get(recipe.id) %}
+        <li class="public-browse-item">
+            <a href="{{ url_for('public.show_public_recipe', slug=recipe.slug) }}">
+                {% if card_image %}
+                <div class="public-browse-card-image">
+                    <img
+                        src="{{ card_image.src }}"
+                        {% if card_image.srcset %}srcset="{{ card_image.srcset }}" sizes="{{ card_image_sizes }}"{% endif %}
+                        width="400"
+                        height="300"
+                        alt="{{ recipe.name }}"
+                        loading="lazy"
+                        decoding="async"
+                    />
+                </div>
+                {% endif %}
+                <div class="public-browse-card-copy">
+                    <h2>{{ recipe.name }}</h2>
+                    {% if data.description %}
+                    <p>{{ data.description }}</p>
+                    {% endif %}
+                </div>
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="public-browse-empty">
+        No recipes here yet. <a href="{{ url_for('public.browse_public_recipes') }}">Browse all recipes</a>
+        or <a href="/">generate one</a>.
+    </p>
+    {% endif %}
+
+    {% if other_hubs %}
+    <nav class="public-hub-links" aria-label="More recipe categories">
+        <h2>More vegan recipe categories</h2>
+        <ul>
+            {% for other in other_hubs %}
+            <li><a href="{{ other.url }}" class="public-tag">{{ other.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </nav>
+    {% endif %}
+</section>
+{% endblock %}
