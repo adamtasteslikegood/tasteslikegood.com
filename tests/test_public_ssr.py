@@ -533,9 +533,9 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
     statements = []
 
     @event.listens_for(db.engine, "before_cursor_execute")
-    def _capture(_conn, _cursor, statement, _params, _ctx, _exec):
+    def _capture(_conn, _cursor, statement, params, _ctx, _exec):
         if statement.lstrip().upper().startswith("SELECT"):
-            statements.append(statement)
+            statements.append((statement, params))
 
     try:
         resp = client.get("/sitemap.xml")
@@ -543,12 +543,28 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
         event.remove(db.engine, "before_cursor_execute", _capture)
 
     assert resp.status_code == 200
-    recipe_queries = [statement for statement in statements if "FROM recipe" in statement]
+    recipe_queries = [
+        (statement, params)
+        for statement, params in statements
+        if "FROM recipe" in statement
+    ]
     assert recipe_queries
-    # KAN-274: the hub entries read one JSON path (the tags) out of data; that
-    # is the only reference to the column allowed, never the full blob.
+    # KAN-274: the hub entries read exactly one JSON path (the tags) out of
+    # data; no other extraction or full-blob reference is allowed.
     tag_path = "JSON_EXTRACT(recipe.data, ?)"
-    assert all("recipe.data" not in statement.replace(tag_path, "") for statement in recipe_queries)
+    assert sum(statement.count(tag_path) for statement, _ in recipe_queries) == 1
+    assert all(
+        "recipe.data" not in statement.replace(tag_path, "")
+        for statement, _ in recipe_queries
+    )
+    json_path_params = [
+        param
+        for _statement, params in recipe_queries
+        for param in params
+        if isinstance(param, str) and param.startswith("$.")
+    ]
+    assert len(json_path_params) == 1
+    assert re.fullmatch(r'\$\.(?:"tags"|tags)', json_path_params[0])
 
 
 def test_public_recipe_image_served_without_session(app, client):
