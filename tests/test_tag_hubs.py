@@ -243,13 +243,11 @@ def test_hub_trailing_slash_redirects(client):
 
 def test_hub_trailing_slash_redirect_preserves_allowlisted_query_params(client):
     resp = client.get(
-        "/browse/tag/dinner/"
-        "?utm_source=email&utm_campaign=fall&save=recipe-123&next=/admin"
+        "/browse/tag/dinner/?utm_source=email&utm_campaign=fall&save=recipe-123&next=/admin"
     )
     assert resp.status_code == 301
     assert resp.headers["Location"] == (
-        "http://localhost/browse/tag/dinner"
-        "?utm_source=email&utm_campaign=fall&save=recipe-123"
+        "http://localhost/browse/tag/dinner" "?utm_source=email&utm_campaign=fall&save=recipe-123"
     )
 
 

@@ -1065,9 +1065,7 @@ def redirect_trailing_slash_hub(hub_slug):
         for key, value in request.args.items()
         if key == "save" or (key.startswith("utm_") and key.replace("_", "").isalnum())
     }
-    return redirect(
-        _canonical_url("public.show_tag_hub", hub_slug=hub_slug, **carried), code=301
-    )
+    return redirect(_canonical_url("public.show_tag_hub", hub_slug=hub_slug, **carried), code=301)
 
 
 @public_bp.route("/sitemap.xml", methods=["GET"])
