@@ -823,7 +823,12 @@ def browse_public_recipes():
     except (TypeError, ValueError):
         page = 1
 
-    base_query = Recipe.query.filter(Recipe.is_public.is_(True)).options(joinedload(Recipe.user))
+    # slug IS NOT NULL, like the sitemap: a slugless public row (legacy data;
+    # publishing always mints a slug now) has no /r/ URL, and url_for on it
+    # would fail the whole page.
+    base_query = Recipe.query.filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None)).options(
+        joinedload(Recipe.user)
+    )
 
     total = base_query.with_entities(Recipe.id).count()
     total_pages = max(1, ceil(total / BROWSE_PAGE_SIZE))

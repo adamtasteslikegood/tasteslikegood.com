@@ -296,3 +296,27 @@ def test_browse_later_pages_say_which_page(app, client):
 
     body = client.get("/browse?page=2").get_data(as_text=True)
     assert "<title>Vegan Recipes, Page 2 of 2 · TastesLikeGood</title>" in body
+
+
+def test_browse_skips_a_public_row_without_a_slug(app, client):
+    """It has no /r/ URL: it used to 500 the page (url_for) and would list /r/None."""
+    with app.app_context():
+        _add("slugged-soup", days=1)
+        legacy = Recipe(
+            id=str(uuid.uuid4()),
+            name="Legacy No Slug",
+            slug=None,
+            is_public=True,
+            data={"name": "Legacy No Slug"},
+            created_at=BASE + timedelta(days=5),
+        )
+        db.session.add(legacy)
+        db.session.commit()
+
+    resp = client.get("/browse")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "<title>Browse 1 Vegan Recipes · TastesLikeGood</title>" in body  # slugless not counted
+    items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
+    assert [(i["position"], i["url"]) for i in items] == [(1, "http://localhost/r/slugged-soup")]
+    assert "/r/None" not in json.dumps(items)
