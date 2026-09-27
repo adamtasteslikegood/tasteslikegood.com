@@ -92,9 +92,17 @@ def _serves_own_image_bytes(recipe: Recipe) -> bool:
     The one signal that separates "our endpoint serves this" from "this is an
     external stock image URL" — which is what decides whether the URL is ours
     to version (see ``_rendered_image_url``).
+
+    Restricted to non-empty strings so this gate agrees with
+    ``_image_version_token`` (which hashes ``str`` sources only). A legacy row
+    whose ``ai_image_data`` decoded to a non-string truthy value would
+    otherwise pass this gate but produce a versionless URL, silently
+    reintroducing the KAN-195 stale-image defect on the og:image and hero.
     """
     data = recipe.data or {}
-    return bool(data.get("ai_image_gcs") or data.get("ai_image_data"))
+    gcs = data.get("ai_image_gcs")
+    payload = data.get("ai_image_data")
+    return (isinstance(gcs, str) and bool(gcs)) or (isinstance(payload, str) and bool(payload))
 
 
 def _own_image_url(recipe: Recipe) -> str | None:
@@ -741,8 +749,17 @@ def redirect_trailing_slash_recipe(slug):
 
     A trailing-slash link from another site used to dead-end on a 404. The
     target decides existence, so this never reveals whether a slug is public.
+
+    Preserves the query string so UTM parameters and the SPA ``?save=`` handoff
+    survive the redirect — the whole point of accepting the alternate URL is
+    to keep the caller's context, and silently zeroing analytics attribution
+    is exactly the failure mode the trailing-slash tolerance exists to avoid.
     """
-    return redirect(_canonical_url("public.show_public_recipe", slug=slug), code=301)
+    target = _canonical_url("public.show_public_recipe", slug=slug)
+    query = request.query_string.decode("utf-8", "ignore")
+    if query:
+        target = f"{target}?{query}"
+    return redirect(target, code=301)
 
 
 @public_bp.route("/api/recipes/public/<slug>", methods=["GET"])
@@ -819,7 +836,13 @@ def browse_public_recipes():
         total=total,
         page_size=BROWSE_PAGE_SIZE,
         canonical_url=canonical_url,
-        description=description,
+        # /browse is subject to the same 155-char result-snippet cap that
+        # ``_meta_description`` enforces on /r/<slug> — the boilerplate is
+        # already 158 chars at today's 96 recipes and lengthens as ``total``
+        # grows. Route both the meta copy and the CollectionPage description
+        # through the shared helper so /browse can't quietly regress the
+        # defect the helper was introduced to fix.
+        description=_meta_description(description),
     )
 
 

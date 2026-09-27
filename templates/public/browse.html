@@ -13,12 +13,14 @@
 <meta property="og:site_name" content="TastesLikeGood">
 {% if og_image_url %}
 <meta property="og:image" content="{{ og_image_url }}">
+<meta property="og:image:alt" content="{{ page_title }}">
 {% endif %}
 <meta name="twitter:card" content="{{ 'summary_large_image' if og_image_url else 'summary' }}">
 <meta name="twitter:title" content="{{ page_title }}">
 <meta name="twitter:description" content="{{ description }}">
 {% if og_image_url %}
 <meta name="twitter:image" content="{{ og_image_url }}">
+<meta name="twitter:image:alt" content="{{ page_title }}">
 {% endif %}
 <script type="application/ld+json">{{ collection_json_ld | tojson(indent=2) }}</script>
 <script type="application/ld+json">{{ breadcrumb_json_ld | tojson(indent=2) }}</script>
