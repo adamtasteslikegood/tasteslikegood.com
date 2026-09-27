@@ -53,8 +53,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
         """
         Plant-based breakfasts that are worth getting up for: stacks of pancakes,
         biscuits smothered in mushroom gravy, breakfast burritos, huevos rancheros
-        with a tofu scramble, muffins, and a full English fry-up with nothing
-        missing but the animals. Some are quick weekday plates and some are
+        with a tofu scramble, muffins, and a full English fry-up. Some are quick weekday plates and some are
         weekend brunch projects. Every recipe lists its prep and cook time up top,
         so you can tell which is which before you start, and recipe cards show a photo of the finished dish when one is available. There are no eggs, dairy or bacon in any of
         them; tofu, beans, oats and a well-stocked spice rack do the work.
@@ -127,9 +126,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
         papas in salsa verde, huevos rancheros, homemade flour tortillas, and even
         cinnamon-sugar dessert tacos. The fillings lean on beans, lentils, tofu
         and jackfruit, with cashew cheese and fresh salsas doing what dairy
-        usually would. Recipe cards show a finished-dish photo when one is available, alongside
-        measured ingredients and a clear method, ready to save to your cookbook for taco
-        night. The chiles and spices are all in the ingredient list, so you can
+        usually would. Recipe cards show a finished-dish photo when one is available, alongside measured ingredients and a clear method for taco night. The chiles and spices are all in the ingredient list, so you can
         turn the heat up or down to suit the table.
         """,
     ),
@@ -159,7 +156,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
         and battered tofu standing in for fish and chips. Each recipe lists the
         tofu it needs alongside the other ingredients and walks through the
         method step by step. Cards show a finished-dish photo when one is available, and every recipe is
-        fully vegan.
+        fully vegan for lunch, dinner or breakfast.
         """,
     ),
     _hub(
