@@ -975,7 +975,18 @@ def show_tag_hub(hub_slug):
         reverse=True,
     )[:HUB_PAGE_LIMIT]
     ids = [row.id for row in members]
-    by_id = {r.id: r for r in Recipe.query.filter(Recipe.id.in_(ids)).all()} if ids else {}
+    # Recheck the catalog predicates during hydration: under READ COMMITTED, a row
+    # can be unpublished or lose its slug after the lightweight catalog query.
+    by_id = (
+        {
+            recipe.id: recipe
+            for recipe in Recipe.query.filter(
+                Recipe.id.in_(ids), Recipe.is_public.is_(True), Recipe.slug.isnot(None)
+            ).all()
+        }
+        if ids
+        else {}
+    )
     recipes = [by_id[recipe_id] for recipe_id in ids if recipe_id in by_id]
 
     canonical_url = _hub_url(hub)
@@ -996,6 +1007,7 @@ def show_tag_hub(hub_slug):
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
         card_image_sizes=CARD_IMAGE_SIZES,
         og_image_url=_versioned_image_url(og_owner) if og_owner else None,
+        og_image_alt=og_owner.name if og_owner else None,
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
         collection_json_ld=_collection_json_ld(page_title, hub.intro, canonical_url, recipes),
