@@ -355,7 +355,11 @@ def test_browse_skips_a_public_row_without_a_slug(app, client):
     resp = client.get("/browse")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "<title>Browse 1 Vegan Recipes · TastesLikeGood</title>" in body  # slugless not counted
+    assert "<title>Browse 1 Vegan Recipe · TastesLikeGood</title>" in body  # slugless not counted
+    description = html.unescape(
+        re.search(r'<meta name="description" content="([^"]*)">', body).group(1)
+    )
+    assert "Browse 1 AI-generated vegan recipe with ingredients and method." in description
     items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
     assert [(i["position"], i["url"]) for i in items] == [(1, "http://localhost/r/slugged-soup")]
     assert "/r/None" not in json.dumps(items)
