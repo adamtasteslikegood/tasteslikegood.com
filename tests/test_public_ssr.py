@@ -88,10 +88,15 @@ def _make_recipe(name, slug, *, public=True, owner=None, data=None):
     ],
 )
 def test_format_ingredient_handles_all_amount_array_lengths(amount, expected):
-    assert _format_ingredient({"amount": amount, "units": "cup", "name": "lentils"}) == expected
+    assert (
+        _format_ingredient({"amount": amount, "units": "cup", "name": "lentils"})
+        == expected
+    )
 
 
-@pytest.mark.parametrize("value", ["Infinity", "-Infinity", float("inf"), float("-inf")])
+@pytest.mark.parametrize(
+    "value", ["Infinity", "-Infinity", float("inf"), float("-inf")]
+)
 def test_safe_minutes_rejects_infinite_values(value):
     assert _safe_minutes(value) is None
 
@@ -110,9 +115,9 @@ def test_show_public_recipe_renders_html(app, client):
     assert '<script defer src="/static/js/public.js"></script>' in body
     assert "document.querySelectorAll('[data-open-kitchen]')" not in body
 
-    public_js = (Path(__file__).resolve().parent.parent / "static/js/public.js").read_text(
-        encoding="utf-8"
-    )
+    public_js = (
+        Path(__file__).resolve().parent.parent / "static/js/public.js"
+    ).read_text(encoding="utf-8")
     assert 'event.key === "Escape"' in public_js
     assert "lastFocused.focus()" in public_js
     assert 'event.key !== "Tab"' in public_js
@@ -154,8 +159,13 @@ def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     resp = client.get("/r/thai-peanut-noodles")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
-    assert '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">' in body
+    assert (
+        '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
+    )
+    assert (
+        '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">'
+        in body
+    )
     # KAN-195: the rendered image URL carries a ?v=<marker> so a regenerated
     # photo is not hidden behind the endpoint's 24h Cache-Control.
     assert re.search(
@@ -195,7 +205,9 @@ def test_pinterest_button_hidden_when_recipe_has_no_image(app, client):
 
 
 def _pinterest_media_param(body: str) -> str:
-    match = re.search(r'href="(https://www\.pinterest\.com/pin/create/button/\?[^"]+)"', body)
+    match = re.search(
+        r'href="(https://www\.pinterest\.com/pin/create/button/\?[^"]+)"', body
+    )
     assert match, "no Pinterest share link in page"
     href = html.unescape(match.group(1))
     return parse_qs(urlsplit(href).query)["media"][0]
@@ -209,7 +221,10 @@ def _pinterest_media_param(body: str) -> str:
             "endpoint",
         ),
         ({"ai_image_gcs": "gs://bucket/recipe/v1.png"}, "endpoint"),
-        ({"stock_image_url": "https://img.example/stock.jpg"}, "https://img.example/stock.jpg"),
+        (
+            {"stock_image_url": "https://img.example/stock.jpg"},
+            "https://img.example/stock.jpg",
+        ),
         (
             # Stored bytes win over whatever ai_image_url claims — the pin
             # media must be the URL the gate actually verified.
@@ -221,7 +236,9 @@ def _pinterest_media_param(body: str) -> str:
         ),
     ],
 )
-def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, expected_media):
+def test_pinterest_button_shown_when_recipe_has_image(
+    app, client, image_field, expected_media
+):
     with app.app_context():
         recipe = _make_recipe(
             "Pinnable Pie",
@@ -241,7 +258,8 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
         # KAN-195: our own image endpoint is versioned; the stock-image case
         # below is someone else's host and must be passed through untouched.
         assert re.fullmatch(
-            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", media
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+            media,
         ), media
     else:
         assert media == expected_media
@@ -353,7 +371,9 @@ def test_browse_uses_joinedload_and_avoids_n_plus_one(app, client):
     assert resp.status_code == 200
     # Expect a small, fixed number of SELECTs — count(*) + recipes+user join.
     # Anything above 5 means eager loading regressed and rows are loading users one-by-one.
-    assert select_count <= 5, f"expected ≤5 SELECTs, got {select_count} (N+1 regression)"
+    assert (
+        select_count <= 5
+    ), f"expected ≤5 SELECTs, got {select_count} (N+1 regression)"
 
 
 def test_partial_recipe_omits_blank_metadata_and_formats_amount_ranges(app, client):
@@ -1046,7 +1066,11 @@ def test_update_cannot_repersist_an_inherited_stock_image(app):
         db.session.commit()
 
         copy = db_recipe_repository.create_recipe(
-            {"id": "copy-update-001", "name": "Update Source", "sourceSlug": "update-source"},
+            {
+                "id": "copy-update-001",
+                "name": "Update Source",
+                "sourceSlug": "update-source",
+            },
             user_id=owner.id,
         )
         assert copy is not None
@@ -1192,7 +1216,9 @@ def _image_recipe(slug: str, *, timestamp: str):
             "name": f"Photo {slug}",
             "description": "Has a photo.",
             "ai_image_gcs": "gs://bucket/recipe/v1.png",
-            "ai_metadata": {"image_generation": {"success": True, "timestamp": timestamp}},
+            "ai_metadata": {
+                "image_generation": {"success": True, "timestamp": timestamp}
+            },
         },
     )
 
@@ -1208,7 +1234,8 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
     before = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
     assert before is not None
     assert re.fullmatch(
-        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", before
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+        before,
     ), before
 
     # Regenerate: the worker stores the new object at a versioned GCS URI and
@@ -1224,7 +1251,9 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
         db.session.commit()
 
     after = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
-    assert after != before, "regenerated image kept the old URL — caches will serve stale bytes"
+    assert (
+        after != before
+    ), "regenerated image kept the old URL — caches will serve stale bytes"
     # Same resource, different cache key.
     assert after.split("?")[0] == before.split("?")[0]
 
@@ -1355,7 +1384,9 @@ def test_saved_copy_versions_from_the_source_row(app, client):
     assert after != before
 
 
-def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(app, client):
+def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(
+    app, client
+):
     """Guards the _serves_own_image_bytes / _image_version_token invariant.
 
     A legacy/corrupt row whose ``ai_image_gcs`` is truthy-but-not-a-string (e.g.
