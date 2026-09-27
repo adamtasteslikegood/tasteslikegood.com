@@ -220,7 +220,7 @@ def _image_version_token(owner: Recipe) -> str | None:
 
     The generic recipe PUT can retain image-generation metadata while changing
     ``ai_image_gcs`` or legacy ``ai_image_data``. Using that metadata as the
-    marker would therefore allow different bytes to keep the same immutable
+    marker would therefore allow different bytes to keep the same cached
     URL. Hash the immutable GCS object URI when present, otherwise the legacy
     base64 payload itself, so the marker changes if and only if the bytes served
     by ``_load_stored_image_bytes`` can change.
@@ -323,8 +323,8 @@ def _image_variants(owner: Recipe, widths: tuple[int, ...]) -> dict[str, str]:
     """``src`` (smallest width) and ``srcset`` for an image ``owner`` serves itself.
 
     Host-relative, like the browse cards' URLs have always been, and carrying
-    the same ``?v=`` marker as the full-size URL, which is what lets the image
-    route mark them ``immutable``.
+    the same ``?v=`` marker as the full-size URL, so a replaced image gets a new
+    URL instead of waiting out the image route's one-day ``max-age``.
     """
     token = _image_version_token(owner)
 
