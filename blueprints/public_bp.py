@@ -860,7 +860,7 @@ def browse_public_recipes():
         page_title=page_title,
         og_image_url=_versioned_image_url(og_owner) if og_owner else None,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
-        collection_json_ld=_collection_json_ld(page_title, hub.intro, canonical_url, recipes),
+        collection_json_ld=_collection_json_ld(page_title, description, canonical_url, recipes),
         recipes=recipes,
         hubs=[{"title": hub.title, "url": _hub_url(hub)} for hub in hubs],
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
@@ -921,7 +921,7 @@ def show_tag_hub(hub_slug):
         og_image_url=_versioned_image_url(og_owner) if og_owner else None,
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
-        collection_json_ld=_collection_json_ld(page_title, description, canonical_url, recipes),
+        collection_json_ld=_collection_json_ld(page_title, hub.intro, canonical_url, recipes),
         other_hubs=[
             {"title": other.title, "url": _hub_url(other)}
             for other in _linkable_hubs(counts)
