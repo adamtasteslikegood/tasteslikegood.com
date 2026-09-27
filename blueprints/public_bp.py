@@ -552,7 +552,7 @@ def _meta_description(text: str) -> str:
     ends = [m.end() for m in _SENTENCE_END.finditer(head) if m.end() <= MAX_DESCRIPTION_LENGTH]
     if ends and ends[-1] >= 60:
         return head[: ends[-1]]
-    cut = head[:MAX_DESCRIPTION_LENGTH].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
+    cut = head[: MAX_DESCRIPTION_LENGTH - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
     return f"{cut}…"
 
 
@@ -792,12 +792,13 @@ def browse_public_recipes():
     # KAN-273: the title and description say what the page is, with the live
     # count; the social card gets the newest photo on the page instead of none.
     if page > 1:
-        page_title = f"Vegan Recipes with Photos, Page {page} of {total_pages}{SITE_TITLE_SUFFIX}"
+        page_title = f"Vegan Recipes, Page {page} of {total_pages}{SITE_TITLE_SUFFIX}"
     else:
-        page_title = f"Browse {total} Vegan Recipes with Photos{SITE_TITLE_SUFFIX}"
+        page_title = f"Browse {total} Vegan Recipes{SITE_TITLE_SUFFIX}"
     description = (
-        f"Browse {total} AI-generated vegan recipes, each with its own photo, ingredients"
-        " and method. No ads, no life story. Save any of them to your cookbook."
+        f"Browse {total} AI-generated vegan recipes with ingredients and method. "
+        "Photos are included when available. No ads, no life story. Save any recipe "
+        "to your cookbook."
     )
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
     breadcrumbs = _breadcrumbs()
