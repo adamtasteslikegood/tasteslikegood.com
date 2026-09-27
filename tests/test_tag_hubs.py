@@ -184,6 +184,32 @@ def test_hub_refetch_rechecks_visibility(app, client, monkeypatch):
     assert response.headers["X-Robots-Tag"] == "noindex, follow"
 
 
+def test_hub_refetch_rechecks_membership(app, client, monkeypatch):
+    with app.app_context():
+        moved_id = _add("retagged-dinner", ["dinner"], days=9)
+        for index in range(2):
+            _add(f"visible-dinner-{index}", ["dinner"], days=index)
+
+        # Preserve an indexable three-member snapshot, then simulate a concurrent
+        # retag before the route hydrates the selected full Recipe rows.
+        catalog_snapshot = public_module._catalog_tag_rows()
+        moved = db.session.get(Recipe, moved_id)
+        moved_data = dict(moved.data or {})
+        moved_data["tags"] = ["dessert"]
+        moved.data = moved_data
+        db.session.commit()
+
+    monkeypatch.setattr(public_module, "_catalog_tag_rows", lambda: catalog_snapshot)
+    response = client.get("/browse/tag/dinner")
+    body = response.get_data(as_text=True)
+
+    assert "Retagged Dinner" not in body
+    items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
+    assert all(not item["url"].endswith("/r/retagged-dinner") for item in items)
+    assert '<meta name="robots" content="noindex,follow">' in body
+    assert response.headers["X-Robots-Tag"] == "noindex, follow"
+
+
 def test_thin_hub_is_noindex_and_unlinked(app, client):
     with app.app_context():
         _add("only-pancake", ["breakfast"])
