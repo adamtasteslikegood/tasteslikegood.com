@@ -1,19 +1,27 @@
 {% extends "public/base_public.html" %}
 
-{% block title %}Browse Vegan Recipes · TastesLikeGood{% endblock %}
+{% block title %}{{ page_title }}{% endblock %}
 
 {% block head %}
 <meta name="description" content="{{ description }}">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="{{ canonical_url }}">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Browse Vegan Recipes · TastesLikeGood">
+<meta property="og:title" content="{{ page_title }}">
 <meta property="og:description" content="{{ description }}">
 <meta property="og:url" content="{{ canonical_url }}">
 <meta property="og:site_name" content="TastesLikeGood">
-<meta name="twitter:card" content="summary">
-<meta name="twitter:title" content="Browse Vegan Recipes · TastesLikeGood">
+{% if og_image_url %}
+<meta property="og:image" content="{{ og_image_url }}">
+{% endif %}
+<meta name="twitter:card" content="{{ 'summary_large_image' if og_image_url else 'summary' }}">
+<meta name="twitter:title" content="{{ page_title }}">
 <meta name="twitter:description" content="{{ description }}">
+{% if og_image_url %}
+<meta name="twitter:image" content="{{ og_image_url }}">
+{% endif %}
+<script type="application/ld+json">{{ collection_json_ld | tojson(indent=2) }}</script>
+<script type="application/ld+json">{{ breadcrumb_json_ld | tojson(indent=2) }}</script>
 {% endblock %}
 
 {% block content %}

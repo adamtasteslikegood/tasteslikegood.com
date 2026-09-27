@@ -2,16 +2,16 @@
 
 {% set data = recipe.data or {} %}
 
-{% block title %}{{ recipe.name }} · TastesLikeGood{% endblock %}
+{% block title %}{{ page_title }}{% endblock %}
 
 {% block head %}
-<meta name="description" content="{{ description }}">
+<meta name="description" content="{{ meta_description }}">
 <meta name="robots" content="index,follow">
 <link rel="canonical" href="{{ canonical_url }}">
 
 <meta property="og:type" content="article">
-<meta property="og:title" content="{{ recipe.name }} · TastesLikeGood">
-<meta property="og:description" content="{{ description }}">
+<meta property="og:title" content="{{ page_title }}">
+<meta property="og:description" content="{{ meta_description }}">
 <meta property="og:url" content="{{ canonical_url }}">
 <meta property="og:site_name" content="TastesLikeGood">
 {% if image_url %}
@@ -20,14 +20,15 @@
 {% endif %}
 
 <meta name="twitter:card" content="{{ 'summary_large_image' if image_url else 'summary' }}">
-<meta name="twitter:title" content="{{ recipe.name }} · TastesLikeGood">
-<meta name="twitter:description" content="{{ description }}">
+<meta name="twitter:title" content="{{ page_title }}">
+<meta name="twitter:description" content="{{ meta_description }}">
 {% if image_url %}
 <meta name="twitter:image" content="{{ image_url }}">
 <meta name="twitter:image:alt" content="{{ recipe.name }}">
 {% endif %}
 
 <script type="application/ld+json">{{ recipe_json_ld | tojson(indent=2) }}</script>
+<script type="application/ld+json">{{ breadcrumb_json_ld | tojson(indent=2) }}</script>
 {% if image_variants %}
 {# The hero is the LCP element: start fetching it with the HTML, not after the
    stylesheets (KAN-271). Same srcset/sizes as the <img>, so it is one fetch. #}
@@ -59,7 +60,13 @@
             {% endif %}
         </div>
         <div class="public-recipe-hero-overlay">
-            <p class="public-eyebrow"><a href="{{ url_for('public.browse_public_recipes') }}" class="public-recipe-back">← Browse all recipes</a></p>
+            <nav class="public-eyebrow public-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                    {% for crumb in breadcrumbs[:-1] %}
+                    <li><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+                    {% endfor %}
+                </ol>
+            </nav>
             <h1 class="public-recipe-title">{{ recipe.name }}</h1>
             {% if data.description %}
             <p class="public-recipe-description">{{ data.description }}</p>
@@ -71,7 +78,13 @@
     <section class="public-recipe-intro">
         {% if not image_url %}
         <div class="public-recipe-title-block">
-            <p class="public-eyebrow"><a href="{{ url_for('public.browse_public_recipes') }}" class="public-recipe-back">← Browse all recipes</a></p>
+            <nav class="public-eyebrow public-breadcrumb" aria-label="Breadcrumb">
+                <ol>
+                    {% for crumb in breadcrumbs[:-1] %}
+                    <li><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+                    {% endfor %}
+                </ol>
+            </nav>
             <h1 class="public-recipe-title">{{ recipe.name }}</h1>
             {% if data.description %}
             <p class="public-recipe-description">{{ data.description }}</p>
@@ -179,6 +192,39 @@
         {% for tag in tags %}
         <span class="public-tag">{{ tag }}</span>
         {% endfor %}
+    </section>
+    {% endif %}
+
+    {# KAN-273: recipe pages linked to no other recipe; these real anchors are
+       what lets one incoming link reach the rest of the catalog. #}
+    {% if related_recipes %}
+    <section class="public-related" aria-labelledby="related-title">
+        <h2 id="related-title">More vegan recipes</h2>
+        <ul class="public-browse-list">
+            {% for item in related_recipes %}
+            {% set related = item.recipe %}
+            <li class="public-browse-item">
+                <a href="{{ url_for('public.show_public_recipe', slug=related.slug) }}">
+                    {% if item.image %}
+                    <div class="public-browse-card-image">
+                        <img
+                            src="{{ item.image.src }}"
+                            {% if item.image.srcset %}srcset="{{ item.image.srcset }}" sizes="{{ card_image_sizes }}"{% endif %}
+                            width="400"
+                            height="300"
+                            alt="{{ related.name }}"
+                            loading="lazy"
+                            decoding="async"
+                        />
+                    </div>
+                    {% endif %}
+                    <div class="public-browse-card-copy">
+                        <h3>{{ related.name }}</h3>
+                    </div>
+                </a>
+            </li>
+            {% endfor %}
+        </ul>
     </section>
     {% endif %}
 </article>
