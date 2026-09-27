@@ -609,12 +609,17 @@ def _related_recipes(recipe: Recipe, catalog: list[Any]) -> list[Recipe]:
     return [by_id[recipe_id] for recipe_id in chosen if recipe_id in by_id]
 
 
-def _hub_counts(catalog: list[Any]) -> dict[str, int]:
-    counts = {hub.slug: 0 for hub in TAG_HUBS}
+def _hub_members(catalog: list[Any]) -> dict[str, list[Any]]:
+    """Map each curated hub to its catalog rows in one catalog pass."""
+    members = {hub.slug: [] for hub in TAG_HUBS}
     for row in catalog:
         for hub in hubs_for_tags(_row_tags(row)):
-            counts[hub.slug] += 1
-    return counts
+            members[hub.slug].append(row)
+    return members
+
+
+def _hub_counts(catalog: list[Any]) -> dict[str, int]:
+    return {slug: len(rows) for slug, rows in _hub_members(catalog).items()}
 
 
 def _linkable_hubs(counts: dict[str, int]) -> list[TagHub]:
@@ -855,7 +860,7 @@ def browse_public_recipes():
         page_title=page_title,
         og_image_url=_versioned_image_url(og_owner) if og_owner else None,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
-        collection_json_ld=_collection_json_ld(page_title, description, canonical_url, recipes),
+        collection_json_ld=_collection_json_ld(page_title, hub.intro, canonical_url, recipes),
         recipes=recipes,
         hubs=[{"title": hub.title, "url": _hub_url(hub)} for hub in hubs],
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
@@ -885,9 +890,10 @@ def show_tag_hub(hub_slug):
         abort(404)
 
     catalog = _catalog_tag_rows()
-    counts = _hub_counts(catalog)
+    hub_members = _hub_members(catalog)
+    counts = {slug: len(rows) for slug, rows in hub_members.items()}
     members = sorted(
-        (row for row in catalog if hub in hubs_for_tags(_row_tags(row))),
+        hub_members[hub.slug],
         key=lambda row: row.created_at or datetime.min,
         reverse=True,
     )[:HUB_PAGE_LIMIT]
@@ -901,13 +907,14 @@ def show_tag_hub(hub_slug):
     breadcrumbs = _breadcrumbs(hub=hub)
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
 
-    return render_template(
+    indexable = counts[hub.slug] >= MIN_INDEXABLE_RECIPES
+    body = render_template(
         "public/tag_hub.html",
         hub=hub,
         page_title=page_title,
         description=description,
         canonical_url=canonical_url,
-        indexable=counts[hub.slug] >= MIN_INDEXABLE_RECIPES,
+        indexable=indexable,
         recipes=recipes,
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
         card_image_sizes=CARD_IMAGE_SIZES,
@@ -921,6 +928,13 @@ def show_tag_hub(hub_slug):
             if other.slug != hub.slug
         ],
     )
+    response = Response(body)
+    if not indexable:
+        # The Express security middleware otherwise supplies a production
+        # indexable default. Preserve the template's thin-page decision at the
+        # HTTP layer so every crawler receives the same directive.
+        response.headers["X-Robots-Tag"] = "noindex, follow"
+    return response
 
 
 @public_bp.route("/browse/tag/<hub_slug>/", methods=["GET"])
@@ -966,11 +980,13 @@ def sitemap_xml():
     # KAN-274: indexable hubs, lastmod from their newest-changed member. Tags
     # only — the catalog scan never reads the full data blob.
     catalog = _catalog_tag_rows()
-    for hub in _linkable_hubs(_hub_counts(catalog)):
+    hub_members = _hub_members(catalog)
+    counts = {slug: len(rows) for slug, rows in hub_members.items()}
+    for hub in _linkable_hubs(counts):
         stamps = [
             row.updated_at or row.created_at
-            for row in catalog
-            if hub in hubs_for_tags(_row_tags(row)) and (row.updated_at or row.created_at)
+            for row in hub_members[hub.slug]
+            if row.updated_at or row.created_at
         ]
         entries.append(
             {
