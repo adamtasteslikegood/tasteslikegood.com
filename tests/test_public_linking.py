@@ -239,6 +239,21 @@ def test_page_meta_is_trimmed_but_json_ld_keeps_the_full_description(app, client
     assert _json_ld(body, "Recipe")["description"] == long_description
 
 
+def test_malformed_description_uses_text_fallback(app, client):
+    with app.app_context():
+        recipe_id = _add("malformed-description")
+        recipe = db.session.get(Recipe, recipe_id)
+        recipe.data = {**recipe.data, "description": ["not", "text"]}
+        db.session.commit()
+
+    resp = client.get("/r/malformed-description")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    fallback = "A vegan recipe from TastesLikeGood."
+    assert f'<meta name="description" content="{fallback}">' in body
+    assert _json_ld(body, "Recipe")["description"] == fallback
+
+
 # ── trailing slash ───────────────────────────────────────────────────────────
 
 
@@ -267,9 +282,11 @@ def test_browse_title_description_and_collection_json_ld(app, client):
     )
     assert "AI-generated vegan recipes" in description
     assert "Photos are included when available." in description
-    assert len(description) <= 160
+    assert len(description) <= 155
 
     collection = _json_ld(body, "CollectionPage")
+    assert collection["description"] == description
+    assert len(collection["description"]) <= 155
     items = collection["mainEntity"]["itemListElement"]
     assert [(i["position"], i["url"]) for i in items] == [
         (1, "http://localhost/r/newest-soup"),
@@ -278,6 +295,17 @@ def test_browse_title_description_and_collection_json_ld(app, client):
     og_image = re.search(r'<meta property="og:image" content="([^"]+)">', body).group(1)
     assert og_image.startswith(f"http://localhost/api/recipes/{newest_id}/image")
     assert '<meta name="twitter:card" content="summary_large_image">' in body
+    # og:image is a specific dish photo, not a shot of the browse page — so its
+    # alt names that dish, otherwise a plate of soup is announced as "Browse N
+    # Vegan Recipes · TastesLikeGood" on social cards and screen readers.
+    og_image_alt = html.unescape(
+        re.search(r'<meta property="og:image:alt" content="([^"]+)">', body).group(1)
+    )
+    assert og_image_alt == "Newest Soup"
+    twitter_image_alt = html.unescape(
+        re.search(r'<meta name="twitter:image:alt" content="([^"]+)">', body).group(1)
+    )
+    assert twitter_image_alt == "Newest Soup"
 
 
 def test_browse_without_photos_has_no_og_image(app, client):
@@ -298,6 +326,17 @@ def test_browse_later_pages_say_which_page(app, client):
     assert "<title>Vegan Recipes, Page 2 of 2 · TastesLikeGood</title>" in body
 
 
+def test_browse_later_page_breadcrumb_uses_its_canonical_url(app, client):
+    with app.app_context():
+        for index in range(21):
+            _add(f"crumb-soup-{index}", days=index)
+
+    body = client.get("/browse?page=2").get_data(as_text=True)
+    crumbs = _json_ld(body, "BreadcrumbList")["itemListElement"]
+    assert crumbs[-1]["name"] == "Browse"
+    assert crumbs[-1]["item"] == "http://localhost/browse?page=2"
+
+
 def test_browse_skips_a_public_row_without_a_slug(app, client):
     """It has no /r/ URL: it used to 500 the page (url_for) and would list /r/None."""
     with app.app_context():
@@ -316,7 +355,20 @@ def test_browse_skips_a_public_row_without_a_slug(app, client):
     resp = client.get("/browse")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "<title>Browse 1 Vegan Recipes · TastesLikeGood</title>" in body  # slugless not counted
+    assert "<title>Browse 1 Vegan Recipe · TastesLikeGood</title>" in body  # slugless not counted
+    description = html.unescape(
+        re.search(r'<meta name="description" content="([^"]*)">', body).group(1)
+    )
+    assert "Browse 1 AI-generated vegan recipe with ingredients and method." in description
     items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
     assert [(i["position"], i["url"]) for i in items] == [(1, "http://localhost/r/slugged-soup")]
     assert "/r/None" not in json.dumps(items)
+
+
+def test_trailing_slash_redirect_keeps_only_campaign_and_save_params(app, client):
+    resp = client.get("/r/slash-soup/?utm_source=twitter&utm_campaign=launch&save=slash-soup&x=1")
+    assert resp.status_code == 301
+    location = resp.headers["Location"]
+    assert location.startswith("http://localhost/r/slash-soup?")
+    query = dict(pair.split("=") for pair in location.split("?", 1)[1].split("&"))
+    assert query == {"utm_source": "twitter", "utm_campaign": "launch", "save": "slash-soup"}

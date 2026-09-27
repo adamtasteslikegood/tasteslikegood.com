@@ -275,14 +275,17 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
     """
     recipe_data = recipe.data or {}
     image_bytes = None
+    stored_uri = recipe_data.get("ai_image_gcs")
+    if not isinstance(stored_uri, str):
+        stored_uri = ""
 
-    if GCS_BUCKET_NAME and recipe_data.get("ai_image_gcs"):
+    if GCS_BUCKET_NAME and stored_uri:
         from services.gcs_service import download_image
 
         image_bytes = download_image(
             GCS_BUCKET_NAME,
             recipe.id,
-            recipe_data.get("ai_image_gcs"),
+            stored_uri,
         )
 
     if image_bytes is None and allow_legacy_fallback:
@@ -308,7 +311,9 @@ def _serve_image_variant(recipe, width: int, http_cache_control: str) -> Respons
     from blueprints.public_bp import _image_version_token
 
     token = _image_version_token(recipe)
-    stored_uri = (recipe.data or {}).get("ai_image_gcs") or ""
+    stored_uri = (recipe.data or {}).get("ai_image_gcs")
+    if not isinstance(stored_uri, str):
+        stored_uri = ""
     version = hashlib.sha256(f"{stored_uri}|{token}".encode("utf-8")).hexdigest()[:16]
     key = recipe_image_variant_key(recipe.id, width, version)
 

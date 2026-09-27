@@ -510,6 +510,15 @@ def test_sitemap_lists_only_public_routes(app, client):
     assert "http://localhost/r/private" not in body
 
 
+def test_sitemap_lists_the_about_page_and_the_footer_links_it(app, client):
+    """KAN-272: /about (served by Express) is in the sitemap and every SSR footer."""
+    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "<loc>http://localhost/about</loc>" in sitemap
+
+    browse = client.get("/browse").get_data(as_text=True)
+    assert '<a href="/about">About</a>' in browse
+
+
 def test_sitemap_selects_only_slug_and_timestamps(app, client):
     with app.app_context():
         db.session.add(
@@ -1328,3 +1337,35 @@ def test_saved_copy_versions_from_the_source_row(app, client):
 
     after = _og_image(client.get("/r/copy-pie").get_data(as_text=True))
     assert after != before
+
+
+def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(app, client):
+    """Guards the _serves_own_image_bytes / _image_version_token invariant.
+
+    A legacy/corrupt row whose ``ai_image_gcs`` is truthy-but-not-a-string (e.g.
+    an int from a bad migration) with a valid base64 ``ai_image_data`` used to
+    slip through: ``_serves_own_image_bytes`` said "yes, we serve this" while
+    ``_image_version_token`` returned None (short-circuit picked the non-string
+    first), so the rendered URL had no ``?v=`` marker and any CDN/browser cache
+    of the previous bytes would linger for the full 24h max-age.
+    """
+    with app.app_context():
+        recipe = _make_recipe(
+            "Odd Photo",
+            "odd-photo",
+            data={
+                "name": "Odd Photo",
+                "description": "Legacy row with a non-string gcs field.",
+                "ai_image_gcs": 12345,
+                "ai_image_data": base64.b64encode(b"\x89PNGodd").decode("ascii"),
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    url = _og_image(client.get("/r/odd-photo").get_data(as_text=True))
+    assert url is not None
+    assert re.fullmatch(
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", url
+    ), url

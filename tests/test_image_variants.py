@@ -231,6 +231,29 @@ def test_failed_gcs_variant_read_does_not_cache_legacy_bytes_as_gcs(app, client,
     download.assert_called()
 
 
+def test_non_string_gcs_uri_keeps_legacy_variant_fallback(app, client, monkeypatch):
+    legacy = _jpeg(color=(0, 0, 220))
+    with app.app_context():
+        recipe_id = _add_image_recipe("malformed-gcs-pie", legacy)
+        recipe = db.session.get(Recipe, recipe_id)
+        data = dict(recipe.data)
+        data["ai_image_gcs"] = 12345
+        recipe.data = data
+        db.session.commit()
+
+    monkeypatch.setattr("blueprints.generation_api_bp.GCS_BUCKET_NAME", "bucket")
+    download = mock.Mock(return_value=None)
+    monkeypatch.setattr("services.gcs_service.download_image", download)
+
+    resp = client.get(f"/api/recipes/{recipe_id}/image?w=400")
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/webp"
+    with Image.open(io.BytesIO(resp.data)) as image:
+        assert image.width == 400
+    download.assert_not_called()
+
+
 def test_private_variant_is_never_publicly_cacheable(app, client):
     from models.user import User
 
