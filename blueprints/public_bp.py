@@ -556,8 +556,8 @@ def _page_title(name: str) -> str:
 def _meta_description(text: str) -> str:
     """``text`` cut to fit a result snippet: at the last sentence end, else a word.
 
-    Only the meta/og/twitter copies are shortened; the page and the JSON-LD
-    keep the full description.
+    Recipe pages and Recipe JSON-LD keep their full descriptions. Browse
+    reuses the bounded copy for both metadata and CollectionPage JSON-LD.
     """
     text = " ".join(text.split())
     if len(text) <= MAX_DESCRIPTION_LENGTH:
