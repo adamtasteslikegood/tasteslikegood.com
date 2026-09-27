@@ -197,6 +197,13 @@ def test_hub_trailing_slash_redirects(client):
     assert resp.headers["Location"] == "http://localhost/browse/tag/dinner"
 
 
+def test_unknown_hub_trailing_slash_is_404_directly(client):
+    # A 301 → 404 chain wastes crawl budget and shows up in Search Console as
+    # a redirect error; an unknown slug should 404 in one hop regardless of
+    # the trailing slash.
+    assert client.get("/browse/tag/not-a-hub/").status_code == 404
+
+
 def test_sitemap_hub_lastmod_is_newest_member(app, client):
     with app.app_context():
         for index in range(3):

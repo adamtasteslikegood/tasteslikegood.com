@@ -665,8 +665,12 @@ def _hub_members(catalog: list[Any]) -> dict[str, list[Any]]:
     return members
 
 
+def _counts_from_members(members: dict[str, list[Any]]) -> dict[str, int]:
+    return {slug: len(rows) for slug, rows in members.items()}
+
+
 def _hub_counts(catalog: list[Any]) -> dict[str, int]:
-    return {slug: len(rows) for slug, rows in _hub_members(catalog).items()}
+    return _counts_from_members(_hub_members(catalog))
 
 
 def _linkable_hubs(counts: dict[str, int]) -> list[TagHub]:
@@ -968,10 +972,14 @@ def show_tag_hub(hub_slug):
 
     catalog = _catalog_tag_rows()
     hub_members = _hub_members(catalog)
-    counts = {slug: len(rows) for slug, rows in hub_members.items()}
+    counts = _counts_from_members(hub_members)
+    # ``row.id`` breaks ties so recipes created in the same second stay in a
+    # stable order across requests: ``_catalog_tag_rows`` has no ``ORDER BY``,
+    # so heap order alone would let the top cards and CollectionPage positions
+    # drift between cache misses.
     members = sorted(
         hub_members[hub.slug],
-        key=lambda row: row.created_at or datetime.min,
+        key=lambda row: (row.created_at or datetime.min, row.id),
         reverse=True,
     )[:HUB_PAGE_LIMIT]
     ids = [row.id for row in members]
@@ -1032,15 +1040,29 @@ def show_tag_hub(hub_slug):
 
 @public_bp.route("/browse/tag/<hub_slug>/", methods=["GET"])
 def redirect_trailing_slash_hub(hub_slug):
-    """``/browse/tag/<slug>/`` → 301 to the canonical hub URL."""
+    """``/browse/tag/<slug>/`` → 301 to the canonical hub URL.
+
+    Unknown slugs 404 directly rather than 301→404, so search consoles don't
+    log a redirect chain and crawlers don't waste a hop on a stale link.
+    """
+    if hub_slug not in HUBS_BY_SLUG:
+        abort(404)
     return redirect(_canonical_url("public.show_tag_hub", hub_slug=hub_slug), code=301)
 
 
 @public_bp.route("/sitemap.xml", methods=["GET"])
 def sitemap_xml():
     """Return an XML sitemap of the public recipe surface."""
+    # One catalog scan feeds both the per-recipe entries and the hub-membership
+    # lookup below. Tags come along on the same row (no full ``data`` blob),
+    # so we avoid a second full-catalog SELECT for the hub loop.
     recipes = (
-        Recipe.query.with_entities(Recipe.slug, Recipe.updated_at, Recipe.created_at)
+        Recipe.query.with_entities(
+            Recipe.slug,
+            Recipe.updated_at,
+            Recipe.created_at,
+            Recipe.data["tags"].label("tags"),
+        )
         .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
         .order_by(Recipe.updated_at.desc(), Recipe.created_at.desc())
         .all()
@@ -1076,11 +1098,10 @@ def sitemap_xml():
         },
     ]
 
-    # KAN-274: indexable hubs, lastmod from their newest-changed member. Tags
-    # only — the catalog scan never reads the full data blob.
-    catalog = _catalog_tag_rows()
-    hub_members = _hub_members(catalog)
-    counts = {slug: len(rows) for slug, rows in hub_members.items()}
+    # KAN-274: indexable hubs, lastmod from their newest-changed member. Reuses
+    # the ``recipes`` rows already fetched above.
+    hub_members = _hub_members(recipes)
+    counts = _counts_from_members(hub_members)
     for hub in _linkable_hubs(counts):
         stamps = [
             row.updated_at or row.created_at
