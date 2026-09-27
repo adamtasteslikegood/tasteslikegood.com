@@ -997,7 +997,9 @@ def show_tag_hub(hub_slug):
     breadcrumbs = _breadcrumbs(hub=hub)
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
 
-    indexable = counts[hub.slug] >= MIN_INDEXABLE_RECIPES
+    # Hydration can drop a concurrently unpublished or slug-cleared member;
+    # indexability must reflect what this response actually renders.
+    indexable = len(recipes) >= MIN_INDEXABLE_RECIPES
     body = render_template(
         "public/tag_hub.html",
         hub=hub,
