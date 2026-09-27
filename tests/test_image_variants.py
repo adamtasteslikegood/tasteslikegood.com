@@ -17,6 +17,7 @@ import re
 import sys
 import uuid
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from PIL import Image
