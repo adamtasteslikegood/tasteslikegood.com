@@ -56,8 +56,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
         with a tofu scramble, muffins, and a full English fry-up with nothing
         missing but the animals. Some are quick weekday plates and some are
         weekend brunch projects. Every recipe lists its prep and cook time up top,
-        so you can tell which is which before you start, and each comes with a
-        photo of the finished dish. There are no eggs, dairy or bacon in any of
+        so you can tell which is which before you start, and recipe cards show a photo of the finished dish when one is available. There are no eggs, dairy or bacon in any of
         them; tofu, beans, oats and a well-stocked spice rack do the work.
         """,
     ),
@@ -71,9 +70,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         carnitas tacos, and chickpea and tofu salads that keep well in a lunchbox.
         Many of them pack well for the next day, and most take less effort than
         the photo suggests. If none of these fit, describe the lunch you want on
-        the generator and get a new recipe in seconds. Each recipe has the full ingredient
-        list, the method step by step, and a photo, with no life story to scroll
-        past on the way to the ingredients.
+        the generator and get a new recipe in seconds. Each recipe has the full ingredient list and method step by step, while cards
+        show a photo when one is available, with no life story before the ingredients.
         """,
     ),
     _hub(
@@ -87,8 +85,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
         chicken-fried steak with country gravy. Plenty of these are the dishes
         people assume they would have to give up, rebuilt from lentils, tofu,
         seitan and beans. Each recipe shows prep and cook times and servings, so
-        you can pick something that fits the evening, and every one has a photo
-        of the finished plate.
+        you can pick something that fits the evening, and cards show a finished-plate photo when one is available.
         """,
     ),
     _hub(
@@ -101,8 +98,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         blooming onions, fish and chips, double cheeseburgers, baked ziti, sloppy
         joes and cornbread. These are the diner, pub and county-fair classics,
         made without meat, dairy or eggs and without pretending to be health
-        food. Each recipe comes with a photo, measured ingredients and a
-        step-by-step method, and you can save any of them to your own cookbook
+        food. Each recipe has measured ingredients and a step-by-step method, while cards
+        show a photo when one is available, and you can save any of them to your own cookbook
         for the next cold night.
         """,
     ),
@@ -115,8 +112,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         tofu ricotta, spaghetti and meatballs, penne with tomato and cannellini
         beans, gnocchi, and margherita and supreme pizzas. The creamy, cheesy
         parts come from cashews, tofu and good olive oil rather than dairy, and
-        the sauces are made as part of the recipe. Every recipe has its own photo, a
-        complete ingredient list and the method laid out step by step, so you can
+        the sauces are made as part of the recipe. Recipe cards show a photo when one is available, alongside a complete
+        ingredient list and the method laid out step by step, so you can
         get dinner on the table without reading through anyone's trip to Tuscany.
         """,
     ),
@@ -130,8 +127,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         papas in salsa verde, huevos rancheros, homemade flour tortillas, and even
         cinnamon-sugar dessert tacos. The fillings lean on beans, lentils, tofu
         and jackfruit, with cashew cheese and fresh salsas doing what dairy
-        usually would. Each recipe includes a photo of the finished dish, measured
-        ingredients and a clear method, ready to save to your cookbook for taco
+        usually would. Recipe cards show a finished-dish photo when one is available, alongside
+        measured ingredients and a clear method, ready to save to your cookbook for taco
         night. The chiles and spices are all in the ingredient list, so you can
         turn the heat up or down to suit the table.
         """,
@@ -147,8 +144,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         lemongrass tofu banh mi and tofu egg-salad sandwiches. Some are quick
         lunches and some, like the cured seitan for the Reuben, are weekend
         projects that pay off for days. Each recipe lists everything that goes
-        between the bread, with the method step by step and a photo of the
-        finished sandwich, so you know how tall to stack it.
+        between the bread, with the method step by step; cards show a finished-sandwich photo when one
+        is available, so you know how tall to stack it.
         """,
     ),
     _hub(
@@ -161,8 +158,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         scramble for huevos rancheros and breakfast burritos, eggless tofu salad,
         and battered tofu standing in for fish and chips. Each recipe lists the
         tofu it needs alongside the other ingredients and walks through the
-        method step by step. All of them come with a photo of the finished
-        dish, and all of them are fully vegan.
+        method step by step. Cards show a finished-dish photo when one is available, and every recipe is
+        fully vegan.
         """,
     ),
     _hub(
@@ -170,7 +167,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         "High-Protein Vegan Recipes",
         ["high protein", "protein rich", "protein packed", "high in protein"],
         """
-        High-protein vegan recipes built on seitan, tofu, tempeh and lentils:
+        AI-generated high-protein vegan recipes built on seitan, tofu, tempeh and
+        lentils:
         chicken-fried seitan steak, lentil sloppy joes, lentil and tofu tacos and
         burritos, a loaded breakfast burrito, and a full English breakfast. They
         are here because the protein comes from the main ingredients rather than
@@ -190,8 +188,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         list, but they are AI-generated recipes and not certified, so if you
         cook for coeliac disease or a serious intolerance, check every packaged
         ingredient (oats, sauces and spice blends especially) for gluten and
-        cross-contamination warnings. Each recipe has a photo, measured
-        ingredients and a step-by-step method, and any of them can be saved to
+        cross-contamination warnings. Recipe cards show a photo when one is available,
+        alongside measured ingredients and a step-by-step method, and any of them can be saved to
         your cookbook.
         """,
     ),
@@ -205,8 +203,8 @@ TAG_HUBS: tuple[TagHub, ...] = (
         funnel cake, air-fried jelly doughnuts, s'mores, and no-bake fruit tarts,
         sorbets and popsicles for hot days. None of them use eggs, dairy butter
         or milk, and each recipe gives exact quantities and a step-by-step
-        method, from mixing bowl to cooling rack. Every dessert comes with a photo,
-        so you know what you are aiming for before you preheat the oven.
+        method, from mixing bowl to cooling rack. Cards show a dessert photo when one is available, so you know what you are
+        aiming for before preheating the oven.
         """,
     ),
     _hub(
@@ -218,7 +216,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
         onion rings, polenta fries, air-fryer french fries, kettle corn, Tex-Mex
         snack mix, hearts of palm ceviche, fresh peach salsa, avocado toast and
         mini club sandwiches. Some are game-day fried snacks and some are light
-        enough for an afternoon tea. Each recipe has a photo, measured
+        enough for an afternoon tea. Recipe cards show a photo when one is available, alongside measured
         ingredients and a step-by-step method, and most scale up easily when you
         are feeding a crowd. Double the quantities, keep the method, and put
         out more napkins.
