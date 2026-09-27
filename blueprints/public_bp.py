@@ -611,7 +611,7 @@ def _related_recipes(recipe: Recipe, catalog: list[Any]) -> list[Recipe]:
 
 def _hub_members(catalog: list[Any]) -> dict[str, list[Any]]:
     """Map each curated hub to its catalog rows in one catalog pass."""
-    members = {hub.slug: [] for hub in TAG_HUBS}
+    members: dict[str, list[Any]] = {hub.slug: [] for hub in TAG_HUBS}
     for row in catalog:
         for hub in hubs_for_tags(_row_tags(row)):
             members[hub.slug].append(row)
