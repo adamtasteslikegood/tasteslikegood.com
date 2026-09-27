@@ -266,13 +266,13 @@ def _image_mimetype(image_bytes: bytes) -> str:
     return "image/png"
 
 
-# A year, and never revalidated: only sent for a variant whose ``?v=`` matches
-# the image's current version, so the URL can never name different bytes.
-IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> bytes | None:
+    """The recipe's image bytes from storage.
 
-
-def _load_stored_image_bytes(recipe) -> bytes | None:
-    """The recipe's image bytes from storage: GCS first, then legacy base64."""
+    GCS is authoritative when configured. Legacy base64 fallback remains for the
+    original endpoint, but callers that bind cache identity to the GCS URI can
+    disable it so different bytes are never stored under that identity.
+    """
     recipe_data = recipe.data or {}
     image_bytes = None
 
@@ -285,7 +285,7 @@ def _load_stored_image_bytes(recipe) -> bytes | None:
             recipe_data.get("ai_image_gcs"),
         )
 
-    if image_bytes is None:
+    if image_bytes is None and allow_legacy_fallback:
         image_b64 = recipe_data.get("ai_image_data")
         if image_b64:
             image_bytes = base64.b64decode(image_b64)
@@ -296,18 +296,14 @@ def _load_stored_image_bytes(recipe) -> bytes | None:
 def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
     """A WebP of the recipe's image at ``width`` px (KAN-271), or ``None`` to fall back.
 
-    Two choices here exist to make a year-long ``immutable`` header safe:
+    The variant is keyed on the image's version and built from storage — never
+    from the ``vgc:img:<id>`` Valkey entry. The worker commits a new image
+    before invalidating that entry, so it can briefly contain stale bytes.
 
-    * The variant is keyed on the image's version, and built from storage —
-      never from the ``vgc:img:<id>`` Valkey entry. The worker commits a new
-      image *before* it invalidates that entry (``worker_api_bp``), so for a
-      moment the entry holds the old bytes while the page already links the new
-      ``?v=``. Built from it, the old photo would be cached under the new
-      version and pinned in browsers for a year. Storage is always current:
-      ``ai_image_gcs`` names the exact object version.
-    * ``immutable`` is only sent when the request's ``?v=`` equals that version
-      token, i.e. the URL the SSR pages emit. A bare or stale ``?v=`` gets the
-      normal header, so no URL can be made to cache the wrong bytes forever.
+    A configured GCS URI is authoritative for variant generation. If its read
+    fails, do not fall back to legacy base64 under a cache key derived from the
+    GCS identity; return ``None`` and let the bounded-cache original path decide
+    whether legacy fallback is appropriate.
     """
     from blueprints.public_bp import _image_version_token
 
@@ -318,18 +314,19 @@ def _serve_image_variant(recipe, width: int, http_cache_control: str) -> Respons
 
     variant = safe_get(key)
     if variant is None:
-        source = _load_stored_image_bytes(recipe)
+        source = _load_stored_image_bytes(recipe, allow_legacy_fallback=not bool(stored_uri))
         if source is None:
-            return jsonify({"error": "No image available"}), 404
+            return None
         variant = make_webp_variant(source, width)
         if variant is None:
             return None
         safe_set(key, variant, timeout=TTL_IMAGE)
 
-    cache_control = http_cache_control
-    if recipe.is_public and token is not None and request.args.get("v") == token:
-        cache_control = IMMUTABLE_CACHE_CONTROL
-    return Response(variant, mimetype="image/webp", headers={"Cache-Control": cache_control})
+    return Response(
+        variant,
+        mimetype="image/webp",
+        headers={"Cache-Control": http_cache_control},
+    )
 
 
 @generation_api_bp.route("/recipes/<recipe_id>/image", methods=["GET"])
