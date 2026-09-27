@@ -4,7 +4,7 @@ Covers:
 - the width allow-list and the resize/encode helper
 - ``GET /api/recipes/<id>/image?w=<n>``: WebP at the right size, same access
   check as the original, 400 on an unlisted width, fallback on bad bytes
-- ``immutable`` only for the exact ``?v=`` the SSR pages emit
+- public image responses retain a bounded cache lifetime even with ``?v=``
 - variants are built from storage, never from the (possibly stale) Valkey
   entry for the original
 - the recipe hero and browse cards emit srcset/sizes/dimensions and the hero
@@ -125,6 +125,21 @@ def test_make_webp_variant_rejects_oversized_source_before_decode():
     transpose.assert_not_called()
 
 
+def test_make_webp_variant_rejects_oversized_output_before_resize():
+    source = mock.MagicMock()
+    source.width = 1
+    source.height = 30_000
+    source.mode = "RGB"
+    source.__enter__.return_value = source
+
+    with (
+        mock.patch("services.image_variants.Image.open", return_value=source),
+        mock.patch("services.image_variants.ImageOps.exif_transpose", return_value=source),
+    ):
+        assert make_webp_variant(b"compact extreme-aspect image", 1200) is None
+    source.resize.assert_not_called()
+
+
 def test_make_webp_variant_keeps_transparency():
     out = io.BytesIO()
     Image.new("RGBA", (800, 400), (0, 0, 0, 0)).save(out, format="PNG")
@@ -180,25 +195,40 @@ def test_undecodable_image_falls_back_to_the_original_bytes(app, client):
     assert resp.mimetype == "image/png"
 
 
-def test_matching_version_marker_is_cached_as_immutable(app, client):
+@pytest.mark.parametrize(
+    "query",
+    ["w=400", "w=400&v=stale0000000", "w=400&v=__TOKEN__", "v=__TOKEN__"],
+)
+def test_public_image_cache_lifetime_stays_bounded(app, client, query):
     with app.app_context():
-        recipe_id = _add_image_recipe("immutable-pie", _jpeg())
-        token = _image_version_token(db.session.get(Recipe, recipe_id))
-    assert token
-
-    resp = client.get(f"/api/recipes/{recipe_id}/image?w=400&v={token}")
-    assert resp.headers["Cache-Control"] == "public, max-age=31536000, immutable"
-
-
-@pytest.mark.parametrize("query", ["w=400", "w=400&v=stale0000000", "v=__TOKEN__"])
-def test_immutable_needs_a_variant_and_the_current_marker(app, client, query):
-    with app.app_context():
-        recipe_id = _add_image_recipe("not-immutable-pie", _jpeg())
+        recipe_id = _add_image_recipe("bounded-cache-pie", _jpeg())
         token = _image_version_token(db.session.get(Recipe, recipe_id))
 
     resp = client.get(f"/api/recipes/{recipe_id}/image?{query.replace('__TOKEN__', token)}")
     assert resp.status_code == 200
-    assert "immutable" not in resp.headers["Cache-Control"]
+    assert resp.headers["Cache-Control"] == "public, max-age=86400"
+
+
+def test_failed_gcs_variant_read_does_not_cache_legacy_bytes_as_gcs(app, client, monkeypatch):
+    legacy = _jpeg(color=(0, 0, 220))
+    with app.app_context():
+        recipe_id = _add_image_recipe("gcs-fallback-pie", legacy)
+        recipe = db.session.get(Recipe, recipe_id)
+        data = dict(recipe.data)
+        data["ai_image_gcs"] = "gs://bucket/recipe/version-2.png"
+        recipe.data = data
+        db.session.commit()
+
+    monkeypatch.setattr("blueprints.generation_api_bp.GCS_BUCKET_NAME", "bucket")
+    download = mock.Mock(return_value=None)
+    monkeypatch.setattr("services.gcs_service.download_image", download)
+
+    resp = client.get(f"/api/recipes/{recipe_id}/image?w=400")
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/jpeg"
+    assert resp.data == legacy
+    assert resp.headers["Cache-Control"] == "public, max-age=86400"
+    download.assert_called()
 
 
 def test_private_variant_is_never_publicly_cacheable(app, client):
