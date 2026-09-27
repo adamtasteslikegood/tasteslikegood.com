@@ -214,8 +214,14 @@ def test_meta_description_cuts_at_last_sentence_before_the_limit():
 def test_meta_description_falls_back_to_a_word_boundary():
     text = "word " * 60
     cut = _meta_description(text)
-    assert len(cut) <= 156
+    assert len(cut) <= 155
     assert cut.endswith("word…")
+
+
+def test_meta_description_reserves_space_for_ellipsis_without_spaces():
+    cut = _meta_description("x" * 200)
+    assert len(cut) == 155
+    assert cut == ("x" * 154) + "…"
 
 
 def test_short_description_is_untouched():
@@ -255,11 +261,12 @@ def test_browse_title_description_and_collection_json_ld(app, client):
         _add("hidden-soup", public=False, days=3)
 
     body = client.get("/browse").get_data(as_text=True)
-    assert "<title>Browse 2 Vegan Recipes with Photos · TastesLikeGood</title>" in body
+    assert "<title>Browse 2 Vegan Recipes · TastesLikeGood</title>" in body
     description = html.unescape(
         re.search(r'<meta name="description" content="([^"]*)">', body).group(1)
     )
     assert "AI-generated vegan recipes" in description
+    assert "Photos are included when available." in description
     assert len(description) <= 160
 
     collection = _json_ld(body, "CollectionPage")
@@ -288,4 +295,4 @@ def test_browse_later_pages_say_which_page(app, client):
             _add(f"soup-{index}", days=index)
 
     body = client.get("/browse?page=2").get_data(as_text=True)
-    assert "<title>Vegan Recipes with Photos, Page 2 of 2 · TastesLikeGood</title>" in body
+    assert "<title>Vegan Recipes, Page 2 of 2 · TastesLikeGood</title>" in body
