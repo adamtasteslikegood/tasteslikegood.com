@@ -1169,11 +1169,12 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
         rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", before
     ), before
 
-    # Regenerate: the worker rewrites ai_metadata.image_generation.timestamp
-    # and nothing else about the URL (worker_api_bp._image_generation_metadata).
+    # Regenerate: the worker stores the new object at a versioned GCS URI and
+    # rewrites the generation metadata (worker_api_bp).
     with app.app_context():
         stored = db.session.get(Recipe, recipe_id)
         data = dict(stored.data)
+        data["ai_image_gcs"] = "gs://bucket/recipe/v2.png"
         data["ai_metadata"] = {
             "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
         }
@@ -1301,6 +1302,7 @@ def test_saved_copy_versions_from_the_source_row(app, client):
     with app.app_context():
         stored = db.session.get(Recipe, source_id)
         data = dict(stored.data)
+        data["ai_image_gcs"] = "gs://bucket/recipe/v2.png"
         data["ai_metadata"] = {
             "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
         }
