@@ -351,7 +351,7 @@ def serve_recipe_image(recipe_id):
     ``create_app`` (images are consumed same-origin through the Express
     proxy; ACAO on them defeated shared caching).
 
-    ``?w=400|800|1200`` (KAN-271) returns a WebP downscaled to that width —
+    ``?w=400|800|1200`` (KAN-271) returns a WebP resized to that exact width —
     see ``_serve_image_variant``. Any other ``w`` is a 400.
     """
     # Public recipes bypass ownership scoping so unauthenticated SSR pages
