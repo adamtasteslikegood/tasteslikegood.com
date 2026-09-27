@@ -1,6 +1,6 @@
 # Tastes Like Good - Vegan Recipe Generator
 
-**Live: [www.tasteslikegood.org](https://www.tasteslikegood.org)** · [Browse the published recipes](https://www.tasteslikegood.org/browse). This repo is the Flask backend; the Angular app and Express proxy live in [tasteslikegoodtheangularsvegancookbook](https://github.com/adamtasteslikegood/tasteslikegoodtheangularsvegancookbook).
+**Live: [free AI vegan recipe generator](https://www.tasteslikegood.org)** · [Browse the published recipes](https://www.tasteslikegood.org/browse). This repo is the Flask backend; the Angular app and Express proxy live in [tasteslikegoodtheangularsvegancookbook](https://github.com/adamtasteslikegood/tasteslikegoodtheangularsvegancookbook).
 
 ## Description
 
