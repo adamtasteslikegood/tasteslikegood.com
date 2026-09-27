@@ -54,6 +54,20 @@ def client(app):
     return app.test_client()
 
 
+def _without_related(body: str) -> str:
+    """The page minus the "More vegan recipes" block (KAN-273).
+
+    That block shows other public recipes' images under their own names, which
+    is correct; the image-attribution tests are about the page's OWN media
+    (hero, og:image, JSON-LD, Pinterest pin), so they assert on the rest.
+    """
+    start = body.find('<section class="public-related"')
+    if start == -1:
+        return body
+    end = body.index("</section>", start) + len("</section>")
+    return body[:start] + body[end:]
+
+
 def _make_recipe(name, slug, *, public=True, owner=None, data=None):
     return Recipe(
         id=str(uuid.uuid4()),
@@ -814,7 +828,7 @@ def test_saved_copy_with_own_image_does_not_fall_back(app, client):
 
     resp = client.get("/r/my-source-dish-copy")
     assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
+    body = _without_related(resp.get_data(as_text=True))
     assert "https://img.example/copy-own.jpg" in body
     assert "https://img.example/source.jpg" not in body
 
@@ -1080,7 +1094,7 @@ def test_slug_fallback_ignores_recipe_created_after_the_copy(app, client):
 
     resp = client.get("/r/orphaned-copy")
     assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
+    body = _without_related(resp.get_data(as_text=True))
     # The impostor must not be attributed as the source, on any surface.
     assert f"/api/recipes/{impostor_id}/image" not in body
     assert "https://img.example/impostor-stock.jpg" not in body
@@ -1320,3 +1334,35 @@ def test_saved_copy_versions_from_the_source_row(app, client):
 
     after = _og_image(client.get("/r/copy-pie").get_data(as_text=True))
     assert after != before
+
+
+def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(app, client):
+    """Guards the _serves_own_image_bytes / _image_version_token invariant.
+
+    A legacy/corrupt row whose ``ai_image_gcs`` is truthy-but-not-a-string (e.g.
+    an int from a bad migration) with a valid base64 ``ai_image_data`` used to
+    slip through: ``_serves_own_image_bytes`` said "yes, we serve this" while
+    ``_image_version_token`` returned None (short-circuit picked the non-string
+    first), so the rendered URL had no ``?v=`` marker and any CDN/browser cache
+    of the previous bytes would linger for the full 24h max-age.
+    """
+    with app.app_context():
+        recipe = _make_recipe(
+            "Odd Photo",
+            "odd-photo",
+            data={
+                "name": "Odd Photo",
+                "description": "Legacy row with a non-string gcs field.",
+                "ai_image_gcs": 12345,
+                "ai_image_data": base64.b64encode(b"\x89PNGodd").decode("ascii"),
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    url = _og_image(client.get("/r/odd-photo").get_data(as_text=True))
+    assert url is not None
+    assert re.fullmatch(
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", url
+    ), url

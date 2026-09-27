@@ -15,13 +15,24 @@ JSON API) continues to flow through the existing blueprints.
 import hashlib
 import logging
 import os
+import re
 from collections.abc import Mapping
+from datetime import datetime
 from math import ceil
 from typing import Any
 from urllib.parse import urlencode
 from xml.etree.ElementTree import Element, SubElement, tostring
 
-from flask import Blueprint, Response, abort, jsonify, render_template, request, url_for
+from flask import (
+    Blueprint,
+    Response,
+    abort,
+    jsonify,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 from sqlalchemy.orm import joinedload
 
 from extensions import db
@@ -81,9 +92,17 @@ def _serves_own_image_bytes(recipe: Recipe) -> bool:
     The one signal that separates "our endpoint serves this" from "this is an
     external stock image URL" — which is what decides whether the URL is ours
     to version (see ``_rendered_image_url``).
+
+    Restricted to non-empty strings so this gate agrees with
+    ``_image_version_token`` (which hashes ``str`` sources only). A legacy row
+    whose ``ai_image_data`` decoded to a non-string truthy value would
+    otherwise pass this gate but produce a versionless URL, silently
+    reintroducing the KAN-195 stale-image defect on the og:image and hero.
     """
     data = recipe.data or {}
-    return bool(data.get("ai_image_gcs") or data.get("ai_image_data"))
+    gcs = data.get("ai_image_gcs")
+    payload = data.get("ai_image_data")
+    return (isinstance(gcs, str) and bool(gcs)) or (isinstance(payload, str) and bool(payload))
 
 
 def _own_image_url(recipe: Recipe) -> str | None:
@@ -201,17 +220,30 @@ def _image_version_token(owner: Recipe) -> str | None:
 
     The generic recipe PUT can retain image-generation metadata while changing
     ``ai_image_gcs`` or legacy ``ai_image_data``. Using that metadata as the
-    marker would therefore allow different bytes to keep the same immutable
+    marker would therefore allow different bytes to keep the same cached
     URL. Hash the immutable GCS object URI when present, otherwise the legacy
     base64 payload itself, so the marker changes if and only if the bytes served
     by ``_load_stored_image_bytes`` can change.
 
     Hashed and truncated rather than emitted raw: storage identifiers and image
     payloads are internal state and do not belong in a public URL.
+
+    Chooses the source with the same per-field ``isinstance(..., str)`` gate as
+    ``_serves_own_image_bytes`` — a plain ``or`` short-circuits on the first
+    truthy value regardless of type, so a legacy ``ai_image_gcs`` that is
+    truthy-but-not-a-string would win here while ``_serves_own_image_bytes``
+    still returned True from ``ai_image_data``. That divergence made
+    ``_versioned_image_url`` emit a versionless URL for an image the endpoint
+    is actively serving — the KAN-195 stale-cache defect wearing a new hat.
     """
     data = owner.data or {}
-    source = data.get("ai_image_gcs") or data.get("ai_image_data")
-    if not isinstance(source, str) or not source:
+    gcs = data.get("ai_image_gcs")
+    payload = data.get("ai_image_data")
+    if isinstance(gcs, str) and gcs:
+        source = gcs
+    elif isinstance(payload, str) and payload:
+        source = payload
+    else:
         return None
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
 
@@ -258,14 +290,24 @@ def _rendered_image(recipe: Recipe) -> tuple[str | None, dict[str, str] | None]:
     url, owner = _recipe_image(recipe)
     if url is None or owner is None or not _serves_own_image_bytes(owner):
         return url, None
-    variants = _image_variants(owner, HERO_IMAGE_WIDTHS)
+    return _versioned_image_url(owner), _image_variants(owner, HERO_IMAGE_WIDTHS)
+
+
+def _versioned_image_url(owner: Recipe) -> str:
+    """Absolute full-size URL of an image ``owner`` serves itself, with ``?v=``.
+
+    Callers gate on ``_serves_own_image_bytes(owner)`` first, and
+    ``_image_version_token`` uses the same per-field ``isinstance`` check, so
+    ``token`` is never ``None`` here. Fail loud rather than silently emitting a
+    versionless (permanently CDN-cached) URL — that path is the KAN-195 defect.
+    """
     token = _image_version_token(owner)
     if token is None:
-        return url, variants
-    return (
-        _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id, v=token),
-        variants,
-    )
+        raise RuntimeError(
+            "_versioned_image_url called for owner without an image-version token; "
+            "callers must gate on _serves_own_image_bytes."
+        )
+    return _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id, v=token)
 
 
 # Sized WebP variants (KAN-271). ``sizes`` mirror recipe-site.css: the hero
@@ -281,8 +323,8 @@ def _image_variants(owner: Recipe, widths: tuple[int, ...]) -> dict[str, str]:
     """``src`` (smallest width) and ``srcset`` for an image ``owner`` serves itself.
 
     Host-relative, like the browse cards' URLs have always been, and carrying
-    the same ``?v=`` marker as the full-size URL, which is what lets the image
-    route mark them ``immutable``.
+    the same ``?v=`` marker as the full-size URL, so a replaced image gets a new
+    URL instead of waiting out the image route's one-day ``max-age``.
     """
     token = _image_version_token(owner)
 
@@ -376,6 +418,15 @@ def _recipe_tags(data: dict[str, Any]) -> list[str]:
     return [tag.strip() for tag in raw_tags if isinstance(tag, str) and tag.strip()]
 
 
+DEFAULT_RECIPE_DESCRIPTION = "A vegan recipe from TastesLikeGood."
+
+
+def _recipe_description(data: dict[str, Any]) -> str:
+    """Persisted recipe JSON is legacy-tolerant; metadata always needs text."""
+    value = data.get("description")
+    return value if isinstance(value, str) and value.strip() else DEFAULT_RECIPE_DESCRIPTION
+
+
 def _clean_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {
@@ -410,7 +461,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         "@context": "https://schema.org",
         "@type": "Recipe",
         "name": recipe.name,
-        "description": data.get("description") or "A vegan recipe from TastesLikeGood.",
+        "description": _recipe_description(data),
         "url": canonical_url,
         "mainEntityOfPage": canonical_url,
         "image": [image_url] if image_url else None,
@@ -434,10 +485,207 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         ]
         or None,
         "keywords": ", ".join(_recipe_tags(data)) or None,
-        "recipeCategory": "Vegan",
+        "recipeCategory": _tag_labels(data, RECIPE_CATEGORY_BY_TAG) or None,
+        "recipeCuisine": _tag_labels(data, RECIPE_CUISINE_BY_TAG) or None,
+        "suitableForDiet": "https://schema.org/VeganDiet",
     }
     cleaned: dict[str, Any] = _clean_json(json_ld)
     return cleaned
+
+
+# ── Internal linking + snippet hygiene (KAN-273) ─────────────────────────────
+
+# Course and cuisine from the tags the generator already writes. Every recipe
+# here is vegan, so "Vegan" was never a category: it is ``suitableForDiet``.
+# Keys are lower-cased tags; a recipe gets every distinct label its tags map to.
+RECIPE_CATEGORY_BY_TAG: dict[str, str] = {
+    "breakfast": "Breakfast",
+    "brunch": "Breakfast",
+    "lunch": "Lunch",
+    "dinner": "Dinner",
+    "main": "Main course",
+    "main course": "Main course",
+    "main dish": "Main course",
+    "entree": "Main course",
+    "dessert": "Dessert",
+    "desserts": "Dessert",
+    "appetizer": "Appetizer",
+    "appetizers": "Appetizer",
+    "starter": "Appetizer",
+    "snack": "Snack",
+    "snacks": "Snack",
+    "side": "Side dish",
+    "side dish": "Side dish",
+    "soup": "Soup",
+    "salad": "Salad",
+    "sandwich": "Sandwich",
+    "sandwiches": "Sandwich",
+    "drink": "Drink",
+    "beverage": "Drink",
+    "smoothie": "Drink",
+}
+
+RECIPE_CUISINE_BY_TAG: dict[str, str] = {
+    "american": "American",
+    "southern": "Southern",
+    "cajun": "Cajun",
+    "tex-mex": "Tex-Mex",
+    "mexican": "Mexican",
+    "italian": "Italian",
+    "french": "French",
+    "spanish": "Spanish",
+    "greek": "Greek",
+    "mediterranean": "Mediterranean",
+    "middle eastern": "Middle Eastern",
+    "british": "British",
+    "english": "British",
+    "indian": "Indian",
+    "thai": "Thai",
+    "vietnamese": "Vietnamese",
+    "korean": "Korean",
+    "japanese": "Japanese",
+    "chinese": "Chinese",
+    "caribbean": "Caribbean",
+    "ethiopian": "Ethiopian",
+}
+
+
+def _tag_labels(data: dict[str, Any], mapping: Mapping[str, str]) -> list[str]:
+    labels: list[str] = []
+    for tag in _recipe_tags(data):
+        label = mapping.get(tag.lower())
+        if label and label not in labels:
+            labels.append(label)
+    return labels
+
+
+SITE_TITLE_SUFFIX = " · TastesLikeGood"
+MAX_TITLE_LENGTH = 60
+MAX_DESCRIPTION_LENGTH = 155
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
+
+
+def _page_title(name: str) -> str:
+    """``name · TastesLikeGood`` when that fits a result line, else just ``name``.
+
+    Results truncate near 60 characters, and 25 of 96 recipe titles lost their
+    ending to the unconditional suffix (SEO audit 2026-09-13, O3).
+    """
+    titled = f"{name}{SITE_TITLE_SUFFIX}"
+    return titled if len(titled) <= MAX_TITLE_LENGTH else name
+
+
+def _meta_description(text: str) -> str:
+    """``text`` cut to fit a result snippet: at the last sentence end, else a word.
+
+    Recipe pages and Recipe JSON-LD keep their full descriptions. Browse
+    reuses the bounded copy for both metadata and CollectionPage JSON-LD.
+    """
+    text = " ".join(text.split())
+    if len(text) <= MAX_DESCRIPTION_LENGTH:
+        return text
+    head = text[: MAX_DESCRIPTION_LENGTH + 1]
+    ends = [m.end() for m in _SENTENCE_END.finditer(head) if m.end() <= MAX_DESCRIPTION_LENGTH]
+    if ends and ends[-1] >= 60:
+        return head[: ends[-1]]
+    cut = head[: MAX_DESCRIPTION_LENGTH - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
+    return f"{cut}…"
+
+
+RELATED_RECIPE_COUNT = 6
+
+
+def _related_recipes(recipe: Recipe) -> list[Recipe]:
+    """Public recipes that share the most tags with ``recipe``, newest first on ties.
+
+    Recipe pages linked to no other recipe, so link equity stopped at every page
+    (SEO audit O2). Scoring reads only id/created_at/tags for the whole public
+    catalog — never the full ``data`` blob, which can still carry legacy base64
+    images — then loads the chosen few in full for their cards.
+    """
+    own_tags = {tag.lower() for tag in _recipe_tags(recipe.data or {})}
+    rows = (
+        Recipe.query.with_entities(Recipe.id, Recipe.created_at, Recipe.data["tags"].label("tags"))
+        .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None), Recipe.id != recipe.id)
+        .all()
+    )
+
+    def rank(row: Any) -> tuple[int, datetime]:
+        tags = row.tags if isinstance(row.tags, list) else []
+        shared = own_tags & {tag.strip().lower() for tag in tags if isinstance(tag, str)}
+        return len(shared), row.created_at or datetime.min
+
+    chosen = [row.id for row in sorted(rows, key=rank, reverse=True)[:RELATED_RECIPE_COUNT]]
+    if not chosen:
+        return []
+    # Mirror the filters from the scoring query: under READ COMMITTED, a recipe
+    # unpublished (or slug-nulled) between the two queries would otherwise be
+    # linked from a public page and 404 on click.
+    by_id = {
+        related.id: related
+        for related in Recipe.query.filter(
+            Recipe.id.in_(chosen), Recipe.is_public.is_(True), Recipe.slug.isnot(None)
+        ).all()
+    }
+    return [by_id[recipe_id] for recipe_id in chosen if recipe_id in by_id]
+
+
+def _breadcrumbs(recipe: Recipe | None = None) -> list[dict[str, str]]:
+    """Home → Browse [→ recipe]: the visible trail and its BreadcrumbList."""
+    crumbs = [
+        {"name": "Home", "url": f"{_public_base_url()}/"},
+        {"name": "Browse", "url": _canonical_url("public.browse_public_recipes")},
+    ]
+    if recipe is not None:
+        crumbs.append(
+            {
+                "name": recipe.name,
+                "url": _canonical_url("public.show_public_recipe", slug=recipe.slug),
+            }
+        )
+    return crumbs
+
+
+def _breadcrumb_json_ld(crumbs: list[dict[str, str]]) -> dict[str, Any]:
+    return {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        "itemListElement": [
+            {
+                "@type": "ListItem",
+                "position": index + 1,
+                "name": crumb["name"],
+                "item": crumb["url"],
+            }
+            for index, crumb in enumerate(crumbs)
+        ],
+    }
+
+
+def _collection_json_ld(
+    name: str, description: str, canonical_url: str, recipes: list[Recipe]
+) -> dict[str, Any]:
+    """``CollectionPage`` whose ``ItemList`` is the recipes on this page, in order."""
+    return {
+        "@context": "https://schema.org",
+        "@type": "CollectionPage",
+        "name": name,
+        "description": description,
+        "url": canonical_url,
+        "mainEntity": {
+            "@type": "ItemList",
+            "numberOfItems": len(recipes),
+            "itemListElement": [
+                {
+                    "@type": "ListItem",
+                    "position": index + 1,
+                    "url": _canonical_url("public.show_public_recipe", slug=recipe.slug),
+                    "name": recipe.name,
+                }
+                for index, recipe in enumerate(recipes)
+            ],
+        },
+    }
 
 
 def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
@@ -499,13 +747,23 @@ def show_public_recipe(slug):
     # pin whose media is the pre-regeneration photo is the same defect wearing
     # a different hat.
     pinterest_image_url = image_url
-    description = data.get("description") or "A vegan recipe from TastesLikeGood."
+    description = _recipe_description(data)
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
+    breadcrumbs = _breadcrumbs(recipe)
 
     return render_template(
         "public/recipe.html",
         recipe=recipe,
+        page_title=_page_title(recipe.name),
+        meta_description=_meta_description(description),
+        breadcrumbs=breadcrumbs,
+        breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
+        related_recipes=[
+            {"recipe": related, "image": _card_image(related)}
+            for related in _related_recipes(recipe)
+        ],
+        card_image_sizes=CARD_IMAGE_SIZES,
         canonical_url=canonical_url,
         image_url=image_url,
         image_variants=image_variants,
@@ -522,6 +780,26 @@ def show_public_recipe(slug):
         ),
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
     )
+
+
+@public_bp.route("/r/<slug>/", methods=["GET"])
+def redirect_trailing_slash_recipe(slug):
+    """``/r/<slug>/`` → 301 to the canonical ``/r/<slug>`` (KAN-273).
+
+    A trailing-slash link from another site used to dead-end on a 404. The
+    target decides existence, so this never reveals whether a slug is public.
+
+    Carries forward the ``utm_*`` campaign parameters and the SPA ``?save=``
+    handoff, and nothing else: only allow-listed parameters, rebuilt by
+    ``url_for`` onto the fixed canonical host, never the raw query string
+    (CodeQL py/url-redirection).
+    """
+    carried = {
+        key: value
+        for key, value in request.args.items()
+        if key == "save" or (key.startswith("utm_") and key.replace("_", "").isalnum())
+    }
+    return redirect(_canonical_url("public.show_public_recipe", slug=slug, **carried), code=301)
 
 
 @public_bp.route("/api/recipes/public/<slug>", methods=["GET"])
@@ -548,7 +826,12 @@ def browse_public_recipes():
     except (TypeError, ValueError):
         page = 1
 
-    base_query = Recipe.query.filter(Recipe.is_public.is_(True)).options(joinedload(Recipe.user))
+    # slug IS NOT NULL, like the sitemap: a slugless public row (legacy data;
+    # publishing always mints a slug now) has no /r/ URL, and url_for on it
+    # would fail the whole page.
+    base_query = Recipe.query.filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None)).options(
+        joinedload(Recipe.user)
+    )
 
     total = base_query.with_entities(Recipe.id).count()
     total_pages = max(1, ceil(total / BROWSE_PAGE_SIZE))
@@ -565,9 +848,37 @@ def browse_public_recipes():
         "public.browse_public_recipes",
         **({"page": page} if page > 1 else {}),
     )
+    # KAN-273: the title and description say what the page is, with the live
+    # count; the social card gets the newest photo on the page instead of none.
+    recipe_noun = "Recipe" if total == 1 else "Recipes"
+    if page > 1:
+        page_title = f"Vegan Recipes, Page {page} of {total_pages}{SITE_TITLE_SUFFIX}"
+    else:
+        page_title = f"Browse {total} Vegan {recipe_noun}{SITE_TITLE_SUFFIX}"
+    description = (
+        f"Browse {total} AI-generated vegan {recipe_noun.lower()} with ingredients and method. "
+        "Photos are included when available. No ads, no life story. Save any recipe "
+        "to your cookbook."
+    )
+    snippet_description = _meta_description(description)
+    og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
+    breadcrumbs = _breadcrumbs()
+    # On paginated browse pages, the current crumb is the current canonical
+    # page, not page 1. Keep recipe-page breadcrumbs pointing to /browse.
+    breadcrumbs[-1]["url"] = canonical_url
 
     return render_template(
         "public/browse.html",
+        page_title=page_title,
+        og_image_url=_versioned_image_url(og_owner) if og_owner else None,
+        # The og:image is a specific dish photo (og_owner), not a shot of the
+        # browse page — so its alt names that dish, otherwise social cards and
+        # screen readers announce "Browse N Vegan Recipes" for a plate of food.
+        og_image_alt=og_owner.name if og_owner else None,
+        breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
+        collection_json_ld=_collection_json_ld(
+            page_title, snippet_description, canonical_url, recipes
+        ),
         recipes=recipes,
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
         card_image_sizes=CARD_IMAGE_SIZES,
@@ -576,7 +887,11 @@ def browse_public_recipes():
         total=total,
         page_size=BROWSE_PAGE_SIZE,
         canonical_url=canonical_url,
-        description="Browse published vegan recipes from the TastesLikeGood community.",
+        # /browse is subject to the same 155-char result-snippet cap that
+        # ``_meta_description`` enforces on /r/<slug> — the boilerplate is
+        # already 158 chars at today's 96 recipes and lengthens as ``total``
+        # grows. Reuse the bounded copy for metadata and CollectionPage JSON-LD.
+        description=snippet_description,
     )
 
 
