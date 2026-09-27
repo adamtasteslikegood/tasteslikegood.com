@@ -21,6 +21,7 @@ import pytest
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
+import blueprints.public_bp as public_module  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from services.tag_hubs import TAG_HUBS, hubs_for_tags, normalize_tag  # noqa: E402
@@ -48,18 +49,24 @@ def client(app):
     return app.test_client()
 
 
-def _add(slug, tags, *, public=True, days=0):
+def _add(slug, tags, *, public=True, days=0, **extra):
     recipe = Recipe(
         id=str(uuid.uuid4()),
         name=slug.replace("-", " ").title(),
         slug=slug,
         is_public=public,
-        data={"name": slug, "description": f"{slug} description.", "tags": list(tags)},
+        data={
+            "name": slug,
+            "description": f"{slug} description.",
+            "tags": list(tags),
+            **extra,
+        },
         created_at=BASE + timedelta(days=days),
         updated_at=BASE + timedelta(days=days),
     )
     db.session.add(recipe)
     db.session.commit()
+    return recipe.id
 
 
 def _json_ld(body: str, type_name: str) -> dict:
@@ -102,7 +109,12 @@ def test_hub_definitions_are_unique_and_have_real_intros():
 def test_hub_page_lists_public_members_newest_first(app, client):
     with app.app_context():
         _add("old-stew", ["Dinner"], days=1)
-        _add("new-curry", ["dinner", "spicy"], days=5)
+        _add(
+            "new-curry",
+            ["dinner", "spicy"],
+            days=5,
+            ai_image_gcs="gs://bucket/new-curry.png",
+        )
         _add("mid-pie", ["main course"], days=3)
         _add("private-roast", ["dinner"], public=False, days=9)
         _add("a-cookie", ["dessert"], days=7)
@@ -113,6 +125,8 @@ def test_hub_page_lists_public_members_newest_first(app, client):
     assert "<h1>Vegan Dinner Recipes</h1>" in body
     assert '<meta name="robots" content="index,follow">' in body
     assert '<link rel="canonical" href="http://localhost/browse/tag/dinner">' in body
+    assert '<meta property="og:image:alt" content="New Curry">' in body
+    assert '<meta name="twitter:image:alt" content="New Curry">' in body
     cards = re.findall(r'<li class="public-browse-item">\s*<a href="/r/([^"]+)"', body)
     assert cards == ["new-curry", "mid-pie", "old-stew"]
 
@@ -126,6 +140,27 @@ def test_hub_page_lists_public_members_newest_first(app, client):
     ]
     crumbs = _json_ld(body, "BreadcrumbList")["itemListElement"]
     assert [crumb["name"] for crumb in crumbs] == ["Home", "Browse", "Vegan Dinner Recipes"]
+
+
+def test_hub_refetch_rechecks_visibility(app, client, monkeypatch):
+    with app.app_context():
+        leaked_id = _add("unpublished-dinner", ["dinner"], days=9)
+        for index in range(3):
+            _add(f"visible-dinner-{index}", ["dinner"], days=index)
+
+        # Preserve the first-query snapshot, then simulate a concurrent
+        # unpublish before the route hydrates the selected full Recipe rows.
+        catalog_snapshot = public_module._catalog_tag_rows()
+        leaked = db.session.get(Recipe, leaked_id)
+        leaked.is_public = False
+        db.session.commit()
+
+    monkeypatch.setattr(public_module, "_catalog_tag_rows", lambda: catalog_snapshot)
+    body = client.get("/browse/tag/dinner").get_data(as_text=True)
+
+    assert "Unpublished Dinner" not in body
+    items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
+    assert all(not item["url"].endswith("/r/unpublished-dinner") for item in items)
 
 
 def test_thin_hub_is_noindex_and_unlinked(app, client):
