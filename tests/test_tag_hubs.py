@@ -241,6 +241,18 @@ def test_hub_trailing_slash_redirects(client):
     assert resp.headers["Location"] == "http://localhost/browse/tag/dinner"
 
 
+def test_hub_trailing_slash_redirect_preserves_allowlisted_query_params(client):
+    resp = client.get(
+        "/browse/tag/dinner/"
+        "?utm_source=email&utm_campaign=fall&save=recipe-123&next=/admin"
+    )
+    assert resp.status_code == 301
+    assert resp.headers["Location"] == (
+        "http://localhost/browse/tag/dinner"
+        "?utm_source=email&utm_campaign=fall&save=recipe-123"
+    )
+
+
 def test_unknown_hub_trailing_slash_is_404_directly(client):
     # A 301 → 404 chain wastes crawl budget and shows up in Search Console as
     # a redirect error; an unknown slug should 404 in one hop regardless of
