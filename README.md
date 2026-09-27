@@ -1,5 +1,7 @@
 # Tastes Like Good - Vegan Recipe Generator
 
+**Live: [www.tasteslikegood.org](https://www.tasteslikegood.org)** · [Browse the published recipes](https://www.tasteslikegood.org/browse). This repo is the Flask backend; the Angular app and Express proxy live in [tasteslikegoodtheangularsvegancookbook](https://github.com/adamtasteslikegood/tasteslikegoodtheangularsvegancookbook).
+
 ## Description
 
 Tastes Like Good is a Flask-based web application for viewing and generating vegan recipes using Google's Gemini AI models. The app features Google OAuth authentication, AI-powered recipe generation with schema validation, image generation with Imagen 3, and an intuitive recipe browsing interface.
