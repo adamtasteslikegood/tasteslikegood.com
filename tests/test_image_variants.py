@@ -28,6 +28,7 @@ from blueprints.public_bp import _image_version_token  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from services.image_variants import (  # noqa: E402
+    MAX_SOURCE_PIXELS,
     make_webp_variant,
     parse_variant_width,
 )
@@ -101,11 +102,26 @@ def test_make_webp_variant_downscales_and_keeps_aspect_ratio():
     assert len(variant) < len(source)
 
 
-def test_make_webp_variant_never_upscales():
+def test_make_webp_variant_guarantees_advertised_width_for_narrow_sources():
     variant = make_webp_variant(_jpeg(300, 200), 1200)
     assert variant is not None
     with Image.open(io.BytesIO(variant)) as image:
-        assert image.size == (300, 200)
+        assert image.size == (1200, 800)
+
+
+def test_make_webp_variant_rejects_oversized_source_before_decode():
+    source = mock.MagicMock()
+    source.width = 5001
+    source.height = 5000
+    source.__enter__.return_value = source
+    assert source.width * source.height > MAX_SOURCE_PIXELS
+
+    with (
+        mock.patch("services.image_variants.Image.open", return_value=source),
+        mock.patch("services.image_variants.ImageOps.exif_transpose") as transpose,
+    ):
+        assert make_webp_variant(b"compact crafted image", 400) is None
+    transpose.assert_not_called()
 
 
 def test_make_webp_variant_keeps_transparency():
