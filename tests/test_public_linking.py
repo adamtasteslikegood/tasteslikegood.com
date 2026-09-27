@@ -239,6 +239,21 @@ def test_page_meta_is_trimmed_but_json_ld_keeps_the_full_description(app, client
     assert _json_ld(body, "Recipe")["description"] == long_description
 
 
+def test_malformed_description_uses_text_fallback(app, client):
+    with app.app_context():
+        recipe_id = _add("malformed-description")
+        recipe = db.session.get(Recipe, recipe_id)
+        recipe.data = {**recipe.data, "description": ["not", "text"]}
+        db.session.commit()
+
+    resp = client.get("/r/malformed-description")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    fallback = "A vegan recipe from TastesLikeGood."
+    assert f'<meta name="description" content="{fallback}">' in body
+    assert _json_ld(body, "Recipe")["description"] == fallback
+
+
 # ── trailing slash ───────────────────────────────────────────────────────────
 
 
@@ -296,6 +311,17 @@ def test_browse_later_pages_say_which_page(app, client):
 
     body = client.get("/browse?page=2").get_data(as_text=True)
     assert "<title>Vegan Recipes, Page 2 of 2 · TastesLikeGood</title>" in body
+
+
+def test_browse_later_page_breadcrumb_uses_its_canonical_url(app, client):
+    with app.app_context():
+        for index in range(21):
+            _add(f"crumb-soup-{index}", days=index)
+
+    body = client.get("/browse?page=2").get_data(as_text=True)
+    crumbs = _json_ld(body, "BreadcrumbList")["itemListElement"]
+    assert crumbs[-1]["name"] == "Browse"
+    assert crumbs[-1]["item"] == "http://localhost/browse?page=2"
 
 
 def test_browse_skips_a_public_row_without_a_slug(app, client):
