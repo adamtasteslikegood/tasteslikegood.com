@@ -396,6 +396,15 @@ def _recipe_tags(data: dict[str, Any]) -> list[str]:
     return [tag.strip() for tag in raw_tags if isinstance(tag, str) and tag.strip()]
 
 
+DEFAULT_RECIPE_DESCRIPTION = "A vegan recipe from TastesLikeGood."
+
+
+def _recipe_description(data: dict[str, Any]) -> str:
+    """Persisted recipe JSON is legacy-tolerant; metadata always needs text."""
+    value = data.get("description")
+    return value if isinstance(value, str) and value.strip() else DEFAULT_RECIPE_DESCRIPTION
+
+
 def _clean_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {
@@ -430,7 +439,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         "@context": "https://schema.org",
         "@type": "Recipe",
         "name": recipe.name,
-        "description": data.get("description") or "A vegan recipe from TastesLikeGood.",
+        "description": _recipe_description(data),
         "url": canonical_url,
         "mainEntityOfPage": canonical_url,
         "image": [image_url] if image_url else None,
@@ -708,7 +717,7 @@ def show_public_recipe(slug):
     # pin whose media is the pre-regeneration photo is the same defect wearing
     # a different hat.
     pinterest_image_url = image_url
-    description = data.get("description") or "A vegan recipe from TastesLikeGood."
+    description = _recipe_description(data)
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
     breadcrumbs = _breadcrumbs(recipe)
@@ -822,6 +831,9 @@ def browse_public_recipes():
     )
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
     breadcrumbs = _breadcrumbs()
+    # On paginated browse pages, the current crumb is the current canonical
+    # page, not page 1. Keep recipe-page breadcrumbs pointing to /browse.
+    breadcrumbs[-1]["url"] = canonical_url
 
     return render_template(
         "public/browse.html",
