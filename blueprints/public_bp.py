@@ -829,6 +829,7 @@ def browse_public_recipes():
         "Photos are included when available. No ads, no life story. Save any recipe "
         "to your cookbook."
     )
+    snippet_description = _meta_description(description)
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
     breadcrumbs = _breadcrumbs()
     # On paginated browse pages, the current crumb is the current canonical
@@ -840,7 +841,9 @@ def browse_public_recipes():
         page_title=page_title,
         og_image_url=_versioned_image_url(og_owner) if og_owner else None,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
-        collection_json_ld=_collection_json_ld(page_title, description, canonical_url, recipes),
+        collection_json_ld=_collection_json_ld(
+            page_title, snippet_description, canonical_url, recipes
+        ),
         recipes=recipes,
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
         card_image_sizes=CARD_IMAGE_SIZES,
@@ -852,10 +855,8 @@ def browse_public_recipes():
         # /browse is subject to the same 155-char result-snippet cap that
         # ``_meta_description`` enforces on /r/<slug> — the boilerplate is
         # already 158 chars at today's 96 recipes and lengthens as ``total``
-        # grows. Route both the meta copy and the CollectionPage description
-        # through the shared helper so /browse can't quietly regress the
-        # defect the helper was introduced to fix.
-        description=_meta_description(description),
+        # grows. Reuse the bounded copy for metadata and CollectionPage JSON-LD.
+        description=snippet_description,
     )
 
 
