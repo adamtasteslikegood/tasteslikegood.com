@@ -282,9 +282,11 @@ def test_browse_title_description_and_collection_json_ld(app, client):
     )
     assert "AI-generated vegan recipes" in description
     assert "Photos are included when available." in description
-    assert len(description) <= 160
+    assert len(description) <= 155
 
     collection = _json_ld(body, "CollectionPage")
+    assert collection["description"] == description
+    assert len(collection["description"]) <= 155
     items = collection["mainEntity"]["itemListElement"]
     assert [(i["position"], i["url"]) for i in items] == [
         (1, "http://localhost/r/newest-soup"),
