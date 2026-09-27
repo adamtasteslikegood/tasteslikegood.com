@@ -997,7 +997,16 @@ def show_tag_hub(hub_slug):
         if ids
         else {}
     )
-    recipes = [by_id[recipe_id] for recipe_id in ids if recipe_id in by_id]
+    recipes = []
+    for recipe_id in ids:
+        recipe = by_id.get(recipe_id)
+        if recipe is None:
+            continue
+        # Tags can change between the catalog snapshot and hydration too; only
+        # render recipes that still belong to this hub in their current data.
+        if hub not in hubs_for_tags(_recipe_tags(recipe.data or {})):
+            continue
+        recipes.append(recipe)
 
     canonical_url = _hub_url(hub)
     page_title = _page_title(hub.title)
@@ -1005,8 +1014,8 @@ def show_tag_hub(hub_slug):
     breadcrumbs = _breadcrumbs(hub=hub)
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
 
-    # Hydration can drop a concurrently unpublished or slug-cleared member;
-    # indexability must reflect what this response actually renders.
+    # Hydration can drop a concurrently unpublished, slug-cleared, or retagged
+    # member; indexability must reflect what this response actually renders.
     indexable = len(recipes) >= MIN_INDEXABLE_RECIPES
     body = render_template(
         "public/tag_hub.html",
