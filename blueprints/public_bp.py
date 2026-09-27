@@ -1053,10 +1053,21 @@ def redirect_trailing_slash_hub(hub_slug):
 
     Unknown slugs 404 directly rather than 301→404, so search consoles don't
     log a redirect chain and crawlers don't waste a hop on a stale link.
+
+    Carries the same allow-listed query params (``utm_*`` and ``save``) as the
+    sibling recipe redirect so email-campaign attribution and the SPA save
+    handoff survive the 301.
     """
     if hub_slug not in HUBS_BY_SLUG:
         abort(404)
-    return redirect(_canonical_url("public.show_tag_hub", hub_slug=hub_slug), code=301)
+    carried = {
+        key: value
+        for key, value in request.args.items()
+        if key == "save" or (key.startswith("utm_") and key.replace("_", "").isalnum())
+    }
+    return redirect(
+        _canonical_url("public.show_tag_hub", hub_slug=hub_slug, **carried), code=301
+    )
 
 
 @public_bp.route("/sitemap.xml", methods=["GET"])
