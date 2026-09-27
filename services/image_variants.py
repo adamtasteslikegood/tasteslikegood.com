@@ -24,6 +24,10 @@ VARIANT_WIDTHS: tuple[int, ...] = (400, 800, 1200)
 
 WEBP_QUALITY = 80
 
+# Generated recipe images are currently 1408x768. Keep a generous ceiling for
+# legacy sources, but reject oversized headers before Pillow decodes pixel data.
+MAX_SOURCE_PIXELS = 25_000_000
+
 
 def parse_variant_width(raw: str | None) -> int | None:
     """``None`` when absent; the width when allow-listed; ``ValueError`` otherwise."""
@@ -39,22 +43,27 @@ def parse_variant_width(raw: str | None) -> int | None:
 
 
 def make_webp_variant(image_bytes: bytes, width: int) -> bytes | None:
-    """Encode ``image_bytes`` as WebP, downscaled to at most ``width`` pixels wide.
+    """Encode ``image_bytes`` as a WebP whose intrinsic width is exactly ``width``.
 
-    Never upscales: a source narrower than ``width`` is re-encoded at its own
-    size (still much smaller than the JPEG/PNG original). Returns ``None`` when
-    the bytes cannot be decoded, so the caller can fall back to serving the
-    original rather than failing the request.
+    Exact sizing keeps HTML ``srcset`` width descriptors truthful even for a
+    narrow legacy source. Returns ``None`` when the bytes cannot be decoded or
+    exceed the application pixel limit, so the caller can fall back to serving
+    the original rather than failing the request.
     """
     try:
         with Image.open(io.BytesIO(image_bytes)) as source:
+            if source.width * source.height > MAX_SOURCE_PIXELS:
+                raise ValueError(
+                    f"source image exceeds {MAX_SOURCE_PIXELS} pixels: "
+                    f"{source.width}x{source.height}"
+                )
             image = ImageOps.exif_transpose(source)
             if image.mode not in ("RGB", "RGBA"):
                 has_alpha = image.mode in ("LA", "PA") or (
                     image.mode == "P" and "transparency" in image.info
                 )
                 image = image.convert("RGBA" if has_alpha else "RGB")
-            if image.width > width:
+            if image.width != width:
                 height = max(1, round(image.height * width / image.width))
                 image = image.resize((width, height), Image.Resampling.LANCZOS)
             out = io.BytesIO()
