@@ -40,8 +40,9 @@
     <section class="public-recipe-hero">
         {% if image_url %}
         <div class="public-recipe-image-wrap">
-            {# LCP element: never lazy. width/height reserve the 1408×768 frame
-               the generator produces; CSS still crops it to 16:9. #}
+            {# LCP element: never lazy. width/height only give the browser an
+               aspect ratio before CSS loads (photos are 1408×768 or 1024×1024);
+               .public-recipe-image-wrap crops every photo to 16:9 regardless. #}
             {% if image_variants %}
             <img
                 src="{{ image_variants.src }}"
