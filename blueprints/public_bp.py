@@ -842,12 +842,13 @@ def browse_public_recipes():
     )
     # KAN-273: the title and description say what the page is, with the live
     # count; the social card gets the newest photo on the page instead of none.
+    recipe_noun = "Recipe" if total == 1 else "Recipes"
     if page > 1:
         page_title = f"Vegan Recipes, Page {page} of {total_pages}{SITE_TITLE_SUFFIX}"
     else:
-        page_title = f"Browse {total} Vegan Recipes{SITE_TITLE_SUFFIX}"
+        page_title = f"Browse {total} Vegan {recipe_noun}{SITE_TITLE_SUFFIX}"
     description = (
-        f"Browse {total} AI-generated vegan recipes with ingredients and method. "
+        f"Browse {total} AI-generated vegan {recipe_noun.lower()} with ingredients and method. "
         "Photos are included when available. No ads, no life story. Save any recipe "
         "to your cookbook."
     )
