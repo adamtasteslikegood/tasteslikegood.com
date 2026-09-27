@@ -91,7 +91,7 @@ def test_hub_definitions_are_unique_and_have_real_intros():
     slugs = [hub.slug for hub in TAG_HUBS]
     assert len(slugs) == len(set(slugs))
     for hub in TAG_HUBS:
-        assert 80 <= len(hub.intro.split()) <= 150, hub.slug
+        assert 80 <= len(hub.intro.split()) <= 100, hub.slug
         assert "vegan" in hub.title.lower(), hub.slug
         assert re.fullmatch(r"[a-z]+(?:-[a-z]+)*", hub.slug), hub.slug
 
@@ -116,7 +116,9 @@ def test_hub_page_lists_public_members_newest_first(app, client):
     cards = re.findall(r'<li class="public-browse-item">\s*<a href="/r/([^"]+)"', body)
     assert cards == ["new-curry", "mid-pie", "old-stew"]
 
-    items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
+    collection = _json_ld(body, "CollectionPage")
+    assert collection["description"] == next(h.intro for h in TAG_HUBS if h.slug == "dinner")
+    items = collection["mainEntity"]["itemListElement"]
     assert [item["url"] for item in items] == [
         "http://localhost/r/new-curry",
         "http://localhost/r/mid-pie",
@@ -133,8 +135,10 @@ def test_thin_hub_is_noindex_and_unlinked(app, client):
         for index in range(3):
             _add(f"dinner-{index}", ["dinner"], days=index)
 
-    hub = client.get("/browse/tag/breakfast").get_data(as_text=True)
+    response = client.get("/browse/tag/breakfast")
+    hub = response.get_data(as_text=True)
     assert '<meta name="robots" content="noindex,follow">' in hub
+    assert response.headers["X-Robots-Tag"] == "noindex, follow"
 
     sitemap = client.get("/sitemap.xml").get_data(as_text=True)
     assert "/browse/tag/breakfast" not in sitemap
