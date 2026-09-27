@@ -496,6 +496,15 @@ def test_sitemap_lists_only_public_routes(app, client):
     assert "http://localhost/r/private" not in body
 
 
+def test_sitemap_lists_the_about_page_and_the_footer_links_it(app, client):
+    """KAN-272: /about (served by Express) is in the sitemap and every SSR footer."""
+    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "<loc>http://localhost/about</loc>" in sitemap
+
+    browse = client.get("/browse").get_data(as_text=True)
+    assert '<a href="/about">About</a>' in browse
+
+
 def test_sitemap_selects_only_slug_and_timestamps(app, client):
     with app.app_context():
         db.session.add(
