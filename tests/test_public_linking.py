@@ -320,3 +320,12 @@ def test_browse_skips_a_public_row_without_a_slug(app, client):
     items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
     assert [(i["position"], i["url"]) for i in items] == [(1, "http://localhost/r/slugged-soup")]
     assert "/r/None" not in json.dumps(items)
+
+
+def test_trailing_slash_redirect_keeps_only_campaign_and_save_params(app, client):
+    resp = client.get("/r/slash-soup/?utm_source=twitter&utm_campaign=launch&save=slash-soup&x=1")
+    assert resp.status_code == 301
+    location = resp.headers["Location"]
+    assert location.startswith("http://localhost/r/slash-soup?")
+    query = dict(pair.split("=") for pair in location.split("?", 1)[1].split("&"))
+    assert query == {"utm_source": "twitter", "utm_campaign": "launch", "save": "slash-soup"}

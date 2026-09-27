@@ -750,16 +750,17 @@ def redirect_trailing_slash_recipe(slug):
     A trailing-slash link from another site used to dead-end on a 404. The
     target decides existence, so this never reveals whether a slug is public.
 
-    Preserves the query string so UTM parameters and the SPA ``?save=`` handoff
-    survive the redirect — the whole point of accepting the alternate URL is
-    to keep the caller's context, and silently zeroing analytics attribution
-    is exactly the failure mode the trailing-slash tolerance exists to avoid.
+    Carries forward the ``utm_*`` campaign parameters and the SPA ``?save=``
+    handoff, and nothing else: only allow-listed parameters, rebuilt by
+    ``url_for`` onto the fixed canonical host, never the raw query string
+    (CodeQL py/url-redirection).
     """
-    target = _canonical_url("public.show_public_recipe", slug=slug)
-    query = request.query_string.decode("utf-8", "ignore")
-    if query:
-        target = f"{target}?{query}"
-    return redirect(target, code=301)
+    carried = {
+        key: value
+        for key, value in request.args.items()
+        if key == "save" or (key.startswith("utm_") and key.replace("_", "").isalnum())
+    }
+    return redirect(_canonical_url("public.show_public_recipe", slug=slug, **carried), code=301)
 
 
 @public_bp.route("/api/recipes/public/<slug>", methods=["GET"])
