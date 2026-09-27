@@ -8,17 +8,21 @@ Provides endpoints for the Angular frontend (via Express proxy):
 """
 
 import base64
+import hashlib
 import logging
 import uuid
 
 from flask import Blueprint, Response, jsonify, request, session
+from flask.typing import ResponseReturnValue
 
 from config import DEFAULT_MODEL, GCS_BUCKET_NAME
 from blueprints.generation_bp import validate_generation_input
 from repositories import db_recipe_repository
+from services.image_variants import make_webp_variant, parse_variant_width
 from utils.cache_utils import (
     invalidate_recipe,
     recipe_image_key,
+    recipe_image_variant_key,
     safe_get,
     safe_set,
     TTL_IMAGE,
@@ -262,6 +266,72 @@ def _image_mimetype(image_bytes: bytes) -> str:
     return "image/png"
 
 
+# A year, and never revalidated: only sent for a variant whose ``?v=`` matches
+# the image's current version, so the URL can never name different bytes.
+IMMUTABLE_CACHE_CONTROL = "public, max-age=31536000, immutable"
+
+
+def _load_stored_image_bytes(recipe) -> bytes | None:
+    """The recipe's image bytes from storage: GCS first, then legacy base64."""
+    recipe_data = recipe.data or {}
+    image_bytes = None
+
+    if GCS_BUCKET_NAME and recipe_data.get("ai_image_gcs"):
+        from services.gcs_service import download_image
+
+        image_bytes = download_image(
+            GCS_BUCKET_NAME,
+            recipe.id,
+            recipe_data.get("ai_image_gcs"),
+        )
+
+    if image_bytes is None:
+        image_b64 = recipe_data.get("ai_image_data")
+        if image_b64:
+            image_bytes = base64.b64decode(image_b64)
+
+    return image_bytes
+
+
+def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
+    """A WebP of the recipe's image at ``width`` px (KAN-271), or ``None`` to fall back.
+
+    Two choices here exist to make a year-long ``immutable`` header safe:
+
+    * The variant is keyed on the image's version, and built from storage —
+      never from the ``vgc:img:<id>`` Valkey entry. The worker commits a new
+      image *before* it invalidates that entry (``worker_api_bp``), so for a
+      moment the entry holds the old bytes while the page already links the new
+      ``?v=``. Built from it, the old photo would be cached under the new
+      version and pinned in browsers for a year. Storage is always current:
+      ``ai_image_gcs`` names the exact object version.
+    * ``immutable`` is only sent when the request's ``?v=`` equals that version
+      token, i.e. the URL the SSR pages emit. A bare or stale ``?v=`` gets the
+      normal header, so no URL can be made to cache the wrong bytes forever.
+    """
+    from blueprints.public_bp import _image_version_token
+
+    token = _image_version_token(recipe)
+    stored_uri = (recipe.data or {}).get("ai_image_gcs") or ""
+    version = hashlib.sha256(f"{stored_uri}|{token}".encode("utf-8")).hexdigest()[:16]
+    key = recipe_image_variant_key(recipe.id, width, version)
+
+    variant = safe_get(key)
+    if variant is None:
+        source = _load_stored_image_bytes(recipe)
+        if source is None:
+            return jsonify({"error": "No image available"}), 404
+        variant = make_webp_variant(source, width)
+        if variant is None:
+            return None
+        safe_set(key, variant, timeout=TTL_IMAGE)
+
+    cache_control = http_cache_control
+    if recipe.is_public and token is not None and request.args.get("v") == token:
+        cache_control = IMMUTABLE_CACHE_CONTROL
+    return Response(variant, mimetype="image/webp", headers={"Cache-Control": cache_control})
+
+
 @generation_api_bp.route("/recipes/<recipe_id>/image", methods=["GET"])
 def serve_recipe_image(recipe_id):
     """
@@ -280,10 +350,18 @@ def serve_recipe_image(recipe_id):
     ``ensure_session_id`` in app.py) and CORS headers are stripped in
     ``create_app`` (images are consumed same-origin through the Express
     proxy; ACAO on them defeated shared caching).
+
+    ``?w=400|800|1200`` (KAN-271) returns a WebP downscaled to that width —
+    see ``_serve_image_variant``. Any other ``w`` is a 400.
     """
     # Public recipes bypass ownership scoping so unauthenticated SSR pages
     # and crawlers can still load the image.
     from models import Recipe
+
+    try:
+        variant_width = parse_variant_width(request.args.get("w"))
+    except ValueError:
+        return jsonify({"error": "Unsupported image width"}), 400
 
     recipe = Recipe.query.filter_by(id=recipe_id).first()
     if recipe is None:
@@ -303,6 +381,13 @@ def serve_recipe_image(recipe_id):
     # Cache lookup must stay below the access check: the key is global
     # (same image for everyone), so serving on a hit without the check
     # would expose private/deleted recipes' images to anyone with the UUID.
+    if variant_width is not None:
+        variant_response = _serve_image_variant(recipe, variant_width, http_cache_control)
+        if variant_response is not None:
+            return variant_response
+        # The stored bytes could not be decoded: serve them untouched below
+        # rather than fail the page's image.
+
     ck = recipe_image_key(recipe_id)
     cached_bytes = safe_get(ck)
     if cached_bytes is not None:
@@ -312,25 +397,7 @@ def serve_recipe_image(recipe_id):
             headers={"Cache-Control": http_cache_control},
         )
 
-    recipe_data = recipe.data or {}
-    image_bytes = None
-
-    # Try GCS first
-    if GCS_BUCKET_NAME and recipe_data.get("ai_image_gcs"):
-        from services.gcs_service import download_image
-
-        image_bytes = download_image(
-            GCS_BUCKET_NAME,
-            recipe_id,
-            recipe_data.get("ai_image_gcs"),
-        )
-
-    # Fall back to legacy base64 in DB
-    if image_bytes is None:
-        image_b64 = recipe_data.get("ai_image_data")
-        if image_b64:
-            image_bytes = base64.b64decode(image_b64)
-
+    image_bytes = _load_stored_image_bytes(recipe)
     if image_bytes is None:
         return jsonify({"error": "No image available"}), 404
 

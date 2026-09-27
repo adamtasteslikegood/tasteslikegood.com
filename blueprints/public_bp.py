@@ -26,6 +26,7 @@ from sqlalchemy.orm import joinedload
 
 from extensions import db
 from models import Recipe
+from services.image_variants import VARIANT_WIDTHS
 
 logger = logging.getLogger(__name__)
 
@@ -248,13 +249,68 @@ def _rendered_image_url(recipe: Recipe) -> str | None:
     An external stock image is left alone: it is not served by us, appending a
     param cannot help, and it could break a signed URL.
     """
+    return _rendered_image(recipe)[0]
+
+
+def _rendered_image(recipe: Recipe) -> tuple[str | None, dict[str, str] | None]:
+    """``(versioned full-size URL, sized variants)`` for the recipe page.
+
+    One ``_recipe_image`` call feeds both, so a saved copy's source lookup is
+    not repeated. Variants are ``None`` when the image is not served by us.
+    """
     url, owner = _recipe_image(recipe)
     if url is None or owner is None or not _serves_own_image_bytes(owner):
-        return url
+        return url, None
+    variants = _image_variants(owner, HERO_IMAGE_WIDTHS)
     token = _image_version_token(owner)
     if token is None:
-        return url
-    return _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id, v=token)
+        return url, variants
+    return (
+        _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id, v=token),
+        variants,
+    )
+
+
+# Sized WebP variants (KAN-271). ``sizes`` mirror recipe-site.css: the hero
+# spans ``.public-main`` (min(1200px, 100vw - 3rem)); browse cards are a
+# 3 / 2 / 1-column grid at >900px / >768px / phones.
+HERO_IMAGE_WIDTHS = VARIANT_WIDTHS
+HERO_IMAGE_SIZES = "(max-width: 1248px) 100vw, 1200px"
+CARD_IMAGE_WIDTHS = (400, 800)
+CARD_IMAGE_SIZES = "(max-width: 768px) 100vw, (max-width: 900px) 50vw, 400px"
+
+
+def _image_variants(owner: Recipe, widths: tuple[int, ...]) -> dict[str, str]:
+    """``src`` (smallest width) and ``srcset`` for an image ``owner`` serves itself.
+
+    Host-relative, like the browse cards' URLs have always been, and carrying
+    the same ``?v=`` marker as the full-size URL, which is what lets the image
+    route mark them ``immutable``.
+    """
+    token = _image_version_token(owner)
+
+    def at(width: int) -> str:
+        params: dict[str, Any] = {"recipe_id": owner.id, "w": width}
+        if token is not None:
+            params["v"] = token
+        return url_for("generation_api.serve_recipe_image", **params)
+
+    return {
+        "src": at(widths[0]),
+        "srcset": ", ".join(f"{at(width)} {width}w" for width in widths),
+    }
+
+
+def _card_image(recipe: Recipe) -> dict[str, str] | None:
+    """Image for a browse card: own bytes as sized variants, else stock, else none.
+
+    Deliberately no saved-copy source fallback — that is a DB lookup per card,
+    and /browse is asserted N+1-free. Same gate the template always applied.
+    """
+    if _serves_own_image_bytes(recipe):
+        return _image_variants(recipe, CARD_IMAGE_WIDTHS)
+    stock = (recipe.data or {}).get("stock_image_url")
+    return {"src": stock} if stock else None
 
 
 def _format_ingredient(ingredient: Mapping[str, Any]) -> str:
@@ -437,7 +493,7 @@ def show_public_recipe(slug):
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
     # KAN-195: versioned, so a regenerated photo is not hidden behind the
     # 24-hour Cache-Control on the (otherwise unchanging) image URL.
-    image_url = _rendered_image_url(recipe)
+    image_url, image_variants = _rendered_image(recipe)
     # Pinterest pin media reuses the page's own byte-gated URL: pinning a dead
     # link creates broken pins, and a run of broken pins from a fresh domain
     # trips Pinterest's new-account spam heuristics (Backend #203/#204).
@@ -455,6 +511,8 @@ def show_public_recipe(slug):
         recipe=recipe,
         canonical_url=canonical_url,
         image_url=image_url,
+        image_variants=image_variants,
+        image_sizes=HERO_IMAGE_SIZES,
         description=description,
         ingredient_groups=_recipe_ingredient_groups(data),
         instructions=instructions,
@@ -514,6 +572,8 @@ def browse_public_recipes():
     return render_template(
         "public/browse.html",
         recipes=recipes,
+        card_images={recipe.id: _card_image(recipe) for recipe in recipes},
+        card_image_sizes=CARD_IMAGE_SIZES,
         page=page,
         total_pages=total_pages,
         total=total,
