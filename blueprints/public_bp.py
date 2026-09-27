@@ -981,7 +981,9 @@ def show_tag_hub(hub_slug):
         {
             recipe.id: recipe
             for recipe in Recipe.query.filter(
-                Recipe.id.in_(ids), Recipe.is_public.is_(True), Recipe.slug.isnot(None)
+                Recipe.id.in_(ids),
+                Recipe.is_public.is_(True),
+                Recipe.slug.isnot(None),
             ).all()
         }
         if ids
