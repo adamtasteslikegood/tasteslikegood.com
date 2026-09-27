@@ -262,9 +262,9 @@ def test_regenerated_image_gets_new_variant_cache_keys(app, client, monkeypatch)
     with app.app_context():
         recipe = db.session.get(Recipe, recipe_id)
         data = dict(recipe.data)
-        data["ai_metadata"] = {
-            "image_generation": {"success": True, "timestamp": "2026-09-02T12:00:00"}
-        }
+        # Reproduce a generic PUT changing the stored bytes while retaining the
+        # old worker metadata timestamp. The immutable marker must still move.
+        data["ai_image_data"] = base64.b64encode(_jpeg(color=(0, 0, 220))).decode("ascii")
         recipe.data = data
         db.session.commit()
 
