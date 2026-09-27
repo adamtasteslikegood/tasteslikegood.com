@@ -209,7 +209,10 @@ def _pinterest_media_param(body: str) -> str:
             "endpoint",
         ),
         ({"ai_image_gcs": "gs://bucket/recipe/v1.png"}, "endpoint"),
-        ({"stock_image_url": "https://img.example/stock.jpg"}, "https://img.example/stock.jpg"),
+        (
+            {"stock_image_url": "https://img.example/stock.jpg"},
+            "https://img.example/stock.jpg",
+        ),
         (
             # Stored bytes win over whatever ai_image_url claims — the pin
             # media must be the URL the gate actually verified.
@@ -241,7 +244,8 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
         # KAN-195: our own image endpoint is versioned; the stock-image case
         # below is someone else's host and must be passed through untouched.
         assert re.fullmatch(
-            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", media
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+            media,
         ), media
     else:
         assert media == expected_media
@@ -533,9 +537,9 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
     statements = []
 
     @event.listens_for(db.engine, "before_cursor_execute")
-    def _capture(_conn, _cursor, statement, _params, _ctx, _exec):
+    def _capture(_conn, _cursor, statement, params, _ctx, _exec):
         if statement.lstrip().upper().startswith("SELECT"):
-            statements.append(statement)
+            statements.append((statement, params))
 
     try:
         resp = client.get("/sitemap.xml")
@@ -543,9 +547,25 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
         event.remove(db.engine, "before_cursor_execute", _capture)
 
     assert resp.status_code == 200
-    recipe_queries = [statement for statement in statements if "FROM recipe" in statement]
+    recipe_queries = [
+        (statement, params) for statement, params in statements if "FROM recipe" in statement
+    ]
     assert recipe_queries
-    assert all("recipe.data" not in statement for statement in recipe_queries)
+    # KAN-274: the hub entries read exactly one JSON path (the tags) out of
+    # data; no other extraction or full-blob reference is allowed.
+    tag_path = "JSON_EXTRACT(recipe.data, ?)"
+    assert sum(statement.count(tag_path) for statement, _ in recipe_queries) == 1
+    assert all(
+        "recipe.data" not in statement.replace(tag_path, "") for statement, _ in recipe_queries
+    )
+    json_path_params = [
+        param
+        for _statement, params in recipe_queries
+        for param in params
+        if isinstance(param, str) and param.startswith("$.")
+    ]
+    assert len(json_path_params) == 1
+    assert re.fullmatch(r'\$\.(?:"tags"|tags)', json_path_params[0])
 
 
 def test_public_recipe_image_served_without_session(app, client):
@@ -1027,7 +1047,11 @@ def test_update_cannot_repersist_an_inherited_stock_image(app):
         db.session.commit()
 
         copy = db_recipe_repository.create_recipe(
-            {"id": "copy-update-001", "name": "Update Source", "sourceSlug": "update-source"},
+            {
+                "id": "copy-update-001",
+                "name": "Update Source",
+                "sourceSlug": "update-source",
+            },
             user_id=owner.id,
         )
         assert copy is not None
@@ -1189,7 +1213,8 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
     before = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
     assert before is not None
     assert re.fullmatch(
-        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", before
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+        before,
     ), before
 
     # Regenerate: the worker stores the new object at a versioned GCS URI and
