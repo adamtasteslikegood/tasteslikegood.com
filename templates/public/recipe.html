@@ -28,6 +28,11 @@
 {% endif %}
 
 <script type="application/ld+json">{{ recipe_json_ld | tojson(indent=2) }}</script>
+{% if image_variants %}
+{# The hero is the LCP element: start fetching it with the HTML, not after the
+   stylesheets (KAN-271). Same srcset/sizes as the <img>, so it is one fetch. #}
+<link rel="preload" as="image" href="{{ image_variants.src }}" imagesrcset="{{ image_variants.srcset }}" imagesizes="{{ image_sizes }}" fetchpriority="high">
+{% endif %}
 {% endblock %}
 
 {% block content %}
@@ -35,7 +40,23 @@
     <section class="public-recipe-hero">
         {% if image_url %}
         <div class="public-recipe-image-wrap">
-            <img src="{{ image_url }}" alt="{{ recipe.name }}" loading="lazy" />
+            {# LCP element: never lazy. width/height only give the browser an
+               aspect ratio before CSS loads (photos are 1408×768 or 1024×1024);
+               .public-recipe-image-wrap crops every photo to 16:9 regardless. #}
+            {% if image_variants %}
+            <img
+                src="{{ image_variants.src }}"
+                srcset="{{ image_variants.srcset }}"
+                sizes="{{ image_sizes }}"
+                width="1408"
+                height="768"
+                alt="{{ recipe.name }}"
+                fetchpriority="high"
+                decoding="async"
+            />
+            {% else %}
+            <img src="{{ image_url }}" alt="{{ recipe.name }}" width="1408" height="768" fetchpriority="high" decoding="async" />
+            {% endif %}
         </div>
         <div class="public-recipe-hero-overlay">
             <p class="public-eyebrow"><a href="{{ url_for('public.browse_public_recipes') }}" class="public-recipe-back">← Browse all recipes</a></p>

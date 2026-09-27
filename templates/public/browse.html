@@ -31,16 +31,25 @@
     <ul class="public-browse-list">
         {% for recipe in recipes %}
         {% set data = recipe.data or {} %}
-        {# Byte-gated, host-relative image URL — mirrors public_bp._recipe_image_url.
+        {# Byte-gated, host-relative image URL built by public_bp._card_image.
            A stored ai_image_url is never trusted here: its bytes may not exist
            (dead card image) and it may carry an absolute host that diverges
-           from the relative URLs on sibling cards (cookbook #3164). #}
-        {% set image_src = (url_for('generation_api.serve_recipe_image', recipe_id=recipe.id) if (data.ai_image_data or data.ai_image_gcs) else data.stock_image_url) %}
+           from the relative URLs on sibling cards (cookbook #3164). Own images
+           are sized WebP variants (KAN-271); stock images are served as-is. #}
+        {% set card_image = card_images.get(recipe.id) %}
         <li class="public-browse-item">
             <a href="{{ url_for('public.show_public_recipe', slug=recipe.slug) }}">
-                {% if image_src %}
+                {% if card_image %}
                 <div class="public-browse-card-image">
-                    <img src="{{ image_src }}" alt="{{ recipe.name }}" loading="lazy" />
+                    <img
+                        src="{{ card_image.src }}"
+                        {% if card_image.srcset %}srcset="{{ card_image.srcset }}" sizes="{{ card_image_sizes }}"{% endif %}
+                        width="400"
+                        height="300"
+                        alt="{{ recipe.name }}"
+                        loading="lazy"
+                        decoding="async"
+                    />
                 </div>
                 {% endif %}
                 <div class="public-browse-card-copy">

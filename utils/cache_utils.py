@@ -108,6 +108,16 @@ def recipe_image_key(recipe_id):
     return f"vgc:img:{recipe_id}"
 
 
+def recipe_image_variant_key(recipe_id, width, version):
+    """A sized WebP variant (KAN-271), keyed on the image's version.
+
+    Versioned rather than invalidated: a regenerated image has a new version,
+    so its variants are new keys and the old ones age out on their TTL.
+    ``invalidate_recipe_image`` therefore does not need to enumerate widths.
+    """
+    return f"vgc:img:{recipe_id}:w{width}:{version}"
+
+
 # ── Invalidation helpers ──────────────────────────────────────────────────────
 
 
