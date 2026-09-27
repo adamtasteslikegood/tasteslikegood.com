@@ -230,7 +230,8 @@ img {
   padding: var(--space-4);
 }
 
-.public-browse-card-copy h2 {
+.public-browse-card-copy h2,
+.public-browse-card-copy h3 {
   margin: 0;
   font-size: var(--text-2xl);
   line-height: var(--leading-snug);
