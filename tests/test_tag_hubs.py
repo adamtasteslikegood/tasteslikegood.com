@@ -145,10 +145,10 @@ def test_hub_page_lists_public_members_newest_first(app, client):
 def test_hub_refetch_rechecks_visibility(app, client, monkeypatch):
     with app.app_context():
         leaked_id = _add("unpublished-dinner", ["dinner"], days=9)
-        for index in range(3):
+        for index in range(2):
             _add(f"visible-dinner-{index}", ["dinner"], days=index)
 
-        # Preserve the first-query snapshot, then simulate a concurrent
+        # Preserve an indexable three-member snapshot, then simulate a concurrent
         # unpublish before the route hydrates the selected full Recipe rows.
         catalog_snapshot = public_module._catalog_tag_rows()
         leaked = db.session.get(Recipe, leaked_id)
@@ -156,11 +156,14 @@ def test_hub_refetch_rechecks_visibility(app, client, monkeypatch):
         db.session.commit()
 
     monkeypatch.setattr(public_module, "_catalog_tag_rows", lambda: catalog_snapshot)
-    body = client.get("/browse/tag/dinner").get_data(as_text=True)
+    response = client.get("/browse/tag/dinner")
+    body = response.get_data(as_text=True)
 
     assert "Unpublished Dinner" not in body
     items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
     assert all(not item["url"].endswith("/r/unpublished-dinner") for item in items)
+    assert '<meta name="robots" content="noindex,follow">' in body
+    assert response.headers["X-Robots-Tag"] == "noindex, follow"
 
 
 def test_thin_hub_is_noindex_and_unlinked(app, client):
