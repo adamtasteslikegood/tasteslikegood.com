@@ -49,9 +49,9 @@ def client(app):
     return app.test_client()
 
 
-def _add(slug, tags, *, public=True, days=0, **extra):
+def _add(slug, tags, *, public=True, days=0, recipe_id=None, **extra):
     recipe = Recipe(
-        id=str(uuid.uuid4()),
+        id=recipe_id or str(uuid.uuid4()),
         name=slug.replace("-", " ").title(),
         slug=slug,
         is_public=public,
@@ -140,6 +140,24 @@ def test_hub_page_lists_public_members_newest_first(app, client):
     ]
     crumbs = _json_ld(body, "BreadcrumbList")["itemListElement"]
     assert [crumb["name"] for crumb in crumbs] == ["Home", "Browse", "Vegan Dinner Recipes"]
+
+
+def test_hub_page_breaks_created_at_ties_by_id(app, client):
+    with app.app_context():
+        for suffix, slug in (
+            ("001", "first-dinner"),
+            ("002", "second-dinner"),
+            ("003", "third-dinner"),
+        ):
+            _add(
+                slug,
+                ["dinner"],
+                recipe_id=f"00000000-0000-0000-0000-000000000{suffix}",
+            )
+
+    body = client.get("/browse/tag/dinner").get_data(as_text=True)
+    cards = re.findall(r'<li class="public-browse-item">\s*<a href="/r/([^"]+)"', body)
+    assert cards == ["third-dinner", "second-dinner", "first-dinner"]
 
 
 def test_hub_refetch_rechecks_visibility(app, client, monkeypatch):
