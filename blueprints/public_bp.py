@@ -215,26 +215,23 @@ def _recipe_image(recipe: Recipe) -> tuple[str | None, Recipe | None]:
 
 
 def _image_version_token(owner: Recipe) -> str | None:
-    """A short marker that changes exactly when the image bytes change.
+    """A short marker derived from the exact stored image source.
 
-    Prefers ``ai_metadata.image_generation.timestamp``, which the Pub/Sub
-    worker rewrites on every successful (re)generation and on nothing else
-    (``worker_api_bp._image_generation_metadata``). Falls back to the row's
-    ``updated_at`` for legacy rows that predate that field — coarser (any edit
-    moves it, costing one needless re-download) but never stale.
+    The generic recipe PUT can retain image-generation metadata while changing
+    ``ai_image_gcs`` or legacy ``ai_image_data``. Using that metadata as the
+    marker would therefore allow different bytes to keep the same immutable
+    URL. Hash the immutable GCS object URI when present, otherwise the legacy
+    base64 payload itself, so the marker changes if and only if the bytes served
+    by ``_load_stored_image_bytes`` can change.
 
-    Hashed and truncated rather than emitted raw: the timestamp is internal
-    metadata and a public URL is not the place to publish when a worker ran.
+    Hashed and truncated rather than emitted raw: storage identifiers and image
+    payloads are internal state and do not belong in a public URL.
     """
     data = owner.data or {}
-    metadata = data.get("ai_metadata")
-    generation = metadata.get("image_generation") if isinstance(metadata, Mapping) else None
-    stamp = generation.get("timestamp") if isinstance(generation, Mapping) else None
-    if not isinstance(stamp, str) or not stamp:
-        stamp = owner.updated_at.isoformat() if owner.updated_at else None
-    if not stamp:
+    source = data.get("ai_image_gcs") or data.get("ai_image_data")
+    if not isinstance(source, str) or not source:
         return None
-    return hashlib.sha256(stamp.encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
 
 
 def _rendered_image_url(recipe: Recipe) -> str | None:
@@ -559,7 +556,7 @@ def _meta_description(text: str) -> str:
     ends = [m.end() for m in _SENTENCE_END.finditer(head) if m.end() <= MAX_DESCRIPTION_LENGTH]
     if ends and ends[-1] >= 60:
         return head[: ends[-1]]
-    cut = head[:MAX_DESCRIPTION_LENGTH].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
+    cut = head[: MAX_DESCRIPTION_LENGTH - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
     return f"{cut}…"
 
 
@@ -841,12 +838,13 @@ def browse_public_recipes():
     # KAN-273: the title and description say what the page is, with the live
     # count; the social card gets the newest photo on the page instead of none.
     if page > 1:
-        page_title = f"Vegan Recipes with Photos, Page {page} of {total_pages}{SITE_TITLE_SUFFIX}"
+        page_title = f"Vegan Recipes, Page {page} of {total_pages}{SITE_TITLE_SUFFIX}"
     else:
-        page_title = f"Browse {total} Vegan Recipes with Photos{SITE_TITLE_SUFFIX}"
+        page_title = f"Browse {total} Vegan Recipes{SITE_TITLE_SUFFIX}"
     description = (
-        f"Browse {total} AI-generated vegan recipes, each with its own photo, ingredients"
-        " and method. No ads, no life story. Save any of them to your cookbook."
+        f"Browse {total} AI-generated vegan recipes with ingredients and method. "
+        "Photos are included when available. No ads, no life story. Save any recipe "
+        "to your cookbook."
     )
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
     breadcrumbs = _breadcrumbs()

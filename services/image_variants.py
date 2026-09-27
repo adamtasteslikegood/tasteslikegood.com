@@ -65,6 +65,10 @@ def make_webp_variant(image_bytes: bytes, width: int) -> bytes | None:
                 image = image.convert("RGBA" if has_alpha else "RGB")
             if image.width != width:
                 height = max(1, round(image.height * width / image.width))
+                if width * height > MAX_SOURCE_PIXELS:
+                    raise ValueError(
+                        f"output image exceeds {MAX_SOURCE_PIXELS} pixels: {width}x{height}"
+                    )
                 image = image.resize((width, height), Image.Resampling.LANCZOS)
             out = io.BytesIO()
             image.save(out, format="WEBP", quality=WEBP_QUALITY, method=4)
