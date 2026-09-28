@@ -881,7 +881,7 @@ def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> Re
     """
     retired = db.session.get(RetiredSlug, slug)
     if retired is None:
-        abort(404)
+        return abort(404)
     if retired.recipe_id is not None:
         target = db.session.get(Recipe, retired.recipe_id)
         if target is not None:
@@ -893,8 +893,8 @@ def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> Re
                     else url_for(endpoint, slug=target.slug)
                 )
                 return redirect(location, code=301)
-            abort(404)
-    abort(410)
+            return abort(404)
+    return abort(410)
 
 
 @public_bp.route("/r/<slug>", methods=["GET"])
