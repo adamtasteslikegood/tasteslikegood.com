@@ -77,12 +77,12 @@ def _retire_published_slugs(session: Session, _flush_context: Any, _instances: A
             # an older rename alias because owned retirements are reclaimable.
             for retired in session.query(RetiredSlug).filter(RetiredSlug.recipe_id == obj.id):
                 retired.recipe_id = None
-            old_slugs: tuple[Optional[str], ...] = tuple(
+            deleted_slugs: tuple[Optional[str], ...] = tuple(
                 inspect(obj).attrs.slug.history.deleted or ()
             )
-            for old_slug in old_slugs:
-                if old_slug:
-                    _retire(session, old_slug, None)
+            for deleted_slug in deleted_slugs:
+                if deleted_slug:
+                    _retire(session, deleted_slug, None)
             if obj.slug:
                 _retire(session, obj.slug, None)
 
