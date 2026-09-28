@@ -281,6 +281,7 @@ def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs
             Recipe(id="live", name="Live", slug="live", is_public=True, data={}),
             Recipe(id="renamed", name="Renamed", slug="renamed-now", data={}),
             Recipe(id="draft", name="Draft", data={}),
+            Recipe(id="private-slug", name="Private", slug="private-slug", data={}),
             Recipe(id="copy", name="Copy", source_slug="deleted-source", data={}),
             # Merely carrying a deleted source's slug privately does not prove
             # ownership and must not suppress its permanent tombstone.
@@ -318,12 +319,22 @@ def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs
     db.session.expire_all()
     assert db.session.get(Recipe, "live").first_published_at is not None
     assert db.session.get(Recipe, "draft").first_published_at is None
+    assert db.session.get(Recipe, "private-slug").first_published_at is None
+    assert db.session.get(Recipe, "renamed").first_published_at is not None
+    assert db.session.get(RetiredSlug, "private-slug").recipe_id == "private-slug"
     assert db.session.get(RetiredSlug, "deleted-source").recipe_id is None
     assert db.session.get(RetiredSlug, "renamed-old").recipe_id == "renamed"
     assert (
         db.session.get(RetiredSlug, "ghost-source").recipe_id is None
     ), "a deleted source's id must not become a reclaimable owner"
     assert db.session.get(RetiredSlug, "live") is None
+
+    # The conservative marker becomes permanent on delete without inventing a
+    # publication timestamp (and therefore without a false KAN-289 warning).
+    private = db.session.get(Recipe, "private-slug")
+    db.session.delete(private)
+    db.session.commit()
+    assert db.session.get(RetiredSlug, "private-slug").recipe_id is None
 
 
 def test_direct_orm_writer_cannot_take_a_retired_slug(app, adam):

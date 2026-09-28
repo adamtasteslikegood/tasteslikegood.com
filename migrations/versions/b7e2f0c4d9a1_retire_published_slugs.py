@@ -13,14 +13,19 @@ backlinks, and every saved copy's ``source_slug`` pointer.
 
 Backfills:
 
-1. ``first_published_at = created_at`` for every row that holds a slug. Slugs
-   are assigned by publishing (``_resolve_public_slug``) and kept on
-   unpublish, so a slugged row is treated as having been published. The
-   exact moment is not recorded anywhere, and only NULL vs non-NULL matters.
+1. ``first_published_at = created_at`` only where publication has evidence:
+   the row is public now, or a saved copy's stable ``source_recipe_id`` points
+   at it. Private rows have long been allowed to carry arbitrary payload slugs,
+   so slug presence alone is not publication history.
 2. Retire every ``source_slug`` without evidence that a matching live row owns
    it. A current public row proves ownership; so does a copy whose stable
    ``source_recipe_id`` points at that row. A private row that merely happens
    to carry the slug is not evidence and must not suppress the tombstone.
+3. Protect ambiguous private slug rows with an owner-scoped ``retired_slug``
+   marker while leaving ``first_published_at`` NULL. This conservatively keeps
+   a possibly historical URL from being reassigned without falsely telling
+   KAN-289 that the row was published. The model listener makes this marker
+   permanent if the row is later deleted.
 
 ``op.add_column``, not ``batch_alter_table``: on SQLite a batch operation
 recreates the table and silently drops the KAN-213 expression indexes
@@ -43,11 +48,14 @@ depends_on = None
 
 
 def _backfill(conn):
-    """Both backfills on a bare connection, so tests can execute the real thing."""
+    """Run historical backfills on a bare connection for production-faithful tests."""
     conn.execute(
         sa.text(
             "UPDATE recipe SET first_published_at = created_at "
-            "WHERE slug IS NOT NULL AND first_published_at IS NULL"
+            "WHERE slug IS NOT NULL AND first_published_at IS NULL "
+            "AND (is_public OR EXISTS ("
+            "SELECT 1 FROM recipe proof WHERE proof.source_recipe_id = recipe.id"
+            "))"
         )
     )
     conn.execute(
@@ -69,6 +77,17 @@ def _backfill(conn):
             ") "
             "AND NOT EXISTS (SELECT 1 FROM retired_slug rs WHERE rs.slug = r.source_slug) "
             "GROUP BY r.source_slug"
+        )
+    )
+    conn.execute(
+        sa.text(
+            "INSERT INTO retired_slug (slug, recipe_id, retired_at) "
+            "SELECT holder.slug, holder.id, CURRENT_TIMESTAMP FROM recipe holder "
+            "WHERE holder.slug IS NOT NULL AND holder.slug <> '' "
+            "AND holder.first_published_at IS NULL "
+            "AND NOT EXISTS ("
+            "SELECT 1 FROM retired_slug rs WHERE rs.slug = holder.slug"
+            ")"
         )
     )
 

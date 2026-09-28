@@ -115,14 +115,23 @@ def _retire_published_slugs(session: Session, _flush_context: Any, _instances: A
                     _retire(session, old_slug, obj.id)
 
         for obj in list(session.deleted):
-            if not isinstance(obj, Recipe) or obj.first_published_at is None:
+            if not isinstance(obj, Recipe):
                 continue
             # Deleting a recipe makes every URL it ever served permanent, not
             # just its current slug. Otherwise a same-id restore could reclaim
             # an older rename alias because owned retirements are reclaimable.
-            for retired in session.query(RetiredSlug).filter(RetiredSlug.recipe_id == obj.id):
+            # Migration-created owner markers also protect ambiguous legacy
+            # private slugs without falsely setting ``first_published_at``.
+            owned_retirements = list(
+                session.query(RetiredSlug).filter(RetiredSlug.recipe_id == obj.id)
+            )
+            if obj.first_published_at is None and not owned_retirements:
+                continue
+            for retired in owned_retirements:
                 lock_slug(session, retired.slug)
                 retired.recipe_id = None
+            if obj.first_published_at is None:
+                continue
             deleted_slugs: tuple[Optional[str], ...] = tuple(
                 inspect(obj).attrs.slug.history.deleted or ()
             )
