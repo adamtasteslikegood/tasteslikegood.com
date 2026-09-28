@@ -88,6 +88,11 @@ def list_recipes(user_id, guest_session_id):
                             "source_slug": recipe.source_slug,
                             "source_recipe_id": recipe.source_recipe_id,
                             "origin": recipe.origin,
+                            "first_published_at": (
+                                recipe.first_published_at.isoformat()
+                                if recipe.first_published_at
+                                else None
+                            ),
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
