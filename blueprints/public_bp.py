@@ -1,4 +1,3 @@
-Warning: Python 3.12 cannot parse code formatted for Python 3.13. To fix this: run Black with Python 3.13, set --target-version to py312, or use --fast to skip the safety check. Black's safety check verifies equivalence by parsing the AST, which fails when the running Python is older than the target version.
 """
 Public SSR blueprint — server-rendered routes for anonymous visitors and
 search-engine crawlers.
