@@ -1501,6 +1501,16 @@ def test_pin_description_skips_oversized_tags_so_the_tail_survives():
     assert only_huge == "Stew — Hearty. Vegan recipe."
 
 
+@pytest.mark.parametrize("name", ["Yum!", "Ready?", "Recipe X."])
+def test_pin_description_does_not_double_a_name_ending_stop(name):
+    assert _pin_description(name, DEFAULT_RECIPE_DESCRIPTION, []) == f"{name} Vegan recipe."
+
+
+def test_pin_description_sentence_survives_abbreviations():
+    text = _pin_description("Chili", "Uses e.g. 20 mins vs. store-bought. Serve hot.", [])
+    assert text == "Chili — Uses e.g. 20 mins vs. store-bought. Vegan recipe."
+
+
 def test_pin_description_skips_a_whitespace_padded_placeholder():
     padded = f"  {DEFAULT_RECIPE_DESCRIPTION}  "
     assert _pin_description("Plain Oats", padded, []) == "Plain Oats. Vegan recipe."

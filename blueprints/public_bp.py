@@ -773,6 +773,10 @@ PIN_DESCRIPTION_TAGS = 3
 # so name + separators + tail always fit and the tail is never cut. Tags are
 # unbounded strings (recipe_schema.json), so one that does not fit is skipped.
 MAX_PIN_TAIL_LENGTH = 200
+# Stricter than _SENTENCE_END for the pin's one sentence: a stop must be followed
+# by a capital, an opening quote, or the end, so "e.g. 20 mins" or "vs. store"
+# does not end the sentence early and drop the searchable body.
+_PIN_SENTENCE_END = re.compile(r"[.!?](?=\s+[A-Z\"“‘']|\s*$)")
 
 
 def _trim_to_words(text: str, limit: int) -> str:
@@ -812,8 +816,10 @@ def _pin_description(name: str, description: str, tags: list[str]) -> str:
 
     text = " ".join(description.split())
     if text == DEFAULT_RECIPE_DESCRIPTION or not text:
-        return _trim_to_words(f"{head}. {tail}", MAX_PIN_DESCRIPTION_LENGTH)
-    end = _SENTENCE_END.search(text)
+        # "Yum!" / "Ready?" already end a sentence; don't append a second stop.
+        stop = "" if head.endswith((".", "!", "?")) else "."
+        return _trim_to_words(f"{head}{stop} {tail}", MAX_PIN_DESCRIPTION_LENGTH)
+    end = _PIN_SENTENCE_END.search(text)
     sentence = text[: end.end()] if end else f"{text}."
     budget = MAX_PIN_DESCRIPTION_LENGTH - len(head) - len(tail) - len(" — ") - 1
     return _trim_to_words(
