@@ -103,9 +103,28 @@ def collection_key(user_id, guest_session_id, collection_id):
     return f"vgc:{_owner_prefix(user_id, guest_session_id)}:c:{collection_id}"
 
 
-def recipe_image_key(recipe_id):
-    """Image cache is NOT user-scoped — same image for everyone."""
-    return f"vgc:img:{recipe_id}"
+def recipe_image_key(recipe_id, version=None):
+    """Full-size image bytes. NOT user-scoped — same image for everyone.
+
+    Keyed on the image's version (KAN-283), like the sized variants below: a
+    PUT that replaces the stored image changes the version, so the next read
+    misses instead of serving the old bytes under the page's new ``?v=`` URL.
+    ``version=None`` names the pre-KAN-283 unversioned key, which only
+    ``invalidate_recipe_image`` still touches.
+    """
+    if version is None:
+        return f"vgc:img:{recipe_id}"
+    return f"vgc:img:{recipe_id}:{version}"
+
+
+def recipe_image_variant_key(recipe_id, width, version):
+    """A sized WebP variant (KAN-271), keyed on the image's version.
+
+    Versioned rather than invalidated: a regenerated image has a new version,
+    so its variants are new keys and the old ones age out on their TTL.
+    ``invalidate_recipe_image`` therefore does not need to enumerate widths.
+    """
+    return f"vgc:img:{recipe_id}:w{width}:{version}"
 
 
 # ── Invalidation helpers ──────────────────────────────────────────────────────
@@ -121,7 +140,11 @@ def invalidate_recipe(user_id, guest_session_id, recipe_id):
 
 
 def invalidate_recipe_image(recipe_id):
-    """Invalidate cached image after regeneration."""
+    """Drop the unversioned full-size entry left by pre-KAN-283 deploys.
+
+    Versioned entries need no invalidation: a regenerated or replaced image has
+    a new version, so its reads use a new key and the old one ages out on TTL.
+    """
     _delete_keys([recipe_image_key(recipe_id)])
 
 

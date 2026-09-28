@@ -57,7 +57,7 @@ flowchart TD
     E3 --> E4[❌ Check Failed]
 
     F --> F1{PR by dependabot?}
-    F1 -->|Yes| F2[Auto-merge via squash]
+    F1 -->|Yes| F2[Auto-merge via rebase or merge commit]
     F1 -->|No| F3[Skip]
 
     LINT_OK --> GATE{All required checks pass?}

@@ -1,10 +1,13 @@
 {% extends "public/base_public.html" %}
 
+{# Curated category hub (KAN-274): services/tag_hubs.py defines the hubs and
+   their intros; membership comes from recipe tags. #}
+
 {% block title %}{{ page_title }}{% endblock %}
 
 {% block head %}
 <meta name="description" content="{{ description }}">
-<meta name="robots" content="index,follow">
+<meta name="robots" content="{{ 'index,follow' if indexable else 'noindex,follow' }}">
 <link rel="canonical" href="{{ canonical_url }}">
 <meta property="og:type" content="website">
 <meta property="og:title" content="{{ page_title }}">
@@ -29,33 +32,21 @@
 {% block content %}
 <section class="public-browse">
     <header class="public-browse-header">
-        <p class="public-eyebrow">Anti-recipe browse</p>
-        <h1>Browse Vegan Recipes</h1>
-        <p>
-            High-contrast, fast-loading public recipes. Showing {{ recipes|length }} of {{ total }}
-            published recipes.
-        </p>
-        {# KAN-274: the indexable category hubs, linked from their parent page. #}
-        {% if hubs %}
-        <nav class="public-hub-links" aria-label="Recipe categories">
-            <ul>
-                {% for hub in hubs %}
-                <li><a href="{{ hub.url }}" class="public-tag">{{ hub.title }}</a></li>
+        <nav class="public-eyebrow public-breadcrumb" aria-label="Breadcrumb">
+            <ol>
+                {% for crumb in breadcrumbs[:-1] %}
+                <li><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
                 {% endfor %}
-            </ul>
+            </ol>
         </nav>
-        {% endif %}
+        <h1>{{ hub.title }}</h1>
+        <p class="public-hub-intro">{{ hub.intro }}</p>
     </header>
 
     {% if recipes %}
     <ul class="public-browse-list">
         {% for recipe in recipes %}
         {% set data = recipe.data or {} %}
-        {# Byte-gated, host-relative image URL built by public_bp._card_image.
-           A stored ai_image_url is never trusted here: its bytes may not exist
-           (dead card image) and it may carry an absolute host that diverges
-           from the relative URLs on sibling cards (cookbook #3164). Own images
-           are sized WebP variants (KAN-271); stock images are served as-is. #}
         {% set card_image = card_images.get(recipe.id) %}
         <li class="public-browse-item">
             <a href="{{ url_for('public.show_public_recipe', slug=recipe.slug) }}">
@@ -74,26 +65,8 @@
                 {% endif %}
                 <div class="public-browse-card-copy">
                     <h2>{{ recipe.name }}</h2>
-                    <ul class="public-browse-meta">
-                        {% if data.get('prepTime') is not none %}
-                        <li>Prep {{ data.prepTime }}m</li>
-                        {% endif %}
-                        {% if data.get('cookTime') is not none %}
-                        <li>Cook {{ data.cookTime }}m</li>
-                        {% endif %}
-                        {% if recipe.user and recipe.user.name %}
-                        <li>By {{ recipe.user.name }}</li>
-                        {% endif %}
-                    </ul>
                     {% if data.description %}
                     <p>{{ data.description }}</p>
-                    {% endif %}
-                    {% if data.tags %}
-                    <div class="public-browse-tags">
-                        {% for tag in data.tags[:3] %}
-                        <span class="public-tag">{{ tag }}</span>
-                        {% endfor %}
-                    </div>
                     {% endif %}
                 </div>
             </a>
@@ -102,25 +75,19 @@
     </ul>
     {% else %}
     <p class="public-browse-empty">
-        No public recipes yet. Check back soon, or <a href="/#kitchen">open the cookbook app</a>.
+        No recipes here yet. <a href="{{ url_for('public.browse_public_recipes') }}">Browse all recipes</a>
+        or <a href="/">generate one</a>.
     </p>
     {% endif %}
 
-    {% if total_pages > 1 %}
-    <nav class="public-browse-pagination" aria-label="Pagination">
-        {% if page > 1 %}
-        <a href="{{ url_for('public.browse_public_recipes', page=page - 1) }}" rel="prev"
-            >← Previous</a
-        >
-        {% else %}
-        <span></span>
-        {% endif %}
-        <span>Page {{ page }} of {{ total_pages }}</span>
-        {% if page < total_pages %}
-        <a href="{{ url_for('public.browse_public_recipes', page=page + 1) }}" rel="next"
-            >Next →</a
-        >
-        {% endif %}
+    {% if other_hubs %}
+    <nav class="public-hub-links" aria-label="More recipe categories">
+        <h2>More vegan recipe categories</h2>
+        <ul>
+            {% for other in other_hubs %}
+            <li><a href="{{ other.url }}" class="public-tag">{{ other.title }}</a></li>
+            {% endfor %}
+        </ul>
     </nav>
     {% endif %}
 </section>

@@ -54,6 +54,20 @@ def client(app):
     return app.test_client()
 
 
+def _without_related(body: str) -> str:
+    """The page minus the "More vegan recipes" block (KAN-273).
+
+    That block shows other public recipes' images under their own names, which
+    is correct; the image-attribution tests are about the page's OWN media
+    (hero, og:image, JSON-LD, Pinterest pin), so they assert on the rest.
+    """
+    start = body.find('<section class="public-related"')
+    if start == -1:
+        return body
+    end = body.index("</section>", start) + len("</section>")
+    return body[:start] + body[end:]
+
+
 def _make_recipe(name, slug, *, public=True, owner=None, data=None):
     return Recipe(
         id=str(uuid.uuid4()),
@@ -195,7 +209,10 @@ def _pinterest_media_param(body: str) -> str:
             "endpoint",
         ),
         ({"ai_image_gcs": "gs://bucket/recipe/v1.png"}, "endpoint"),
-        ({"stock_image_url": "https://img.example/stock.jpg"}, "https://img.example/stock.jpg"),
+        (
+            {"stock_image_url": "https://img.example/stock.jpg"},
+            "https://img.example/stock.jpg",
+        ),
         (
             # Stored bytes win over whatever ai_image_url claims — the pin
             # media must be the URL the gate actually verified.
@@ -227,7 +244,8 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
         # KAN-195: our own image endpoint is versioned; the stock-image case
         # below is someone else's host and must be passed through untouched.
         assert re.fullmatch(
-            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", media
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+            media,
         ), media
     else:
         assert media == expected_media
@@ -496,6 +514,15 @@ def test_sitemap_lists_only_public_routes(app, client):
     assert "http://localhost/r/private" not in body
 
 
+def test_sitemap_lists_the_about_page_and_the_footer_links_it(app, client):
+    """KAN-272: /about (served by Express) is in the sitemap and every SSR footer."""
+    sitemap = client.get("/sitemap.xml").get_data(as_text=True)
+    assert "<loc>http://localhost/about</loc>" in sitemap
+
+    browse = client.get("/browse").get_data(as_text=True)
+    assert '<a href="/about">About</a>' in browse
+
+
 def test_sitemap_selects_only_slug_and_timestamps(app, client):
     with app.app_context():
         db.session.add(
@@ -510,9 +537,9 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
     statements = []
 
     @event.listens_for(db.engine, "before_cursor_execute")
-    def _capture(_conn, _cursor, statement, _params, _ctx, _exec):
+    def _capture(_conn, _cursor, statement, params, _ctx, _exec):
         if statement.lstrip().upper().startswith("SELECT"):
-            statements.append(statement)
+            statements.append((statement, params))
 
     try:
         resp = client.get("/sitemap.xml")
@@ -520,9 +547,25 @@ def test_sitemap_selects_only_slug_and_timestamps(app, client):
         event.remove(db.engine, "before_cursor_execute", _capture)
 
     assert resp.status_code == 200
-    recipe_queries = [statement for statement in statements if "FROM recipe" in statement]
+    recipe_queries = [
+        (statement, params) for statement, params in statements if "FROM recipe" in statement
+    ]
     assert recipe_queries
-    assert all("recipe.data" not in statement for statement in recipe_queries)
+    # KAN-274: the hub entries read exactly one JSON path (the tags) out of
+    # data; no other extraction or full-blob reference is allowed.
+    tag_path = "JSON_EXTRACT(recipe.data, ?)"
+    assert sum(statement.count(tag_path) for statement, _ in recipe_queries) == 1
+    assert all(
+        "recipe.data" not in statement.replace(tag_path, "") for statement, _ in recipe_queries
+    )
+    json_path_params = [
+        param
+        for _statement, params in recipe_queries
+        for param in params
+        if isinstance(param, str) and param.startswith("$.")
+    ]
+    assert len(json_path_params) == 1
+    assert re.fullmatch(r'\$\.(?:"tags"|tags)', json_path_params[0])
 
 
 def test_public_recipe_image_served_without_session(app, client):
@@ -805,7 +848,7 @@ def test_saved_copy_with_own_image_does_not_fall_back(app, client):
 
     resp = client.get("/r/my-source-dish-copy")
     assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
+    body = _without_related(resp.get_data(as_text=True))
     assert "https://img.example/copy-own.jpg" in body
     assert "https://img.example/source.jpg" not in body
 
@@ -1004,7 +1047,11 @@ def test_update_cannot_repersist_an_inherited_stock_image(app):
         db.session.commit()
 
         copy = db_recipe_repository.create_recipe(
-            {"id": "copy-update-001", "name": "Update Source", "sourceSlug": "update-source"},
+            {
+                "id": "copy-update-001",
+                "name": "Update Source",
+                "sourceSlug": "update-source",
+            },
             user_id=owner.id,
         )
         assert copy is not None
@@ -1071,7 +1118,7 @@ def test_slug_fallback_ignores_recipe_created_after_the_copy(app, client):
 
     resp = client.get("/r/orphaned-copy")
     assert resp.status_code == 200
-    body = resp.get_data(as_text=True)
+    body = _without_related(resp.get_data(as_text=True))
     # The impostor must not be attributed as the source, on any surface.
     assert f"/api/recipes/{impostor_id}/image" not in body
     assert "https://img.example/impostor-stock.jpg" not in body
@@ -1166,14 +1213,16 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
     before = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
     assert before is not None
     assert re.fullmatch(
-        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", before
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+        before,
     ), before
 
-    # Regenerate: the worker rewrites ai_metadata.image_generation.timestamp
-    # and nothing else about the URL (worker_api_bp._image_generation_metadata).
+    # Regenerate: the worker stores the new object at a versioned GCS URI and
+    # rewrites the generation metadata (worker_api_bp).
     with app.app_context():
         stored = db.session.get(Recipe, recipe_id)
         data = dict(stored.data)
+        data["ai_image_gcs"] = "gs://bucket/recipe/v2.png"
         data["ai_metadata"] = {
             "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
         }
@@ -1183,6 +1232,38 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
     after = _og_image(client.get("/r/regen-pie").get_data(as_text=True))
     assert after != before, "regenerated image kept the old URL — caches will serve stale bytes"
     # Same resource, different cache key.
+    assert after.split("?")[0] == before.split("?")[0]
+
+
+def test_rendered_image_url_changes_when_failed_gcs_fallback_changes(app, client):
+    """A fallback-only PUT must also move the browser/CDN cache key."""
+    old_payload = base64.b64encode(b"old-fallback").decode("ascii")
+    new_payload = base64.b64encode(b"new-fallback").decode("ascii")
+    with app.app_context():
+        recipe = _make_recipe(
+            "Fallback Photo",
+            "fallback-photo",
+            data={
+                "name": "Fallback Photo",
+                "description": "Retains a GCS URI and a legacy fallback.",
+                "ai_image_gcs": "gs://bucket/recipe/unchanged.png",
+                "ai_image_data": old_payload,
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    before = _og_image(client.get("/r/fallback-photo").get_data(as_text=True))
+
+    with app.app_context():
+        stored = db.session.get(Recipe, recipe_id)
+        stored.data = {**stored.data, "ai_image_data": new_payload}
+        db.session.commit()
+
+    after = _og_image(client.get("/r/fallback-photo").get_data(as_text=True))
+    assert before is not None and after is not None
+    assert after != before, "changed fallback kept the old public cache URL"
     assert after.split("?")[0] == before.split("?")[0]
 
 
@@ -1301,6 +1382,7 @@ def test_saved_copy_versions_from_the_source_row(app, client):
     with app.app_context():
         stored = db.session.get(Recipe, source_id)
         data = dict(stored.data)
+        data["ai_image_gcs"] = "gs://bucket/recipe/v2.png"
         data["ai_metadata"] = {
             "image_generation": {"success": True, "timestamp": "2026-08-02T11:30:00"}
         }
@@ -1309,3 +1391,35 @@ def test_saved_copy_versions_from_the_source_row(app, client):
 
     after = _og_image(client.get("/r/copy-pie").get_data(as_text=True))
     assert after != before
+
+
+def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(app, client):
+    """Guards the _serves_own_image_bytes / _image_version_token invariant.
+
+    A legacy/corrupt row whose ``ai_image_gcs`` is truthy-but-not-a-string (e.g.
+    an int from a bad migration) with a valid base64 ``ai_image_data`` used to
+    slip through: ``_serves_own_image_bytes`` said "yes, we serve this" while
+    ``_image_version_token`` returned None (short-circuit picked the non-string
+    first), so the rendered URL had no ``?v=`` marker and any CDN/browser cache
+    of the previous bytes would linger for the full 24h max-age.
+    """
+    with app.app_context():
+        recipe = _make_recipe(
+            "Odd Photo",
+            "odd-photo",
+            data={
+                "name": "Odd Photo",
+                "description": "Legacy row with a non-string gcs field.",
+                "ai_image_gcs": 12345,
+                "ai_image_data": base64.b64encode(b"\x89PNGodd").decode("ascii"),
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    url = _og_image(client.get("/r/odd-photo").get_data(as_text=True))
+    assert url is not None
+    assert re.fullmatch(
+        rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", url
+    ), url

@@ -134,7 +134,7 @@
 
   <rect x="755" y="236" width="310" height="40" rx="6" fill="white" stroke="#fb923c"/>
   <text x="910" y="254" text-anchor="middle" fill="#9a3412" font-weight="bold" font-size="12">Dependabot Auto-Merge</text>
-  <text x="910" y="268" text-anchor="middle" fill="#c2410c" font-size="10">Auto squash-merge dependabot PRs</text>
+  <text x="910" y="268" text-anchor="middle" fill="#c2410c" font-size="10">Auto rebase/merge dependabot PRs</text>
 
   <!-- ═══════ Platform Services ═══════ -->
   <rect x="740" y="328" width="340" height="130" rx="8" fill="#f0f9ff" stroke="#7dd3fc" stroke-width="1.5" filter="url(#shadow)"/>

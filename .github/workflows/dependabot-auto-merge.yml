@@ -18,9 +18,23 @@ jobs:
 
       # Majors wait for a human; patch/minor still merge hands-free. For
       # grouped PRs, update-type reports the highest bump in the group.
+      #
+      # Squash is rejected on dev ("Merge method squash merging is not allowed
+      # on this repository"), so pick per PR: a single-commit bump rebases
+      # cleanly and keeps history linear; a multi-commit PR gets a merge commit
+      # so its ancestry survives. If the ruleset rejects the first choice, fall
+      # back to the other rather than leaving the PR unmerged.
       - name: Enable auto-merge for Dependabot PRs
         if: steps.metadata.outputs.update-type != 'version-update:semver-major'
-        run: gh pr merge --auto --squash "$PR_URL"
+        run: |
+          commits=$(gh pr view "$PR_URL" --json commits --jq '.commits | length')
+          if [ "$commits" -eq 1 ]; then
+            first=--rebase; second=--merge
+          else
+            first=--merge; second=--rebase
+          fi
+          gh pr merge --auto "$first" "$PR_URL" \
+            || gh pr merge --auto "$second" "$PR_URL"
         env:
           PR_URL: ${{ github.event.pull_request.html_url }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
