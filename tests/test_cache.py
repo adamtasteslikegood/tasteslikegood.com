@@ -287,6 +287,28 @@ def test_failed_gcs_fallback_replaced_through_put_is_not_served_stale(app, clien
 # ── Image endpoint: access check runs BEFORE the cache lookup ─────────────────
 
 
+@pytest.mark.parametrize("bad_payload", [123, ["not", "a", "string"], "x", "@@@"])
+def test_invalid_legacy_image_payload_is_404_not_500(app, client, bad_payload):
+    """``ai_image_data`` is writable through the generic PUT, so it can hold any
+    JSON value. A non-string, malformed, or empty-decoding payload means "no
+    image" (404); it must not crash the image route with a 500."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        owner_id = _owner(f"badimage-{recipe_id[:8]}@example.com")
+        owner = db.session.get(User, owner_id)
+        db.session.add(_make_recipe(recipe_id, b"\x89PNG\r\n\x1a\nok", public=True, owner=owner))
+        db.session.commit()
+
+    _login(client, owner_id)
+    assert (
+        client.put(f"/api/recipes/{recipe_id}", json={"ai_image_data": bad_payload}).status_code
+        == 200
+    )
+
+    assert client.get(f"/api/recipes/{recipe_id}/image").status_code == 404
+    assert client.get(f"/api/recipes/{recipe_id}/image?w=400").status_code == 404
+
+
 def test_deleted_recipe_image_404s_even_when_cached(app, client):
     """A cached image must not outlive its recipe row."""
     png_bytes = b"\x89PNG\r\n\x1a\ndeleted"
