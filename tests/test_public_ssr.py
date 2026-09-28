@@ -1472,6 +1472,13 @@ def test_pin_description_fits_500_and_keeps_the_keyword_tail():
     assert "…" in text
 
 
+def test_pin_description_omits_an_unbroken_token_instead_of_splitting_it():
+    text = _pin_description("N" * 200, "x" * 600, ["soup"])
+    assert "x" not in text
+    assert len(text) <= 500
+    assert text.endswith("… Vegan recipe: soup.")
+
+
 def test_pin_description_skips_oversized_tags_so_the_tail_survives():
     # Tags have no schema length limit; with three 300-char tags the old tail
     # alone passed 500 and the final cap cut it. Tags that do not fit are skipped.
