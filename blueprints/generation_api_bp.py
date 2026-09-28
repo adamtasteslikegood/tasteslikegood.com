@@ -299,14 +299,14 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
 def _image_cache_version(recipe) -> str:
     """Cache identity of every byte source the image endpoint can serve.
 
-    The shared public token includes both the preferred GCS URI and the legacy
-    fallback payload when both exist. Hash it again to retain the established
-    16-character internal cache-key shape without duplicating source logic.
+    The shared source identity includes both the preferred GCS URI and the
+    legacy fallback payload when both exist. Hash the raw identity to retain
+    the established 16-character internal cache-key strength.
     """
-    from blueprints.public_bp import _image_version_token
+    from blueprints.public_bp import _image_version_source
 
-    token = _image_version_token(recipe) or ""
-    return hashlib.sha256(token.encode("utf-8")).hexdigest()[:16]
+    source = _image_version_source(recipe) or ""
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
 
 
 def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
