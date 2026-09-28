@@ -35,7 +35,7 @@ class RetiredSlug(db.Model):  # type: ignore[name-defined, misc]
 
     slug = db.Column(db.String(255), primary_key=True)
     # No FK: the row this points at is usually gone. NULL = deleted, permanent.
-    recipe_id = db.Column(db.String(36), nullable=True)
+    recipe_id = db.Column(db.String(36), nullable=True, index=True)
     retired_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
