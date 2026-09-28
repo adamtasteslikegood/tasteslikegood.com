@@ -839,6 +839,21 @@ def show_public_recipe(slug):
     )
 
 
+def _carried_redirect_params(*, keep_save: bool) -> dict[str, str]:
+    """Query params a trailing-slash 301 may carry: ``utm_*`` and, optionally, ``save``.
+
+    Only allow-listed keys, rebuilt by ``url_for`` onto the canonical host, never
+    the raw query string (CodeQL py/url-redirection). ``save`` is the SPA's
+    save-to-cookbook handoff and only means something on a recipe URL.
+    """
+    return {
+        key: value
+        for key, value in request.args.items()
+        if (keep_save and key == "save")
+        or (key.startswith("utm_") and key.replace("_", "").isalnum())
+    }
+
+
 @public_bp.route("/r/<slug>/", methods=["GET"])
 def redirect_trailing_slash_recipe(slug):
     """``/r/<slug>/`` → 301 to the canonical ``/r/<slug>`` (KAN-273).
@@ -851,11 +866,7 @@ def redirect_trailing_slash_recipe(slug):
     ``url_for`` onto the fixed canonical host, never the raw query string
     (CodeQL py/url-redirection).
     """
-    carried = {
-        key: value
-        for key, value in request.args.items()
-        if key == "save" or (key.startswith("utm_") and key.replace("_", "").isalnum())
-    }
+    carried = _carried_redirect_params(keep_save=True)
     return redirect(_canonical_url("public.show_public_recipe", slug=slug, **carried), code=301)
 
 
@@ -1053,17 +1064,12 @@ def redirect_trailing_slash_hub(hub_slug):
     Unknown slugs 404 directly rather than 301→404, so search consoles don't
     log a redirect chain and crawlers don't waste a hop on a stale link.
 
-    Carries the same allow-listed query params (``utm_*`` and ``save``) as the
-    sibling recipe redirect so email-campaign attribution and the SPA save
-    handoff survive the 301.
+    Carries the ``utm_*`` campaign params so attribution survives the 301.
+    Not ``save``: that handoff is only read on recipe URLs.
     """
     if hub_slug not in HUBS_BY_SLUG:
         abort(404)
-    carried = {
-        key: value
-        for key, value in request.args.items()
-        if key == "save" or (key.startswith("utm_") and key.replace("_", "").isalnum())
-    }
+    carried = _carried_redirect_params(keep_save=False)
     return redirect(_canonical_url("public.show_tag_hub", hub_slug=hub_slug, **carried), code=301)
 
 

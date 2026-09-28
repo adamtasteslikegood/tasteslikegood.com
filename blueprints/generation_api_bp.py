@@ -396,8 +396,10 @@ def serve_recipe_image(recipe_id):
         variant_response = _serve_image_variant(recipe, variant_width, http_cache_control)
         if variant_response is not None:
             return variant_response
-        # The stored bytes could not be decoded: serve them untouched below
-        # rather than fail the page's image.
+        # No variant (undecodable bytes, or a GCS read failed): serve the
+        # original below rather than fail the page's image, but never let an
+        # HTTP cache pin full-size bytes under this sized ``?w=`` URL.
+        http_cache_control = "no-store"
 
     ck = recipe_image_key(recipe_id, _image_cache_version(recipe))
     cached_bytes = safe_get(ck)
