@@ -248,6 +248,44 @@ def test_image_replaced_through_put_is_not_served_stale(app, client):
     assert client.get(f"/api/recipes/{recipe_id}/image").data == new_bytes
 
 
+def test_failed_gcs_fallback_replaced_through_put_is_not_served_stale(
+    app, client, monkeypatch
+):
+    """KAN-283: changing a legacy fallback also versions a retained GCS source."""
+    from blueprints import generation_api_bp
+
+    old_bytes = b"\x89PNG\r\n\x1a\nold-fallback"
+    new_bytes = b"\x89PNG\r\n\x1a\nnew-fallback"
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        owner_id = _owner("fallbackswap@example.com")
+        owner = db.session.get(User, owner_id)
+        recipe = _make_recipe(recipe_id, old_bytes, public=True, owner=owner)
+        recipe.data = {
+            **recipe.data,
+            "ai_image_gcs": "gs://bucket/recipe/unchanged.png",
+        }
+        db.session.add(recipe)
+        db.session.commit()
+
+    monkeypatch.setattr(generation_api_bp, "GCS_BUCKET_NAME", "bucket")
+    monkeypatch.setattr(
+        "services.gcs_service.download_image",
+        lambda *_args, **_kwargs: None,
+    )
+
+    assert client.get(f"/api/recipes/{recipe_id}/image").data == old_bytes
+
+    _login(client, owner_id)
+    resp = client.put(
+        f"/api/recipes/{recipe_id}",
+        json={"ai_image_data": base64.b64encode(new_bytes).decode()},
+    )
+    assert resp.status_code == 200, resp.get_json()
+
+    assert client.get(f"/api/recipes/{recipe_id}/image").data == new_bytes
+
+
 # ── Image endpoint: access check runs BEFORE the cache lookup ─────────────────
 
 
