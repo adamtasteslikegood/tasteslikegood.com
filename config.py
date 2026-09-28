@@ -54,7 +54,7 @@ VALKEY_AUTH_MODE = _VALKEY.auth_mode
 REDIS_URL = _VALKEY.redis_url
 
 # Default Model Configuration
-DEFAULT_MODEL = os.getenv("GEMINI_DEFAULT_MODEL") or "gemini-3.7-flash"
+DEFAULT_MODEL = os.getenv("GEMINI_DEFAULT_MODEL") or "gemini-3.8-flash"
 IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL") or "gemini-3-pro-image"
 
 # Cache settings
