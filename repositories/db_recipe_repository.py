@@ -292,6 +292,21 @@ def _slug_retired_against(slug: str, recipe_id: str) -> bool:
     return retired is not None and retired.recipe_id != recipe_id
 
 
+def _clear_unowned_retired_slug_from_private(
+    recipe_data: Dict[str, Any], recipe_id: str
+) -> None:
+    """Do not let a private row occupy another recipe's retired alias.
+
+    Private slugs are not public URLs and may be payload-provided, but the
+    Recipe.slug uniqueness constraint would still prevent the retirement owner
+    from reclaiming its alias. Clear only slugs retired against this row; the
+    same recipe remains free to stage one of its own rename aliases.
+    """
+    slug = recipe_data.get("slug")
+    if recipe_data.get("is_public") is False and slug and _slug_retired_against(str(slug), recipe_id):
+        recipe_data["slug"] = None
+
+
 def _resolve_public_slug(
     recipe_data: Dict[str, Any],
     recipe_id: str,
@@ -516,6 +531,8 @@ def _commit_publish_retrying(
             recipe_data["slug"] = _resolve_public_slug(
                 resolver_input, recipe_id, current_slug, skip=frozenset(skip)
             )
+        else:
+            _clear_unowned_retired_slug_from_private(recipe_data, recipe_id)
         recipe = stage(recipe_data)
         try:
             db.session.commit()
