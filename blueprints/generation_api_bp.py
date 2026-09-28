@@ -363,10 +363,14 @@ def _serve_derived_image(
 
 def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
     """A WebP of the recipe's image at ``width`` px (KAN-271), or ``None`` to fall back."""
+
+    def build_webp_variant(source: bytes) -> bytes | None:
+        return make_webp_variant(source, width)
+
     return _serve_derived_image(
         recipe,
         recipe_image_variant_key(recipe.id, width, _image_cache_version(recipe)),
-        lambda source: make_webp_variant(source, width),
+        build_webp_variant,
         "image/webp",
         http_cache_control,
     )
