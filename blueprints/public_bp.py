@@ -242,11 +242,7 @@ def _image_version_token(owner: Recipe) -> str | None:
     data = owner.data or {}
     gcs = data.get("ai_image_gcs")
     payload = data.get("ai_image_data")
-    sources = [
-        source
-        for source in (gcs, payload)
-        if isinstance(source, str) and source
-    ]
+    sources = [source for source in (gcs, payload) if isinstance(source, str) and source]
     if not sources:
         return None
     return hashlib.sha256("|".join(sources).encode("utf-8")).hexdigest()[:12]
