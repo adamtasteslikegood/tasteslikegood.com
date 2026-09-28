@@ -130,7 +130,10 @@ def make_pin_variant(image_bytes: bytes) -> bytes | None:
         background = Image.new("RGB", PIN_SIZE, "white")
         background.paste(background_layer, (0, 0), background_layer)
         scale = min(pin_w / photo.width, pin_h / photo.height)
-        fitted_size = (max(1, round(photo.width * scale)), max(1, round(photo.height * scale)))
+        fitted_size = (
+            max(1, round(photo.width * scale)),
+            max(1, round(photo.height * scale)),
+        )
         fitted = photo.resize(fitted_size, Image.Resampling.LANCZOS)
         offset = ((pin_w - fitted_size[0]) // 2, (pin_h - fitted_size[1]) // 2)
         background.paste(fitted, offset, fitted)
