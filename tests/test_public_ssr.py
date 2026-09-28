@@ -1501,7 +1501,7 @@ def test_pin_description_skips_oversized_tags_so_the_tail_survives():
     assert only_huge == "Stew — Hearty. Vegan recipe."
 
 
-@pytest.mark.parametrize("name", ["Yum!", "Ready?", "Recipe X."])
+@pytest.mark.parametrize("name", ["Yum!", "Ready?", "Recipe X.", "Yum…"])
 def test_pin_description_does_not_double_a_name_ending_stop(name):
     assert _pin_description(name, DEFAULT_RECIPE_DESCRIPTION, []) == f"{name} Vegan recipe."
 
