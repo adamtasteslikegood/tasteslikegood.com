@@ -19,6 +19,7 @@ import base64
 import sys
 import uuid
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -191,31 +192,60 @@ def test_image_invalidation_clears_cached_bytes(app):
 def test_image_endpoint_populates_and_serves_from_cache(app, client):
     """First image GET caches the bytes; later GETs are served from cache.
 
-    Proven by swapping the DB image after the first request — the second
-    response returns the original bytes, which only exist in the cache.
+    Proven by counting storage reads: the second GET of an unchanged image must
+    not touch storage at all.
     """
+    from blueprints import generation_api_bp
+
     png_bytes = b"\x89PNG\r\n\x1a\ncached-image"
     recipe_id = str(uuid.uuid4())
     with app.app_context():
         db.session.add(_make_recipe(recipe_id, png_bytes, public=True))
         db.session.commit()
 
-    first = client.get(f"/api/recipes/{recipe_id}/image")
-    assert first.status_code == 200
-    assert first.data == png_bytes
-    assert first.headers["Cache-Control"] == "public, max-age=86400"
+    loads = []
+    real_load = generation_api_bp._load_stored_image_bytes
 
+    def counting_load(recipe, **kwargs):
+        loads.append(recipe.id)
+        return real_load(recipe, **kwargs)
+
+    with patch.object(generation_api_bp, "_load_stored_image_bytes", counting_load):
+        first = client.get(f"/api/recipes/{recipe_id}/image")
+        second = client.get(f"/api/recipes/{recipe_id}/image")
+
+    assert first.status_code == second.status_code == 200
+    assert first.data == second.data == png_bytes
+    assert first.headers["Cache-Control"] == "public, max-age=86400"
+    assert loads == [recipe_id]  # second request was a cache hit
+
+
+def test_image_replaced_through_put_is_not_served_stale(app, client):
+    """KAN-283: a PUT that swaps the stored image must not serve the old bytes.
+
+    The page's ``?v=`` token follows the stored source, so a primed cache keyed
+    only on the recipe id would return the previous photo under the new URL
+    for the whole TTL. Driven through the real PUT route, not the ORM.
+    """
+    old_bytes = b"\x89PNG\r\n\x1a\nold-photo"
+    new_bytes = b"\x89PNG\r\n\x1a\nnew-photo"
+    recipe_id = str(uuid.uuid4())
     with app.app_context():
-        recipe = db.session.get(Recipe, recipe_id)
-        recipe.data = {
-            **recipe.data,
-            "ai_image_data": base64.b64encode(b"regenerated-image").decode(),
-        }
+        owner_id = _owner("imageswap@example.com")
+        owner = db.session.get(User, owner_id)
+        db.session.add(_make_recipe(recipe_id, old_bytes, public=True, owner=owner))
         db.session.commit()
 
-    second = client.get(f"/api/recipes/{recipe_id}/image")
-    assert second.status_code == 200
-    assert second.data == png_bytes  # cache hit, not the regenerated DB bytes
+    assert client.get(f"/api/recipes/{recipe_id}/image").data == old_bytes  # primes cache
+
+    _login(client, owner_id)
+    resp = client.put(
+        f"/api/recipes/{recipe_id}",
+        json={"ai_image_data": base64.b64encode(new_bytes).decode()},
+    )
+    assert resp.status_code == 200, resp.get_json()
+
+    assert client.get(f"/api/recipes/{recipe_id}/image").data == new_bytes
 
 
 # ── Image endpoint: access check runs BEFORE the cache lookup ─────────────────
