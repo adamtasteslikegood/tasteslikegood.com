@@ -318,9 +318,7 @@ def _image_cache_version(recipe) -> str:
     if stored_uri and isinstance(fallback_payload, str) and fallback_payload:
         fallback_token = hashlib.sha256(fallback_payload.encode("utf-8")).hexdigest()[:12]
 
-    return hashlib.sha256(
-        f"{stored_uri}|{token}|{fallback_token}".encode("utf-8")
-    ).hexdigest()[:16]
+    return hashlib.sha256(f"{stored_uri}|{token}|{fallback_token}".encode("utf-8")).hexdigest()[:16]
 
 
 def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:

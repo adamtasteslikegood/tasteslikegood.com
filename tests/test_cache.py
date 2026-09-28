@@ -248,9 +248,7 @@ def test_image_replaced_through_put_is_not_served_stale(app, client):
     assert client.get(f"/api/recipes/{recipe_id}/image").data == new_bytes
 
 
-def test_failed_gcs_fallback_replaced_through_put_is_not_served_stale(
-    app, client, monkeypatch
-):
+def test_failed_gcs_fallback_replaced_through_put_is_not_served_stale(app, client, monkeypatch):
     """KAN-283: changing a legacy fallback also versions a retained GCS source."""
     from blueprints import generation_api_bp
 
