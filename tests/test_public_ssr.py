@@ -29,6 +29,7 @@ from blueprints.public_bp import (  # noqa: E402
     DEFAULT_RECIPE_DESCRIPTION,
     _format_ingredient,
     _pin_description,
+    _pin_image_url,
     _safe_minutes,
 )
 from extensions import db  # noqa: E402
@@ -82,6 +83,13 @@ def _make_recipe(name, slug, *, public=True, owner=None, data=None):
         is_public=public,
         data=data or {"name": name, "description": f"{name} description"},
     )
+
+
+def test_pin_image_url_rejects_a_missing_version_token():
+    recipe = _make_recipe("No Image", "no-image")
+
+    with pytest.raises(RuntimeError, match="without an image-version token"):
+        _pin_image_url(recipe)
 
 
 @pytest.mark.parametrize(
