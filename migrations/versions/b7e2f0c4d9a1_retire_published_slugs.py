@@ -17,9 +17,10 @@ Backfills:
    are assigned by publishing (``_resolve_public_slug``) and kept on
    unpublish, so a slugged row is treated as having been published. The
    exact moment is not recorded anywhere, and only NULL vs non-NULL matters.
-2. Retire every ``source_slug`` that no live row holds: the source a copy was
-   saved from was deleted (or renamed) before this table existed, and that
-   URL must not go to the next recipe that happens to share the name.
+2. Retire every ``source_slug`` without evidence that a matching live row owns
+   it. A current public row proves ownership; so does a copy whose stable
+   ``source_recipe_id`` points at that row. A private row that merely happens
+   to carry the slug is not evidence and must not suppress the tombstone.
 
 ``op.add_column``, not ``batch_alter_table``: on SQLite a batch operation
 recreates the table and silently drops the KAN-213 expression indexes
@@ -59,7 +60,13 @@ def _backfill(conn):
             "CURRENT_TIMESTAMP FROM recipe r "
             "LEFT JOIN recipe live ON live.id = r.source_recipe_id "
             "WHERE r.source_slug IS NOT NULL AND r.source_slug <> '' "
-            "AND NOT EXISTS (SELECT 1 FROM recipe r2 WHERE r2.slug = r.source_slug) "
+            "AND NOT EXISTS ("
+            "SELECT 1 FROM recipe holder WHERE holder.slug = r.source_slug "
+            "AND (holder.is_public OR EXISTS ("
+            "SELECT 1 FROM recipe proof WHERE proof.source_slug = r.source_slug "
+            "AND proof.source_recipe_id = holder.id"
+            "))"
+            ") "
             "AND NOT EXISTS (SELECT 1 FROM retired_slug rs WHERE rs.slug = r.source_slug) "
             "GROUP BY r.source_slug"
         )

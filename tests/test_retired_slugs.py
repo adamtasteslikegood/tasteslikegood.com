@@ -257,10 +257,19 @@ def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs
     spec.loader.exec_module(migration)
     db.session.add_all(
         [
-            Recipe(id="live", name="Live", slug="live", data={}),
+            Recipe(id="live", name="Live", slug="live", is_public=True, data={}),
             Recipe(id="renamed", name="Renamed", slug="renamed-now", data={}),
             Recipe(id="draft", name="Draft", data={}),
             Recipe(id="copy", name="Copy", source_slug="deleted-source", data={}),
+            # Merely carrying a deleted source's slug privately does not prove
+            # ownership and must not suppress its permanent tombstone.
+            Recipe(
+                id="private-holder",
+                name="Unrelated private draft",
+                slug="deleted-source",
+                is_public=False,
+                data={},
+            ),
             Recipe(id="copy2", name="Copy", source_slug="live", data={}),
             Recipe(
                 id="renamed-copy",
