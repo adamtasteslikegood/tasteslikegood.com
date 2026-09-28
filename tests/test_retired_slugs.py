@@ -356,6 +356,25 @@ def test_direct_orm_writer_cannot_take_a_retired_slug(app, adam):
     db.session.rollback()
     assert app.test_client().get(f"/r/{slug}").status_code == 410
 
+    # A legacy/private holder can coexist after the migration. Publishing it
+    # without changing the slug must still run the model-level guard.
+    db.session.execute(
+        Recipe.__table__.insert().values(
+            id="legacy-private",
+            name="Legacy private holder",
+            slug=slug,
+            is_public=False,
+            data={},
+        )
+    )
+    db.session.commit()
+    legacy = db.session.get(Recipe, "legacy-private")
+    legacy.is_public = True
+    with pytest.raises(RetiredSlugTakenError):
+        db.session.flush()
+    db.session.rollback()
+    assert app.test_client().get(f"/r/{slug}").status_code == 410
+
 
 def test_backfill_script_skips_retired_slugs(app, adam):
     slug = _publish(adam, "zp-1")["slug"]

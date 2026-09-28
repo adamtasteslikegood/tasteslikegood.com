@@ -100,16 +100,16 @@ def _retire_published_slugs(session: Session, _flush_context: Any, _instances: A
         for obj in list(session.dirty):
             if not isinstance(obj, Recipe):
                 continue
-            if obj.slug and inspect(obj).attrs.slug.history.added:
+            state: Any = inspect(obj)
+            is_becoming_public = bool(obj.is_public and state.attrs.is_public.history.has_changes())
+            if obj.slug and (state.attrs.slug.history.added or is_becoming_public):
                 _guard_new_slug(session, obj)
             was_published = obj.first_published_at is not None
             if obj.is_public and not was_published:
                 obj.first_published_at = datetime.utcnow()
             if not was_published:
                 continue
-            old_slugs: tuple[Optional[str], ...] = tuple(
-                inspect(obj).attrs.slug.history.deleted or ()
-            )
+            old_slugs: tuple[Optional[str], ...] = tuple(state.attrs.slug.history.deleted or ())
             for old_slug in old_slugs:
                 if old_slug and old_slug != obj.slug:
                     _retire(session, old_slug, obj.id)
