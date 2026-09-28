@@ -222,6 +222,15 @@ def _recipe_image(recipe: Recipe) -> tuple[str | None, Recipe | None]:
     return None, None
 
 
+def _image_version_source(owner: Recipe) -> str | None:
+    """Canonical identity of every stored source the image endpoint can serve."""
+    data = owner.data or {}
+    gcs = data.get("ai_image_gcs")
+    payload = data.get("ai_image_data")
+    sources = [source for source in (gcs, payload) if isinstance(source, str) and source]
+    return "|".join(sources) if sources else None
+
+
 def _image_version_token(owner: Recipe) -> str | None:
     """A short marker derived from every stored source the endpoint can serve.
 
@@ -239,13 +248,10 @@ def _image_version_token(owner: Recipe) -> str | None:
     ``_serves_own_image_bytes``, preserving the invariant that every image the
     endpoint can serve receives a versioned public URL.
     """
-    data = owner.data or {}
-    gcs = data.get("ai_image_gcs")
-    payload = data.get("ai_image_data")
-    sources = [source for source in (gcs, payload) if isinstance(source, str) and source]
-    if not sources:
+    source = _image_version_source(owner)
+    if source is None:
         return None
-    return hashlib.sha256("|".join(sources).encode("utf-8")).hexdigest()[:12]
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
 
 
 def _rendered_image_url(recipe: Recipe) -> str | None:
