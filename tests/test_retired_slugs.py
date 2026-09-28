@@ -193,7 +193,9 @@ def test_first_published_at_is_exposed_and_survives_unpublish(app, adam):
 
     assert _unpublish(adam, "zp-1")["first_published_at"] == first
     listed = adam.get("/api/recipes").get_json()["recipes"]
-    assert next(recipe for recipe in listed if recipe["id"] == "zp-1")["first_published_at"] == first
+    assert (
+        next(recipe for recipe in listed if recipe["id"] == "zp-1")["first_published_at"] == first
+    )
 
 
 def test_renamed_slug_301s_to_the_same_recipe_and_can_be_reclaimed(app, adam, other):
