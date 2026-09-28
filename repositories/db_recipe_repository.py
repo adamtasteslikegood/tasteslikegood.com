@@ -292,9 +292,7 @@ def _slug_retired_against(slug: str, recipe_id: str) -> bool:
     return retired is not None and retired.recipe_id != recipe_id
 
 
-def _clear_unowned_retired_slug_from_private(
-    recipe_data: Dict[str, Any], recipe_id: str
-) -> None:
+def _clear_unowned_retired_slug_from_private(recipe_data: Dict[str, Any], recipe_id: str) -> None:
     """Do not let a private row occupy another recipe's retired alias.
 
     Private slugs are not public URLs and may be payload-provided, but the
