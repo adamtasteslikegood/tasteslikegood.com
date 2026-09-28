@@ -222,35 +222,34 @@ def _recipe_image(recipe: Recipe) -> tuple[str | None, Recipe | None]:
     return None, None
 
 
+def _image_version_source(owner: Recipe) -> str | None:
+    """Canonical identity of every stored source the image endpoint can serve."""
+    data = owner.data or {}
+    gcs = data.get("ai_image_gcs")
+    payload = data.get("ai_image_data")
+    sources = [source for source in (gcs, payload) if isinstance(source, str) and source]
+    return "|".join(sources) if sources else None
+
+
 def _image_version_token(owner: Recipe) -> str | None:
-    """A short marker derived from the exact stored image source.
+    """A short marker derived from every stored source the endpoint can serve.
 
     The generic recipe PUT can retain image-generation metadata while changing
-    ``ai_image_gcs`` or legacy ``ai_image_data``. Using that metadata as the
-    marker would therefore allow different bytes to keep the same cached
-    URL. Hash the immutable GCS object URI when present, otherwise the legacy
-    base64 payload itself, so the marker changes if and only if the bytes served
-    by ``_load_stored_image_bytes`` can change.
+    ``ai_image_gcs`` or legacy ``ai_image_data``. The full-size loader prefers
+    GCS but falls back to the legacy payload when that read fails, so both
+    non-empty string sources must participate when both are stored. Otherwise a
+    fallback-only PUT would keep the same public URL and browsers/CDNs could
+    serve stale fallback bytes for the full one-day ``max-age``.
 
     Hashed and truncated rather than emitted raw: storage identifiers and image
     payloads are internal state and do not belong in a public URL.
 
-    Chooses the source with the same per-field ``isinstance(..., str)`` gate as
-    ``_serves_own_image_bytes`` — a plain ``or`` short-circuits on the first
-    truthy value regardless of type, so a legacy ``ai_image_gcs`` that is
-    truthy-but-not-a-string would win here while ``_serves_own_image_bytes``
-    still returned True from ``ai_image_data``. That divergence made
-    ``_versioned_image_url`` emit a versionless URL for an image the endpoint
-    is actively serving — the KAN-195 stale-cache defect wearing a new hat.
+    Uses the same per-field ``isinstance(..., str)`` gate as
+    ``_serves_own_image_bytes``, preserving the invariant that every image the
+    endpoint can serve receives a versioned public URL.
     """
-    data = owner.data or {}
-    gcs = data.get("ai_image_gcs")
-    payload = data.get("ai_image_data")
-    if isinstance(gcs, str) and gcs:
-        source = gcs
-    elif isinstance(payload, str) and payload:
-        source = payload
-    else:
+    source = _image_version_source(owner)
+    if source is None:
         return None
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:12]
 

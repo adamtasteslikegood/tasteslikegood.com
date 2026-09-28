@@ -296,26 +296,35 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
     return image_bytes
 
 
+def _image_cache_version(recipe) -> str:
+    """Cache identity of every byte source the image endpoint can serve.
+
+    The shared source identity includes both the preferred GCS URI and the
+    legacy fallback payload when both exist. Hash the raw identity to retain
+    the established 16-character internal cache-key strength.
+    """
+    from blueprints.public_bp import _image_version_source
+
+    source = _image_version_source(recipe) or ""
+    return hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
+
+
 def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
     """A WebP of the recipe's image at ``width`` px (KAN-271), or ``None`` to fall back.
 
-    The variant is keyed on the image's version and built from storage — never
-    from the ``vgc:img:<id>`` Valkey entry. The worker commits a new image
-    before invalidating that entry, so it can briefly contain stale bytes.
+    The variant is keyed on the image's version (``_image_cache_version``) and
+    built from storage, never from the full-size Valkey entry, so a variant
+    only ever reflects the bytes its version names.
 
     A configured GCS URI is authoritative for variant generation. If its read
     fails, do not fall back to legacy base64 under a cache key derived from the
     GCS identity; return ``None`` and let the bounded-cache original path decide
     whether legacy fallback is appropriate.
     """
-    from blueprints.public_bp import _image_version_token
-
-    token = _image_version_token(recipe)
     stored_uri = (recipe.data or {}).get("ai_image_gcs")
     if not isinstance(stored_uri, str):
         stored_uri = ""
-    version = hashlib.sha256(f"{stored_uri}|{token}".encode("utf-8")).hexdigest()[:16]
-    key = recipe_image_variant_key(recipe.id, width, version)
+    key = recipe_image_variant_key(recipe.id, width, _image_cache_version(recipe))
 
     variant = safe_get(key)
     if variant is None:
@@ -390,7 +399,7 @@ def serve_recipe_image(recipe_id):
         # The stored bytes could not be decoded: serve them untouched below
         # rather than fail the page's image.
 
-    ck = recipe_image_key(recipe_id)
+    ck = recipe_image_key(recipe_id, _image_cache_version(recipe))
     cached_bytes = safe_get(ck)
     if cached_bytes is not None:
         return Response(

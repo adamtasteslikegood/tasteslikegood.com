@@ -1235,6 +1235,38 @@ def test_rendered_image_url_changes_when_the_image_is_regenerated(app, client):
     assert after.split("?")[0] == before.split("?")[0]
 
 
+def test_rendered_image_url_changes_when_failed_gcs_fallback_changes(app, client):
+    """A fallback-only PUT must also move the browser/CDN cache key."""
+    old_payload = base64.b64encode(b"old-fallback").decode("ascii")
+    new_payload = base64.b64encode(b"new-fallback").decode("ascii")
+    with app.app_context():
+        recipe = _make_recipe(
+            "Fallback Photo",
+            "fallback-photo",
+            data={
+                "name": "Fallback Photo",
+                "description": "Retains a GCS URI and a legacy fallback.",
+                "ai_image_gcs": "gs://bucket/recipe/unchanged.png",
+                "ai_image_data": old_payload,
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+        recipe_id = recipe.id
+
+    before = _og_image(client.get("/r/fallback-photo").get_data(as_text=True))
+
+    with app.app_context():
+        stored = db.session.get(Recipe, recipe_id)
+        stored.data = {**stored.data, "ai_image_data": new_payload}
+        db.session.commit()
+
+    after = _og_image(client.get("/r/fallback-photo").get_data(as_text=True))
+    assert before is not None and after is not None
+    assert after != before, "changed fallback kept the old public cache URL"
+    assert after.split("?")[0] == before.split("?")[0]
+
+
 def test_rendered_image_url_is_stable_when_the_image_is_not_regenerated(app, client):
     """A marker that churns on every render would defeat the 24h cache entirely."""
     with app.app_context():
