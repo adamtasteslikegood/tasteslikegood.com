@@ -198,7 +198,7 @@ def test_first_published_at_is_exposed_and_survives_unpublish(app, adam):
     )
 
 
-def test_renamed_slug_301s_to_the_same_recipe_and_can_be_reclaimed(app, adam, other):
+def test_renamed_slug_temporarily_redirects_and_can_be_reclaimed(app, adam, other):
     _publish(adam, "zp-1")
 
     resp = adam.put("/api/recipes/zp-1", json={"slug": "zucchini-poppers-deluxe"})
@@ -206,7 +206,7 @@ def test_renamed_slug_301s_to_the_same_recipe_and_can_be_reclaimed(app, adam, ot
     assert resp.get_json()["slug"] == "zucchini-poppers-deluxe"
 
     old = app.test_client().get("/r/zucchini-poppers?utm_source=pin")
-    assert old.status_code == 301
+    assert old.status_code == 302
     assert old.headers["Location"].endswith("/r/zucchini-poppers-deluxe?utm_source=pin")
     assert _publish(other, "zp-other")["slug"] == "zucchini-poppers-2"
 

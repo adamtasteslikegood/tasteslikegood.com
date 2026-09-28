@@ -18,6 +18,7 @@ from sqlalchemy.exc import IntegrityError
 
 from extensions import db
 from models import Recipe, RetiredSlug
+from models.retired_slug import lock_slug
 from utils.log_sanitizer import sanitize_log_value
 from utils.slug_utils import normalize_slug
 
@@ -292,6 +293,12 @@ def _slug_retired_against(slug: str, recipe_id: str) -> bool:
     return retired is not None and retired.recipe_id != recipe_id
 
 
+def _slug_occupied_against(slug: str, recipe_id: str) -> bool:
+    """Recheck both live and retired ownership after locking ``slug``."""
+    live = Recipe.query.filter(Recipe.slug == slug, Recipe.id != recipe_id).first()
+    return live is not None or _slug_retired_against(slug, recipe_id)
+
+
 def _clear_unowned_retired_slug_from_private(recipe_data: Dict[str, Any], recipe_id: str) -> None:
     """Do not let a private row occupy another recipe's retired alias.
 
@@ -301,6 +308,10 @@ def _clear_unowned_retired_slug_from_private(recipe_data: Dict[str, Any], recipe
     same recipe remains free to stage one of its own rename aliases.
     """
     slug = recipe_data.get("slug")
+    if recipe_data.get("is_public") is False and slug:
+        # Private rows share Recipe.slug's global uniqueness and can otherwise
+        # win the same release-versus-retirement race as a publisher.
+        lock_slug(db.session(), str(slug))
     if (
         recipe_data.get("is_public") is False
         and slug
@@ -342,9 +353,10 @@ def _resolve_public_slug(
         and (provided_slug is None or str(provided_slug) == current_slug)
         # KAN-288: a private row can hold any payload slug unvalidated, so the
         # slug it carries into publication may be one another recipe retired.
-        and not _slug_retired_against(current_slug, recipe_id)
     ):
-        return current_slug
+        lock_slug(db.session(), current_slug)
+        if not _slug_occupied_against(current_slug, recipe_id):
+            return current_slug
 
     for source in (recipe_data.get("slug"), current_slug, recipe_data.get("name")):
         candidate = _slugify(str(source)) if source else ""
@@ -375,11 +387,20 @@ def _resolve_public_slug(
         }
     )
     candidate, suffix = base, 1
-    while candidate in occupied:
-        suffix += 1
-        tail = f"-{suffix}"
-        candidate = f"{base[: _SLUG_MAX_LENGTH - len(tail)].rstrip('-')}{tail}"
-    return candidate
+    while True:
+        while candidate in occupied:
+            suffix += 1
+            tail = f"-{suffix}"
+            candidate = f"{base[: _SLUG_MAX_LENGTH - len(tail)].rstrip('-')}{tail}"
+
+        # The prefix probes above are intentionally optimistic. Serialize the
+        # final choice with retirement, then recheck exact ownership while the
+        # transaction holds the lock. This prevents a concurrent rename/delete
+        # from releasing Recipe.slug just before its tombstone becomes visible.
+        lock_slug(db.session(), candidate)
+        if not _slug_occupied_against(candidate, recipe_id):
+            return candidate
+        occupied.add(candidate)
 
 
 def _pin_source_slug_to_column(

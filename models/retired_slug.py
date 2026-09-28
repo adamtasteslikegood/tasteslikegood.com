@@ -12,7 +12,7 @@ set) gives it up:
 - **deleted** -> ``recipe_id`` NULL. Permanent: nobody reclaims it, not even a
   restore that re-POSTs the same recipe id. ``/r/<slug>`` answers 410 Gone.
 - **renamed** -> ``recipe_id`` = the row's id. The same recipe may take its old
-  slug back; while it lives under a new one, ``/r/<old>`` 301s there.
+  slug back; while it lives under a new one, ``/r/<old>`` temporarily redirects.
 
 The retirement is written by a ``before_flush`` hook rather than at each call
 site, so every write path (API delete, guest-merge cleanup, update/upsert
@@ -22,7 +22,7 @@ restaging, scripts) is covered without having to remember it.
 from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import event, inspect
+from sqlalchemy import event, inspect, text
 from sqlalchemy.orm import Session
 
 from extensions import db
@@ -39,7 +39,23 @@ class RetiredSlug(db.Model):  # type: ignore[name-defined, misc]
     retired_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
+def lock_slug(session: Session, slug: str) -> None:
+    """Serialize live/retired ownership changes for ``slug`` on PostgreSQL.
+
+    ``recipe.slug`` and ``retired_slug.slug`` live in separate tables, so a
+    database uniqueness constraint cannot span both. A transaction-scoped
+    advisory lock closes the rename/delete versus publish race without leaving
+    locks behind after commit or rollback. SQLite already serializes writers.
+    """
+    if session.get_bind().dialect.name == "postgresql":
+        session.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:slug, 0))"),
+            {"slug": slug},
+        )
+
+
 def _retire(session: Session, slug: str, recipe_id: Optional[str]) -> None:
+    lock_slug(session, slug)
     existing = session.get(RetiredSlug, slug)
     if existing is None:
         session.add(RetiredSlug(slug=slug, recipe_id=recipe_id, retired_at=datetime.utcnow()))
@@ -49,6 +65,12 @@ def _retire(session: Session, slug: str, recipe_id: Optional[str]) -> None:
 
 
 def _retire_published_slugs(session: Session, _flush_context: Any, _instances: Any) -> None:
+    # Historical data migrations run against schemas that predate this model's
+    # column/table. They opt out explicitly so this global listener cannot lazy
+    # load ``first_published_at`` before the column exists.
+    if session.info.get("skip_retired_slug_listener"):
+        return
+
     with session.no_autoflush:
         for obj in list(session.new):
             if isinstance(obj, Recipe) and obj.is_public and obj.first_published_at is None:
@@ -76,6 +98,7 @@ def _retire_published_slugs(session: Session, _flush_context: Any, _instances: A
             # just its current slug. Otherwise a same-id restore could reclaim
             # an older rename alias because owned retirements are reclaimable.
             for retired in session.query(RetiredSlug).filter(RetiredSlug.recipe_id == obj.id):
+                lock_slug(session, retired.slug)
                 retired.recipe_id = None
             deleted_slugs: tuple[Optional[str], ...] = tuple(
                 inspect(obj).attrs.slug.history.deleted or ()

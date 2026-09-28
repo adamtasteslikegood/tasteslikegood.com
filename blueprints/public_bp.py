@@ -876,7 +876,7 @@ def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> Re
 
     - retired by a delete, or its recipe has since been deleted -> 410 Gone:
       the page existed and was removed on purpose, and never comes back;
-    - retired by a rename and that recipe is public under a new slug -> 301;
+    - retired by a rename and that recipe is public under a new slug -> 302;
     - anything else (never existed, or unpublished, which is reversible) -> 404.
     """
     retired = db.session.get(RetiredSlug, slug)
@@ -892,7 +892,10 @@ def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> Re
                     if canonical
                     else url_for(endpoint, slug=target.slug)
                 )
-                return redirect(location, code=301)
+                # This alias is reclaimable by its recipe, so the redirect must
+                # not be cached permanently. A cached 301 can redirect away
+                # from the alias after it becomes live again (or create a loop).
+                return redirect(location, code=302)
             return abort(404)
     return abort(410)
 
