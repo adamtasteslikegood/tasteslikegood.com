@@ -208,7 +208,12 @@ def test_unpublished_recipe_is_404_not_410(app, adam):
     slug = _publish(adam, "zp-1")["slug"]
     _unpublish(adam, "zp-1")
 
-    assert app.test_client().get(f"/r/{slug}").status_code == 404
+    client = app.test_client()
+    assert client.get(f"/r/{slug}").status_code == 404
+    api = client.get(f"/api/recipes/public/{slug}")
+    assert api.status_code == 404
+    assert api.is_json, api.get_data(as_text=True)
+    assert api.get_json() == {"error": "Recipe not found"}
     assert db.session.get(RetiredSlug, slug) is None
 
 
