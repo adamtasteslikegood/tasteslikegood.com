@@ -158,6 +158,7 @@ def test_private_row_carrying_a_retired_slug_cannot_publish_under_it(app, adam, 
 
     resp = other.post("/api/recipes", json={"id": "sneaky", "name": "Something else", "slug": slug})
     assert resp.status_code == 201, resp.get_json()
+    assert resp.get_json()["slug"] is None, "a private row must not occupy a retired alias"
 
     resp = other.put("/api/recipes/sneaky", json={"is_public": True})
 
@@ -191,6 +192,8 @@ def test_first_published_at_is_exposed_and_survives_unpublish(app, adam):
     assert first is not None
 
     assert _unpublish(adam, "zp-1")["first_published_at"] == first
+    listed = adam.get("/api/recipes").get_json()["recipes"]
+    assert next(recipe for recipe in listed if recipe["id"] == "zp-1")["first_published_at"] == first
 
 
 def test_renamed_slug_301s_to_the_same_recipe_and_can_be_reclaimed(app, adam, other):
@@ -216,9 +219,17 @@ def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs
     db.session.add_all(
         [
             Recipe(id="live", name="Live", slug="live", data={}),
+            Recipe(id="renamed", name="Renamed", slug="renamed-now", data={}),
             Recipe(id="draft", name="Draft", data={}),
             Recipe(id="copy", name="Copy", source_slug="deleted-source", data={}),
             Recipe(id="copy2", name="Copy", source_slug="live", data={}),
+            Recipe(
+                id="renamed-copy",
+                name="Copy",
+                source_slug="renamed-old",
+                source_recipe_id="renamed",
+                data={},
+            ),
         ]
     )
     db.session.commit()
@@ -231,4 +242,5 @@ def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs
     assert db.session.get(Recipe, "live").first_published_at is not None
     assert db.session.get(Recipe, "draft").first_published_at is None
     assert db.session.get(RetiredSlug, "deleted-source").recipe_id is None
+    assert db.session.get(RetiredSlug, "renamed-old").recipe_id == "renamed"
     assert db.session.get(RetiredSlug, "live") is None
