@@ -54,9 +54,15 @@
                 alt="{{ recipe.name }}"
                 fetchpriority="high"
                 decoding="async"
+                {# KAN-284: saves through the Pinterest browser extension get the
+                   same 2:3 image and keyword text as the Save button. #}
+                {%- if pin_image_url %}
+                data-pin-media="{{ pin_image_url }}"
+                data-pin-description="{{ pin_description }}"
+                {%- endif %}
             />
             {% else %}
-            <img src="{{ image_url }}" alt="{{ recipe.name }}" width="1408" height="768" fetchpriority="high" decoding="async" />
+            <img src="{{ image_url }}" alt="{{ recipe.name }}" width="1408" height="768" fetchpriority="high" decoding="async"{% if pin_image_url %} data-pin-media="{{ pin_image_url }}" data-pin-description="{{ pin_description }}"{% endif %} />
             {% endif %}
         </div>
         <div class="public-recipe-hero-overlay">

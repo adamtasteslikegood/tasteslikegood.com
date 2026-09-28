@@ -25,7 +25,12 @@ from sqlalchemy import event
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
-from blueprints.public_bp import _format_ingredient, _safe_minutes  # noqa: E402
+from blueprints.public_bp import (  # noqa: E402
+    DEFAULT_RECIPE_DESCRIPTION,
+    _format_ingredient,
+    _pin_description,
+    _safe_minutes,
+)
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from models.user import User  # noqa: E402
@@ -243,10 +248,12 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
     if expected_media == "endpoint":
         # KAN-195: our own image endpoint is versioned; the stock-image case
         # below is someone else's host and must be passed through untouched.
+        # KAN-284: the pin uses the 2:3 variant, versioned like the hero.
         assert re.fullmatch(
-            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?pin=1&v=[0-9a-f]+",
             media,
         ), media
+        assert f'data-pin-media="{html.escape(media)}"' in body
     else:
         assert media == expected_media
 
@@ -1423,3 +1430,64 @@ def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(
     assert re.fullmatch(
         rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", url
     ), url
+
+
+# ── Pinterest pin text (KAN-284) ─────────────────────────────────────────────
+
+
+def _pinterest_description_param(body: str) -> str:
+    match = re.search(r'href="(https://www\.pinterest\.com/pin/create/button/\?[^"]+)"', body)
+    assert match, "no Pinterest share link in page"
+    return parse_qs(urlsplit(html.unescape(match.group(1))).query)["description"][0]
+
+
+def test_pin_description_leads_with_name_then_sentence_then_keywords():
+    text = _pin_description(
+        "Smoky Tofu Tacos",
+        "Charred tortillas with smoky tofu. Ready in 20 minutes.",
+        ["Tacos", "vegan", "Dinner", "High-Protein", "Quick"],
+    )
+    assert text == (
+        "Smoky Tofu Tacos — Charred tortillas with smoky tofu. "
+        "Vegan recipe: Tacos, Dinner, High-Protein."
+    )
+
+
+def test_pin_description_skips_the_placeholder_description():
+    assert _pin_description("Plain Oats", DEFAULT_RECIPE_DESCRIPTION, []) == (
+        "Plain Oats. Vegan recipe."
+    )
+
+
+def test_pin_description_dedupes_tags_case_insensitively():
+    text = _pin_description("Soup", "Warm.", ["VEGAN", "soup", "Soup", "winter"])
+    assert text.endswith("Vegan recipe: soup, winter.")
+
+
+def test_pin_description_fits_500_and_keeps_the_keyword_tail():
+    long_sentence = " ".join(["word"] * 200) + "."
+    text = _pin_description("Long Recipe", long_sentence, ["breakfast", "brunch"])
+    assert len(text) <= 500
+    assert text.endswith("Vegan recipe: breakfast, brunch.")
+    assert "…" in text
+
+
+def test_recipe_page_pins_with_keyword_description(app, client):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Keyword Curry",
+            "keyword-curry",
+            data={
+                "name": "Keyword Curry",
+                "description": "A coconut curry with chickpeas. Serve with rice.",
+                "tags": ["curry", "dinner"],
+                "ai_image_data": base64.b64encode(b"\x89PNGpin").decode("ascii"),
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    body = client.get("/r/keyword-curry").get_data(as_text=True)
+    expected = "Keyword Curry — A coconut curry with chickpeas. Vegan recipe: curry, dinner."
+    assert _pinterest_description_param(body) == expected
+    assert f'data-pin-description="{html.escape(expected)}"' in body

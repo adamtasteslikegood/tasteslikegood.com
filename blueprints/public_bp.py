@@ -291,12 +291,30 @@ def _rendered_image(recipe: Recipe) -> tuple[str | None, dict[str, str] | None]:
     """``(versioned full-size URL, sized variants)`` for the recipe page.
 
     One ``_recipe_image`` call feeds both, so a saved copy's source lookup is
-    not repeated. Variants are ``None`` when the image is not served by us.
+    not repeated. Variants are ``None`` when the image is not served by us;
+    otherwise they also carry ``pin``, the Pinterest pin image URL.
     """
     url, owner = _recipe_image(recipe)
     if url is None or owner is None or not _serves_own_image_bytes(owner):
         return url, None
-    return _versioned_image_url(owner), _image_variants(owner, HERO_IMAGE_WIDTHS)
+    variants = _image_variants(owner, HERO_IMAGE_WIDTHS)
+    variants["pin"] = _pin_image_url(owner)
+    return _versioned_image_url(owner), variants
+
+
+def _pin_image_url(owner: Recipe) -> str:
+    """Absolute URL of the 2:3 Pinterest pin JPEG (KAN-284), versioned like the hero.
+
+    Absolute because Pinterest fetches it from its own servers. Same gate and
+    ``?v=`` marker as ``_versioned_image_url``: a pin of a replaced photo must
+    not be the old bytes.
+    """
+    return _canonical_url(
+        "generation_api.serve_recipe_image",
+        recipe_id=owner.id,
+        pin=1,
+        v=_image_version_token(owner),
+    )
 
 
 def _versioned_image_url(owner: Recipe) -> str:
@@ -741,10 +759,53 @@ def _collection_json_ld(
     }
 
 
-def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
+MAX_PIN_DESCRIPTION_LENGTH = 500
+PIN_DESCRIPTION_TAGS = 3
+
+
+def _trim_to_words(text: str, limit: int) -> str:
+    """``text`` cut to at most ``limit`` characters at a word boundary, with an ellipsis."""
+    if len(text) <= limit:
+        return text
+    cut = text[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
+    return f"{cut}…"
+
+
+def _pin_description(name: str, description: str, tags: list[str]) -> str:
+    """Keyword pin text (KAN-284): name, first sentence, "Vegan recipe", up to 3 tags.
+
+    Pinterest search indexes the pin description (up to 500 characters; the
+    first 50-60 show in the feed), so the name leads. The placeholder
+    description is skipped rather than pinned, and "vegan" is said once, not
+    repeated from the tags. The keyword tail is kept whole: when the text is
+    too long, the sentence gives way.
+    """
+    seen = {"vegan"}
+    keywords = []
+    for tag in tags:
+        if tag.lower() not in seen:
+            seen.add(tag.lower())
+            keywords.append(tag)
+    tail = "Vegan recipe" + (
+        f": {', '.join(keywords[:PIN_DESCRIPTION_TAGS])}." if keywords else "."
+    )
+    head = " ".join(name.split())
+
+    text = " ".join(description.split())
+    if description == DEFAULT_RECIPE_DESCRIPTION or not text:
+        return _trim_to_words(f"{head}. {tail}", MAX_PIN_DESCRIPTION_LENGTH)
+    end = _SENTENCE_END.search(text)
+    sentence = text[: end.end()] if end else f"{text}."
+    budget = MAX_PIN_DESCRIPTION_LENGTH - len(head) - len(tail) - len(" — ") - 1
+    return _trim_to_words(
+        f"{head} — {_trim_to_words(sentence, max(budget, 1))} {tail}", MAX_PIN_DESCRIPTION_LENGTH
+    )
+
+
+def _pinterest_share_url(canonical_url: str, image_url: str | None, description: str) -> str:
     params = {
         "url": canonical_url,
-        "description": recipe_name,
+        "description": description,
     }
     if image_url:
         params["media"] = image_url
@@ -799,10 +860,13 @@ def show_public_recipe(slug):
     # saved-copy source lookup for no gain. It gets the versioned URL too: a
     # pin whose media is the pre-regeneration photo is the same defect wearing
     # a different hat.
-    pinterest_image_url = image_url
+    #
+    # KAN-284: when the photo is ours, the pin uses its 2:3 variant instead.
+    pinterest_image_url = (image_variants or {}).get("pin") or image_url
     description = _recipe_description(data)
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
+    pin_description = _pin_description(recipe.name, description, tags)
     catalog = _catalog_tag_rows()
     linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
     # KAN-274: the trail runs through the recipe's first indexable hub.
@@ -831,10 +895,12 @@ def show_public_recipe(slug):
         tags=tags,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=(
-            _pinterest_share_url(canonical_url, pinterest_image_url, recipe.name)
+            _pinterest_share_url(canonical_url, pinterest_image_url, pin_description)
             if pinterest_image_url
             else None
         ),
+        pin_image_url=pinterest_image_url,
+        pin_description=pin_description,
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
     )
 
