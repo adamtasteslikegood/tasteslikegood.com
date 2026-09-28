@@ -8,6 +8,7 @@ Provides endpoints for the Angular frontend (via Express proxy):
 """
 
 import base64
+import binascii
 import hashlib
 import logging
 import uuid
@@ -290,8 +291,13 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
 
     if image_bytes is None and allow_legacy_fallback:
         image_b64 = recipe_data.get("ai_image_data")
-        if image_b64:
-            image_bytes = base64.b64decode(image_b64)
+        # Writable through the generic recipe PUT, so it can be any JSON value:
+        # a non-string or malformed payload is "no image" (404), not a 500.
+        if isinstance(image_b64, str) and image_b64:
+            try:
+                image_bytes = base64.b64decode(image_b64) or None
+            except (binascii.Error, ValueError):
+                image_bytes = None
 
     return image_bytes
 
