@@ -886,12 +886,14 @@ def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> Re
         target = db.session.get(Recipe, retired.recipe_id)
         if target is not None:
             if target.is_public and target.slug and target.slug != slug:
-                carried = _carried_redirect_params(keep_save=True)
-                location = (
-                    _canonical_url(endpoint, slug=target.slug, **carried)
-                    if canonical
-                    else url_for(endpoint, slug=target.slug)
-                )
+                if canonical:
+                    location = _canonical_url(
+                        endpoint,
+                        slug=target.slug,
+                        **_carried_redirect_params(keep_save=True),
+                    )
+                else:
+                    location = url_for(endpoint, slug=target.slug)
                 # This alias is reclaimable by its recipe, so the redirect must
                 # not be cached permanently. A cached 301 can redirect away
                 # from the alias after it becomes live again (or create a loop).

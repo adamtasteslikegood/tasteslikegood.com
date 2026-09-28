@@ -16,8 +16,10 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from app import create_app
 from extensions import db
 from models import Recipe, RetiredSlug
+from models.retired_slug import RetiredSlugTakenError
 from models.user import User
 
+_BACKFILL = Path(__file__).resolve().parent.parent / "scripts" / "backfill_slugs.py"
 _MIGRATION = (
     Path(__file__).resolve().parent.parent
     / "migrations"
@@ -232,6 +234,14 @@ def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs
                 source_recipe_id="renamed",
                 data={},
             ),
+            # The source was hard-deleted: its id is a ghost, not an owner.
+            Recipe(
+                id="ghost-copy",
+                name="Copy",
+                source_slug="ghost-source",
+                source_recipe_id="ghost-uuid",
+                data={},
+            ),
         ]
     )
     db.session.commit()
@@ -245,4 +255,42 @@ def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs
     assert db.session.get(Recipe, "draft").first_published_at is None
     assert db.session.get(RetiredSlug, "deleted-source").recipe_id is None
     assert db.session.get(RetiredSlug, "renamed-old").recipe_id == "renamed"
+    assert (
+        db.session.get(RetiredSlug, "ghost-source").recipe_id is None
+    ), "a deleted source's id must not become a reclaimable owner"
     assert db.session.get(RetiredSlug, "live") is None
+
+
+def test_direct_orm_writer_cannot_take_a_retired_slug(app, adam):
+    """Scripts bypass the repository resolvers; the flush hook still refuses."""
+    slug = _publish(adam, "zp-1")["slug"]
+    _unpublish_and_delete(adam, "zp-1")
+
+    db.session.add(Recipe(id="scripted", name="Zucchini Poppers", slug=slug, data={}))
+    with pytest.raises(RetiredSlugTakenError):
+        db.session.flush()
+    db.session.rollback()
+
+    row = Recipe(id="scripted", name="Zucchini Poppers", data={})
+    db.session.add(row)
+    db.session.commit()
+    row.slug = slug
+    with pytest.raises(RetiredSlugTakenError):
+        db.session.flush()
+    db.session.rollback()
+    assert app.test_client().get(f"/r/{slug}").status_code == 410
+
+
+def test_backfill_script_skips_retired_slugs(app, adam):
+    slug = _publish(adam, "zp-1")["slug"]
+    _unpublish_and_delete(adam, "zp-1")
+    db.session.add(Recipe(id="slugless", name="Zucchini Poppers", data={}))
+    db.session.commit()
+
+    spec = importlib.util.spec_from_file_location("backfill_slugs", _BACKFILL)
+    script = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(script)
+    script.run_backfill(app)
+
+    db.session.expire_all()
+    assert db.session.get(Recipe, "slugless").slug == f"{slug}-2"

@@ -54,6 +54,23 @@ def lock_slug(session: Session, slug: str) -> None:
         )
 
 
+class RetiredSlugTakenError(ValueError):
+    """A write tried to give a recipe a slug retired against a different recipe."""
+
+
+def _guard_new_slug(session: Session, obj: Recipe) -> None:
+    """Refuse a newly assigned slug that is retired against another recipe.
+
+    The repository resolvers never pick such a slug; this backstops every
+    other writer (scripts such as ``backfill_slugs.py``, ad-hoc ORM code), so
+    a tombstoned /r/<slug> can never start serving a different recipe.
+    """
+    lock_slug(session, obj.slug)
+    retired = session.get(RetiredSlug, obj.slug)
+    if retired is not None and retired.recipe_id != obj.id:
+        raise RetiredSlugTakenError(f"slug {obj.slug!r} is retired and cannot be reassigned")
+
+
 def _retire(session: Session, slug: str, recipe_id: Optional[str]) -> None:
     lock_slug(session, slug)
     existing = session.get(RetiredSlug, slug)
@@ -73,12 +90,18 @@ def _retire_published_slugs(session: Session, _flush_context: Any, _instances: A
 
     with session.no_autoflush:
         for obj in list(session.new):
-            if isinstance(obj, Recipe) and obj.is_public and obj.first_published_at is None:
+            if not isinstance(obj, Recipe):
+                continue
+            if obj.slug:
+                _guard_new_slug(session, obj)
+            if obj.is_public and obj.first_published_at is None:
                 obj.first_published_at = datetime.utcnow()
 
         for obj in list(session.dirty):
             if not isinstance(obj, Recipe):
                 continue
+            if obj.slug and inspect(obj).attrs.slug.history.added:
+                _guard_new_slug(session, obj)
             was_published = obj.first_published_at is not None
             if obj.is_public and not was_published:
                 obj.first_published_at = datetime.utcnow()
@@ -112,9 +135,3 @@ def _retire_published_slugs(session: Session, _flush_context: Any, _instances: A
 
 if not event.contains(Session, "before_flush", _retire_published_slugs):
     event.listen(Session, "before_flush", _retire_published_slugs)
-
-
-def retired_slug_owner(slug: str) -> tuple[bool, Optional[str]]:
-    """``(retired, recipe_id)`` for ``slug``; ``recipe_id`` is None once deleted."""
-    row = db.session.get(RetiredSlug, slug)
-    return (row is not None, row.recipe_id if row is not None else None)
