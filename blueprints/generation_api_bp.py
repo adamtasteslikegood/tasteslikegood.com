@@ -297,19 +297,30 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
 
 
 def _image_cache_version(recipe) -> str:
-    """Cache identity of the recipe's stored image, shared by every size.
+    """Cache identity of every byte source the full-size endpoint can serve.
 
-    Derived from the stored source (GCS URI plus the public ``?v=`` token), so
-    any change to ``ai_image_gcs`` or ``ai_image_data``, from the worker or a
-    generic recipe PUT, yields a new version and therefore new cache keys.
+    The primary token follows the public ``?v=`` URL: immutable GCS URI when
+    present, otherwise legacy base64. The full-size loader may still fall back
+    to ``ai_image_data`` when a configured GCS read fails, so include a
+    separate fallback digest whenever both sources exist. A generic recipe PUT
+    that replaces either source therefore always yields a new cache key.
     """
     from blueprints.public_bp import _image_version_token
 
+    data = recipe.data or {}
     token = _image_version_token(recipe)
-    stored_uri = (recipe.data or {}).get("ai_image_gcs")
+    stored_uri = data.get("ai_image_gcs")
     if not isinstance(stored_uri, str):
         stored_uri = ""
-    return hashlib.sha256(f"{stored_uri}|{token}".encode("utf-8")).hexdigest()[:16]
+
+    fallback_token = ""
+    fallback_payload = data.get("ai_image_data")
+    if stored_uri and isinstance(fallback_payload, str) and fallback_payload:
+        fallback_token = hashlib.sha256(fallback_payload.encode("utf-8")).hexdigest()[:12]
+
+    return hashlib.sha256(
+        f"{stored_uri}|{token}|{fallback_token}".encode("utf-8")
+    ).hexdigest()[:16]
 
 
 def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
