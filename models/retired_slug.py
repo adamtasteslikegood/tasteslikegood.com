@@ -129,7 +129,11 @@ def _retire_published_slugs(session: Session, _flush_context: Any, _instances: A
             for deleted_slug in deleted_slugs:
                 if deleted_slug:
                     _retire(session, deleted_slug, None)
-            if obj.slug:
+            # If the slug changed immediately before deletion, SQLAlchemy
+            # cancels that UPDATE and only the persisted value in
+            # ``history.deleted`` ever served a public URL. Do not tombstone
+            # the transient replacement as though it had gone live.
+            if obj.slug and not deleted_slugs:
                 _retire(session, obj.slug, None)
 
 

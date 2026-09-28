@@ -188,6 +188,22 @@ def test_deleting_a_renamed_recipe_permanently_retires_every_alias(app, adam):
     assert public.get("/r/zucchini-poppers-deluxe").status_code == 410
 
 
+def test_rename_and_delete_in_one_flush_does_not_retire_transient_slug(app, adam):
+    """A cancelled same-flush UPDATE must not tombstone a URL that never served."""
+    _publish(adam, "zp-1")
+    recipe = db.session.get(Recipe, "zp-1")
+    assert recipe is not None
+
+    recipe.slug = "never-persisted"
+    db.session.delete(recipe)
+    db.session.commit()
+
+    retired = db.session.get(RetiredSlug, "zucchini-poppers")
+    assert retired is not None and retired.recipe_id is None
+    assert db.session.get(RetiredSlug, "never-persisted") is None
+    assert app.test_client().get("/r/never-persisted").status_code == 404
+
+
 def test_private_row_carrying_a_retired_slug_cannot_publish_under_it(app, adam, other):
     """A private row stores any payload slug unvalidated; publishing must re-check it."""
     slug = _publish(adam, "zp-1")["slug"]
