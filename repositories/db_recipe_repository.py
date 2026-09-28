@@ -1459,7 +1459,21 @@ def delete_recipe(
         True if deleted successfully, False otherwise
     """
     try:
-        recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
+        # Serialize deletion with publish/rename updates.  In addition to the
+        # row lock, ``populate_existing`` is important here: this scoped
+        # session may already hold a stale private Recipe while a concurrent
+        # transaction has just published it.  Rechecking the locked database
+        # row keeps the 409 guard authoritative.
+        recipe = cast(
+            Optional[Recipe],
+            _apply_recipe_scope(
+                Recipe.query.populate_existing().filter(Recipe.id == recipe_id),
+                user_id,
+                guest_session_id,
+            )
+            .with_for_update()
+            .first(),
+        )
 
         if not recipe:
             logger.warning(

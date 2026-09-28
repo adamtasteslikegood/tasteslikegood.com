@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from sqlalchemy.orm import Session
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -18,6 +19,7 @@ from extensions import db
 from models import Recipe, RetiredSlug
 from models.retired_slug import RetiredSlugTakenError
 from models.user import User
+from repositories import db_recipe_repository
 
 _BACKFILL = Path(__file__).resolve().parent.parent / "scripts" / "backfill_slugs.py"
 _MIGRATION = (
@@ -90,6 +92,34 @@ def test_deleting_a_published_recipe_is_refused_with_409(app, adam):
     row = db.session.get(Recipe, "zp-1")
     assert row is not None and row.is_public and row.slug == created["slug"]
     assert db.session.get(RetiredSlug, created["slug"]) is None
+
+
+def test_delete_refreshes_and_locks_before_checking_publish_state(app, adam):
+    """A concurrent publish cannot race an earlier private-row read into deletion."""
+    created = adam.post(
+        "/api/recipes",
+        json={"id": "zp-1", "name": "Zucchini Poppers", "slug": "zucchini-poppers"},
+    )
+    assert created.status_code == 201, created.get_json()
+    stale = db.session.get(Recipe, "zp-1")
+    assert stale is not None and stale.is_public is False
+
+    # A separate transaction publishes after this session cached the private
+    # row.  delete_recipe must populate the locked row from the database before
+    # applying its 409 guard.
+    with Session(db.engine) as concurrent:
+        published = concurrent.get(Recipe, "zp-1")
+        assert published is not None
+        published.is_public = True
+        concurrent.commit()
+
+    assert stale.is_public is False, "the deleting session still has the old snapshot"
+    with pytest.raises(db_recipe_repository.PublishedRecipeDeleteError):
+        db_recipe_repository.delete_recipe("zp-1", user_id=stale.user_id)
+
+    db.session.expire_all()
+    current = db.session.get(Recipe, "zp-1")
+    assert current is not None and current.is_public is True
 
 
 def test_deleted_slug_answers_410_and_is_never_given_to_another_recipe(app, adam, other):
