@@ -460,6 +460,23 @@ def test_pin_variant_flattens_transparency_onto_the_pad():
         assert r > 240 and g > 240 and b > 240
 
 
+def test_pin_variant_flattens_mixed_alpha_before_blurring():
+    source = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+    source.paste((220, 20, 20, 255), (60, 60, 140, 140))
+    out = io.BytesIO()
+    source.save(out, format="PNG")
+
+    pin = make_pin_variant(out.getvalue())
+    assert pin is not None
+    with Image.open(io.BytesIO(pin)) as image:
+        # This point is just outside the sharp foreground subject, where the
+        # RGB pad should carry its blurred red colour. Blurring RGBA first and
+        # reusing the blurred alpha as a paste mask applies alpha twice and
+        # leaves a pale seam here instead.
+        r, g, b = image.getpixel((175, 750))
+        assert r > 235 and r - g > 40 and r - b > 40
+
+
 def test_pin_variant_of_undecodable_bytes_is_none():
     assert make_pin_variant(b"not an image") is None
 
