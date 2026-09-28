@@ -121,14 +121,15 @@ def make_pin_variant(image_bytes: bytes) -> bytes | None:
     pin_w, pin_h = PIN_SIZE
     try:
         photo = _open_source(image_bytes).convert("RGBA")
-        background_layer = ImageOps.fit(photo, PIN_SIZE, Image.Resampling.LANCZOS).filter(
-            ImageFilter.GaussianBlur(PIN_BACKGROUND_BLUR)
-        )
-        # RGBA -> RGB drops alpha instead of compositing it, which turns fully
-        # transparent pixels black. Composite the blurred pad onto an opaque
-        # canvas first so transparent sources cannot leak black/hidden RGB.
+        # Composite the cover-scaled copy onto an opaque canvas *before* blurring:
+        # blurring RGBA would smear the alpha channel too, which for a hard 0/255
+        # edge (opaque subject on transparent field) leaks white through the pad
+        # along the original alpha seams. Flattening first also stops the RGBA ->
+        # RGB drop from turning fully transparent pixels black.
+        covered = ImageOps.fit(photo, PIN_SIZE, Image.Resampling.LANCZOS)
         background = Image.new("RGB", PIN_SIZE, "white")
-        background.paste(background_layer, (0, 0), background_layer)
+        background.paste(covered, (0, 0), covered)
+        background = background.filter(ImageFilter.GaussianBlur(PIN_BACKGROUND_BLUR))
         scale = min(pin_w / photo.width, pin_h / photo.height)
         fitted_size = (
             max(1, round(photo.width * scale)),

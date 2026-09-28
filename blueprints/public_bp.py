@@ -307,13 +307,21 @@ def _pin_image_url(owner: Recipe) -> str:
 
     Absolute because Pinterest fetches it from its own servers. Same gate and
     ``?v=`` marker as ``_versioned_image_url``: a pin of a replaced photo must
-    not be the old bytes.
+    not be the old bytes. Fail loud on a missing token for the same reason
+    ``_versioned_image_url`` does (KAN-195): a versionless URL is permanently
+    CDN-cached.
     """
+    token = _image_version_token(owner)
+    if token is None:
+        raise RuntimeError(
+            "_pin_image_url called for owner without an image-version token; "
+            "callers must gate on _serves_own_image_bytes."
+        )
     return _canonical_url(
         "generation_api.serve_recipe_image",
         recipe_id=owner.id,
         pin=1,
-        v=_image_version_token(owner),
+        v=token,
     )
 
 
