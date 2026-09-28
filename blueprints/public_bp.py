@@ -291,8 +291,9 @@ def _rendered_image(recipe: Recipe) -> tuple[str | None, dict[str, str] | None]:
     """``(versioned full-size URL, sized variants)`` for the recipe page.
 
     One ``_recipe_image`` call feeds both, so a saved copy's source lookup is
-    not repeated. Variants are ``None`` when the image is not served by us;
-    otherwise they also carry ``pin``, the Pinterest pin image URL.
+    not repeated. Variants are ``None`` when the image is not served by us.
+    Their ``src`` and ``srcset`` entries are host-relative; ``pin`` is
+    deliberately absolute because Pinterest fetches it from its own servers.
     """
     url, owner = _recipe_image(recipe)
     if url is None or owner is None or not _serves_own_image_bytes(owner):
@@ -815,6 +816,8 @@ def _pin_description(name: str, description: str, tags: list[str]) -> str:
     keywords: list[str] = []
     for tag in tags:
         tag = " ".join(tag.split())
+        if not tag:
+            continue
         if tag.lower() in seen or len(keywords) == PIN_DESCRIPTION_TAGS:
             continue
         if len(f"Vegan recipe: {', '.join([*keywords, tag])}.") > MAX_PIN_TAIL_LENGTH:
