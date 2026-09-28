@@ -776,11 +776,15 @@ MAX_PIN_TAIL_LENGTH = 200
 
 
 def _trim_to_words(text: str, limit: int) -> str:
-    """``text`` cut to at most ``limit`` characters at a word boundary, with an ellipsis."""
+    """``text`` cut to at most ``limit`` characters at a word boundary, with an ellipsis.
+
+    Sentence terminators are stripped from the cut word so the ellipsis does not
+    double up on the abbreviation-cut sentence (``"e.g."`` → ``"e.g.…"``).
+    """
     if len(text) <= limit:
         return text
     prefix = text[: limit - 1]
-    cut = prefix.rsplit(" ", 1)[0].rstrip(" ,;:-–—") if " " in prefix else ""
+    cut = prefix.rsplit(" ", 1)[0].rstrip(" .,;:!?-–—") if " " in prefix else ""
     return f"{cut}…" if cut else "…"
 
 
@@ -881,7 +885,11 @@ def show_public_recipe(slug):
     description = _recipe_description(data)
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
-    pin_description = _pin_description(recipe.name, description, tags)
+    # Only used behind ``pinterest_image_url`` (share button + ``data-pin-*``);
+    # skip the tag/regex/trim work on imageless recipes that never emit it.
+    pin_description = (
+        _pin_description(recipe.name, description, tags) if pinterest_image_url else None
+    )
     catalog = _catalog_tag_rows()
     linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
     # KAN-274: the trail runs through the recipe's first indexable hub.
