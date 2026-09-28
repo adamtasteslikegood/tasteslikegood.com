@@ -1,3 +1,4 @@
+Warning: Python 3.12 cannot parse code formatted for Python 3.13. To fix this: run Black with Python 3.13, set --target-version to py312, or use --fast to skip the safety check. Black's safety check verifies equivalence by parsing the AST, which fails when the running Python is older than the target version.
 """
 Public SSR blueprint — server-rendered routes for anonymous visitors and
 search-engine crawlers.
@@ -109,9 +110,7 @@ def _serves_own_image_bytes(recipe: Recipe) -> bool:
     data = recipe.data or {}
     gcs = data.get("ai_image_gcs")
     payload = data.get("ai_image_data")
-    return (isinstance(gcs, str) and bool(gcs)) or (
-        isinstance(payload, str) and bool(payload)
-    )
+    return (isinstance(gcs, str) and bool(gcs)) or (isinstance(payload, str) and bool(payload))
 
 
 def _own_image_url(recipe: Recipe) -> str | None:
@@ -229,9 +228,7 @@ def _image_version_source(owner: Recipe) -> str | None:
     data = owner.data or {}
     gcs = data.get("ai_image_gcs")
     payload = data.get("ai_image_data")
-    sources = [
-        source for source in (gcs, payload) if isinstance(source, str) and source
-    ]
+    sources = [source for source in (gcs, payload) if isinstance(source, str) and source]
     return "|".join(sources) if sources else None
 
 
@@ -343,9 +340,7 @@ def _versioned_image_url(owner: Recipe) -> str:
             "_versioned_image_url called for owner without an image-version token; "
             "callers must gate on _serves_own_image_bytes."
         )
-    return _canonical_url(
-        "generation_api.serve_recipe_image", recipe_id=owner.id, v=token
-    )
+    return _canonical_url("generation_api.serve_recipe_image", recipe_id=owner.id, v=token)
 
 
 # Sized WebP variants (KAN-271). ``sizes`` mirror recipe-site.css: the hero
@@ -426,9 +421,7 @@ def _recipe_ingredient_groups(
     for group_name, raw_ingredients in raw_groups.items():
         if not isinstance(raw_ingredients, list):
             continue
-        ingredients = [
-            ingredient for ingredient in raw_ingredients if isinstance(ingredient, dict)
-        ]
+        ingredients = [ingredient for ingredient in raw_ingredients if isinstance(ingredient, dict)]
         if ingredients:
             groups.append((str(group_name), ingredients))
     return groups
@@ -464,11 +457,7 @@ DEFAULT_RECIPE_DESCRIPTION = "A vegan recipe from TastesLikeGood."
 def _recipe_description(data: dict[str, Any]) -> str:
     """Persisted recipe JSON is legacy-tolerant; metadata always needs text."""
     value = data.get("description")
-    return (
-        value
-        if isinstance(value, str) and value.strip()
-        else DEFAULT_RECIPE_DESCRIPTION
-    )
+    return value if isinstance(value, str) and value.strip() else DEFAULT_RECIPE_DESCRIPTION
 
 
 def _clean_json(value: Any) -> Any:
@@ -479,17 +468,11 @@ def _clean_json(value: Any) -> Any:
             if (cleaned := _clean_json(raw)) not in (None, "", [], {})
         }
     if isinstance(value, list):
-        return [
-            cleaned
-            for raw in value
-            if (cleaned := _clean_json(raw)) not in (None, "", [], {})
-        ]
+        return [cleaned for raw in value if (cleaned := _clean_json(raw)) not in (None, "", [], {})]
     return value
 
 
-def _recipe_json_ld(
-    recipe: Recipe, canonical_url: str, image_url: str | None
-) -> dict[str, Any]:
+def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -> dict[str, Any]:
     data = recipe.data or {}
     prep_minutes = _safe_minutes(data.get("prepTime"))
     cook_minutes = _safe_minutes(data.get("cookTime"))
@@ -520,19 +503,13 @@ def _recipe_json_ld(
             if author_name
             else {"@type": "Organization", "name": "TastesLikeGood"}
         ),
-        "datePublished": (
-            recipe.created_at.date().isoformat() if recipe.created_at else None
-        ),
-        "dateModified": (
-            recipe.updated_at.date().isoformat() if recipe.updated_at else None
-        ),
+        "datePublished": recipe.created_at.date().isoformat() if recipe.created_at else None,
+        "dateModified": recipe.updated_at.date().isoformat() if recipe.updated_at else None,
         "prepTime": _minutes_to_iso_duration(prep_minutes),
         "cookTime": _minutes_to_iso_duration(cook_minutes),
         "totalTime": _minutes_to_iso_duration(total_minutes) if total_minutes else None,
         "recipeYield": (
-            str(data.get("servings"))
-            if data.get("servings") not in (None, "")
-            else None
+            str(data.get("servings")) if data.get("servings") not in (None, "") else None
         ),
         "recipeIngredient": ingredient_lines or None,
         "recipeInstructions": [
@@ -641,11 +618,7 @@ def _meta_description(text: str) -> str:
     if len(text) <= MAX_DESCRIPTION_LENGTH:
         return text
     head = text[: MAX_DESCRIPTION_LENGTH + 1]
-    ends = [
-        m.end()
-        for m in _SENTENCE_END.finditer(head)
-        if m.end() <= MAX_DESCRIPTION_LENGTH
-    ]
+    ends = [m.end() for m in _SENTENCE_END.finditer(head) if m.end() <= MAX_DESCRIPTION_LENGTH]
     if ends and ends[-1] >= 60:
         return head[: ends[-1]]
     cut = head[: MAX_DESCRIPTION_LENGTH - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
@@ -691,14 +664,10 @@ def _related_recipes(recipe: Recipe, catalog: list[Any]) -> list[Recipe]:
 
     def rank(row: Any) -> tuple[int, datetime]:
         tags = _row_tags(row)
-        shared = own_tags & {
-            tag.strip().lower() for tag in tags if isinstance(tag, str)
-        }
+        shared = own_tags & {tag.strip().lower() for tag in tags if isinstance(tag, str)}
         return len(shared), row.created_at or datetime.min
 
-    chosen = [
-        row.id for row in sorted(rows, key=rank, reverse=True)[:RELATED_RECIPE_COUNT]
-    ]
+    chosen = [row.id for row in sorted(rows, key=rank, reverse=True)[:RELATED_RECIPE_COUNT]]
     if not chosen:
         return []
     # Mirror the filters from the scoring query: under READ COMMITTED, a recipe
@@ -739,9 +708,7 @@ def _hub_url(hub: TagHub) -> str:
     return _canonical_url("public.show_tag_hub", hub_slug=hub.slug)
 
 
-def _breadcrumbs(
-    recipe: Recipe | None = None, hub: TagHub | None = None
-) -> list[dict[str, str]]:
+def _breadcrumbs(recipe: Recipe | None = None, hub: TagHub | None = None) -> list[dict[str, str]]:
     """Home → Browse [→ hub] [→ recipe]: the visible trail and its BreadcrumbList."""
     crumbs = [
         {"name": "Home", "url": f"{_public_base_url()}/"},
@@ -792,9 +759,7 @@ def _collection_json_ld(
                 {
                     "@type": "ListItem",
                     "position": index + 1,
-                    "url": _canonical_url(
-                        "public.show_public_recipe", slug=recipe.slug
-                    ),
+                    "url": _canonical_url("public.show_public_recipe", slug=recipe.slug),
                     "name": recipe.name,
                 }
                 for index, recipe in enumerate(recipes)
@@ -811,9 +776,7 @@ PIN_DESCRIPTION_TAGS = 3
 MAX_PIN_TAIL_LENGTH = 200
 # Common title/word abbreviations must not terminate the pin's first sentence.
 # Multi-initial abbreviations such as "e.g." and "U.S." are recognized separately.
-_PIN_ABBREVIATIONS = frozenset(
-    {"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."}
-)
+_PIN_ABBREVIATIONS = frozenset({"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."})
 
 
 def _trim_to_words(text: str, limit: int) -> str:
@@ -869,14 +832,11 @@ def _pin_description(name: str, description: str, tags: list[str]) -> str:
     sentence = _first_pin_sentence(text)
     budget = MAX_PIN_DESCRIPTION_LENGTH - len(head) - len(tail) - len(" — ") - 1
     return _trim_to_words(
-        f"{head} — {_trim_to_words(sentence, max(budget, 1))} {tail}",
-        MAX_PIN_DESCRIPTION_LENGTH,
+        f"{head} — {_trim_to_words(sentence, max(budget, 1))} {tail}", MAX_PIN_DESCRIPTION_LENGTH
     )
 
 
-def _pinterest_share_url(
-    canonical_url: str, image_url: str | None, description: str
-) -> str:
+def _pinterest_share_url(canonical_url: str, image_url: str | None, description: str) -> str:
     params = {
         "url": canonical_url,
         "description": description,
@@ -943,9 +903,7 @@ def show_public_recipe(slug):
     # Only used behind ``pinterest_image_url`` (share button + ``data-pin-*``);
     # skip the tag/regex/trim work on imageless recipes that never emit it.
     pin_description = (
-        _pin_description(recipe.name, description, tags)
-        if pinterest_image_url
-        else None
+        _pin_description(recipe.name, description, tags) if pinterest_image_url else None
     )
     catalog = _catalog_tag_rows()
     linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
@@ -1013,9 +971,7 @@ def redirect_trailing_slash_recipe(slug):
     (CodeQL py/url-redirection).
     """
     carried = _carried_redirect_params(keep_save=True)
-    return redirect(
-        _canonical_url("public.show_public_recipe", slug=slug, **carried), code=301
-    )
+    return redirect(_canonical_url("public.show_public_recipe", slug=slug, **carried), code=301)
 
 
 @public_bp.route("/api/recipes/public/<slug>", methods=["GET"])
@@ -1024,9 +980,7 @@ def public_recipe_json(slug):
 
     Returns 404 when no recipe matches the slug or the recipe is not public.
     """
-    recipe = Recipe.query.filter(
-        Recipe.slug == slug, Recipe.is_public.is_(True)
-    ).first()
+    recipe = Recipe.query.filter(Recipe.slug == slug, Recipe.is_public.is_(True)).first()
     if recipe is None:
         abort(404)
     return jsonify(_save_recipe_payload(recipe, _recipe_image_url(recipe)))
@@ -1047,9 +1001,9 @@ def browse_public_recipes():
     # slug IS NOT NULL, like the sitemap: a slugless public row (legacy data;
     # publishing always mints a slug now) has no /r/ URL, and url_for on it
     # would fail the whole page.
-    base_query = Recipe.query.filter(
-        Recipe.is_public.is_(True), Recipe.slug.isnot(None)
-    ).options(joinedload(Recipe.user))
+    base_query = Recipe.query.filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None)).options(
+        joinedload(Recipe.user)
+    )
 
     total = base_query.with_entities(Recipe.id).count()
     total_pages = max(1, ceil(total / BROWSE_PAGE_SIZE))
@@ -1191,9 +1145,7 @@ def show_tag_hub(hub_slug):
         og_image_alt=og_owner.name if og_owner else None,
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
-        collection_json_ld=_collection_json_ld(
-            page_title, hub.intro, canonical_url, recipes
-        ),
+        collection_json_ld=_collection_json_ld(page_title, hub.intro, canonical_url, recipes),
         other_hubs=[
             {"title": other.title, "url": _hub_url(other)}
             for other in _linkable_hubs(counts)
@@ -1222,9 +1174,7 @@ def redirect_trailing_slash_hub(hub_slug):
     if hub_slug not in HUBS_BY_SLUG:
         abort(404)
     carried = _carried_redirect_params(keep_save=False)
-    return redirect(
-        _canonical_url("public.show_tag_hub", hub_slug=hub_slug, **carried), code=301
-    )
+    return redirect(_canonical_url("public.show_tag_hub", hub_slug=hub_slug, **carried), code=301)
 
 
 @public_bp.route("/sitemap.xml", methods=["GET"])
@@ -1257,21 +1207,13 @@ def sitemap_xml():
     entries = [
         {
             "loc": f"{_public_base_url()}/",
-            "lastmod": (
-                latest_recipe_update.date().isoformat()
-                if latest_recipe_update
-                else None
-            ),
+            "lastmod": latest_recipe_update.date().isoformat() if latest_recipe_update else None,
             "changefreq": "daily",
             "priority": "1.0",
         },
         {
             "loc": _canonical_url("public.browse_public_recipes"),
-            "lastmod": (
-                latest_recipe_update.date().isoformat()
-                if latest_recipe_update
-                else None
-            ),
+            "lastmod": latest_recipe_update.date().isoformat() if latest_recipe_update else None,
             "changefreq": "daily",
             "priority": "0.9",
         },
