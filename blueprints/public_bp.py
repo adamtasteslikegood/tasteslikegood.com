@@ -776,6 +776,7 @@ MAX_PIN_TAIL_LENGTH = 200
 # Common title/word abbreviations must not terminate the pin's first sentence.
 # Multi-initial abbreviations such as "e.g." and "U.S." are recognized separately.
 _PIN_ABBREVIATIONS = frozenset({"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."})
+_PIN_INITIALISM = re.compile(r"(?:[a-z]\.){2,}")
 
 
 def _trim_to_words(text: str, limit: int) -> str:
@@ -795,7 +796,7 @@ def _first_pin_sentence(text: str) -> str:
     """Return the first sentence without stopping at common abbreviations."""
     for end in _SENTENCE_END.finditer(text):
         token = text[: end.end()].rsplit(" ", 1)[-1].lower().lstrip("(\"'“‘")
-        if token in _PIN_ABBREVIATIONS or re.fullmatch(r"(?:[a-z]\.){2,}", token):
+        if token in _PIN_ABBREVIATIONS or _PIN_INITIALISM.fullmatch(token):
             continue
         return text[: end.end()]
     return f"{text}."
@@ -826,7 +827,7 @@ def _pin_description(name: str, description: str, tags: list[str]) -> str:
     text = " ".join(description.split())
     if text == DEFAULT_RECIPE_DESCRIPTION or not text:
         # "Yum!" / "Ready?" already end a sentence; don't append a second stop.
-        stop = "" if head.endswith((".", "!", "?")) else "."
+        stop = "" if head.endswith((".", "!", "?", "…")) else "."
         return _trim_to_words(f"{head}{stop} {tail}", MAX_PIN_DESCRIPTION_LENGTH)
     sentence = _first_pin_sentence(text)
     budget = MAX_PIN_DESCRIPTION_LENGTH - len(head) - len(tail) - len(" — ") - 1

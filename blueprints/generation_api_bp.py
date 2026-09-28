@@ -417,7 +417,7 @@ def serve_recipe_image(recipe_id):
         return jsonify({"error": "Unsupported image width"}), 400
     pin_values = request.args.getlist("pin")
     if len(pin_values) > 1:
-        return jsonify({"error": "Unsupported pin value"}), 400
+        return jsonify({"error": "Duplicate pin parameter"}), 400
     try:
         pin = parse_pin_flag(pin_values[0] if pin_values else None)
     except ValueError:
