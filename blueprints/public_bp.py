@@ -33,10 +33,11 @@ from flask import (
     request,
     url_for,
 )
+from flask.typing import ResponseReturnValue
 from sqlalchemy.orm import joinedload
 
 from extensions import db
-from models import Recipe
+from models import Recipe, RetiredSlug
 from services.image_variants import VARIANT_WIDTHS
 from services.tag_hubs import (
     HUBS_BY_SLUG,
@@ -870,11 +871,38 @@ def _save_recipe_payload(recipe: Recipe, image_url: str | None) -> dict[str, Any
     }
 
 
+def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> ResponseReturnValue:
+    """What a slug with no live public recipe answers (KAN-288).
+
+    - retired by a delete, or its recipe has since been deleted -> 410 Gone:
+      the page existed and was removed on purpose, and never comes back;
+    - retired by a rename and that recipe is public under a new slug -> 301;
+    - anything else (never existed, or unpublished, which is reversible) -> 404.
+    """
+    retired = db.session.get(RetiredSlug, slug)
+    if retired is None:
+        abort(404)
+    if retired.recipe_id is not None:
+        target = db.session.get(Recipe, retired.recipe_id)
+        if target is not None:
+            if target.is_public and target.slug and target.slug != slug:
+                carried = _carried_redirect_params(keep_save=True)
+                location = (
+                    _canonical_url(endpoint, slug=target.slug, **carried)
+                    if canonical
+                    else url_for(endpoint, slug=target.slug)
+                )
+                return redirect(location, code=301)
+            abort(404)
+    abort(410)
+
+
 @public_bp.route("/r/<slug>", methods=["GET"])
 def show_public_recipe(slug):
     """Render the SSR view of a single published recipe.
 
-    Returns 404 when no recipe matches the slug or the recipe is not public.
+    Returns 404 when no recipe matches the slug or the recipe is not public,
+    410 when the slug belonged to a deleted recipe (KAN-288).
     """
     recipe = (
         Recipe.query.options(joinedload(Recipe.user))
@@ -883,7 +911,7 @@ def show_public_recipe(slug):
     )
 
     if recipe is None:
-        abort(404)
+        return _missing_recipe_response(slug, "public.show_public_recipe", canonical=True)
 
     data = recipe.data or {}
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
@@ -981,11 +1009,12 @@ def redirect_trailing_slash_recipe(slug):
 def public_recipe_json(slug):
     """JSON payload of a published recipe for the SPA's ?save=<slug> flow.
 
-    Returns 404 when no recipe matches the slug or the recipe is not public.
+    Returns 404 when no recipe matches the slug or the recipe is not public,
+    410 when the slug belonged to a deleted recipe (KAN-288).
     """
     recipe = Recipe.query.filter(Recipe.slug == slug, Recipe.is_public.is_(True)).first()
     if recipe is None:
-        abort(404)
+        return _missing_recipe_response(slug, "public.public_recipe_json", canonical=False)
     return jsonify(_save_recipe_payload(recipe, _recipe_image_url(recipe)))
 
 

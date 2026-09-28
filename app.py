@@ -318,6 +318,11 @@ def create_app(**config_overrides):
         """Handle 404 errors with a friendly message."""
         return render_template("404.html"), 404
 
+    @app.errorhandler(410)
+    def gone(error):
+        """A deleted recipe's retired /r/<slug> (KAN-288): honestly gone, for good."""
+        return render_template("410.html"), 410
+
     @app.errorhandler(Exception)
     def handle_unexpected_error(error):
         """Log and handle unexpected exceptions."""

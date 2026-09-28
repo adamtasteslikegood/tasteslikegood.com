@@ -17,7 +17,7 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from extensions import db
-from models import Recipe
+from models import Recipe, RetiredSlug
 from utils.log_sanitizer import sanitize_log_value
 from utils.slug_utils import normalize_slug
 
@@ -52,6 +52,18 @@ CANONICAL_RECIPE_LOCKED_ERROR = (
 
 class CanonicalRecipeError(ValueError):
     """Publish-state, slug, or delete changes to a canonical recipe are locked."""
+
+
+# Also returned verbatim by the API routes (fixed string, same rationale as
+# PUBLIC_SLUG_REQUIRED_ERROR above).
+PUBLISHED_RECIPE_DELETE_ERROR = (
+    "This recipe is published. Unpublish it before deleting it: deleting "
+    "permanently retires its public page."
+)
+
+
+class PublishedRecipeDeleteError(ValueError):
+    """KAN-288: a published recipe cannot be deleted until it is unpublished."""
 
 
 # Also returned verbatim by the API routes (fixed string, same rationale as
@@ -270,6 +282,16 @@ def _is_saved_copy(recipe: Recipe) -> bool:
     return bool(recipe.source_slug or recipe.source_recipe_id)
 
 
+def _slug_retired_against(slug: str, recipe_id: str) -> bool:
+    """Whether ``slug`` was retired by any recipe other than ``recipe_id`` (KAN-288).
+
+    A deleted recipe's retirement (``recipe_id`` NULL) blocks everyone,
+    including a restore that re-POSTs the same id.
+    """
+    retired = db.session.get(RetiredSlug, slug)
+    return retired is not None and retired.recipe_id != recipe_id
+
+
 def _resolve_public_slug(
     recipe_data: Dict[str, Any],
     recipe_id: str,
@@ -301,6 +323,9 @@ def _resolve_public_slug(
         and "/" not in current_slug
         and "\\" not in current_slug
         and (provided_slug is None or str(provided_slug) == current_slug)
+        # KAN-288: a private row can hold any payload slug unvalidated, so the
+        # slug it carries into publication may be one another recipe retired.
+        and not _slug_retired_against(current_slug, recipe_id)
     ):
         return current_slug
 
@@ -315,12 +340,23 @@ def _resolve_public_slug(
     # Short enough that every truncated-for-suffix variant still matches.
     # _slugify output has no LIKE metacharacters (%, _).
     prefix = base[: _SLUG_MAX_LENGTH - 12].rstrip("-")
-    occupied = set(skip) | {
-        slug
-        for (slug,) in db.session.query(Recipe.slug).filter(
-            Recipe.id != recipe_id, Recipe.slug.like(f"{prefix}%")
-        )
-    }
+    occupied = (
+        set(skip)
+        | {
+            slug
+            for (slug,) in db.session.query(Recipe.slug).filter(
+                Recipe.id != recipe_id, Recipe.slug.like(f"{prefix}%")
+            )
+        }
+        # KAN-288: a slug that once served a published page is never reassigned.
+        | {
+            slug
+            for (slug,) in db.session.query(RetiredSlug.slug).filter(
+                RetiredSlug.slug.like(f"{prefix}%"),
+                or_(RetiredSlug.recipe_id.is_(None), RetiredSlug.recipe_id != recipe_id),
+            )
+        }
+    )
     candidate, suffix = base, 1
     while candidate in occupied:
         suffix += 1
@@ -1401,13 +1437,23 @@ def delete_recipe(
             )
             raise CanonicalRecipeError(CANONICAL_RECIPE_LOCKED_ERROR)
 
+        if recipe.is_public:
+            # KAN-288: deleting would retire the live /r/<slug> for good, so
+            # unpublishing is its own, explicit (and reversible) step first.
+            logger.info(
+                "Refusing to delete published recipe %s (slug=%s)",
+                sanitize_log_value(recipe_id),
+                sanitize_log_value(recipe.slug),
+            )
+            raise PublishedRecipeDeleteError(PUBLISHED_RECIPE_DELETE_ERROR)
+
         db.session.delete(recipe)
         db.session.commit()
 
         logger.info("Deleted recipe %s", sanitize_log_value(recipe_id))
         return True
 
-    except CanonicalRecipeError:
+    except (CanonicalRecipeError, PublishedRecipeDeleteError):
         raise
     except Exception as e:
         logger.error(
