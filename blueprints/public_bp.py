@@ -797,7 +797,7 @@ def _first_pin_sentence(text: str) -> str:
     """Return the first sentence without stopping at common abbreviations."""
     for end in _SENTENCE_END.finditer(text):
         token = text[: end.end()].rsplit(" ", 1)[-1].lower().lstrip("(\"'“‘")
-        if token in _PIN_ABBREVIATIONS or re.fullmatch(r"(?:[a-z]\\.){2,}", token):
+        if token in _PIN_ABBREVIATIONS or re.fullmatch(r"(?:[a-z]\.){2,}", token):
             continue
         return text[: end.end()]
     return f"{text}."
