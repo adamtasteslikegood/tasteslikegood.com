@@ -771,8 +771,9 @@ def _trim_to_words(text: str, limit: int) -> str:
     """``text`` cut to at most ``limit`` characters at a word boundary, with an ellipsis."""
     if len(text) <= limit:
         return text
-    cut = text[: limit - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
-    return f"{cut}…"
+    prefix = text[: limit - 1]
+    cut = prefix.rsplit(" ", 1)[0].rstrip(" ,;:-–—") if " " in prefix else ""
+    return f"{cut}…" if cut else "…"
 
 
 def _pin_description(name: str, description: str, tags: list[str]) -> str:
