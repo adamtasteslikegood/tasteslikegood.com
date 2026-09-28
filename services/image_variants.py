@@ -13,7 +13,7 @@ written back to storage, so there is no migration and no backfill.
 import io
 import logging
 
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,11 @@ logger = logging.getLogger(__name__)
 VARIANT_WIDTHS: tuple[int, ...] = (400, 800, 1200)
 
 WEBP_QUALITY = 80
+
+# Pinterest's recommended pin shape (KAN-284): 2:3 portrait at 1000x1500.
+PIN_SIZE: tuple[int, int] = (1000, 1500)
+PIN_JPEG_QUALITY = 85
+PIN_BACKGROUND_BLUR = 40
 
 # Generated recipe images are currently 1408x768. Keep a generous ceiling for
 # legacy sources, but reject oversized headers before Pillow decodes pixel data.
@@ -42,6 +47,39 @@ def parse_variant_width(raw: str | None) -> int | None:
     return width
 
 
+def parse_pin_flag(raw: str | None) -> bool:
+    """``False`` when absent, ``True`` for ``"1"``; ``ValueError`` for anything else."""
+    if raw is None:
+        return False
+    if raw == "1":
+        return True
+    raise ValueError(f"unsupported pin value: {raw!r}")
+
+
+def _open_source(image_bytes: bytes) -> Image.Image:
+    """Decode ``image_bytes`` upright in RGB/RGBA, refusing oversized sources first.
+
+    Raises ``OSError``/``ValueError``/``DecompressionBombError`` for the
+    callers to turn into a ``None`` (fall back to the original bytes).
+    """
+    with Image.open(io.BytesIO(image_bytes)) as source:
+        if source.width * source.height > MAX_SOURCE_PIXELS:
+            raise ValueError(
+                f"source image exceeds {MAX_SOURCE_PIXELS} pixels: "
+                f"{source.width}x{source.height}"
+            )
+        image = ImageOps.exif_transpose(source)
+        if image.mode not in ("RGB", "RGBA"):
+            has_alpha = image.mode in ("LA", "PA") or (
+                image.mode == "P" and "transparency" in image.info
+            )
+            image = image.convert("RGBA" if has_alpha else "RGB")
+        # exif_transpose can hand back the lazily loaded source itself; load
+        # the pixels before the ``with`` closes it.
+        image.load()
+        return image
+
+
 def make_webp_variant(image_bytes: bytes, width: int) -> bytes | None:
     """Encode ``image_bytes`` as a WebP whose intrinsic width is exactly ``width``.
 
@@ -51,29 +89,58 @@ def make_webp_variant(image_bytes: bytes, width: int) -> bytes | None:
     the original rather than failing the request.
     """
     try:
-        with Image.open(io.BytesIO(image_bytes)) as source:
-            if source.width * source.height > MAX_SOURCE_PIXELS:
+        image = _open_source(image_bytes)
+        if image.width != width:
+            height = max(1, round(image.height * width / image.width))
+            if width * height > MAX_SOURCE_PIXELS:
                 raise ValueError(
-                    f"source image exceeds {MAX_SOURCE_PIXELS} pixels: "
-                    f"{source.width}x{source.height}"
+                    f"output image exceeds {MAX_SOURCE_PIXELS} pixels: {width}x{height}"
                 )
-            image = ImageOps.exif_transpose(source)
-            if image.mode not in ("RGB", "RGBA"):
-                has_alpha = image.mode in ("LA", "PA") or (
-                    image.mode == "P" and "transparency" in image.info
-                )
-                image = image.convert("RGBA" if has_alpha else "RGB")
-            if image.width != width:
-                height = max(1, round(image.height * width / image.width))
-                if width * height > MAX_SOURCE_PIXELS:
-                    raise ValueError(
-                        f"output image exceeds {MAX_SOURCE_PIXELS} pixels: {width}x{height}"
-                    )
-                image = image.resize((width, height), Image.Resampling.LANCZOS)
-            out = io.BytesIO()
-            image.save(out, format="WEBP", quality=WEBP_QUALITY, method=4)
-            return out.getvalue()
+            image = image.resize((width, height), Image.Resampling.LANCZOS)
+        out = io.BytesIO()
+        image.save(out, format="WEBP", quality=WEBP_QUALITY, method=4)
+        return out.getvalue()
     except (OSError, ValueError, Image.DecompressionBombError) as exc:
         # OSError covers PIL.UnidentifiedImageError and truncated files.
         logger.warning("Could not build %dw image variant: %s", width, exc)
+        return None
+
+
+def make_pin_variant(image_bytes: bytes) -> bytes | None:
+    """A 1000x1500 (2:3) JPEG of the photo for Pinterest pins (KAN-284).
+
+    Generated photos are 1408x768 landscape or 1024x1024 square. A 2:3 centre
+    crop of a landscape source keeps a 512 px sliver of the dish and upscales it
+    2x, so instead the whole photo is fitted into the frame and centred on a
+    blurred, cover-scaled copy of itself: the familiar "blurred pad" pin shape.
+    JPEG has no alpha, so a transparent source is composited onto that
+    background rather than onto black.
+
+    Returns ``None`` when the bytes cannot be decoded, like ``make_webp_variant``.
+    """
+    pin_w, pin_h = PIN_SIZE
+    try:
+        photo = _open_source(image_bytes).convert("RGBA")
+        # Composite the cover-scaled copy onto an opaque canvas *before* blurring:
+        # blurring RGBA would smear the alpha channel too, which for a hard 0/255
+        # edge (opaque subject on transparent field) leaks white through the pad
+        # along the original alpha seams. Flattening first also stops the RGBA ->
+        # RGB drop from turning fully transparent pixels black.
+        covered = ImageOps.fit(photo, PIN_SIZE, Image.Resampling.LANCZOS)
+        background = Image.new("RGB", PIN_SIZE, "white")
+        background.paste(covered, (0, 0), covered)
+        background = background.filter(ImageFilter.GaussianBlur(PIN_BACKGROUND_BLUR))
+        scale = min(pin_w / photo.width, pin_h / photo.height)
+        fitted_size = (
+            max(1, round(photo.width * scale)),
+            max(1, round(photo.height * scale)),
+        )
+        fitted = photo.resize(fitted_size, Image.Resampling.LANCZOS)
+        offset = ((pin_w - fitted_size[0]) // 2, (pin_h - fitted_size[1]) // 2)
+        background.paste(fitted, offset, fitted)
+        out = io.BytesIO()
+        background.save(out, format="JPEG", quality=PIN_JPEG_QUALITY, optimize=True)
+        return out.getvalue()
+    except (OSError, ValueError, Image.DecompressionBombError) as exc:
+        logger.warning("Could not build pin image variant: %s", exc)
         return None
