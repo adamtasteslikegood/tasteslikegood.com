@@ -303,7 +303,11 @@ def _clear_unowned_retired_slug_from_private(
     same recipe remains free to stage one of its own rename aliases.
     """
     slug = recipe_data.get("slug")
-    if recipe_data.get("is_public") is False and slug and _slug_retired_against(str(slug), recipe_id):
+    if (
+        recipe_data.get("is_public") is False
+        and slug
+        and _slug_retired_against(str(slug), recipe_id)
+    ):
         recipe_data["slug"] = None
 
 
