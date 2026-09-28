@@ -241,13 +241,14 @@ def test_hub_trailing_slash_redirects(client):
     assert resp.headers["Location"] == "http://localhost/browse/tag/dinner"
 
 
-def test_hub_trailing_slash_redirect_preserves_allowlisted_query_params(client):
+def test_hub_trailing_slash_redirect_keeps_only_campaign_params(client):
+    # ``save`` is the SPA's recipe handoff; nothing reads it on a hub URL.
     resp = client.get(
         "/browse/tag/dinner/?utm_source=email&utm_campaign=fall&save=recipe-123&next=/admin"
     )
     assert resp.status_code == 301
     assert resp.headers["Location"] == (
-        "http://localhost/browse/tag/dinner" "?utm_source=email&utm_campaign=fall&save=recipe-123"
+        "http://localhost/browse/tag/dinner?utm_source=email&utm_campaign=fall"
     )
 
 

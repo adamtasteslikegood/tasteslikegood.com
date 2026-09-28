@@ -193,6 +193,12 @@ def test_undecodable_image_falls_back_to_the_original_bytes(app, client):
     assert resp.status_code == 200
     assert resp.data == broken
     assert resp.mimetype == "image/png"
+    # Full-size bytes under a sized ?w= URL must not be pinned by any HTTP
+    # cache: a later successful variant would otherwise never reach clients.
+    assert resp.headers["Cache-Control"] == "no-store"
+    # The plain URL for the same image keeps its normal public lifetime.
+    plain = client.get(f"/api/recipes/{recipe_id}/image")
+    assert plain.headers["Cache-Control"] == "public, max-age=86400"
 
 
 @pytest.mark.parametrize(
@@ -227,7 +233,9 @@ def test_failed_gcs_variant_read_does_not_cache_legacy_bytes_as_gcs(app, client,
     assert resp.status_code == 200
     assert resp.mimetype == "image/jpeg"
     assert resp.data == legacy
-    assert resp.headers["Cache-Control"] == "public, max-age=86400"
+    # Full-size fallback bytes at a sized ?w= URL: no HTTP cache may pin them,
+    # or a transient GCS failure outlives itself by a day in every CDN.
+    assert resp.headers["Cache-Control"] == "no-store"
     download.assert_called()
 
 
