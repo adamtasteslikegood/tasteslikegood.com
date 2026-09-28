@@ -136,7 +136,12 @@ def test_deleted_slug_answers_410_and_is_never_given_to_another_recipe(app, adam
     page = client.get(f"/r/{slug}")
     assert page.status_code == 410
     assert b"This recipe was removed" in page.data
-    assert client.get(f"/api/recipes/public/{slug}").status_code == 410
+    # The SPA hits the JSON API; a 410 must return JSON, not the HTML template
+    # the app-level errorhandler renders for the SSR /r/<slug> route.
+    api = client.get(f"/api/recipes/public/{slug}")
+    assert api.status_code == 410
+    assert api.is_json, api.get_data(as_text=True)
+    assert api.get_json() == {"error": "Recipe removed"}
     sitemap = client.get("/sitemap.xml").get_data(as_text=True)
     assert f"/r/{slug}<" not in sitemap
     assert "/r/zucchini-poppers-2<" in sitemap

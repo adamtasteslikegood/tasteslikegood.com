@@ -871,17 +871,23 @@ def _save_recipe_payload(recipe: Recipe, image_url: str | None) -> dict[str, Any
     }
 
 
-def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> ResponseReturnValue:
+def _missing_recipe_response(
+    slug: str, endpoint: str, *, canonical: bool, json: bool = False
+) -> ResponseReturnValue:
     """What a slug with no live public recipe answers (KAN-288).
 
     - retired by a delete, or its recipe has since been deleted -> 410 Gone:
       the page existed and was removed on purpose, and never comes back;
     - retired by a rename and that recipe is public under a new slug -> 302;
     - anything else (never existed, or unpublished, which is reversible) -> 404.
+
+    ``json=True`` returns a JSON body for 404/410 (the app-level errorhandlers
+    render HTML, which would break clients that expect JSON). The 302 branch
+    still redirects — the SPA follows it exactly like the SSR route does.
     """
     retired = db.session.get(RetiredSlug, slug)
     if retired is None:
-        return abort(404)
+        return (jsonify({"error": "Recipe not found"}), 404) if json else abort(404)
     if retired.recipe_id is not None:
         target = db.session.get(Recipe, retired.recipe_id)
         if target is not None:
@@ -898,8 +904,8 @@ def _missing_recipe_response(slug: str, endpoint: str, *, canonical: bool) -> Re
                 # not be cached permanently. A cached 301 can redirect away
                 # from the alias after it becomes live again (or create a loop).
                 return redirect(location, code=302)
-            return abort(404)
-    return abort(410)
+            return (jsonify({"error": "Recipe not found"}), 404) if json else abort(404)
+    return (jsonify({"error": "Recipe removed"}), 410) if json else abort(410)
 
 
 @public_bp.route("/r/<slug>", methods=["GET"])
@@ -1019,7 +1025,9 @@ def public_recipe_json(slug):
     """
     recipe = Recipe.query.filter(Recipe.slug == slug, Recipe.is_public.is_(True)).first()
     if recipe is None:
-        return _missing_recipe_response(slug, "public.public_recipe_json", canonical=False)
+        return _missing_recipe_response(
+            slug, "public.public_recipe_json", canonical=False, json=True
+        )
     return jsonify(_save_recipe_payload(recipe, _recipe_image_url(recipe)))
 
 
