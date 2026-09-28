@@ -270,16 +270,20 @@ def test_deleted_recipe_image_404s_even_when_cached(app, client):
 
 def test_private_cached_image_not_served_to_strangers(app, client):
     """A primed private image must not be fetchable by unauthorized clients."""
+    from blueprints.generation_api_bp import _image_cache_version
+
     png_bytes = b"\x89PNG\r\n\x1a\nprivate"
     recipe_id = str(uuid.uuid4())
     with app.app_context():
         owner = User(email="owner@example.com", name="Owner")
         db.session.add(owner)
         db.session.commit()
-        db.session.add(_make_recipe(recipe_id, png_bytes, public=False, owner=owner))
+        recipe = _make_recipe(recipe_id, png_bytes, public=False, owner=owner)
+        db.session.add(recipe)
         db.session.commit()
-        # Simulate the owner having primed the cache.
-        cache_utils.safe_set(cache_utils.recipe_image_key(recipe_id), png_bytes, timeout=60)
+        # Seed the exact versioned key the endpoint reads after KAN-283.
+        key = cache_utils.recipe_image_key(recipe_id, _image_cache_version(recipe))
+        cache_utils.safe_set(key, png_bytes, timeout=60)
 
     resp = client.get(f"/api/recipes/{recipe_id}/image")
     assert resp.status_code == 404
