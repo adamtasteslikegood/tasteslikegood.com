@@ -17,7 +17,8 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.exc import IntegrityError
 
 from extensions import db
-from models import Recipe
+from models import Recipe, RetiredSlug
+from models.retired_slug import lock_slug
 from utils.log_sanitizer import sanitize_log_value
 from utils.slug_utils import normalize_slug
 
@@ -52,6 +53,18 @@ CANONICAL_RECIPE_LOCKED_ERROR = (
 
 class CanonicalRecipeError(ValueError):
     """Publish-state, slug, or delete changes to a canonical recipe are locked."""
+
+
+# Also returned verbatim by the API routes (fixed string, same rationale as
+# PUBLIC_SLUG_REQUIRED_ERROR above).
+PUBLISHED_RECIPE_DELETE_ERROR = (
+    "This recipe is published. Unpublish it before deleting it: deleting "
+    "permanently retires its public page."
+)
+
+
+class PublishedRecipeDeleteError(ValueError):
+    """KAN-288: a published recipe cannot be deleted until it is unpublished."""
 
 
 # Also returned verbatim by the API routes (fixed string, same rationale as
@@ -270,6 +283,43 @@ def _is_saved_copy(recipe: Recipe) -> bool:
     return bool(recipe.source_slug or recipe.source_recipe_id)
 
 
+def _slug_retired_against(slug: str, recipe_id: str) -> bool:
+    """Whether ``slug`` was retired by any recipe other than ``recipe_id`` (KAN-288).
+
+    A deleted recipe's retirement (``recipe_id`` NULL) blocks everyone,
+    including a restore that re-POSTs the same id.
+    """
+    retired = db.session.get(RetiredSlug, slug)
+    return retired is not None and retired.recipe_id != recipe_id
+
+
+def _slug_occupied_against(slug: str, recipe_id: str) -> bool:
+    """Recheck both live and retired ownership after locking ``slug``."""
+    live = Recipe.query.filter(Recipe.slug == slug, Recipe.id != recipe_id).first()
+    return live is not None or _slug_retired_against(slug, recipe_id)
+
+
+def _clear_unowned_retired_slug_from_private(recipe_data: Dict[str, Any], recipe_id: str) -> None:
+    """Do not let a private row occupy another recipe's retired alias.
+
+    Private slugs are not public URLs and may be payload-provided, but the
+    Recipe.slug uniqueness constraint would still prevent the retirement owner
+    from reclaiming its alias. Clear only slugs retired against this row; the
+    same recipe remains free to stage one of its own rename aliases.
+    """
+    slug = recipe_data.get("slug")
+    if recipe_data.get("is_public") is False and slug:
+        # Private rows share Recipe.slug's global uniqueness and can otherwise
+        # win the same release-versus-retirement race as a publisher.
+        lock_slug(db.session(), str(slug))
+    if (
+        recipe_data.get("is_public") is False
+        and slug
+        and _slug_retired_against(str(slug), recipe_id)
+    ):
+        recipe_data["slug"] = None
+
+
 def _resolve_public_slug(
     recipe_data: Dict[str, Any],
     recipe_id: str,
@@ -301,8 +351,12 @@ def _resolve_public_slug(
         and "/" not in current_slug
         and "\\" not in current_slug
         and (provided_slug is None or str(provided_slug) == current_slug)
+        # KAN-288: a private row can hold any payload slug unvalidated, so the
+        # slug it carries into publication may be one another recipe retired.
     ):
-        return current_slug
+        lock_slug(db.session(), current_slug)
+        if not _slug_occupied_against(current_slug, recipe_id):
+            return current_slug
 
     for source in (recipe_data.get("slug"), current_slug, recipe_data.get("name")):
         candidate = _slugify(str(source)) if source else ""
@@ -315,18 +369,38 @@ def _resolve_public_slug(
     # Short enough that every truncated-for-suffix variant still matches.
     # _slugify output has no LIKE metacharacters (%, _).
     prefix = base[: _SLUG_MAX_LENGTH - 12].rstrip("-")
-    occupied = set(skip) | {
-        slug
-        for (slug,) in db.session.query(Recipe.slug).filter(
-            Recipe.id != recipe_id, Recipe.slug.like(f"{prefix}%")
-        )
-    }
+    occupied = (
+        set(skip)
+        | {
+            slug
+            for (slug,) in db.session.query(Recipe.slug).filter(
+                Recipe.id != recipe_id, Recipe.slug.like(f"{prefix}%")
+            )
+        }
+        # KAN-288: a slug that once served a published page is never reassigned.
+        | {
+            slug
+            for (slug,) in db.session.query(RetiredSlug.slug).filter(
+                RetiredSlug.slug.like(f"{prefix}%"),
+                or_(RetiredSlug.recipe_id.is_(None), RetiredSlug.recipe_id != recipe_id),
+            )
+        }
+    )
     candidate, suffix = base, 1
-    while candidate in occupied:
-        suffix += 1
-        tail = f"-{suffix}"
-        candidate = f"{base[: _SLUG_MAX_LENGTH - len(tail)].rstrip('-')}{tail}"
-    return candidate
+    while True:
+        while candidate in occupied:
+            suffix += 1
+            tail = f"-{suffix}"
+            candidate = f"{base[: _SLUG_MAX_LENGTH - len(tail)].rstrip('-')}{tail}"
+
+        # The prefix probes above are intentionally optimistic. Serialize the
+        # final choice with retirement, then recheck exact ownership while the
+        # transaction holds the lock. This prevents a concurrent rename/delete
+        # from releasing Recipe.slug just before its tombstone becomes visible.
+        lock_slug(db.session(), candidate)
+        if not _slug_occupied_against(candidate, recipe_id):
+            return candidate
+        occupied.add(candidate)
 
 
 def _pin_source_slug_to_column(
@@ -480,6 +554,8 @@ def _commit_publish_retrying(
             recipe_data["slug"] = _resolve_public_slug(
                 resolver_input, recipe_id, current_slug, skip=frozenset(skip)
             )
+        else:
+            _clear_unowned_retired_slug_from_private(recipe_data, recipe_id)
         recipe = stage(recipe_data)
         try:
             db.session.commit()
@@ -1383,7 +1459,21 @@ def delete_recipe(
         True if deleted successfully, False otherwise
     """
     try:
-        recipe = get_recipe_by_id(recipe_id, user_id, guest_session_id)
+        # Serialize deletion with publish/rename updates.  In addition to the
+        # row lock, ``populate_existing`` is important here: this scoped
+        # session may already hold a stale private Recipe while a concurrent
+        # transaction has just published it.  Rechecking the locked database
+        # row keeps the 409 guard authoritative.
+        recipe = cast(
+            Optional[Recipe],
+            _apply_recipe_scope(
+                Recipe.query.populate_existing().filter(Recipe.id == recipe_id),
+                user_id,
+                guest_session_id,
+            )
+            .with_for_update()
+            .first(),
+        )
 
         if not recipe:
             logger.warning(
@@ -1401,13 +1491,23 @@ def delete_recipe(
             )
             raise CanonicalRecipeError(CANONICAL_RECIPE_LOCKED_ERROR)
 
+        if recipe.is_public:
+            # KAN-288: deleting would retire the live /r/<slug> for good, so
+            # unpublishing is its own, explicit (and reversible) step first.
+            logger.info(
+                "Refusing to delete published recipe %s (slug=%s)",
+                sanitize_log_value(recipe_id),
+                sanitize_log_value(recipe.slug),
+            )
+            raise PublishedRecipeDeleteError(PUBLISHED_RECIPE_DELETE_ERROR)
+
         db.session.delete(recipe)
         db.session.commit()
 
         logger.info("Deleted recipe %s", sanitize_log_value(recipe_id))
         return True
 
-    except CanonicalRecipeError:
+    except (CanonicalRecipeError, PublishedRecipeDeleteError):
         raise
     except Exception as e:
         logger.error(

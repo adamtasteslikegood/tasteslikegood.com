@@ -35,13 +35,24 @@ depends_on = None
 logger = logging.getLogger("alembic.runtime.migration")
 
 
+def _run(conn, reassign_email=None):
+    """Run against this revision's schema without newer model listeners."""
+    from scripts.gate_guest_public_recipes import run_gate
+
+    session = Session(bind=conn, info={"skip_retired_slug_listener": True})
+    try:
+        return run_gate(session, reassign_email=reassign_email)
+    finally:
+        session.close()
+
+
 def upgrade():
     # Data-only migration: no schema change. Runs inside the app context that
     # `flask db upgrade` provides, so app modules are importable.
-    from scripts.gate_guest_public_recipes import run_gate
-
-    session = Session(bind=op.get_bind())
-    summary = run_gate(session, reassign_email=os.environ.get("GUEST_PUBLIC_REASSIGN_EMAIL"))
+    summary = _run(
+        op.get_bind(),
+        reassign_email=os.environ.get("GUEST_PUBLIC_REASSIGN_EMAIL"),
+    )
     logger.info("gate_guest_published_recipes: %s", summary)
 
 

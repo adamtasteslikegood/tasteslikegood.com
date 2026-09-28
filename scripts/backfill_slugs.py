@@ -7,6 +7,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
+from models.retired_slug import RetiredSlugTakenError  # noqa: E402
 from utils.slug_utils import normalize_slug  # noqa: E402
 
 
@@ -33,7 +34,7 @@ def run_backfill(app):
                     print(f"Backfilled slug '{slug}' for recipe '{recipe.name}'")
                     success_count += 1
                     break
-                except IntegrityError:
+                except (IntegrityError, RetiredSlugTakenError):
                     db.session.rollback()
                     suffix += 1
                     slug = f"{base_slug}-{suffix}"

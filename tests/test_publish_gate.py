@@ -6,10 +6,12 @@ the data migration reassigns-or-unpublishes pre-existing guest-owned public
 rows so /r/<slug> pages backed by an accountable owner stay live.
 """
 
+import importlib.util
 import sys
 from pathlib import Path
 
 import pytest
+import sqlalchemy as sa
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -19,6 +21,13 @@ from models.recipe import Recipe
 from models.user import User
 from repositories import db_recipe_repository
 from scripts.gate_guest_public_recipes import run_gate
+
+_GATE_MIGRATION = (
+    Path(__file__).resolve().parent.parent
+    / "migrations"
+    / "versions"
+    / "e91b47a2c5d3_gate_guest_published_recipes.py"
+)
 
 
 @pytest.fixture
@@ -654,3 +663,43 @@ def test_gate_noop_when_no_guest_public_rows(app, user):
 
     assert summary == {"found": 0, "reassigned": 0, "unpublished": 0}
     assert Recipe.query.get("u-pub").is_public is True
+
+
+def test_gate_migration_runs_before_retired_slug_schema_exists():
+    """The historical ORM migration must not trigger newer model listeners."""
+    spec = importlib.util.spec_from_file_location("gate_migration", _GATE_MIGRATION)
+    migration = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migration)
+
+    engine = sa.create_engine("sqlite:///:memory:")
+    metadata = sa.MetaData()
+    recipe = sa.Table(
+        "recipe",
+        metadata,
+        sa.Column("id", sa.String(36), primary_key=True),
+        sa.Column("slug", sa.String(255)),
+        sa.Column("user_id", sa.Integer),
+        sa.Column("guest_session_id", sa.String(36)),
+        sa.Column("is_public", sa.Boolean, nullable=False),
+        sa.Column("data", sa.JSON, nullable=False),
+        sa.Column("updated_at", sa.DateTime),
+    )
+    metadata.create_all(engine)
+
+    with engine.begin() as conn:
+        conn.execute(
+            recipe.insert(),
+            {
+                "id": "legacy-guest",
+                "slug": "legacy-guest",
+                "guest_session_id": "guest-1",
+                "is_public": True,
+                "data": {"id": "legacy-guest", "is_public": True},
+            },
+        )
+        summary = migration._run(conn, reassign_email=None)
+        row = conn.execute(sa.select(recipe)).mappings().one()
+
+    assert summary == {"found": 1, "reassigned": 0, "unpublished": 1}
+    assert row["is_public"] is False
+    assert row["data"]["is_public"] is False
