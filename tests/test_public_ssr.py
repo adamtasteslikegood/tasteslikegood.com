@@ -1467,8 +1467,8 @@ def test_pin_description_skips_the_placeholder_description():
     )
 
 
-def test_pin_description_dedupes_tags_case_insensitively():
-    text = _pin_description("Soup", "Warm.", ["VEGAN", "soup", "Soup", "winter"])
+def test_pin_description_dedupes_tags_and_skips_blanks():
+    text = _pin_description("Soup", "Warm.", ["   ", "VEGAN", "soup", "Soup", "winter"])
     assert text.endswith("Vegan recipe: soup, winter.")
 
 
