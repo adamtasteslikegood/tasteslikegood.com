@@ -773,23 +773,34 @@ PIN_DESCRIPTION_TAGS = 3
 # so name + separators + tail always fit and the tail is never cut. Tags are
 # unbounded strings (recipe_schema.json), so one that does not fit is skipped.
 MAX_PIN_TAIL_LENGTH = 200
-# Stricter than _SENTENCE_END for the pin's one sentence: a stop must be followed
-# by a capital, an opening quote, or the end, so "e.g. 20 mins" or "vs. store"
-# does not end the sentence early and drop the searchable body.
-_PIN_SENTENCE_END = re.compile(r"[.!?](?=\s+[A-Z\"“‘']|\s*$)")
+# Common title/word abbreviations must not terminate the pin's first sentence.
+# Multi-initial abbreviations such as "e.g." and "U.S." are recognized separately.
+_PIN_ABBREVIATIONS = frozenset(
+    {"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."}
+)
 
 
 def _trim_to_words(text: str, limit: int) -> str:
     """``text`` cut to at most ``limit`` characters at a word boundary, with an ellipsis.
 
-    Sentence terminators are stripped from the cut word so the ellipsis does not
-    double up on the abbreviation-cut sentence (``"e.g."`` → ``"e.g.…"``).
+    Sentence terminators are stripped from the cut word so punctuation does not
+    double up before the ellipsis (``"Done."`` → ``"Done…"``).
     """
     if len(text) <= limit:
         return text
     prefix = text[: limit - 1]
     cut = prefix.rsplit(" ", 1)[0].rstrip(" .,;:!?-–—") if " " in prefix else ""
     return f"{cut}…" if cut else "…"
+
+
+def _first_pin_sentence(text: str) -> str:
+    """Return the first sentence without stopping at common abbreviations."""
+    for end in _SENTENCE_END.finditer(text):
+        token = text[: end.end()].rsplit(" ", 1)[-1].lower().lstrip("(\"'“‘")
+        if token in _PIN_ABBREVIATIONS or re.fullmatch(r"(?:[a-z]\\.){2,}", token):
+            continue
+        return text[: end.end()]
+    return f"{text}."
 
 
 def _pin_description(name: str, description: str, tags: list[str]) -> str:
@@ -819,8 +830,7 @@ def _pin_description(name: str, description: str, tags: list[str]) -> str:
         # "Yum!" / "Ready?" already end a sentence; don't append a second stop.
         stop = "" if head.endswith((".", "!", "?")) else "."
         return _trim_to_words(f"{head}{stop} {tail}", MAX_PIN_DESCRIPTION_LENGTH)
-    end = _PIN_SENTENCE_END.search(text)
-    sentence = text[: end.end()] if end else f"{text}."
+    sentence = _first_pin_sentence(text)
     budget = MAX_PIN_DESCRIPTION_LENGTH - len(head) - len(tail) - len(" — ") - 1
     return _trim_to_words(
         f"{head} — {_trim_to_words(sentence, max(budget, 1))} {tail}", MAX_PIN_DESCRIPTION_LENGTH
