@@ -454,6 +454,10 @@ def test_pin_variant_flattens_transparency_onto_the_pad():
     with Image.open(io.BytesIO(pin)) as image:
         assert image.mode == "RGB"
         assert image.size == PIN_SIZE
+        # RGBA -> RGB without compositing exposed black for this fully
+        # transparent source instead of flattening it onto an opaque canvas.
+        r, g, b = image.getpixel((500, 750))
+        assert r > 240 and g > 240 and b > 240
 
 
 def test_pin_variant_of_undecodable_bytes_is_none():
