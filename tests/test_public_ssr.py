@@ -1506,9 +1506,20 @@ def test_pin_description_does_not_double_a_name_ending_stop(name):
     assert _pin_description(name, DEFAULT_RECIPE_DESCRIPTION, []) == f"{name} Vegan recipe."
 
 
-def test_pin_description_sentence_survives_abbreviations():
-    text = _pin_description("Chili", "Uses e.g. 20 mins vs. store-bought. Serve hot.", [])
-    assert text == "Chili — Uses e.g. 20 mins vs. store-bought. Vegan recipe."
+@pytest.mark.parametrize(
+    ("description", "first_sentence"),
+    [
+        ("Uses e.g. 20 mins vs. store-bought. Serve hot.", "Uses e.g. 20 mins vs. store-bought."),
+        ("Ask Mr. Smith for help. Serve hot.", "Ask Mr. Smith for help."),
+        ("A U.S. favorite. Serve hot.", "A U.S. favorite."),
+        ("Cook until tender. serve immediately.", "Cook until tender."),
+    ],
+)
+def test_pin_description_finds_the_first_sentence_without_splitting_abbreviations(
+    description, first_sentence
+):
+    text = _pin_description("Chili", description, [])
+    assert text == f"Chili — {first_sentence} Vegan recipe."
 
 
 def test_pin_description_skips_a_whitespace_padded_placeholder():
