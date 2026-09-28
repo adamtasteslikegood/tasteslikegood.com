@@ -761,6 +761,10 @@ def _collection_json_ld(
 
 MAX_PIN_DESCRIPTION_LENGTH = 500
 PIN_DESCRIPTION_TAGS = 3
+# The "Vegan recipe: tags." tail's share of the 500. Recipe.name is String(200),
+# so name + separators + tail always fit and the tail is never cut. Tags are
+# unbounded strings (recipe_schema.json), so one that does not fit is skipped.
+MAX_PIN_TAIL_LENGTH = 200
 
 
 def _trim_to_words(text: str, limit: int) -> str:
@@ -781,18 +785,20 @@ def _pin_description(name: str, description: str, tags: list[str]) -> str:
     too long, the sentence gives way.
     """
     seen = {"vegan"}
-    keywords = []
+    keywords: list[str] = []
     for tag in tags:
-        if tag.lower() not in seen:
-            seen.add(tag.lower())
-            keywords.append(tag)
-    tail = "Vegan recipe" + (
-        f": {', '.join(keywords[:PIN_DESCRIPTION_TAGS])}." if keywords else "."
-    )
+        tag = " ".join(tag.split())
+        if tag.lower() in seen or len(keywords) == PIN_DESCRIPTION_TAGS:
+            continue
+        if len(f"Vegan recipe: {', '.join([*keywords, tag])}.") > MAX_PIN_TAIL_LENGTH:
+            continue
+        seen.add(tag.lower())
+        keywords.append(tag)
+    tail = "Vegan recipe" + (f": {', '.join(keywords)}." if keywords else ".")
     head = " ".join(name.split())
 
     text = " ".join(description.split())
-    if description == DEFAULT_RECIPE_DESCRIPTION or not text:
+    if text == DEFAULT_RECIPE_DESCRIPTION or not text:
         return _trim_to_words(f"{head}. {tail}", MAX_PIN_DESCRIPTION_LENGTH)
     end = _SENTENCE_END.search(text)
     sentence = text[: end.end()] if end else f"{text}."

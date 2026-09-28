@@ -1472,6 +1472,25 @@ def test_pin_description_fits_500_and_keeps_the_keyword_tail():
     assert "…" in text
 
 
+def test_pin_description_skips_oversized_tags_so_the_tail_survives():
+    # Tags have no schema length limit; with three 300-char tags the old tail
+    # alone passed 500 and the final cap cut it. Tags that do not fit are skipped.
+    huge = ["x" * 300, "y" * 300, "z" * 300]
+    long_sentence = " ".join(["word"] * 200) + "."
+    text = _pin_description("N" * 200, long_sentence, [*huge, "soup"])
+    assert len(text) <= 500
+    assert text.endswith("Vegan recipe: soup.")
+    assert not any(tag in text for tag in huge)
+
+    only_huge = _pin_description("Stew", "Hearty.", huge)
+    assert only_huge == "Stew — Hearty. Vegan recipe."
+
+
+def test_pin_description_skips_a_whitespace_padded_placeholder():
+    padded = f"  {DEFAULT_RECIPE_DESCRIPTION}  "
+    assert _pin_description("Plain Oats", padded, []) == "Plain Oats. Vegan recipe."
+
+
 def test_recipe_page_pins_with_keyword_description(app, client):
     with app.app_context():
         recipe = _make_recipe(

@@ -424,13 +424,26 @@ def test_pin_variant_is_a_2_by_3_jpeg_for_any_source_shape(size):
 
 
 def test_pin_variant_keeps_the_whole_landscape_photo_centred():
-    # A 1408x768 red photo fitted to 1000 px wide is ~545 px tall, centred.
-    # The middle is the photo itself; the top edge is the blurred pad.
-    pin = make_pin_variant(_jpeg(1408, 768, color=(200, 30, 30)))
+    # A 1408x768 photo with a blue left edge band, a green right edge band and a
+    # red middle. Fitted to 1000 px wide it is ~545 px tall, centred, so both
+    # bands must survive sharp at the pin's edges. A 2:3 centre crop (a 512 px
+    # slice of the middle) would lose both and leave only red.
+    source = Image.new("RGB", (1408, 768), (200, 30, 30))
+    source.paste((30, 30, 200), (0, 0, 141, 768))
+    source.paste((30, 170, 30), (1267, 0, 1408, 768))
+    out = io.BytesIO()
+    source.save(out, format="JPEG", quality=95)
+
+    pin = make_pin_variant(out.getvalue())
     with Image.open(io.BytesIO(pin)) as image:
         r, g, b = image.getpixel((500, 750))
-        assert r > 150 and g < 80 and b < 80
-        assert image.getpixel((5, 750))[0] > 150  # full width kept, no side crop
+        assert r > 150 and g < 80 and b < 80  # centre of the photo
+        r, g, b = image.getpixel((20, 750))
+        assert b > 150 and r < 80 and g < 80  # left edge band kept
+        r, g, b = image.getpixel((980, 750))
+        assert g > 120 and r < 80 and b < 80  # right edge band kept
+        # Above the ~545 px photo is the blurred pad, not the sharp band.
+        assert image.getpixel((20, 300)) != image.getpixel((20, 750))
 
 
 def test_pin_variant_flattens_transparency_onto_the_pad():
