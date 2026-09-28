@@ -493,8 +493,10 @@ def test_pin_endpoint_serves_the_pin_jpeg(app, client):
     assert resp.headers["Cache-Control"] == "public, max-age=86400"
 
 
-@pytest.mark.parametrize("query", ["pin=2", "pin=true", "pin=1&w=400"])
-def test_pin_endpoint_rejects_bad_or_combined_params(app, client, query):
+@pytest.mark.parametrize(
+    "query", ["pin=2", "pin=true", "pin=1&w=400", "pin=1&pin=2", "pin=1&pin=1"]
+)
+def test_pin_endpoint_rejects_bad_combined_or_duplicate_params(app, client, query):
     with app.app_context():
         recipe_id = _add_image_recipe("pin-bad-" + query.replace("=", "").replace("&", ""), _jpeg())
 
