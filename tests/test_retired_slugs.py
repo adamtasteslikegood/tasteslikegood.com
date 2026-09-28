@@ -125,6 +125,32 @@ def test_restoring_a_deleted_recipe_cannot_reclaim_its_slug(app, adam):
     assert app.test_client().get(f"/r/{slug}").status_code == 410
 
 
+def test_deleting_a_renamed_recipe_permanently_retires_every_alias(app, adam):
+    _publish(adam, "zp-1")
+    renamed = adam.put("/api/recipes/zp-1", json={"slug": "zucchini-poppers-deluxe"})
+    assert renamed.status_code == 200, renamed.get_json()
+    _unpublish_and_delete(adam, "zp-1")
+
+    assert db.session.get(RetiredSlug, "zucchini-poppers").recipe_id is None
+    assert db.session.get(RetiredSlug, "zucchini-poppers-deluxe").recipe_id is None
+
+    restored = adam.post(
+        "/api/recipes",
+        json={
+            "id": "zp-1",
+            "name": "Zucchini Poppers",
+            "slug": "zucchini-poppers",
+            "is_public": True,
+        },
+    )
+
+    assert restored.status_code == 201, restored.get_json()
+    assert restored.get_json()["slug"] == "zucchini-poppers-2"
+    public = app.test_client()
+    assert public.get("/r/zucchini-poppers").status_code == 410
+    assert public.get("/r/zucchini-poppers-deluxe").status_code == 410
+
+
 def test_private_row_carrying_a_retired_slug_cannot_publish_under_it(app, adam, other):
     """A private row stores any payload slug unvalidated; publishing must re-check it."""
     slug = _publish(adam, "zp-1")["slug"]
