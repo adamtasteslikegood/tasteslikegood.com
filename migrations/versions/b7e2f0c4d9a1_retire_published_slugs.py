@@ -51,11 +51,16 @@ def _backfill(conn):
     )
     conn.execute(
         sa.text(
-            "INSERT INTO retired_slug (slug, retired_at) "
-            "SELECT DISTINCT r.source_slug, CURRENT_TIMESTAMP FROM recipe r "
+            "INSERT INTO retired_slug (slug, recipe_id, retired_at) "
+            "SELECT r.source_slug, "
+            "CASE WHEN COUNT(*) = COUNT(r.source_recipe_id) "
+            "AND COUNT(DISTINCT r.source_recipe_id) = 1 "
+            "THEN MIN(r.source_recipe_id) ELSE NULL END, "
+            "CURRENT_TIMESTAMP FROM recipe r "
             "WHERE r.source_slug IS NOT NULL AND r.source_slug <> '' "
             "AND NOT EXISTS (SELECT 1 FROM recipe r2 WHERE r2.slug = r.source_slug) "
-            "AND NOT EXISTS (SELECT 1 FROM retired_slug rs WHERE rs.slug = r.source_slug)"
+            "AND NOT EXISTS (SELECT 1 FROM retired_slug rs WHERE rs.slug = r.source_slug) "
+            "GROUP BY r.source_slug"
         )
     )
 
