@@ -93,6 +93,17 @@ img {
   text-decoration: none;
 }
 
+/* KAN-292: the "Analytics choice" control reads as a footer link. */
+.public-footer-button {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .public-nav-link,
 .public-recipe-action-link,
 .public-browse-pagination a {

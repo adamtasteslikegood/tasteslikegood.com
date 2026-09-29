@@ -122,6 +122,11 @@ def test_show_public_recipe_renders_html(app, client):
     assert "Thai Peanut Noodles description" in body
     assert '<script defer src="/static/js/public.js"></script>' in body
     assert "document.querySelectorAll('[data-open-kitchen]')" not in body
+    # KAN-292: the shared same-origin consent gate is the only other script, and
+    # the footer offers a way to reopen (and withdraw) the analytics choice.
+    assert '<script defer src="/rum/consent.js"></script>' in body
+    assert "data-analytics-settings" in body
+    assert "datadoghq" not in body
 
     public_js = (Path(__file__).resolve().parent.parent / "static/js/public.js").read_text(
         encoding="utf-8"

@@ -47,6 +47,12 @@
                         <a href="/about">About</a>
                         <a href="/privacy-policy">Privacy Policy</a>
                     </nav>
+                    {# KAN-292: a button outside the footer nav, so the canonical link set is
+                       untouched. Ships hidden; /rum/consent.js reveals it when RUM is
+                       configured and opens the analytics choice on click. #}
+                    <button type="button" class="public-footer-button" hidden data-analytics-settings>
+                        Analytics choice
+                    </button>
                 </div>
             </footer>
         </div>
@@ -54,5 +60,10 @@
         <div id="public-toast" class="public-toast" hidden></div>
 
         <script defer src="{{ url_for('static', filename='js/public.js') }}"></script>
+        {# KAN-292: analytics consent gate + Datadog RUM loader. Served same-origin by the
+           Express frontend (cookbook repo public/rum/consent.js), the SAME file the SPA
+           loads, so SSR pages and the SPA share one consent choice. It loads nothing from
+           Datadog until the visitor clicks "Allow analytics". #}
+        <script defer src="/rum/consent.js"></script>
     </body>
 </html>
