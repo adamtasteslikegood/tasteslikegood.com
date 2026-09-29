@@ -236,10 +236,7 @@ def refresh_after_auth_failure() -> bool:
             if _current_client is None:
                 return False
             last = _last_refresh_monotonic
-        if (
-            last is not None
-            and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE
-        ):
+        if last is not None and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE:
             return True
         try:
             refreshed = _refresh_token_in_place()
