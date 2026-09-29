@@ -10,8 +10,11 @@ and fall through to the database, never crash the request.
 import json
 import logging
 
+from redis.exceptions import AuthenticationError
+
 from extensions import cache
 from utils.log_sanitizer import sanitize_log_value
+from utils.valkey_auth import refresh_after_auth_failure
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +36,27 @@ MAX_JSON_CACHE_BYTES = 256 * 1024
 # ── Safe cache operations (never raise) ───────────────────────────────────────
 
 
+def _call_with_auth_retry(op):
+    """Run a cache operation; on an IAM auth rejection, refresh and retry ONCE.
+
+    The Memorystore IAM token can expire before the background refresh fires
+    (KAN-268). Instead of failing every command until then, refresh the token
+    on the first AuthenticationError and retry exactly once. Any error on the
+    retry — or a refresh that did not happen — propagates to the caller's
+    existing fault-tolerant handler. Never loops.
+    """
+    try:
+        return op()
+    except AuthenticationError:
+        if not refresh_after_auth_failure():
+            raise
+    return op()
+
+
 def safe_get(key):
     """Get from cache. Returns None on any failure."""
     try:
-        return cache.get(key)
+        return _call_with_auth_retry(lambda: cache.get(key))
     except Exception as e:
         logger.warning(
             "Cache GET failed for %s: %s",
@@ -68,7 +88,7 @@ def safe_set(key, value, timeout=None, max_bytes=None):
                     max_bytes,
                 )
                 return
-        cache.set(key, value, timeout=timeout)
+        _call_with_auth_retry(lambda: cache.set(key, value, timeout=timeout))
     except Exception as e:
         logger.warning(
             "Cache SET failed for %s: %s",
@@ -187,7 +207,7 @@ def _delete_keys(keys):
     """Delete cache keys, logging failures without raising."""
     for key in keys:
         try:
-            cache.delete(key)
+            _call_with_auth_retry(lambda: cache.delete(key))
         except Exception as e:
             logger.warning(
                 "Cache delete failed for %s: %s",

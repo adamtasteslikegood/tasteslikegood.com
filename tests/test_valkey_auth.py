@@ -4,16 +4,31 @@ Covers:
 - TLS CA trust (VALKEY_CA_CERT → ssl_ca_data)
 - RESP2 protocol enforcement (avoids redis-py 8.x RESP3 "default" username injection)
 - Token refresh retry with exponential backoff on failure
+- Expiry-aware refresh scheduling (KAN-268)
+- AuthenticationError is never retried by redis-py (KAN-268)
+- Debounced refresh-on-auth-failure hook (KAN-268)
 """
 
 import ssl as ssl_mod
 import sys
 import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+
+import pytest
+from redis.backoff import NoBackoff
+from redis.exceptions import AuthenticationError
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from utils import valkey_auth  # noqa: E402
+
+
+def _utcnow():
+    """Naive UTC now — the form google-auth uses for Credentials.expiry."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
 
 # A syntactically shaped but fake PEM — the client is never actually opened.
 _FAKE_PEM = (
@@ -36,7 +51,9 @@ def _capture_strictredis(monkeypatch):
         return object()  # _build_client only constructs & returns; never calls it
 
     monkeypatch.setattr("redis.StrictRedis", fake_strictredis)
-    monkeypatch.setattr(valkey_auth, "_get_iam_token", lambda: ("sa@project.iam", "iam-token"))
+    monkeypatch.setattr(
+        valkey_auth, "_get_iam_token", lambda: ("sa@project.iam", "iam-token", None)
+    )
     return captured
 
 
@@ -89,6 +106,8 @@ def test_refresh_loop_retries_on_failure(monkeypatch):
     """On token refresh failure, the loop should retry with backoff, not sleep 45 min."""
     call_count = 0
     sleeps = []
+    # Token reported as expiring in 35 min — the Cloud Run cached-token case.
+    monkeypatch.setattr(valkey_auth, "_token_expiry", _utcnow() + timedelta(minutes=35))
 
     def fake_refresh():
         nonlocal call_count
@@ -111,8 +130,205 @@ def test_refresh_loop_retries_on_failure(monkeypatch):
     except StopIteration:
         pass
 
-    # First sleep is the normal 45-min interval
-    assert sleeps[0] == valkey_auth._TOKEN_REFRESH_INTERVAL
+    # First sleep is expiry-derived (35 min − 5 min margin), NOT the fixed
+    # 45 min that outlived the token (KAN-268).
+    assert 29 * 60 <= sleeps[0] <= 30 * 60
     # After failure, retry backoff should be much shorter than 45 min
     assert sleeps[1] == valkey_auth._RETRY_BASE  # 30s first retry
     assert sleeps[2] == valkey_auth._RETRY_BASE * 2  # 60s second retry
+
+
+# ── Expiry-aware refresh scheduling (KAN-268) ─────────────────────────────
+
+
+_NOW = datetime(2026, 9, 29, 12, 0, 0)
+
+
+def test_refresh_delay_is_expiry_minus_margin():
+    """A cached token with 35 min left is refreshed at 30 min, not 45."""
+    delay = valkey_auth._refresh_delay(_NOW + timedelta(minutes=35), now=_NOW)
+    assert delay == 30 * 60
+
+
+def test_refresh_delay_capped_at_interval_for_fresh_token():
+    """A full 60-min token still refreshes at the 45-min cap."""
+    delay = valkey_auth._refresh_delay(_NOW + timedelta(minutes=60), now=_NOW)
+    assert delay == valkey_auth._TOKEN_REFRESH_INTERVAL
+
+
+def test_refresh_delay_floor_when_inside_margin_or_expired():
+    """A token already inside the margin (or expired) re-polls at the floor."""
+    near = valkey_auth._refresh_delay(_NOW + timedelta(minutes=3), now=_NOW)
+    past = valkey_auth._refresh_delay(_NOW - timedelta(minutes=10), now=_NOW)
+    assert near == valkey_auth._MIN_REFRESH_DELAY
+    assert past == valkey_auth._MIN_REFRESH_DELAY
+    assert valkey_auth._MIN_REFRESH_DELAY > 0
+
+
+def test_refresh_delay_missing_expiry_is_short_not_45_min():
+    """Unknown expiry must not fall back to the 45-min assumption that caused KAN-268."""
+    delay = valkey_auth._refresh_delay(None, now=_NOW)
+    assert delay == valkey_auth._UNKNOWN_EXPIRY_DELAY
+    assert delay < valkey_auth._TOKEN_REFRESH_INTERVAL
+
+
+def test_refresh_delay_accepts_aware_and_naive_mix():
+    """Aware expiry vs naive now (and vice versa) compares in UTC, no TypeError."""
+    aware_expiry = (_NOW + timedelta(minutes=35)).replace(tzinfo=timezone.utc)
+    assert valkey_auth._refresh_delay(aware_expiry, now=_NOW) == 30 * 60
+    aware_now = _NOW.replace(tzinfo=timezone.utc)
+    assert valkey_auth._refresh_delay(_NOW + timedelta(minutes=35), now=aware_now) == 30 * 60
+    # Non-UTC offset is normalised, not taken at face value.
+    plus2 = timezone(timedelta(hours=2))
+    offset_expiry = (_NOW + timedelta(hours=2, minutes=35)).replace(tzinfo=plus2)
+    assert valkey_auth._refresh_delay(offset_expiry, now=_NOW) == 30 * 60
+
+
+def test_refresh_delay_default_now_uses_naive_utc():
+    """Without an explicit now, a naive-UTC expiry 35 min out yields ~30 min."""
+    delay = valkey_auth._refresh_delay(_utcnow() + timedelta(minutes=35))
+    assert 29 * 60 <= delay <= 30 * 60
+
+
+def test_refresh_in_place_records_new_expiry(monkeypatch):
+    """A successful in-place refresh stores the new token's expiry for the loop."""
+    new_expiry = _NOW + timedelta(minutes=33)
+
+    class _Pool:
+        def __init__(self):
+            self.connection_kwargs = {}
+            self.disconnected = False
+
+        def disconnect(self):
+            self.disconnected = True
+
+    class _Client:
+        def __init__(self):
+            self.connection_pool = _Pool()
+
+        def ping(self):
+            return True
+
+    client = _Client()
+    monkeypatch.setattr(valkey_auth, "_current_client", client)
+    monkeypatch.setattr(valkey_auth, "_token_expiry", None)
+    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", None)
+    monkeypatch.setattr(valkey_auth, "_get_iam_token", lambda: ("sa", "tok2", new_expiry))
+
+    assert valkey_auth._refresh_token_in_place() is True
+    assert valkey_auth._token_expiry == new_expiry
+    assert valkey_auth._last_refresh_monotonic is not None
+    assert client.connection_pool.connection_kwargs["password"] == "tok2"
+    assert client.connection_pool.disconnected is True
+
+
+# ── redis-py must not retry a rejected credential (KAN-268) ───────────────
+
+
+def test_build_client_installs_no_auth_retry(monkeypatch):
+    captured = _capture_strictredis(monkeypatch)
+    valkey_auth._build_client("10.128.0.11", 6379)
+    assert isinstance(captured.get("retry"), valkey_auth._NoAuthRetry)
+    assert captured["retry"].get_retries() == valkey_auth._REDIS_RETRIES
+
+
+def test_no_auth_retry_fails_fast_on_authentication_error():
+    """AuthenticationError (a ConnectionError subclass) raises on the first attempt."""
+    retry = valkey_auth._NoAuthRetry(NoBackoff(), 10)
+    calls = []
+    fails = []
+
+    def do():
+        calls.append(1)
+        raise AuthenticationError("invalid password")
+
+    with pytest.raises(AuthenticationError):
+        retry.call_with_retry(do, lambda e: fails.append(e))
+    assert len(calls) == 1
+    assert fails == []
+
+
+def test_no_auth_retry_still_retries_plain_connection_errors():
+    """Refused sockets / dropped connections keep the normal retry behaviour."""
+    retry = valkey_auth._NoAuthRetry(NoBackoff(), 3)
+    calls = []
+
+    def do():
+        calls.append(1)
+        if len(calls) < 3:
+            raise RedisConnectionError("connection reset")
+        return "ok"
+
+    assert retry.call_with_retry(do, lambda e: None) == "ok"
+    assert len(calls) == 3
+
+
+def test_no_auth_retry_honours_caller_is_retryable_and_failure_count():
+    retry = valkey_auth._NoAuthRetry(NoBackoff(), 5)
+    calls = []
+    counts = []
+
+    def do():
+        calls.append(1)
+        raise RedisConnectionError("nope")
+
+    with pytest.raises(RedisConnectionError):
+        retry.call_with_retry(
+            do,
+            lambda e, n: counts.append(n),
+            is_retryable=lambda e: len(calls) < 2,
+            with_failure_count=True,
+        )
+    assert len(calls) == 2
+    assert counts == [1]
+
+
+# ── refresh_after_auth_failure hook (KAN-268) ─────────────────────────────
+
+
+def test_refresh_after_auth_failure_without_client_returns_false(monkeypatch):
+    monkeypatch.setattr(valkey_auth, "_current_client", None)
+    called = []
+    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", lambda: called.append(1))
+    assert valkey_auth.refresh_after_auth_failure() is False
+    assert called == []
+
+
+def test_refresh_after_auth_failure_refreshes_once_then_debounces(monkeypatch):
+    """A burst of auth failures triggers ONE refresh, not one per request."""
+    monkeypatch.setattr(valkey_auth, "_current_client", object())
+    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", None)
+    calls = []
+
+    def fake_refresh():
+        calls.append(1)
+        valkey_auth._last_refresh_monotonic = time.monotonic()
+        return True
+
+    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", fake_refresh)
+
+    assert valkey_auth.refresh_after_auth_failure() is True
+    assert valkey_auth.refresh_after_auth_failure() is True
+    assert valkey_auth.refresh_after_auth_failure() is True
+    assert len(calls) == 1
+
+
+def test_refresh_after_auth_failure_refreshes_after_debounce_window(monkeypatch):
+    monkeypatch.setattr(valkey_auth, "_current_client", object())
+    stale = time.monotonic() - valkey_auth._AUTH_FAILURE_REFRESH_DEBOUNCE - 1
+    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", stale)
+    calls = []
+    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", lambda: calls.append(1) or True)
+    assert valkey_auth.refresh_after_auth_failure() is True
+    assert len(calls) == 1
+
+
+def test_refresh_after_auth_failure_swallows_refresh_errors(monkeypatch):
+    monkeypatch.setattr(valkey_auth, "_current_client", object())
+    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", None)
+
+    def boom():
+        raise RedisConnectionError("metadata server unreachable")
+
+    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", boom)
+    assert valkey_auth.refresh_after_auth_failure() is False
