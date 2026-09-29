@@ -126,9 +126,10 @@ def test_show_public_recipe_renders_html(app, client):
     public_js = (Path(__file__).resolve().parent.parent / "static/js/public.js").read_text(
         encoding="utf-8"
     )
-    assert 'event.key === "Escape"' in public_js
-    assert "lastFocused.focus()" in public_js
-    assert 'event.key !== "Tab"' in public_js
+    # KAN-294 removed the Kitchen modal; only the save/toast behaviour remains.
+    assert "[data-save-recipe]" in public_js
+    assert 'getElementById("public-toast")' in public_js
+    assert "spa-modal" not in public_js
 
 
 def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
