@@ -11,6 +11,7 @@ Covers:
 
 import ssl as ssl_mod
 import sys
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -332,3 +333,46 @@ def test_refresh_after_auth_failure_swallows_refresh_errors(monkeypatch):
 
     monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", boom)
     assert valkey_auth.refresh_after_auth_failure() is False
+
+
+def test_refresh_after_auth_failure_is_single_flight(monkeypatch):
+    """Concurrent auth failures trigger one refresh and share its result."""
+    monkeypatch.setattr(valkey_auth, "_current_client", object())
+    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", None)
+    first_started = threading.Event()
+    second_started = threading.Event()
+    release_first = threading.Event()
+    calls = []
+    results = []
+
+    def fake_refresh():
+        calls.append(1)
+        first_started.set()
+        assert release_first.wait(timeout=2)
+        valkey_auth._last_refresh_monotonic = time.monotonic()
+        return True
+
+    def worker(started=None):
+        if started is not None:
+            started.set()
+        results.append(valkey_auth.refresh_after_auth_failure())
+
+    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", fake_refresh)
+    first = threading.Thread(target=worker)
+    first.start()
+    assert first_started.wait(timeout=2)
+
+    second = threading.Thread(target=worker, args=(second_started,))
+    second.start()
+    assert second_started.wait(timeout=2)
+    # Give the second worker a chance to contend for the single-flight lock
+    # while the first refresh is deliberately held open.
+    time.sleep(0.05)
+    release_first.set()
+
+    first.join(timeout=2)
+    second.join(timeout=2)
+    assert not first.is_alive()
+    assert not second.is_alive()
+    assert results == [True, True]
+    assert len(calls) == 1
