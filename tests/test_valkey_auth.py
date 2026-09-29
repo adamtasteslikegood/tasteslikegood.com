@@ -468,3 +468,98 @@ def test_refresh_after_auth_failure_is_single_flight(monkeypatch):
     assert not second.is_alive()
     assert results == [True, True]
     assert len(calls) == 1
+
+
+# ── PING runs outside the state lock (PR #338 review) ─────────────────────
+
+
+def _refresh_fixture(monkeypatch, on_ping):
+    """Install a fake client whose ping() runs ``on_ping``; return (client, expiry)."""
+    new_expiry = _NOW + timedelta(minutes=33)
+
+    class _Pool:
+        def __init__(self):
+            self.connection_kwargs = {}
+
+        def disconnect(self):
+            pass
+
+    class _Client:
+        def __init__(self):
+            self.connection_pool = _Pool()
+
+        def ping(self):
+            return on_ping()
+
+    client = _Client()
+    monkeypatch.setattr(valkey_auth, "_current_client", client)
+    monkeypatch.setattr(valkey_auth, "_token_expiry", None)
+    monkeypatch.setattr(valkey_auth, "_get_iam_token", lambda: ("sa", "tok2", new_expiry))
+    return client, new_expiry
+
+
+def test_refresh_in_place_pings_without_holding_state_lock(monkeypatch):
+    """A slow PING (redis-py retries on a flaky backend) must not hold _lock."""
+    lock_free_during_ping = []
+
+    def on_ping():
+        acquired = valkey_auth._lock.acquire(blocking=False)
+        if acquired:
+            valkey_auth._lock.release()
+        lock_free_during_ping.append(acquired)
+        return True
+
+    _, new_expiry = _refresh_fixture(monkeypatch, on_ping)
+
+    assert valkey_auth._refresh_token_in_place() is True
+    assert lock_free_during_ping == [True]
+    assert valkey_auth._token_expiry == new_expiry
+
+
+def test_refresh_superseded_during_ping_does_not_publish_expiry(monkeypatch):
+    """A newer refresh that installs a token while this PING runs owns the expiry."""
+
+    def on_ping():
+        with valkey_auth._lock:
+            valkey_auth._refresh_generation += 1  # a concurrent refresh installed
+        return True
+
+    _refresh_fixture(monkeypatch, on_ping)
+
+    assert valkey_auth._refresh_token_in_place() is True
+    assert valkey_auth._token_expiry is None
+
+
+def test_refresh_after_client_replaced_during_ping_does_not_publish_expiry(monkeypatch):
+    """A replacement client (create_iam_redis_client) publishes its own expiry."""
+    replacement = object()
+
+    def on_ping():
+        with valkey_auth._lock:
+            valkey_auth._current_client = replacement
+        return True
+
+    _refresh_fixture(monkeypatch, on_ping)
+
+    assert valkey_auth._refresh_token_in_place() is True
+    assert valkey_auth._token_expiry is None
+    assert valkey_auth._current_client is replacement
+
+
+def test_refresh_ping_failure_raises_and_keeps_old_expiry(monkeypatch):
+    def on_ping():
+        raise RedisConnectionError("backend down")
+
+    _refresh_fixture(monkeypatch, on_ping)
+
+    with pytest.raises(RedisConnectionError):
+        valkey_auth._refresh_token_in_place()
+    assert valkey_auth._token_expiry is None
+    # The lock is not left held after the failure.
+    assert valkey_auth._lock.acquire(blocking=False)
+    valkey_auth._lock.release()
+
+
+def test_refresh_delay_unknown_expiry_returns_float():
+    """e808898: every return path of the ``-> float`` function returns a float."""
+    assert isinstance(valkey_auth._refresh_delay(None, now=_NOW), float)

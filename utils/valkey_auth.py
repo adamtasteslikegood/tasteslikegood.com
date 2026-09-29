@@ -135,6 +135,9 @@ _auth_failure_refresh_lock = threading.Lock()
 _current_client: redis.StrictRedis | None = None
 _refresh_thread: threading.Thread | None = None
 _token_expiry: datetime | None = None
+# Bumped under _lock each time a refresh installs a token on the pool, so a
+# refresh whose PING finishes after a newer one does not publish a stale expiry.
+_refresh_generation = 0
 
 
 class _AuthFailureRefreshState:
@@ -200,7 +203,7 @@ def _refresh_token_in_place() -> bool:
         bool: True if a client was present and successfully refreshed,
         False if there is no current client (nothing to refresh).
     """
-    global _token_expiry
+    global _token_expiry, _refresh_generation
 
     with _lock:
         if _current_client is None:
@@ -225,12 +228,23 @@ def _refresh_token_in_place() -> bool:
         # Close all sockets — next use triggers reconnect with the updated password
         pool.disconnect()
 
-        # Verify the refreshed token works
-        client.ping()
+        _refresh_generation += 1
+        generation = _refresh_generation
 
-        _token_expiry = new_expiry
-        _refresh_condition.notify_all()
-        return True
+    # Verify the refreshed token OUTSIDE _lock. PING is network I/O behind
+    # redis-py's connection retry (up to ~10 jittered attempts on a flaky
+    # backend); holding the state lock across it would stall every other
+    # refresh path. PING reads no module state, so it needs no lock.
+    client.ping()
+
+    # Publish the expiry only if nothing superseded this refresh while the
+    # lock was released: a newer in-place refresh (higher generation) or a
+    # replacement client. Either one publishes its own expiry.
+    with _lock:
+        if _current_client is client and _refresh_generation == generation:
+            _token_expiry = new_expiry
+            _refresh_condition.notify_all()
+    return True
 
 
 def refresh_after_auth_failure() -> bool:
