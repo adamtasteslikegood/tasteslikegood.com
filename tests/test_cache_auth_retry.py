@@ -111,6 +111,21 @@ def test_non_auth_errors_are_not_retried(monkeypatch, refresh_calls):
     assert refresh_calls == []
 
 
+def test_bulk_delete_stops_after_unrecoverable_auth_failure(
+    monkeypatch, refresh_calls, caplog
+):
+    """One pool-wide auth failure should not emit a warning for every key."""
+    refresh_calls.result = False
+    fake = _install(monkeypatch, [AuthenticationError("invalid password")])
+
+    with caplog.at_level("WARNING", logger=cache_utils.__name__):
+        cache_utils._delete_keys(["vgc:r:1", "vgc:r:2", "vgc:r:3"])
+
+    assert [call[0] for call in fake.calls] == ["delete"]
+    assert len(refresh_calls) == 1
+    assert caplog.messages == ["Cache delete failed for vgc:r:1: invalid password"]
+
+
 def test_happy_path_makes_one_call_and_no_refresh(monkeypatch, refresh_calls):
     fake = _install(monkeypatch, [b"hit"])
     assert cache_utils.safe_get("vgc:img:1") == b"hit"
