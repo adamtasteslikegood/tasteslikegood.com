@@ -125,6 +125,9 @@ def _redis_retry() -> Retry:
 
 # ── Module-level state for token refresh ──────────────────────────
 _lock = threading.Lock()
+# The refresh loop waits on this condition so any successful in-place refresh
+# can wake it to recompute the deadline from the replacement token's expiry.
+_refresh_condition = threading.Condition(_lock)
 # Serializes refreshes initiated by AuthenticationError handlers. The main
 # state lock cannot be held while calling _refresh_token_in_place(), because
 # that function acquires it too.
@@ -226,6 +229,7 @@ def _refresh_token_in_place() -> bool:
         client.ping()
 
         _token_expiry = new_expiry
+        _refresh_condition.notify_all()
         return True
 
 
@@ -277,18 +281,22 @@ def _refresh_loop():
     """
     consecutive_failures = 0
     while True:
-        if consecutive_failures == 0:
-            with _lock:
-                expiry = _token_expiry
-            time.sleep(_refresh_delay(expiry))
-        else:
-            backoff = min(_RETRY_BASE * (2 ** (consecutive_failures - 1)), _RETRY_MAX)
-            logger.info(
-                "Valkey token refresh retry in %ds (attempt %d)",
-                backoff,
-                consecutive_failures + 1,
-            )
-            time.sleep(backoff)
+        with _refresh_condition:
+            if consecutive_failures == 0:
+                delay = _refresh_delay(_token_expiry)
+            else:
+                delay = min(_RETRY_BASE * (2 ** (consecutive_failures - 1)), _RETRY_MAX)
+                logger.info(
+                    "Valkey token refresh retry in %ds (attempt %d)",
+                    delay,
+                    consecutive_failures + 1,
+                )
+            # A successful refresh from another thread updates _token_expiry and
+            # notifies while holding the same lock. Wake without refreshing so
+            # this loop recomputes its deadline from that replacement token.
+            if _refresh_condition.wait(timeout=delay):
+                consecutive_failures = 0
+                continue
 
         try:
             refreshed = _refresh_token_in_place()
