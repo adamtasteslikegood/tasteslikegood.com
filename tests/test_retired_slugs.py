@@ -256,6 +256,26 @@ def test_first_published_at_is_exposed_and_survives_unpublish(app, adam):
     )
 
 
+def test_list_flags_rows_whose_delete_would_make_a_slug_permanent(app, adam):
+    """KAN-291 item 6: an owner marker on a never-published row is invisible to
+    first_published_at, but the delete hook makes it permanent, so the SPA
+    needs its own signal to show the irreversible warning."""
+    for recipe_id, slug in (("marked", "marked-slug"), ("plain", "plain-slug")):
+        resp = adam.post("/api/recipes", json={"id": recipe_id, "name": recipe_id, "slug": slug})
+        assert resp.status_code == 201
+    # Rule 3 of migration b7e2f0c4d9a1 writes this marker; no API path does.
+    db.session.add(RetiredSlug(slug="marked-slug", recipe_id="marked"))
+    db.session.commit()
+
+    listed = {r["id"]: r for r in adam.get("/api/recipes").get_json()["recipes"]}
+    assert listed["marked"]["first_published_at"] is None
+    assert listed["marked"]["slug_reserved"] is True
+    assert listed["plain"]["slug_reserved"] is False
+
+    assert adam.delete("/api/recipes/marked").status_code == 200
+    assert db.session.get(RetiredSlug, "marked-slug").recipe_id is None
+
+
 def test_renamed_slug_temporarily_redirects_and_can_be_reclaimed(app, adam, other):
     _publish(adam, "zp-1")
 

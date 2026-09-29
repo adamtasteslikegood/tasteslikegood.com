@@ -17,13 +17,22 @@
         <div class="public-shell">
             <header class="public-header">
                 <div class="public-header-inner">
-                    <a href="{{ url_for('public.browse_public_recipes') }}" class="public-brand">
-                        <span class="public-brand-mark">🥗</span>
+                    {#
+                        Header + footer links are the site-wide canonical set shared with the
+                        SPA shell (KAN-294): the cookbook repo's src/site-nav.json is the source
+                        of truth, and tests/test_public_nav_parity.py asserts this template
+                        renders exactly that set, in order. Literal paths, not url_for(): the
+                        SPA routes (/, /generate, /kitchen) are not Flask endpoints, and the
+                        Express proxy serves every path here on the same origin.
+                    #}
+                    <a href="/" class="public-brand" aria-label="VeganGenius Chef home">
+                        <span class="public-brand-mark" aria-hidden="true">🥗</span>
                         <span class="public-brand-text">VeganGenius Chef</span>
                     </a>
                     <nav class="public-nav" aria-label="Primary">
-                        <a href="{{ url_for('public.browse_public_recipes') }}" class="public-nav-link">Browse</a>
-                        <button type="button" class="public-nav-button" data-open-kitchen>My Kitchen ↗</button>
+                        <a href="/generate" class="public-nav-link">Generator</a>
+                        <a href="/kitchen" class="public-nav-link">My Kitchen</a>
+                        <a href="/browse" class="public-nav-link">Browse</a>
                     </nav>
                 </div>
             </header>
@@ -34,37 +43,27 @@
                 <div class="public-footer-inner">
                     <p>TastesLikeGood.org · honest vegan recipes</p>
                     <nav class="public-footer-links" aria-label="Footer">
-                        <a href="{{ url_for('public.browse_public_recipes') }}">Browse</a>
+                        <a href="/browse">Browse recipes</a>
                         <a href="/about">About</a>
-                        <a href="/privacy-policy">Privacy</a>
+                        <a href="/privacy-policy">Privacy Policy</a>
                     </nav>
+                    {# KAN-292: a button outside the footer nav, so the canonical link set is
+                       untouched. Ships hidden; /rum/consent.js reveals it when RUM is
+                       configured and opens the analytics choice on click. #}
+                    <button type="button" class="public-footer-button" hidden data-analytics-settings>
+                        Analytics choice
+                    </button>
                 </div>
             </footer>
         </div>
 
         <div id="public-toast" class="public-toast" hidden></div>
 
-        <div id="spa-modal" class="public-modal" aria-hidden="true">
-            <div class="public-modal-card" role="dialog" aria-modal="true" aria-labelledby="spa-modal-title" tabindex="-1">
-                <div class="public-modal-header">
-                    <p class="public-eyebrow">Your Kitchen Awaits</p>
-                    <h2 id="spa-modal-title" class="public-modal-title">Open the cookbook app</h2>
-                </div>
-                <div class="public-modal-body">
-                    <p class="public-modal-body">
-                        Jump into the SPA to save recipes, organize cookbooks, and continue as a
-                        guest or with Google.
-                    </p>
-                </div>
-                <div class="public-modal-actions">
-                    <a href="/#kitchen" class="public-modal-button public-modal-button--primary"
-                        >Open my kitchen</a
-                    >
-                    <button type="button" class="public-modal-button" data-close-modal>Stay here</button>
-                </div>
-            </div>
-        </div>
-
         <script defer src="{{ url_for('static', filename='js/public.js') }}"></script>
+        {# KAN-292: analytics consent gate + Datadog RUM loader. Served same-origin by the
+           Express frontend (cookbook repo public/rum/consent.js), the SAME file the SPA
+           loads, so SSR pages and the SPA share one consent choice. It loads nothing from
+           Datadog until the visitor clicks "Allow analytics". #}
+        <script defer src="/rum/consent.js"></script>
     </body>
 </html>
