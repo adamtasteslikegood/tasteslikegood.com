@@ -1,0 +1,62 @@
+{% extends "public/base_public.html" %}
+
+{# KAN-288: rendered by the app-level 410 handler for a deleted recipe's
+   retired /r/<slug>. Honest "removed on purpose", not a 404: the address will
+   never be given to a different recipe. Extends the PUBLIC base for the same
+   reason as 404.html. #}
+
+{% block title %}Recipe removed · TastesLikeGood.org{% endblock %}
+
+{% block content %}
+<div class="error-page">
+    <h1>This recipe was removed</h1>
+    <p>Its author deleted it, and this address will not be reused for another recipe.</p>
+
+    <div class="error-actions">
+        <a href="{{ url_for('public.browse_public_recipes') }}" class="button">Browse recipes</a>
+        <a href="/#kitchen" class="button">Open the cookbook app</a>
+    </div>
+</div>
+
+<style>
+    .error-page {
+        text-align: center;
+        padding: 3rem 1rem;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    .error-page h1 {
+        font-size: 2.25rem;
+        margin-bottom: 1rem;
+    }
+
+    .error-page p {
+        font-size: 1.1rem;
+        margin-bottom: 0.5rem;
+        color: #666;
+    }
+
+    .error-actions {
+        margin-top: 2rem;
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
+    .error-actions .button {
+        display: inline-block;
+        padding: 0.75rem 1.5rem;
+        background-color: #4caf50;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background-color 0.3s;
+    }
+
+    .error-actions .button:hover {
+        background-color: #45a049;
+    }
+</style>
+{% endblock %}

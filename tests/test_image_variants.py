@@ -30,7 +30,10 @@ from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from services.image_variants import (  # noqa: E402
     MAX_SOURCE_PIXELS,
+    PIN_SIZE,
+    make_pin_variant,
     make_webp_variant,
+    parse_pin_flag,
     parse_variant_width,
 )
 
@@ -395,3 +398,124 @@ def test_browse_cards_use_small_variants_and_stay_lazy(app, client):
     assert f"w=800&amp;v={token} 800w" in img
     assert 'loading="lazy"' in img
     assert 'width="400"' in img and 'height="300"' in img
+
+
+# ── Pinterest pin variant (KAN-284) ──────────────────────────────────────────
+
+
+@pytest.mark.parametrize(("raw", "expected"), [(None, False), ("1", True)])
+def test_parse_pin_flag_accepts_absent_or_one(raw, expected):
+    assert parse_pin_flag(raw) is expected
+
+
+@pytest.mark.parametrize("raw", ["0", "2", "true", "", "yes"])
+def test_parse_pin_flag_rejects_everything_else(raw):
+    with pytest.raises(ValueError):
+        parse_pin_flag(raw)
+
+
+@pytest.mark.parametrize("size", [(1408, 768), (1024, 1024), (600, 1400), (300, 200)], ids=str)
+def test_pin_variant_is_a_2_by_3_jpeg_for_any_source_shape(size):
+    pin = make_pin_variant(_jpeg(*size))
+    assert pin is not None
+    with Image.open(io.BytesIO(pin)) as image:
+        assert image.format == "JPEG"
+        assert image.size == PIN_SIZE == (1000, 1500)
+
+
+def test_pin_variant_keeps_the_whole_landscape_photo_centred():
+    # A 1408x768 photo with a blue left edge band, a green right edge band and a
+    # red middle. Fitted to 1000 px wide it is ~545 px tall, centred, so both
+    # bands must survive sharp at the pin's edges. A 2:3 centre crop (a 512 px
+    # slice of the middle) would lose both and leave only red.
+    source = Image.new("RGB", (1408, 768), (200, 30, 30))
+    source.paste((30, 30, 200), (0, 0, 141, 768))
+    source.paste((30, 170, 30), (1267, 0, 1408, 768))
+    out = io.BytesIO()
+    source.save(out, format="JPEG", quality=95)
+
+    pin = make_pin_variant(out.getvalue())
+    with Image.open(io.BytesIO(pin)) as image:
+        r, g, b = image.getpixel((500, 750))
+        assert r > 150 and g < 80 and b < 80  # centre of the photo
+        r, g, b = image.getpixel((20, 750))
+        assert b > 150 and r < 80 and g < 80  # left edge band kept
+        r, g, b = image.getpixel((980, 750))
+        assert g > 120 and r < 80 and b < 80  # right edge band kept
+        # Above the ~545 px photo is the blurred pad, not the sharp band.
+        assert image.getpixel((20, 300)) != image.getpixel((20, 750))
+
+
+def test_pin_variant_flattens_transparency_onto_the_pad():
+    out = io.BytesIO()
+    Image.new("RGBA", (800, 800), (0, 120, 0, 0)).save(out, format="PNG")
+    pin = make_pin_variant(out.getvalue())
+    assert pin is not None
+    with Image.open(io.BytesIO(pin)) as image:
+        assert image.mode == "RGB"
+        assert image.size == PIN_SIZE
+        # RGBA -> RGB without compositing exposed black for this fully
+        # transparent source instead of flattening it onto an opaque canvas.
+        r, g, b = image.getpixel((500, 750))
+        assert r > 240 and g > 240 and b > 240
+
+
+def test_pin_variant_flattens_mixed_alpha_before_blurring():
+    source = Image.new("RGBA", (200, 200), (0, 0, 0, 0))
+    source.paste((220, 20, 20, 255), (60, 60, 140, 140))
+    out = io.BytesIO()
+    source.save(out, format="PNG")
+
+    pin = make_pin_variant(out.getvalue())
+    assert pin is not None
+    with Image.open(io.BytesIO(pin)) as image:
+        # This point is just outside the sharp foreground subject, where the
+        # RGB pad should carry its blurred red colour. Blurring RGBA first and
+        # reusing the blurred alpha as a paste mask applies alpha twice and
+        # leaves a pale seam here instead.
+        r, g, b = image.getpixel((175, 750))
+        assert r > 235 and r - g > 40 and r - b > 40
+
+
+def test_pin_variant_of_undecodable_bytes_is_none():
+    assert make_pin_variant(b"not an image") is None
+
+
+def test_pin_endpoint_serves_the_pin_jpeg(app, client):
+    with app.app_context():
+        recipe_id = _add_image_recipe("pin-pie", _jpeg())
+
+    resp = client.get(f"/api/recipes/{recipe_id}/image?pin=1")
+    assert resp.status_code == 200
+    assert resp.mimetype == "image/jpeg"
+    with Image.open(io.BytesIO(resp.data)) as image:
+        assert image.size == PIN_SIZE
+    assert resp.headers["Cache-Control"] == "public, max-age=86400"
+
+
+@pytest.mark.parametrize(
+    "query", ["pin=2", "pin=true", "pin=1&w=400", "pin=1&pin=2", "pin=1&pin=1"]
+)
+def test_pin_endpoint_rejects_bad_combined_or_duplicate_params(app, client, query):
+    with app.app_context():
+        recipe_id = _add_image_recipe("pin-bad-" + query.replace("=", "").replace("&", ""), _jpeg())
+
+    assert client.get(f"/api/recipes/{recipe_id}/image?{query}").status_code == 400
+
+
+def test_pin_of_a_private_recipe_still_requires_ownership(app, client):
+    with app.app_context():
+        recipe_id = _add_image_recipe("private-pin", _jpeg(), public=False)
+
+    assert client.get(f"/api/recipes/{recipe_id}/image?pin=1").status_code == 404
+
+
+def test_undecodable_image_pin_falls_back_uncached(app, client):
+    broken = b"\x89PNG\r\n\x1a\nnot really a png"
+    with app.app_context():
+        recipe_id = _add_image_recipe("broken-pin", broken)
+
+    resp = client.get(f"/api/recipes/{recipe_id}/image?pin=1")
+    assert resp.status_code == 200
+    assert resp.data == broken
+    assert resp.headers["Cache-Control"] == "no-store"

@@ -25,7 +25,13 @@ from sqlalchemy import event
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
-from blueprints.public_bp import _format_ingredient, _safe_minutes  # noqa: E402
+from blueprints.public_bp import (  # noqa: E402
+    DEFAULT_RECIPE_DESCRIPTION,
+    _format_ingredient,
+    _pin_description,
+    _pin_image_url,
+    _safe_minutes,
+)
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from models.user import User  # noqa: E402
@@ -77,6 +83,13 @@ def _make_recipe(name, slug, *, public=True, owner=None, data=None):
         is_public=public,
         data=data or {"name": name, "description": f"{name} description"},
     )
+
+
+def test_pin_image_url_rejects_a_missing_version_token():
+    recipe = _make_recipe("No Image", "no-image")
+
+    with pytest.raises(RuntimeError, match="without an image-version token"):
+        _pin_image_url(recipe)
 
 
 @pytest.mark.parametrize(
@@ -243,10 +256,12 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
     if expected_media == "endpoint":
         # KAN-195: our own image endpoint is versioned; the stock-image case
         # below is someone else's host and must be passed through untouched.
+        # KAN-284: the pin uses the 2:3 variant, versioned like the hero.
         assert re.fullmatch(
-            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+",
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?pin=1&v=[0-9a-f]+",
             media,
         ), media
+        assert f'data-pin-media="{html.escape(media)}"' in body
     else:
         assert media == expected_media
 
@@ -1423,3 +1438,111 @@ def test_rendered_image_versions_when_gcs_field_is_non_string_but_data_is_valid(
     assert re.fullmatch(
         rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?v=[0-9a-f]+", url
     ), url
+
+
+# ── Pinterest pin text (KAN-284) ─────────────────────────────────────────────
+
+
+def _pinterest_description_param(body: str) -> str:
+    match = re.search(r'href="(https://www\.pinterest\.com/pin/create/button/\?[^"]+)"', body)
+    assert match, "no Pinterest share link in page"
+    return parse_qs(urlsplit(html.unescape(match.group(1))).query)["description"][0]
+
+
+def test_pin_description_leads_with_name_then_sentence_then_keywords():
+    text = _pin_description(
+        "Smoky Tofu Tacos",
+        "Charred tortillas with smoky tofu. Ready in 20 minutes.",
+        ["Tacos", "vegan", "Dinner", "High-Protein", "Quick"],
+    )
+    assert text == (
+        "Smoky Tofu Tacos — Charred tortillas with smoky tofu. "
+        "Vegan recipe: Tacos, Dinner, High-Protein."
+    )
+
+
+def test_pin_description_skips_the_placeholder_description():
+    assert _pin_description("Plain Oats", DEFAULT_RECIPE_DESCRIPTION, []) == (
+        "Plain Oats. Vegan recipe."
+    )
+
+
+def test_pin_description_dedupes_tags_and_skips_blanks():
+    text = _pin_description("Soup", "Warm.", ["   ", "VEGAN", "soup", "Soup", "winter"])
+    assert text.endswith("Vegan recipe: soup, winter.")
+
+
+def test_pin_description_fits_500_and_keeps_the_keyword_tail():
+    long_sentence = " ".join(["word"] * 200) + "."
+    text = _pin_description("Long Recipe", long_sentence, ["breakfast", "brunch"])
+    assert len(text) <= 500
+    assert text.endswith("Vegan recipe: breakfast, brunch.")
+    assert "…" in text
+
+
+def test_pin_description_omits_an_unbroken_token_instead_of_splitting_it():
+    text = _pin_description("N" * 200, "x" * 600, ["soup"])
+    assert "x" not in text
+    assert len(text) <= 500
+    assert text.endswith("… Vegan recipe: soup.")
+
+
+def test_pin_description_skips_oversized_tags_so_the_tail_survives():
+    # Tags have no schema length limit; with three 300-char tags the old tail
+    # alone passed 500 and the final cap cut it. Tags that do not fit are skipped.
+    huge = ["x" * 300, "y" * 300, "z" * 300]
+    long_sentence = " ".join(["word"] * 200) + "."
+    text = _pin_description("N" * 200, long_sentence, [*huge, "soup"])
+    assert len(text) <= 500
+    assert text.endswith("Vegan recipe: soup.")
+    assert not any(tag in text for tag in huge)
+
+    only_huge = _pin_description("Stew", "Hearty.", huge)
+    assert only_huge == "Stew — Hearty. Vegan recipe."
+
+
+@pytest.mark.parametrize("name", ["Yum!", "Ready?", "Recipe X.", "Yum…"])
+def test_pin_description_does_not_double_a_name_ending_stop(name):
+    assert _pin_description(name, DEFAULT_RECIPE_DESCRIPTION, []) == f"{name} Vegan recipe."
+
+
+@pytest.mark.parametrize(
+    ("description", "first_sentence"),
+    [
+        ("Uses e.g. 20 mins vs. store-bought. Serve hot.", "Uses e.g. 20 mins vs. store-bought."),
+        ("Ask Mr. Smith for help. Serve hot.", "Ask Mr. Smith for help."),
+        ("A U.S. favorite. Serve hot.", "A U.S. favorite."),
+        ("Cook until tender. serve immediately.", "Cook until tender."),
+    ],
+)
+def test_pin_description_finds_the_first_sentence_without_splitting_abbreviations(
+    description, first_sentence
+):
+    text = _pin_description("Chili", description, [])
+    assert text == f"Chili — {first_sentence} Vegan recipe."
+
+
+def test_pin_description_skips_a_whitespace_padded_placeholder():
+    padded = f"  {DEFAULT_RECIPE_DESCRIPTION}  "
+    assert _pin_description("Plain Oats", padded, []) == "Plain Oats. Vegan recipe."
+
+
+def test_recipe_page_pins_with_keyword_description(app, client):
+    with app.app_context():
+        recipe = _make_recipe(
+            "Keyword Curry",
+            "keyword-curry",
+            data={
+                "name": "Keyword Curry",
+                "description": "A coconut curry with chickpeas. Serve with rice.",
+                "tags": ["curry", "dinner"],
+                "ai_image_data": base64.b64encode(b"\x89PNGpin").decode("ascii"),
+            },
+        )
+        db.session.add(recipe)
+        db.session.commit()
+
+    body = client.get("/r/keyword-curry").get_data(as_text=True)
+    expected = "Keyword Curry — A coconut curry with chickpeas. Vegan recipe: curry, dinner."
+    assert _pinterest_description_param(body) == expected
+    assert f'data-pin-description="{html.escape(expected)}"' in body

@@ -118,6 +118,11 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
     # holds this row") — these columns add precision without removing anything.
     user_id_author = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
     user_id_saved_to = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=True)
+    # KAN-288: when this row first went public. Set by the retired_slug flush
+    # hook, never by the API. Non-NULL means the slug has served /r/<slug>, so
+    # giving it up retires it for good; the SPA uses it to pick the
+    # irreversible-delete warning (KAN-289).
+    first_published_at = db.Column(db.DateTime, nullable=True)
     # MutableDict ensures in-place JSON updates are tracked (important for SQLite dev).
     data = db.Column(MutableDict.as_mutable(GenericJSON), nullable=False)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -142,6 +147,9 @@ class Recipe(db.Model):  # type: ignore[name-defined, misc]
             "origin": self.origin,
             "user_id_author": self.user_id_author,
             "user_id_saved_to": self.user_id_saved_to,
+            "first_published_at": (
+                self.first_published_at.isoformat() if self.first_published_at else None
+            ),
             "data": self.data,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,

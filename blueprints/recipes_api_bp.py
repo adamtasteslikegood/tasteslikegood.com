@@ -88,6 +88,11 @@ def list_recipes(user_id, guest_session_id):
                             "source_slug": recipe.source_slug,
                             "source_recipe_id": recipe.source_recipe_id,
                             "origin": recipe.origin,
+                            "first_published_at": (
+                                recipe.first_published_at.isoformat()
+                                if recipe.first_published_at
+                                else None
+                            ),
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
@@ -307,6 +312,8 @@ def delete_recipe(user_id, guest_session_id, recipe_id):
 
     except db_recipe_repository.CanonicalRecipeError:
         return jsonify({"error": db_recipe_repository.CANONICAL_RECIPE_LOCKED_ERROR}), 400
+    except db_recipe_repository.PublishedRecipeDeleteError:
+        return jsonify({"error": db_recipe_repository.PUBLISHED_RECIPE_DELETE_ERROR}), 409
     except Exception as e:
         logger.error(
             "Error deleting recipe %s: %s",

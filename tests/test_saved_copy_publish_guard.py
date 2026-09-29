@@ -293,6 +293,9 @@ def test_source_deleted_copy_stays_blocked(app, author, saver, published_recipe)
     """Locked rule: deleting the source does not free its copies for publishing."""
     client, created = _save_copy_via_api(app, saver, published_recipe.slug)
 
+    # KAN-288: a published recipe must be unpublished before it can be deleted.
+    published_recipe.is_public = False
+    db.session.commit()
     assert db_recipe_repository.delete_recipe(published_recipe.id, user_id=author.id)
 
     resp = client.put(f"/api/recipes/{created['id']}", json={"is_public": True})

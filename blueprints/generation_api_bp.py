@@ -12,6 +12,7 @@ import binascii
 import hashlib
 import logging
 import uuid
+from collections.abc import Callable
 
 from flask import Blueprint, Response, jsonify, request, session
 from flask.typing import ResponseReturnValue
@@ -19,10 +20,16 @@ from flask.typing import ResponseReturnValue
 from config import DEFAULT_MODEL, GCS_BUCKET_NAME
 from blueprints.generation_bp import validate_generation_input
 from repositories import db_recipe_repository
-from services.image_variants import make_webp_variant, parse_variant_width
+from services.image_variants import (
+    make_pin_variant,
+    make_webp_variant,
+    parse_pin_flag,
+    parse_variant_width,
+)
 from utils.cache_utils import (
     invalidate_recipe,
     recipe_image_key,
+    recipe_image_pin_key,
     recipe_image_variant_key,
     safe_get,
     safe_set,
@@ -315,14 +322,20 @@ def _image_cache_version(recipe) -> str:
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
 
 
-def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
-    """A WebP of the recipe's image at ``width`` px (KAN-271), or ``None`` to fall back.
+def _serve_derived_image(
+    recipe,
+    key: str,
+    build: Callable[[bytes], bytes | None],
+    mimetype: str,
+    http_cache_control: str,
+) -> ResponseReturnValue | None:
+    """A derived image (sized WebP, pin JPEG) of the recipe's photo, or ``None``.
 
-    The variant is keyed on the image's version (``_image_cache_version``) and
-    built from storage, never from the full-size Valkey entry, so a variant
-    only ever reflects the bytes its version names.
+    ``key`` must be keyed on the image's version (``_image_cache_version``), and
+    the bytes are built from storage, never from the full-size Valkey entry, so
+    a derived image only ever reflects the bytes its version names.
 
-    A configured GCS URI is authoritative for variant generation. If its read
+    A configured GCS URI is authoritative for derived images. If its read
     fails, do not fall back to legacy base64 under a cache key derived from the
     GCS identity; return ``None`` and let the bounded-cache original path decide
     whether legacy fallback is appropriate.
@@ -330,22 +343,47 @@ def _serve_image_variant(recipe, width: int, http_cache_control: str) -> Respons
     stored_uri = (recipe.data or {}).get("ai_image_gcs")
     if not isinstance(stored_uri, str):
         stored_uri = ""
-    key = recipe_image_variant_key(recipe.id, width, _image_cache_version(recipe))
 
-    variant = safe_get(key)
-    if variant is None:
+    derived = safe_get(key)
+    if derived is None:
         source = _load_stored_image_bytes(recipe, allow_legacy_fallback=not bool(stored_uri))
         if source is None:
             return None
-        variant = make_webp_variant(source, width)
-        if variant is None:
+        derived = build(source)
+        if derived is None:
             return None
-        safe_set(key, variant, timeout=TTL_IMAGE)
+        safe_set(key, derived, timeout=TTL_IMAGE)
 
     return Response(
-        variant,
-        mimetype="image/webp",
+        derived,
+        mimetype=mimetype,
         headers={"Cache-Control": http_cache_control},
+    )
+
+
+def _serve_image_variant(recipe, width: int, http_cache_control: str) -> ResponseReturnValue | None:
+    """A WebP of the recipe's image at ``width`` px (KAN-271), or ``None`` to fall back."""
+
+    def build_webp_variant(source: bytes) -> bytes | None:
+        return make_webp_variant(source, width)
+
+    return _serve_derived_image(
+        recipe,
+        recipe_image_variant_key(recipe.id, width, _image_cache_version(recipe)),
+        build_webp_variant,
+        "image/webp",
+        http_cache_control,
+    )
+
+
+def _serve_pin_image(recipe, http_cache_control: str) -> ResponseReturnValue | None:
+    """The 2:3 Pinterest pin JPEG of the recipe's image (KAN-284), or ``None``."""
+    return _serve_derived_image(
+        recipe,
+        recipe_image_pin_key(recipe.id, _image_cache_version(recipe)),
+        make_pin_variant,
+        "image/jpeg",
+        http_cache_control,
     )
 
 
@@ -369,7 +407,9 @@ def serve_recipe_image(recipe_id):
     proxy; ACAO on them defeated shared caching).
 
     ``?w=400|800|1200`` (KAN-271) returns a WebP resized to that exact width —
-    see ``_serve_image_variant``. Any other ``w`` is a 400.
+    see ``_serve_image_variant``. Any other ``w`` is a 400. ``?pin=1``
+    (KAN-284) returns the 1000x1500 Pinterest pin JPEG; ``pin`` with ``w``, or
+    any other ``pin`` value, is a 400.
     """
     # Public recipes bypass ownership scoping so unauthenticated SSR pages
     # and crawlers can still load the image.
@@ -379,6 +419,15 @@ def serve_recipe_image(recipe_id):
         variant_width = parse_variant_width(request.args.get("w"))
     except ValueError:
         return jsonify({"error": "Unsupported image width"}), 400
+    pin_values = request.args.getlist("pin")
+    if len(pin_values) > 1:
+        return jsonify({"error": "Duplicate pin parameter"}), 400
+    try:
+        pin = parse_pin_flag(pin_values[0] if pin_values else None)
+    except ValueError:
+        return jsonify({"error": "Unsupported pin value"}), 400
+    if pin and variant_width is not None:
+        return jsonify({"error": "pin and w cannot be combined"}), 400
 
     recipe = Recipe.query.filter_by(id=recipe_id).first()
     if recipe is None:
@@ -398,13 +447,17 @@ def serve_recipe_image(recipe_id):
     # Cache lookup must stay below the access check: the key is global
     # (same image for everyone), so serving on a hit without the check
     # would expose private/deleted recipes' images to anyone with the UUID.
-    if variant_width is not None:
-        variant_response = _serve_image_variant(recipe, variant_width, http_cache_control)
-        if variant_response is not None:
-            return variant_response
-        # No variant (undecodable bytes, or a GCS read failed): serve the
+    if variant_width is not None or pin:
+        derived_response = (
+            _serve_pin_image(recipe, http_cache_control)
+            if pin
+            else _serve_image_variant(recipe, variant_width, http_cache_control)
+        )
+        if derived_response is not None:
+            return derived_response
+        # No derived image (undecodable bytes, or a GCS read failed): serve the
         # original below rather than fail the page's image, but never let an
-        # HTTP cache pin full-size bytes under this sized ``?w=`` URL.
+        # HTTP cache pin full-size bytes under this ``?w=``/``?pin=`` URL.
         http_cache_control = "no-store"
 
     ck = recipe_image_key(recipe_id, _image_cache_version(recipe))

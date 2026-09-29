@@ -33,10 +33,11 @@ from flask import (
     request,
     url_for,
 )
+from flask.typing import ResponseReturnValue
 from sqlalchemy.orm import joinedload
 
 from extensions import db
-from models import Recipe
+from models import Recipe, RetiredSlug
 from services.image_variants import VARIANT_WIDTHS
 from services.tag_hubs import (
     HUBS_BY_SLUG,
@@ -292,11 +293,38 @@ def _rendered_image(recipe: Recipe) -> tuple[str | None, dict[str, str] | None]:
 
     One ``_recipe_image`` call feeds both, so a saved copy's source lookup is
     not repeated. Variants are ``None`` when the image is not served by us.
+    Their ``src`` and ``srcset`` entries are host-relative; ``pin`` is
+    deliberately absolute because Pinterest fetches it from its own servers.
     """
     url, owner = _recipe_image(recipe)
     if url is None or owner is None or not _serves_own_image_bytes(owner):
         return url, None
-    return _versioned_image_url(owner), _image_variants(owner, HERO_IMAGE_WIDTHS)
+    variants = _image_variants(owner, HERO_IMAGE_WIDTHS)
+    variants["pin"] = _pin_image_url(owner)
+    return _versioned_image_url(owner), variants
+
+
+def _pin_image_url(owner: Recipe) -> str:
+    """Absolute URL of the 2:3 Pinterest pin JPEG (KAN-284), versioned like the hero.
+
+    Absolute because Pinterest fetches it from its own servers. Same gate and
+    ``?v=`` marker as ``_versioned_image_url``: a pin of a replaced photo must
+    not be the old bytes. Fail loud on a missing token for the same reason
+    ``_versioned_image_url`` does (KAN-195): a versionless URL is permanently
+    CDN-cached.
+    """
+    token = _image_version_token(owner)
+    if token is None:
+        raise RuntimeError(
+            "_pin_image_url called for owner without an image-version token; "
+            "callers must gate on _serves_own_image_bytes."
+        )
+    return _canonical_url(
+        "generation_api.serve_recipe_image",
+        recipe_id=owner.id,
+        pin=1,
+        v=token,
+    )
 
 
 def _versioned_image_url(owner: Recipe) -> str:
@@ -741,10 +769,81 @@ def _collection_json_ld(
     }
 
 
-def _pinterest_share_url(canonical_url: str, image_url: str | None, recipe_name: str) -> str:
+MAX_PIN_DESCRIPTION_LENGTH = 500
+PIN_DESCRIPTION_TAGS = 3
+# The "Vegan recipe: tags." tail's share of the 500. Recipe.name is String(200),
+# so name + separators + tail always fit and the tail is never cut. Tags are
+# unbounded strings (recipe_schema.json), so one that does not fit is skipped.
+MAX_PIN_TAIL_LENGTH = 200
+# Common title/word abbreviations must not terminate the pin's first sentence.
+# Multi-initial abbreviations such as "e.g." and "U.S." are recognized separately.
+_PIN_ABBREVIATIONS = frozenset({"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."})
+_PIN_INITIALISM = re.compile(r"(?:[a-z]\.){2,}")
+
+
+def _trim_to_words(text: str, limit: int) -> str:
+    """``text`` cut to at most ``limit`` characters at a word boundary, with an ellipsis.
+
+    Sentence terminators are stripped from the cut word so punctuation does not
+    double up before the ellipsis (``"Done."`` → ``"Done…"``).
+    """
+    if len(text) <= limit:
+        return text
+    prefix = text[: limit - 1]
+    cut = prefix.rsplit(" ", 1)[0].rstrip(" .,;:!?-–—") if " " in prefix else ""
+    return f"{cut}…" if cut else "…"
+
+
+def _first_pin_sentence(text: str) -> str:
+    """Return the first sentence without stopping at common abbreviations."""
+    for end in _SENTENCE_END.finditer(text):
+        token = text[: end.end()].rsplit(" ", 1)[-1].lower().lstrip("(\"'“‘")
+        if token in _PIN_ABBREVIATIONS or _PIN_INITIALISM.fullmatch(token):
+            continue
+        return text[: end.end()]
+    return f"{text}."
+
+
+def _pin_description(name: str, description: str, tags: list[str]) -> str:
+    """Keyword pin text (KAN-284): name, first sentence, "Vegan recipe", up to 3 tags.
+
+    Pinterest search indexes the pin description (up to 500 characters; the
+    first 50-60 show in the feed), so the name leads. The placeholder
+    description is skipped rather than pinned, and "vegan" is said once, not
+    repeated from the tags. The keyword tail is kept whole: when the text is
+    too long, the sentence gives way.
+    """
+    seen = {"vegan"}
+    keywords: list[str] = []
+    for tag in tags:
+        tag = " ".join(tag.split())
+        if not tag:
+            continue
+        if tag.lower() in seen or len(keywords) == PIN_DESCRIPTION_TAGS:
+            continue
+        if len(f"Vegan recipe: {', '.join([*keywords, tag])}.") > MAX_PIN_TAIL_LENGTH:
+            continue
+        seen.add(tag.lower())
+        keywords.append(tag)
+    tail = "Vegan recipe" + (f": {', '.join(keywords)}." if keywords else ".")
+    head = " ".join(name.split())
+
+    text = " ".join(description.split())
+    if text == DEFAULT_RECIPE_DESCRIPTION or not text:
+        # "Yum!" / "Ready?" already end a sentence; don't append a second stop.
+        stop = "" if head.endswith((".", "!", "?", "…")) else "."
+        return _trim_to_words(f"{head}{stop} {tail}", MAX_PIN_DESCRIPTION_LENGTH)
+    sentence = _first_pin_sentence(text)
+    budget = MAX_PIN_DESCRIPTION_LENGTH - len(head) - len(tail) - len(" — ") - 1
+    return _trim_to_words(
+        f"{head} — {_trim_to_words(sentence, max(budget, 1))} {tail}", MAX_PIN_DESCRIPTION_LENGTH
+    )
+
+
+def _pinterest_share_url(canonical_url: str, image_url: str | None, description: str) -> str:
     params = {
         "url": canonical_url,
-        "description": recipe_name,
+        "description": description,
     }
     if image_url:
         params["media"] = image_url
@@ -772,11 +871,49 @@ def _save_recipe_payload(recipe: Recipe, image_url: str | None) -> dict[str, Any
     }
 
 
+def _missing_recipe_response(
+    slug: str, endpoint: str, *, canonical: bool, json: bool = False
+) -> ResponseReturnValue:
+    """What a slug with no live public recipe answers (KAN-288).
+
+    - retired by a delete, or its recipe has since been deleted -> 410 Gone:
+      the page existed and was removed on purpose, and never comes back;
+    - retired by a rename and that recipe is public under a new slug -> 302;
+    - anything else (never existed, or unpublished, which is reversible) -> 404.
+
+    ``json=True`` returns a JSON body for 404/410 (the app-level errorhandlers
+    render HTML, which would break clients that expect JSON). The 302 branch
+    still redirects — the SPA follows it exactly like the SSR route does.
+    """
+    retired = db.session.get(RetiredSlug, slug)
+    if retired is None:
+        return (jsonify({"error": "Recipe not found"}), 404) if json else abort(404)
+    if retired.recipe_id is not None:
+        target = db.session.get(Recipe, retired.recipe_id)
+        if target is not None:
+            if target.is_public and target.slug and target.slug != slug:
+                if canonical:
+                    location = _canonical_url(
+                        endpoint,
+                        slug=target.slug,
+                        **_carried_redirect_params(keep_save=True),
+                    )
+                else:
+                    location = url_for(endpoint, slug=target.slug)
+                # This alias is reclaimable by its recipe, so the redirect must
+                # not be cached permanently. A cached 301 can redirect away
+                # from the alias after it becomes live again (or create a loop).
+                return redirect(location, code=302)
+            return (jsonify({"error": "Recipe not found"}), 404) if json else abort(404)
+    return (jsonify({"error": "Recipe removed"}), 410) if json else abort(410)
+
+
 @public_bp.route("/r/<slug>", methods=["GET"])
 def show_public_recipe(slug):
     """Render the SSR view of a single published recipe.
 
-    Returns 404 when no recipe matches the slug or the recipe is not public.
+    Returns 404 when no recipe matches the slug or the recipe is not public,
+    410 when the slug belonged to a deleted recipe (KAN-288).
     """
     recipe = (
         Recipe.query.options(joinedload(Recipe.user))
@@ -785,7 +922,7 @@ def show_public_recipe(slug):
     )
 
     if recipe is None:
-        abort(404)
+        return _missing_recipe_response(slug, "public.show_public_recipe", canonical=True)
 
     data = recipe.data or {}
     canonical_url = _canonical_url("public.show_public_recipe", slug=recipe.slug)
@@ -799,10 +936,17 @@ def show_public_recipe(slug):
     # saved-copy source lookup for no gain. It gets the versioned URL too: a
     # pin whose media is the pre-regeneration photo is the same defect wearing
     # a different hat.
-    pinterest_image_url = image_url
+    #
+    # KAN-284: when the photo is ours, the pin uses its 2:3 variant instead.
+    pinterest_image_url = (image_variants or {}).get("pin") or image_url
     description = _recipe_description(data)
     instructions = _recipe_instructions(data)
     tags = _recipe_tags(data)
+    # Only used behind ``pinterest_image_url`` (share button + ``data-pin-*``);
+    # skip the tag/regex/trim work on imageless recipes that never emit it.
+    pin_description = (
+        _pin_description(recipe.name, description, tags) if pinterest_image_url else None
+    )
     catalog = _catalog_tag_rows()
     linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
     # KAN-274: the trail runs through the recipe's first indexable hub.
@@ -831,10 +975,12 @@ def show_public_recipe(slug):
         tags=tags,
         recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
         pinterest_share_url=(
-            _pinterest_share_url(canonical_url, pinterest_image_url, recipe.name)
+            _pinterest_share_url(canonical_url, pinterest_image_url, pin_description)
             if pinterest_image_url
             else None
         ),
+        pin_image_url=pinterest_image_url,
+        pin_description=pin_description,
         spa_save_url=f"{_public_base_url()}/?save={recipe.slug}#kitchen",
     )
 
@@ -874,11 +1020,14 @@ def redirect_trailing_slash_recipe(slug):
 def public_recipe_json(slug):
     """JSON payload of a published recipe for the SPA's ?save=<slug> flow.
 
-    Returns 404 when no recipe matches the slug or the recipe is not public.
+    Returns 404 when no recipe matches the slug or the recipe is not public,
+    410 when the slug belonged to a deleted recipe (KAN-288).
     """
     recipe = Recipe.query.filter(Recipe.slug == slug, Recipe.is_public.is_(True)).first()
     if recipe is None:
-        abort(404)
+        return _missing_recipe_response(
+            slug, "public.public_recipe_json", canonical=False, json=True
+        )
     return jsonify(_save_recipe_payload(recipe, _recipe_image_url(recipe)))
 
 

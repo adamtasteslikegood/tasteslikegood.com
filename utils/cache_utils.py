@@ -127,6 +127,11 @@ def recipe_image_variant_key(recipe_id, width, version):
     return f"vgc:img:{recipe_id}:w{width}:{version}"
 
 
+def recipe_image_pin_key(recipe_id, version):
+    """The 2:3 Pinterest pin JPEG (KAN-284), versioned like the sized variants."""
+    return f"vgc:img:{recipe_id}:pin:{version}"
+
+
 # ── Invalidation helpers ──────────────────────────────────────────────────────
 
 
