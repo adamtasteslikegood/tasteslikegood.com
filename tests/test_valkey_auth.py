@@ -182,6 +182,39 @@ def test_refresh_loop_recomputes_deadline_when_expiry_changes(monkeypatch):
     assert refreshed == []
 
 
+def test_create_client_wakes_existing_refresh_loop(monkeypatch):
+    """A replacement client's expiry must reschedule an already-running loop."""
+    expiry = _utcnow() + timedelta(minutes=35)
+    notifications = []
+
+    class _Client:
+        def ping(self):
+            return True
+
+    class _AliveThread:
+        def is_alive(self):
+            return True
+
+    class _Condition:
+        def notify_all(self):
+            notifications.append(1)
+
+    client = _Client()
+    monkeypatch.setattr(valkey_auth, "_build_client", lambda host, port: (client, expiry))
+    monkeypatch.setattr(valkey_auth, "_refresh_thread", _AliveThread())
+    monkeypatch.setattr(valkey_auth, "_refresh_condition", _Condition())
+    monkeypatch.setattr(valkey_auth, "_current_client", None)
+    monkeypatch.setattr(valkey_auth, "_token_expiry", None)
+    monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "monotonic", 1.0)
+    monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "result", False)
+
+    assert valkey_auth.create_iam_redis_client("10.128.0.11") is client
+    assert valkey_auth._token_expiry == expiry
+    assert notifications == [1]
+    assert valkey_auth._auth_failure_refresh_state.monotonic is None
+    assert valkey_auth._auth_failure_refresh_state.result is None
+
+
 # ── Expiry-aware refresh scheduling (KAN-268) ─────────────────────────────
 
 
