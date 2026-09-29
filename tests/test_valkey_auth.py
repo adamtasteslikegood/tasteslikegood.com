@@ -295,15 +295,28 @@ def test_refresh_after_auth_failure_without_client_returns_false(monkeypatch):
     assert called == []
 
 
+def test_recent_scheduled_refresh_does_not_suppress_auth_failure_recovery(monkeypatch):
+    """A normal refresh cannot debounce recovery from a rejected credential."""
+    monkeypatch.setattr(valkey_auth, "_current_client", object())
+    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", time.monotonic())
+    monkeypatch.setattr(valkey_auth, "_last_auth_failure_refresh_monotonic", None)
+    calls = []
+    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", lambda: calls.append(1) or True)
+
+    assert valkey_auth.refresh_after_auth_failure() is True
+    assert calls == [1]
+    assert valkey_auth._last_auth_failure_refresh_monotonic is not None
+
+
 def test_refresh_after_auth_failure_refreshes_once_then_debounces(monkeypatch):
     """A burst of auth failures triggers ONE refresh, not one per request."""
     monkeypatch.setattr(valkey_auth, "_current_client", object())
-    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", None)
+    monkeypatch.setattr(valkey_auth, "_last_auth_failure_refresh_monotonic", None)
     calls = []
 
     def fake_refresh():
         calls.append(1)
-        valkey_auth._last_refresh_monotonic = time.monotonic()
+        valkey_auth._last_auth_failure_refresh_monotonic = time.monotonic()
         return True
 
     monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", fake_refresh)
@@ -317,7 +330,7 @@ def test_refresh_after_auth_failure_refreshes_once_then_debounces(monkeypatch):
 def test_refresh_after_auth_failure_refreshes_after_debounce_window(monkeypatch):
     monkeypatch.setattr(valkey_auth, "_current_client", object())
     stale = time.monotonic() - valkey_auth._AUTH_FAILURE_REFRESH_DEBOUNCE - 1
-    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", stale)
+    monkeypatch.setattr(valkey_auth, "_last_auth_failure_refresh_monotonic", stale)
     calls = []
     monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", lambda: calls.append(1) or True)
     assert valkey_auth.refresh_after_auth_failure() is True
@@ -326,7 +339,7 @@ def test_refresh_after_auth_failure_refreshes_after_debounce_window(monkeypatch)
 
 def test_refresh_after_auth_failure_swallows_refresh_errors(monkeypatch):
     monkeypatch.setattr(valkey_auth, "_current_client", object())
-    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", None)
+    monkeypatch.setattr(valkey_auth, "_last_auth_failure_refresh_monotonic", None)
 
     def boom():
         raise RedisConnectionError("metadata server unreachable")
@@ -338,7 +351,7 @@ def test_refresh_after_auth_failure_swallows_refresh_errors(monkeypatch):
 def test_refresh_after_auth_failure_is_single_flight(monkeypatch):
     """Concurrent auth failures trigger one refresh and share its result."""
     monkeypatch.setattr(valkey_auth, "_current_client", object())
-    monkeypatch.setattr(valkey_auth, "_last_refresh_monotonic", None)
+    monkeypatch.setattr(valkey_auth, "_last_auth_failure_refresh_monotonic", None)
     first_started = threading.Event()
     second_started = threading.Event()
     release_first = threading.Event()
@@ -349,7 +362,7 @@ def test_refresh_after_auth_failure_is_single_flight(monkeypatch):
         calls.append(1)
         first_started.set()
         assert release_first.wait(timeout=2)
-        valkey_auth._last_refresh_monotonic = time.monotonic()
+        valkey_auth._last_auth_failure_refresh_monotonic = time.monotonic()
         return True
 
     def worker(started=None):
