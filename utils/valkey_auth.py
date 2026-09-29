@@ -133,6 +133,9 @@ _current_client: redis.StrictRedis | None = None
 _refresh_thread: threading.Thread | None = None
 _token_expiry: datetime | None = None
 _last_refresh_monotonic: float | None = None
+# Separate from the general refresh timestamp: client creation and scheduled
+# refreshes must not suppress recovery from a rejected credential.
+_last_auth_failure_refresh_monotonic: float | None = None
 
 
 def _build_client(host: str, port: int) -> tuple[redis.StrictRedis, datetime | None]:
@@ -235,7 +238,7 @@ def refresh_after_auth_failure() -> bool:
         with _lock:
             if _current_client is None:
                 return False
-            last = _last_refresh_monotonic
+            last = _last_auth_failure_refresh_monotonic
         if last is not None and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE:
             return True
         try:
@@ -244,6 +247,9 @@ def refresh_after_auth_failure() -> bool:
             logger.warning("Valkey token refresh after auth failure failed: %s", e)
             return False
         if refreshed:
+            with _lock:
+                global _last_auth_failure_refresh_monotonic
+                _last_auth_failure_refresh_monotonic = time.monotonic()
             logger.info("Valkey token refreshed after auth failure")
         return refreshed
 
@@ -304,6 +310,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
     caller to fall back to a different session backend.
     """
     global _current_client, _refresh_thread, _token_expiry, _last_refresh_monotonic
+    global _last_auth_failure_refresh_monotonic
 
     try:
         client, expiry = _build_client(host, port)
@@ -314,6 +321,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
             _current_client = client
             _token_expiry = expiry
             _last_refresh_monotonic = time.monotonic()
+            _last_auth_failure_refresh_monotonic = None
 
         # Start background token refresh thread (daemon — dies with the process)
         if _refresh_thread is None or not _refresh_thread.is_alive():
