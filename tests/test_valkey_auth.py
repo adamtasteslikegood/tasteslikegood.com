@@ -337,15 +337,21 @@ def test_refresh_after_auth_failure_refreshes_after_debounce_window(monkeypatch)
     assert len(calls) == 1
 
 
-def test_refresh_after_auth_failure_swallows_refresh_errors(monkeypatch):
+def test_refresh_after_auth_failure_swallows_and_debounces_refresh_errors(monkeypatch):
+    """Queued callers reuse a failed attempt instead of stampeding the metadata server."""
     monkeypatch.setattr(valkey_auth, "_current_client", object())
     monkeypatch.setattr(valkey_auth, "_last_auth_failure_refresh_monotonic", None)
+    monkeypatch.setattr(valkey_auth, "_last_auth_failure_refresh_result", None)
+    calls = []
 
     def boom():
+        calls.append(1)
         raise RedisConnectionError("metadata server unreachable")
 
     monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", boom)
     assert valkey_auth.refresh_after_auth_failure() is False
+    assert valkey_auth.refresh_after_auth_failure() is False
+    assert calls == [1]
 
 
 def test_refresh_after_auth_failure_is_single_flight(monkeypatch):
