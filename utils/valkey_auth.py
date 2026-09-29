@@ -84,7 +84,7 @@ def _refresh_delay(expiry: datetime | None, now: datetime | None = None) -> floa
     the two always compare. Unknown expiry → _UNKNOWN_EXPIRY_DELAY.
     """
     if expiry is None:
-        return _UNKNOWN_EXPIRY_DELAY
+        return float(_UNKNOWN_EXPIRY_DELAY)
     if expiry.tzinfo is not None:
         expiry = expiry.astimezone(timezone.utc).replace(tzinfo=None)
     if now is None:
@@ -341,6 +341,11 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
             _token_expiry = expiry
             _auth_failure_refresh_state.monotonic = None
             _auth_failure_refresh_state.result = None
+            # Wake an already-running refresh loop so it recomputes its
+            # deadline from the new token's expiry. Without this, a second
+            # init that installs a shorter-lived token would let the loop
+            # keep sleeping on the previous (longer) deadline.
+            _refresh_condition.notify_all()
 
         # Start background token refresh thread (daemon — dies with the process)
         if _refresh_thread is None or not _refresh_thread.is_alive():
