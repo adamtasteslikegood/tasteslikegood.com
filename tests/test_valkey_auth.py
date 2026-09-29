@@ -119,12 +119,20 @@ def test_refresh_loop_retries_on_failure(monkeypatch):
 
     monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", fake_refresh)
 
-    def fake_sleep(seconds):
-        sleeps.append(seconds)
-        if len(sleeps) >= 3:
-            raise StopIteration("stop the loop")
+    class FakeCondition:
+        def __enter__(self):
+            return self
 
-    monkeypatch.setattr(time, "sleep", fake_sleep)
+        def __exit__(self, *args):
+            return False
+
+        def wait(self, timeout):
+            sleeps.append(timeout)
+            if len(sleeps) >= 3:
+                raise StopIteration("stop the loop")
+            return False
+
+    monkeypatch.setattr(valkey_auth, "_refresh_condition", FakeCondition())
 
     try:
         valkey_auth._refresh_loop()
@@ -137,6 +145,41 @@ def test_refresh_loop_retries_on_failure(monkeypatch):
     # After failure, retry backoff should be much shorter than 45 min
     assert sleeps[1] == valkey_auth._RETRY_BASE  # 30s first retry
     assert sleeps[2] == valkey_auth._RETRY_BASE * 2  # 60s second retry
+
+
+def test_refresh_loop_recomputes_deadline_when_expiry_changes(monkeypatch):
+    """An auth-triggered refresh wakes the loop before the old deadline."""
+    waits = []
+    refreshed = []
+    monkeypatch.setattr(valkey_auth, "_token_expiry", _utcnow() + timedelta(minutes=60))
+    monkeypatch.setattr(
+        valkey_auth, "_refresh_token_in_place", lambda: refreshed.append(True) or True
+    )
+
+    class FakeCondition:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def wait(self, timeout):
+            waits.append(timeout)
+            if len(waits) == 1:
+                # Model another thread installing a cached token with a shorter
+                # lifetime and notifying the condition.
+                valkey_auth._token_expiry = _utcnow() + timedelta(minutes=35)
+                return True
+            raise StopIteration("deadline recomputed")
+
+    monkeypatch.setattr(valkey_auth, "_refresh_condition", FakeCondition())
+
+    with pytest.raises(StopIteration, match="deadline recomputed"):
+        valkey_auth._refresh_loop()
+
+    assert waits[0] == valkey_auth._TOKEN_REFRESH_INTERVAL
+    assert 29 * 60 <= waits[1] <= 30 * 60
+    assert refreshed == []
 
 
 # ── Expiry-aware refresh scheduling (KAN-268) ─────────────────────────────
