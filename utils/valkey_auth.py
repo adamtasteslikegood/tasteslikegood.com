@@ -125,6 +125,10 @@ def _redis_retry() -> Retry:
 
 # ── Module-level state for token refresh ──────────────────────────
 _lock = threading.Lock()
+# Serializes refreshes initiated by AuthenticationError handlers. The main
+# state lock cannot be held while calling _refresh_token_in_place(), because
+# that function acquires it too.
+_auth_failure_refresh_lock = threading.Lock()
 _current_client: redis.StrictRedis | None = None
 _refresh_thread: threading.Thread | None = None
 _token_expiry: datetime | None = None
@@ -223,20 +227,28 @@ def refresh_after_auth_failure() -> bool:
     the debounce window); False when there is no IAM client or the refresh
     failed. Never raises.
     """
-    with _lock:
-        if _current_client is None:
+    # The timestamp check and refresh decision must be single-flight. Without
+    # this lock, a burst of failures can all observe the same stale timestamp,
+    # then queue through _refresh_token_in_place() and repeatedly disconnect
+    # the pool after the first caller already installed a fresh token.
+    with _auth_failure_refresh_lock:
+        with _lock:
+            if _current_client is None:
+                return False
+            last = _last_refresh_monotonic
+        if (
+            last is not None
+            and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE
+        ):
+            return True
+        try:
+            refreshed = _refresh_token_in_place()
+        except Exception as e:
+            logger.warning("Valkey token refresh after auth failure failed: %s", e)
             return False
-        last = _last_refresh_monotonic
-    if last is not None and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE:
-        return True
-    try:
-        refreshed = _refresh_token_in_place()
-    except Exception as e:
-        logger.warning("Valkey token refresh after auth failure failed: %s", e)
-        return False
-    if refreshed:
-        logger.info("Valkey token refreshed after auth failure")
-    return refreshed
+        if refreshed:
+            logger.info("Valkey token refreshed after auth failure")
+        return refreshed
 
 
 def _refresh_loop():
