@@ -230,6 +230,8 @@ def refresh_after_auth_failure() -> bool:
     the debounce window); False when there is no IAM client or the refresh
     failed. Never raises.
     """
+    global _last_auth_failure_refresh_monotonic
+
     # The timestamp check and refresh decision must be single-flight. Without
     # this lock, a burst of failures can all observe the same stale timestamp,
     # then queue through _refresh_token_in_place() and repeatedly disconnect
@@ -248,7 +250,6 @@ def refresh_after_auth_failure() -> bool:
             return False
         if refreshed:
             with _lock:
-                global _last_auth_failure_refresh_monotonic
                 _last_auth_failure_refresh_monotonic = time.monotonic()
             logger.info("Valkey token refreshed after auth failure")
         return refreshed
