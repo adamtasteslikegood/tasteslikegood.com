@@ -41,9 +41,9 @@ _MIN_REFRESH_DELAY = 60
 # the KAN-268 bug). The metadata server serves cached tokens, so this is cheap.
 _UNKNOWN_EXPIRY_DELAY = 10 * 60
 
-# A refresh triggered by an AuthenticationError within this many seconds of a
-# previous successful refresh is skipped: a burst of requests inside a dead
-# window must not each fetch a token and pool.disconnect() the others.
+# Auth-failure refresh attempts within this many seconds share the first
+# attempt's result. This prevents request bursts from repeatedly fetching a
+# token and disconnecting the pool during either recovery or an outage.
 _AUTH_FAILURE_REFRESH_DEBOUNCE = 30
 
 # Retry backoff after a failed token refresh (seconds). Starts at 30s,
@@ -136,6 +136,7 @@ _last_refresh_monotonic: float | None = None
 # Separate from the general refresh timestamp: client creation and scheduled
 # refreshes must not suppress recovery from a rejected credential.
 _last_auth_failure_refresh_monotonic: float | None = None
+_last_auth_failure_refresh_result: bool | None = None
 
 
 def _build_client(host: str, port: int) -> tuple[redis.StrictRedis, datetime | None]:
@@ -230,7 +231,7 @@ def refresh_after_auth_failure() -> bool:
     the debounce window); False when there is no IAM client or the refresh
     failed. Never raises.
     """
-    global _last_auth_failure_refresh_monotonic
+    global _last_auth_failure_refresh_monotonic, _last_auth_failure_refresh_result
 
     # The timestamp check and refresh decision must be single-flight. Without
     # this lock, a burst of failures can all observe the same stale timestamp,
@@ -241,16 +242,21 @@ def refresh_after_auth_failure() -> bool:
             if _current_client is None:
                 return False
             last = _last_auth_failure_refresh_monotonic
+            last_result = _last_auth_failure_refresh_result
         if last is not None and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE:
-            return True
+            return bool(last_result)
         try:
             refreshed = _refresh_token_in_place()
         except Exception as e:
-            logger.warning("Valkey token refresh after auth failure failed: %s", e)
-            return False
-        if refreshed:
             with _lock:
                 _last_auth_failure_refresh_monotonic = time.monotonic()
+                _last_auth_failure_refresh_result = False
+            logger.warning("Valkey token refresh after auth failure failed: %s", e)
+            return False
+        with _lock:
+            _last_auth_failure_refresh_monotonic = time.monotonic()
+            _last_auth_failure_refresh_result = refreshed
+        if refreshed:
             logger.info("Valkey token refreshed after auth failure")
         return refreshed
 
@@ -311,7 +317,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
     caller to fall back to a different session backend.
     """
     global _current_client, _refresh_thread, _token_expiry, _last_refresh_monotonic
-    global _last_auth_failure_refresh_monotonic
+    global _last_auth_failure_refresh_monotonic, _last_auth_failure_refresh_result
 
     try:
         client, expiry = _build_client(host, port)
@@ -323,6 +329,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
             _token_expiry = expiry
             _last_refresh_monotonic = time.monotonic()
             _last_auth_failure_refresh_monotonic = None
+            _last_auth_failure_refresh_result = None
 
         # Start background token refresh thread (daemon — dies with the process)
         if _refresh_thread is None or not _refresh_thread.is_alive():
