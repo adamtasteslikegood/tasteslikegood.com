@@ -13,7 +13,8 @@ import logging
 
 from flask import Blueprint, jsonify, request, session
 
-from extensions import db  # noqa: F401
+from extensions import db
+from models import RetiredSlug
 from repositories import db_recipe_repository
 from utils.cache_utils import (
     MAX_JSON_CACHE_BYTES,
@@ -70,6 +71,16 @@ def list_recipes(user_id, guest_session_id):
     """
     try:
         recipes = db_recipe_repository.get_user_recipes(user_id, guest_session_id)
+        # KAN-291: rows owning a retired_slug marker (a migration owner marker on
+        # a private slug, or a published row's rename alias). Deleting one makes
+        # the slug permanent, so the SPA must warn even when first_published_at
+        # is NULL.
+        reserved = {
+            recipe_id
+            for (recipe_id,) in db.session.query(RetiredSlug.recipe_id)
+            .filter(RetiredSlug.recipe_id.in_([recipe.id for recipe in recipes]))
+            .distinct()
+        }
 
         return (
             jsonify(
@@ -93,6 +104,7 @@ def list_recipes(user_id, guest_session_id):
                                 if recipe.first_published_at
                                 else None
                             ),
+                            "slug_reserved": recipe.id in reserved,
                             "created_at": (
                                 recipe.created_at.isoformat() if recipe.created_at else None
                             ),
