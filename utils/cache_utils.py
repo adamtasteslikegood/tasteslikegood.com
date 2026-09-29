@@ -214,3 +214,9 @@ def _delete_keys(keys):
                 sanitize_log_value(key),
                 sanitize_log_value(e),
             )
+            # A rejected credential affects the whole connection pool, not one
+            # key. Stop this bulk invalidation after the first unrecoverable
+            # auth error instead of emitting the same warning for every key.
+            # Other failures remain key-local and continue best-effort.
+            if isinstance(e, AuthenticationError):
+                break
