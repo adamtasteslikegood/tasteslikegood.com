@@ -131,9 +131,10 @@ def test_show_public_recipe_renders_html(app, client):
     public_js = (Path(__file__).resolve().parent.parent / "static/js/public.js").read_text(
         encoding="utf-8"
     )
-    assert 'event.key === "Escape"' in public_js
-    assert "lastFocused.focus()" in public_js
-    assert 'event.key !== "Tab"' in public_js
+    # KAN-294 removed the Kitchen modal; only the save/toast behaviour remains.
+    assert "[data-save-recipe]" in public_js
+    assert 'getElementById("public-toast")' in public_js
+    assert "spa-modal" not in public_js
 
 
 def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
@@ -1504,6 +1505,14 @@ def test_pin_description_skips_oversized_tags_so_the_tail_survives():
 
     only_huge = _pin_description("Stew", "Hearty.", huge)
     assert only_huge == "Stew — Hearty. Vegan recipe."
+
+
+@pytest.mark.parametrize("description", ["Warm, cozy, comforting,", "Warm; cozy;", "Serve with:"])
+def test_pin_description_does_not_stack_a_stop_on_trailing_punctuation(description):
+    # KAN-291: "comforting," used to render as "comforting,." in the pin text.
+    text = _pin_description("Stew", description, [])
+    sentence = text.removeprefix("Stew — ").removesuffix(" Vegan recipe.")
+    assert sentence == description.rstrip(",;: ") + "."
 
 
 @pytest.mark.parametrize("name", ["Yum!", "Ready?", "Recipe X.", "Yum…"])
