@@ -801,7 +801,8 @@ def _first_pin_sentence(text: str) -> str:
         if token in _PIN_ABBREVIATIONS or _PIN_INITIALISM.fullmatch(token):
             continue
         return text[: end.end()]
-    return f"{text}."
+    # A trailing comma/semicolon/colon plus the added stop reads as ",." (KAN-291).
+    return f"{text.rstrip(',;: ')}."
 
 
 def _pin_description(name: str, description: str, tags: list[str]) -> str:
