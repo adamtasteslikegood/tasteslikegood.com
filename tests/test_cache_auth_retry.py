@@ -112,7 +112,9 @@ def test_non_auth_errors_are_not_retried(monkeypatch, refresh_calls):
 
 
 def test_bulk_delete_stops_after_unrecoverable_auth_failure(
-    monkeypatch, refresh_calls, caplog
+    monkeypatch,
+    refresh_calls,
+    caplog,
 ):
     """One pool-wide auth failure should not emit a warning for every key."""
     refresh_calls.result = False
