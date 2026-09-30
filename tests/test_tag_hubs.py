@@ -288,6 +288,24 @@ def test_recipe_breadcrumb_runs_through_its_first_indexable_hub(app, client):
     assert '<a href="http://localhost/browse/tag/breakfast">Vegan Breakfast Recipes</a>' in body
 
 
+def test_public_json_carries_the_ssr_breadcrumb_trail(app, client):
+    """KAN-295: the SPA's visible breadcrumb reads the same trail as the SSR page."""
+    with app.app_context():
+        for index in range(3):
+            _add(f"brunch-{index}", ["brunch", "dinner"], days=index)
+        _add("lonely-pancake-json", ["unhubbed"])
+
+    ssr = _json_ld(client.get("/r/brunch-0").get_data(as_text=True), "BreadcrumbList")
+    api = client.get("/api/recipes/public/brunch-0").get_json()["breadcrumbs"]
+    assert [(c["name"], c["url"]) for c in api] == [
+        (c["name"], c["item"]) for c in ssr["itemListElement"]
+    ]
+    assert api[2]["name"] == "Vegan Breakfast Recipes"
+
+    thin = client.get("/api/recipes/public/lonely-pancake-json").get_json()["breadcrumbs"]
+    assert [c["name"] for c in thin] == ["Home", "Browse", "Lonely Pancake Json"]
+
+
 def test_recipe_breadcrumb_skips_a_thin_hub(app, client):
     with app.app_context():
         _add("lonely-pancake", ["breakfast"])
