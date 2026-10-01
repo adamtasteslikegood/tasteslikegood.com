@@ -136,8 +136,9 @@ def download_image(
     ``NotFound`` from the download itself and is treated exactly like the old
     ``exists() == False`` path — ``None``, no error log.
 
-    ``single_shot_download=True`` reads the body in one call instead of 8 KiB
-    Python-level chunks, and the library still validates the checksum. The
+    ``single_shot_download=True`` reads the body in one request instead of the
+    default streaming path (urllib3 ``iter_content`` under
+    ``download_as_bytes``), and the library still validates the checksum. The
     trade-off is peak memory: the full body is buffered once before it is
     copied into the ``BytesIO`` behind ``download_as_bytes``, so each in-flight
     miss briefly holds one extra copy of the object (~2 MB for the largest

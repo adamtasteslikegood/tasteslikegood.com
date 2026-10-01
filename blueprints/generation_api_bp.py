@@ -302,7 +302,7 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
                 recipe.id,
                 stored_uri,
             )
-            span.set_metric("image.bytes", len(image_bytes) if image_bytes else 0)
+            span.set_metric("image.bytes", len(image_bytes or b""))
 
     if image_bytes is None and allow_legacy_fallback:
         image_b64 = recipe_data.get("ai_image_data")
