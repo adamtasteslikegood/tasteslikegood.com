@@ -318,6 +318,32 @@ img {
   font-size: var(--text-sm);
 }
 
+/* KAN-296: numbered page anchors stay one wrapping row, even on phones. */
+.public-page-numbers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.public-page-numbers a,
+.public-page-current {
+  display: inline-block;
+  min-width: 2.75rem;
+  text-align: center;
+}
+
+.public-page-current {
+  border: var(--ar-border);
+  padding: 0.75rem 1rem;
+  background: var(--ar-black);
+  color: var(--fg-inverted);
+  font-weight: var(--fw-bold);
+}
+
 .public-recipe {
   display: grid;
   gap: var(--space-8);
@@ -545,7 +571,7 @@ img {
 
   .public-nav-link,
   .public-recipe-action-link,
-  .public-browse-pagination a,
+  .public-browse-pagination .public-page-step,
   .public-save-cta {
     width: 100%;
     text-align: center;

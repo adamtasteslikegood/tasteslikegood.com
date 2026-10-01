@@ -16,7 +16,7 @@ import hashlib
 import logging
 import os
 import re
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from datetime import datetime
 from math import ceil
 from typing import Any
@@ -52,6 +52,16 @@ logger = logging.getLogger(__name__)
 public_bp = Blueprint("public", __name__)
 
 BROWSE_PAGE_SIZE = 20
+# KAN-296: hubs page at the same size as /browse, so a hub's cards and the
+# browse index read as one paginated surface.
+HUB_PAGE_SIZE = BROWSE_PAGE_SIZE
+# Numbered anchors shown either side of the current page; the first and last
+# page are always shown, and a longer run collapses to an ellipsis.
+PAGINATION_WINDOW = 2
+# ``?page=`` in its one canonical spelling: a positive integer, no sign, no
+# leading zero, no whitespace. Nine digits bounds the int() conversion; a page
+# that large is past the last page anyway, so it 404s like any other.
+_PAGE_PARAM = re.compile(r"[1-9][0-9]{0,8}")
 
 
 def _public_base_url() -> str:
@@ -1011,6 +1021,67 @@ def _carried_redirect_params(*, keep_save: bool) -> dict[str, str]:
     }
 
 
+def _requested_page() -> int | None:
+    """The ``?page=`` number: 1 when absent, ``None`` when not a canonical page (KAN-296).
+
+    Only the ``page`` key is read; any other query parameter is left alone.
+    """
+    raw = request.args.get("page")
+    if raw is None:
+        return 1
+    return int(raw) if _PAGE_PARAM.fullmatch(raw) else None
+
+
+def _page_values(page: int) -> dict[str, int]:
+    """``url_for`` values for a listing page: page 1 is the bare URL, never ``?page=1``."""
+    return {"page": page} if page > 1 else {}
+
+
+def _page_numbers(page: int, total_pages: int) -> list[int | None]:
+    """Page numbers to link, ``None`` for an elided run (KAN-296).
+
+    Always the first and last page plus ``PAGINATION_WINDOW`` either side of
+    the current one. A gap of a single page shows that page rather than an
+    ellipsis that would hide just one number.
+    """
+    shown = {1, total_pages}
+    shown.update(
+        range(max(1, page - PAGINATION_WINDOW), min(total_pages, page + PAGINATION_WINDOW) + 1)
+    )
+    numbers: list[int | None] = []
+    previous = 0
+    for number in sorted(shown):
+        if number - previous == 2:
+            numbers.append(previous + 1)
+        elif number - previous > 2:
+            numbers.append(None)
+        numbers.append(number)
+        previous = number
+    return numbers
+
+
+def _pagination(
+    page: int, total_pages: int, page_url: Callable[[int], str]
+) -> dict[str, Any] | None:
+    """Template data for the numbered pagination nav; ``None`` on a single page."""
+    if total_pages <= 1:
+        return None
+    return {
+        "page": page,
+        "total_pages": total_pages,
+        "prev_url": page_url(page - 1) if page > 1 else None,
+        "next_url": page_url(page + 1) if page < total_pages else None,
+        "pages": [
+            (
+                {"gap": True}
+                if number is None
+                else {"number": number, "url": page_url(number), "current": number == page}
+            )
+            for number in _page_numbers(page, total_pages)
+        ],
+    }
+
+
 @public_bp.route("/r/<slug>/", methods=["GET"])
 def redirect_trailing_slash_recipe(slug):
     """``/r/<slug>/`` → 301 to the canonical ``/r/<slug>`` (KAN-273).
@@ -1052,11 +1123,17 @@ def browse_public_recipes():
 
     Uses ``joinedload`` on ``Recipe.user`` so the template can show author
     names without triggering an extra SELECT per row (N+1).
+
+    KAN-296: ``?page=N`` is self-canonical. ``?page=1`` 301s to the bare
+    ``/browse`` (older Previous links emitted it); a page past the last, or a
+    ``page`` that is not a positive integer, is a 404.
     """
-    try:
-        page = max(1, int(request.args.get("page", 1)))
-    except (TypeError, ValueError):
-        page = 1
+    page = _requested_page()
+    if page is None:
+        abort(404)
+    if page == 1 and "page" in request.args:
+        carried = _carried_redirect_params(keep_save=False)
+        return redirect(_canonical_url("public.browse_public_recipes", **carried), code=301)
 
     # slug IS NOT NULL, like the sitemap: a slugless public row (legacy data;
     # publishing always mints a slug now) has no /r/ URL, and url_for on it
@@ -1067,7 +1144,8 @@ def browse_public_recipes():
 
     total = base_query.with_entities(Recipe.id).count()
     total_pages = max(1, ceil(total / BROWSE_PAGE_SIZE))
-    page = min(page, total_pages)
+    if page > total_pages:
+        abort(404)
 
     recipes = (
         base_query.order_by(Recipe.created_at.desc())
@@ -1076,10 +1154,7 @@ def browse_public_recipes():
         .all()
     )
 
-    canonical_url = _canonical_url(
-        "public.browse_public_recipes",
-        **({"page": page} if page > 1 else {}),
-    )
+    canonical_url = _canonical_url("public.browse_public_recipes", **_page_values(page))
     # KAN-273: the title and description say what the page is, with the live
     # count; the social card gets the newest photo on the page instead of none.
     recipe_noun = "Recipe" if total == 1 else "Recipes"
@@ -1116,10 +1191,12 @@ def browse_public_recipes():
         hubs=[{"title": hub.title, "url": _hub_url(hub)} for hub in hubs],
         card_images={recipe.id: _card_image(recipe) for recipe in recipes},
         card_image_sizes=CARD_IMAGE_SIZES,
-        page=page,
-        total_pages=total_pages,
+        pagination=_pagination(
+            page,
+            total_pages,
+            lambda number: url_for("public.browse_public_recipes", **_page_values(number)),
+        ),
         total=total,
-        page_size=BROWSE_PAGE_SIZE,
         canonical_url=canonical_url,
         # /browse is subject to the same 155-char result-snippet cap that
         # ``_meta_description`` enforces on /r/<slug> — the boilerplate is
@@ -1129,9 +1206,6 @@ def browse_public_recipes():
     )
 
 
-HUB_PAGE_LIMIT = 60
-
-
 @public_bp.route("/browse/tag/<hub_slug>", methods=["GET"])
 def show_tag_hub(hub_slug):
     """A curated category hub: intro copy + every public recipe in it (KAN-274).
@@ -1139,10 +1213,22 @@ def show_tag_hub(hub_slug):
     Only allow-listed hubs exist (``services.tag_hubs``); anything else is a
     404, so arbitrary tag filters never become indexable pages. A hub below
     ``MIN_INDEXABLE_RECIPES`` still renders but is ``noindex``.
+
+    KAN-296: paginated like ``/browse``, ``HUB_PAGE_SIZE`` per page, with the
+    same ``?page=`` rules: self-canonical, ``?page=1`` 301s to the bare hub
+    URL, past-the-last or malformed is a 404.
     """
     hub = HUBS_BY_SLUG.get(hub_slug)
     if hub is None:
         abort(404)
+    page = _requested_page()
+    if page is None:
+        abort(404)
+    if page == 1 and "page" in request.args:
+        carried = _carried_redirect_params(keep_save=False)
+        return redirect(
+            _canonical_url("public.show_tag_hub", hub_slug=hub.slug, **carried), code=301
+        )
 
     catalog = _catalog_tag_rows()
     hub_members = _hub_members(catalog)
@@ -1155,8 +1241,12 @@ def show_tag_hub(hub_slug):
         hub_members[hub.slug],
         key=lambda row: (row.created_at or datetime.min, row.id),
         reverse=True,
-    )[:HUB_PAGE_LIMIT]
-    ids = [row.id for row in members]
+    )
+    total_pages = max(1, ceil(len(members) / HUB_PAGE_SIZE))
+    if page > total_pages:
+        abort(404)
+    start = (page - 1) * HUB_PAGE_SIZE
+    ids = [row.id for row in members[start : start + HUB_PAGE_SIZE]]
     # Recheck the catalog predicates during hydration: under READ COMMITTED, a row
     # can be unpublished or lose its slug after the lightweight catalog query.
     by_id = (
@@ -1182,15 +1272,21 @@ def show_tag_hub(hub_slug):
             continue
         recipes.append(recipe)
 
-    canonical_url = _hub_url(hub)
-    page_title = _page_title(hub.title)
+    canonical_url = _canonical_url("public.show_tag_hub", hub_slug=hub.slug, **_page_values(page))
+    page_title = _page_title(
+        f"{hub.title}, Page {page} of {total_pages}" if page > 1 else hub.title
+    )
     description = _meta_description(hub.intro)
     breadcrumbs = _breadcrumbs(hub=hub)
+    # As on /browse: a later page's own crumb is its canonical, not page 1.
+    breadcrumbs[-1]["url"] = canonical_url
     og_owner = next((r for r in recipes if _serves_own_image_bytes(r)), None)
 
     # Hydration can drop a concurrently unpublished, slug-cleared, or retagged
     # member; indexability must reflect what this response actually renders.
-    indexable = len(recipes) >= MIN_INDEXABLE_RECIPES
+    # A later page exists only because the hub overflows page 1, so a short
+    # last page is not a thin hub and stays indexable.
+    indexable = page > 1 or len(recipes) >= MIN_INDEXABLE_RECIPES
     body = render_template(
         "public/tag_hub.html",
         hub=hub,
@@ -1206,6 +1302,13 @@ def show_tag_hub(hub_slug):
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
         collection_json_ld=_collection_json_ld(page_title, hub.intro, canonical_url, recipes),
+        pagination=_pagination(
+            page,
+            total_pages,
+            lambda number: url_for(
+                "public.show_tag_hub", hub_slug=hub.slug, **_page_values(number)
+            ),
+        ),
         other_hubs=[
             {"title": other.title, "url": _hub_url(other)}
             for other in _linkable_hubs(counts)
