@@ -671,3 +671,166 @@ def test_scheduled_cycle_tears_down_pool_once_not_twice(monkeypatch):
     assert client.pings == 1
     assert client.connection_pool.connection_kwargs["password"] == "tok2"
     assert valkey_auth._token_expiry == fresh_expiry
+
+
+# ── Refresh diagnostics spans (KAN-268): spans only, no behaviour change ──────
+
+
+class _FakeSpan:
+    def __init__(self, tracer, name):
+        self._tracer = tracer
+        self.name = name
+        self.tags = {}
+        self.metrics = {}
+        self.error = None
+
+    def set_tag(self, key, value):
+        self.tags[key] = value
+
+    def set_metric(self, key, value):
+        self.metrics[key] = value
+
+    def __enter__(self):
+        self._tracer.stack.append(self)
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        self.error = exc
+        self._tracer.stack.pop()
+        return False
+
+
+class _FakeTracer:
+    """Records spans in start order; ``current_root_span`` mirrors ddtrace."""
+
+    def __init__(self, outer=None):
+        self.spans = []
+        self.stack = []
+        if outer is not None:
+            # Simulate an already-active root (e.g. a Flask request span).
+            self.stack.append(_FakeSpan(self, outer))
+
+    def trace(self, name):
+        span = _FakeSpan(self, name)
+        self.spans.append(span)
+        return span
+
+    def current_root_span(self):
+        return self.stack[0] if self.stack else None
+
+    def names(self):
+        return [s.name for s in self.spans]
+
+    def get(self, name):
+        return next(s for s in self.spans if s.name == name)
+
+
+@pytest.fixture
+def fake_tracer(monkeypatch):
+    tracer = _FakeTracer()
+    monkeypatch.setattr(valkey_auth, "tracer", tracer)
+    return tracer
+
+
+def test_scheduled_refresh_new_token_emits_root_and_step_spans(monkeypatch, fake_tracer):
+    client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok2")
+
+    assert valkey_auth._traced_scheduled_refresh() is True
+
+    assert fake_tracer.names() == [
+        "valkey.token_refresh",
+        "valkey.token_fetch",
+        "valkey.pool_disconnect",
+        "valkey.ping",
+    ]
+    root = fake_tracer.get("valkey.token_refresh")
+    assert root.tags["token_changed"] == "true"
+    assert root.metrics["wall_ms"] >= 0
+    assert root.metrics["thread_cpu_ms"] >= 0
+    assert fake_tracer.get("valkey.ping").tags["valkey.includes_connect"] == "true"
+    # Behaviour unchanged: one teardown, one verifying PING, expiry published.
+    assert client.connection_pool.connection_kwargs["password"] == "tok2"
+    assert client.connection_pool.disconnects == 1
+    assert client.pings == 1
+    assert valkey_auth._token_expiry == new_expiry
+
+
+def test_scheduled_refresh_unchanged_token_tags_false_and_skips_steps(monkeypatch, fake_tracer):
+    client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok1")
+
+    assert valkey_auth._traced_scheduled_refresh() is True
+
+    assert fake_tracer.names() == ["valkey.token_refresh", "valkey.token_fetch"]
+    assert fake_tracer.get("valkey.token_refresh").tags["token_changed"] == "false"
+    assert client.connection_pool.disconnects == 0
+    assert client.pings == 0
+    assert valkey_auth._token_expiry == new_expiry
+
+
+def test_scheduled_refresh_records_wall_and_thread_cpu_deltas(monkeypatch, fake_tracer):
+    """wall ≫ CPU is the throttling signature the tags exist to show."""
+    _install_counting_client(monkeypatch, "tok1", "tok2")
+    walls = iter([100.0, 103.0])  # 3,000 ms elapsed
+    cpus = iter([5.0, 5.02])  # 20 ms of CPU
+    monkeypatch.setattr(valkey_auth.time, "monotonic", lambda: next(walls))
+    monkeypatch.setattr(valkey_auth.time, "thread_time", lambda: next(cpus))
+
+    valkey_auth._traced_scheduled_refresh()
+
+    root = fake_tracer.get("valkey.token_refresh")
+    assert root.metrics["wall_ms"] == pytest.approx(3000.0)
+    assert root.metrics["thread_cpu_ms"] == pytest.approx(20.0)
+
+
+def test_scheduled_refresh_failure_propagates_and_still_records_timing(monkeypatch, fake_tracer):
+    client, _ = _install_counting_client(monkeypatch, "tok1", "tok2")
+
+    def failing_ping():
+        raise RedisConnectionError("tls handshake timed out")
+
+    monkeypatch.setattr(client, "ping", failing_ping)
+
+    with pytest.raises(RedisConnectionError):
+        valkey_auth._traced_scheduled_refresh()
+
+    root = fake_tracer.get("valkey.token_refresh")
+    assert isinstance(root.error, RedisConnectionError)
+    assert "wall_ms" in root.metrics and "thread_cpu_ms" in root.metrics
+
+
+def test_refresh_loop_runs_scheduled_refresh_under_root_span(monkeypatch, fake_tracer):
+    _install_counting_client(monkeypatch, "tok1", "tok2")
+    waits = []
+
+    class FakeCondition:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def wait(self, timeout):
+            waits.append(timeout)
+            if len(waits) >= 2:
+                raise StopIteration("stop the loop")
+            return False
+
+    monkeypatch.setattr(valkey_auth, "_refresh_condition", FakeCondition())
+
+    with pytest.raises(StopIteration):
+        valkey_auth._refresh_loop()
+
+    assert fake_tracer.names()[0] == "valkey.token_refresh"
+
+
+def test_auth_failure_refresh_does_not_tag_a_foreign_root_span(monkeypatch):
+    """Inside a request the root is the Flask span: token_changed stays off it."""
+    tracer = _FakeTracer(outer="flask.request")
+    monkeypatch.setattr(valkey_auth, "tracer", tracer)
+    client, _ = _install_counting_client(monkeypatch, "tok1", "tok2")
+
+    assert valkey_auth._refresh_token_in_place(force=True) is True
+
+    assert "token_changed" not in tracer.current_root_span().tags
+    assert tracer.names() == ["valkey.token_fetch", "valkey.pool_disconnect", "valkey.ping"]
+    assert client.pings == 1
