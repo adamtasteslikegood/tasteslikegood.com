@@ -1339,11 +1339,20 @@ def redirect_trailing_slash_hub(hub_slug):
 
     Carries the ``utm_*`` campaign params so attribution survives the 301.
     Not ``save``: that handoff is only read on recipe URLs.
+
+    KAN-296: a valid ``?page=N`` survives the 301 (page 1 as the bare URL); a
+    malformed one 404s here, as it would on the target, rather than 301→404.
     """
     if hub_slug not in HUBS_BY_SLUG:
         abort(404)
+    page = _requested_page()
+    if page is None:
+        abort(404)
     carried = _carried_redirect_params(keep_save=False)
-    return redirect(_canonical_url("public.show_tag_hub", hub_slug=hub_slug, **carried), code=301)
+    return redirect(
+        _canonical_url("public.show_tag_hub", hub_slug=hub_slug, **_page_values(page), **carried),
+        code=301,
+    )
 
 
 @public_bp.route("/sitemap.xml", methods=["GET"])

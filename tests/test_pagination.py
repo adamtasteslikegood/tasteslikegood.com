@@ -277,6 +277,20 @@ def test_unknown_hub_with_page_is_404(app, client):
     assert client.get("/browse/tag/not-a-hub?page=2").status_code == 404
 
 
+def test_hub_trailing_slash_redirect_keeps_the_page(app, client):
+    _seed(HUB_PAGE_SIZE + 1, "slash")
+    resp = client.get("/browse/tag/dinner/?page=2&utm_source=x")
+    assert resp.status_code == 301
+    assert resp.headers["Location"] == "http://localhost/browse/tag/dinner?page=2&utm_source=x"
+
+    resp = client.get("/browse/tag/dinner/?page=1")
+    assert resp.status_code == 301
+    assert resp.headers["Location"] == "http://localhost/browse/tag/dinner"
+
+    assert client.get("/browse/tag/dinner/?page=abc").status_code == 404
+    assert client.get("/browse/tag/dinner/?page=2&page=3").status_code == 404
+
+
 def test_repeated_page_key_is_404(app, client):
     """``?page=2&page=3`` is not a canonical spelling of any page."""
     _seed(2 * BROWSE_PAGE_SIZE + 1, "dup")
