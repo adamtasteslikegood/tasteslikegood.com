@@ -152,6 +152,21 @@ def download_image(
     Returns:
         Raw PNG bytes on success, None if not found or on failure
     """
+    # The span lives here, not at the call site, so every caller of
+    # download_image (route, repair job, audits) is traced the same way. It
+    # covers the whole download including the body read; ddtrace's requests
+    # span closes at the response headers (KAN-268).
+    with tracer.trace("image.gcs_fetch") as span:
+        image_bytes = _download_image_bytes(bucket_name, recipe_id, gcs_uri)
+        span.set_metric("image.bytes", len(image_bytes or b""))
+    return image_bytes
+
+
+def _download_image_bytes(
+    bucket_name: str,
+    recipe_id: str,
+    gcs_uri: Optional[str],
+) -> Optional[bytes]:
     if not _init_gcs(bucket_name):
         return None
     assert _bucket is not None

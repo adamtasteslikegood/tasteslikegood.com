@@ -112,3 +112,51 @@ def test_download_image_other_failure_is_none_and_logged(fake_bucket, caplog):
 
     assert result is None
     assert any("Failed to download image" in r.getMessage() for r in caplog.records)
+
+
+class _FakeSpan:
+    def __init__(self, name):
+        self.name = name
+        self.metrics = {}
+
+    def set_metric(self, key, value):
+        self.metrics[key] = value
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+
+class _FakeTracer:
+    def __init__(self):
+        self.spans = []
+
+    def trace(self, name, **kwargs):
+        span = _FakeSpan(name)
+        self.spans.append(span)
+        return span
+
+
+@pytest.mark.parametrize(
+    "blob, expected_bytes",
+    [
+        (_FakeBlob(payload=b"\x89PNG\r\n\x1a\nbytes"), 13),
+        (_FakeBlob(error=NotFound("no such object")), 0),
+    ],
+)
+def test_download_image_traces_itself_for_every_caller(
+    fake_bucket, monkeypatch, blob, expected_bytes
+):
+    # The span is owned by the service, so a caller other than the image
+    # route (repair job, audit) still records image.gcs_fetch (KAN-268 review).
+    fake_bucket(blob)
+    fake_tracer = _FakeTracer()
+    monkeypatch.setattr(gcs_service, "tracer", fake_tracer)
+
+    gcs_service.download_image("recipe-images", "recipe-1")
+
+    fetch = [s for s in fake_tracer.spans if s.name == "image.gcs_fetch"]
+    assert len(fetch) == 1
+    assert fetch[0].metrics == {"image.bytes": expected_bytes}

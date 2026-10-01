@@ -294,15 +294,12 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
         stored_uri = ""
 
     if GCS_BUCKET_NAME and stored_uri:
-        # The span covers the whole download including the body read; ddtrace's
-        # requests span closes at the response headers (KAN-268).
-        with tracer.trace("image.gcs_fetch") as span:
-            image_bytes = gcs_service.download_image(
-                GCS_BUCKET_NAME,
-                recipe.id,
-                stored_uri,
-            )
-            span.set_metric("image.bytes", len(image_bytes or b""))
+        # download_image traces itself (image.gcs_fetch, KAN-268).
+        image_bytes = gcs_service.download_image(
+            GCS_BUCKET_NAME,
+            recipe.id,
+            stored_uri,
+        )
 
     if image_bytes is None and allow_legacy_fallback:
         image_b64 = recipe_data.get("ai_image_data")
