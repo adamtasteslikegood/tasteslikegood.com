@@ -601,7 +601,45 @@ def _install_counting_client(monkeypatch, pool_password, fetched_token):
     monkeypatch.setattr(valkey_auth, "_current_client", client)
     monkeypatch.setattr(valkey_auth, "_token_expiry", None)
     monkeypatch.setattr(valkey_auth, "_get_iam_token", lambda: ("sa", fetched_token, new_expiry))
+    # create_iam_redis_client PINGs before installing, so a live pool is verified.
+    monkeypatch.setattr(valkey_auth, "_pool_verified", True)
     return client, new_expiry
+
+
+def test_unchanged_token_after_failed_ping_is_verified_again(monkeypatch):
+    """A new token whose PING failed must not be trusted on the next attempt.
+
+    The metadata server hands the same token back on the scheduled retry, so the
+    retry sees it as unchanged. It must still disconnect and PING before it
+    publishes the expiry and reports success (Backend #347 review)."""
+    client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok2")
+    pings = iter([RedisConnectionError("backend down"), True])
+
+    def ping():
+        client.pings += 1
+        result = next(pings)
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+    client.ping = ping
+
+    with pytest.raises(RedisConnectionError):
+        valkey_auth._refresh_token_in_place()
+    assert valkey_auth._token_expiry is None
+    assert valkey_auth._pool_verified is False
+
+    # Retry: the pool already holds tok2, so the token looks unchanged.
+    assert valkey_auth._refresh_token_in_place() is True
+    assert client.connection_pool.disconnects == 2
+    assert client.pings == 2
+    assert valkey_auth._token_expiry == new_expiry
+    assert valkey_auth._pool_verified is True
+
+    # Now verified, an unchanged token takes the shortcut again.
+    assert valkey_auth._refresh_token_in_place() is True
+    assert client.connection_pool.disconnects == 2
+    assert client.pings == 2
 
 
 def test_refresh_with_unchanged_token_keeps_pool_and_skips_ping(monkeypatch):
@@ -658,6 +696,7 @@ def test_scheduled_cycle_tears_down_pool_once_not_twice(monkeypatch):
     monkeypatch.setattr(valkey_auth, "_current_client", client)
     monkeypatch.setattr(valkey_auth, "_token_expiry", None)
     monkeypatch.setattr(valkey_auth, "_get_iam_token", lambda: next(fetches))
+    monkeypatch.setattr(valkey_auth, "_pool_verified", True)
 
     assert valkey_auth._refresh_token_in_place() is True
     # Unchanged token inside the margin: the loop re-polls on the floor delay.
