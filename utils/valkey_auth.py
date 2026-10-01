@@ -191,13 +191,23 @@ def _build_client(host: str, port: int) -> tuple[redis.StrictRedis, datetime | N
     return client, expiry
 
 
-def _refresh_token_in_place() -> bool:
+def _refresh_token_in_place(force: bool = False) -> bool:
     """Refresh the IAM token on the EXISTING client's connection pool.
 
     This is critical because Flask-Caching holds a reference to the original
     client object. Creating a new client doesn't help — we must update the
     password on the pool it is already using, then drop stale connections so
     new ones authenticate with the fresh token.
+
+    When the metadata server hands back the token the pool ALREADY uses, the
+    pool is left alone: only the expiry is republished. On Cloud Run the
+    scheduled refresh lands inside the metadata server's own reuse window, so
+    the first fetch of every cycle returns the unchanged token and, before this
+    check, tore down every pooled connection and re-dialled TCP+TLS+AUTH for
+    nothing — then did it again 60 s later when the real new token arrived
+    (KAN-268: refreshes in pairs ~67 s apart, 111 PINGs/day). ``force=True``
+    (the auth-failure path) always disconnects and verifies: a token that was
+    just rejected must be re-checked, not trusted because it is unchanged.
 
     Returns:
         bool: True if a client was present and successfully refreshed,
@@ -214,6 +224,17 @@ def _refresh_token_in_place() -> bool:
         # Work with a local reference while holding the lock to avoid races.
         client = _current_client
         pool = client.connection_pool
+
+        if not force and pool.connection_kwargs.get("password") == new_token:
+            # Same credential the pool authenticated with: existing connections
+            # are still valid. Publish the expiry so the loop schedules from it.
+            _token_expiry = new_expiry
+            _refresh_condition.notify_all()
+            logger.info(
+                "Valkey token unchanged; pool kept (next refresh in %ds)",
+                int(_refresh_delay(new_expiry)),
+            )
+            return True
 
         # Update pool-level kwargs (used when creating NEW connections)
         pool.connection_kwargs["password"] = new_token
@@ -269,7 +290,7 @@ def refresh_after_auth_failure() -> bool:
         if last is not None and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE:
             return bool(last_result)
         try:
-            refreshed = _refresh_token_in_place()
+            refreshed = _refresh_token_in_place(force=True)
         except Exception as e:
             with _lock:
                 _auth_failure_refresh_state.monotonic = time.monotonic()
