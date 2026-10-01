@@ -364,7 +364,9 @@ def test_no_auth_retry_honours_caller_is_retryable_and_failure_count():
 def test_refresh_after_auth_failure_without_client_returns_false(monkeypatch):
     monkeypatch.setattr(valkey_auth, "_current_client", None)
     called = []
-    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", lambda: called.append(1))
+    monkeypatch.setattr(
+        valkey_auth, "_refresh_token_in_place", lambda force=False: called.append(1)
+    )
     assert valkey_auth.refresh_after_auth_failure() is False
     assert called == []
 
@@ -374,7 +376,9 @@ def test_auth_failure_recovery_is_not_suppressed_by_general_refresh_state(monkey
     monkeypatch.setattr(valkey_auth, "_current_client", object())
     monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "monotonic", None)
     calls = []
-    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", lambda: calls.append(1) or True)
+    monkeypatch.setattr(
+        valkey_auth, "_refresh_token_in_place", lambda force=False: calls.append(1) or True
+    )
 
     assert valkey_auth.refresh_after_auth_failure() is True
     assert calls == [1]
@@ -387,7 +391,7 @@ def test_refresh_after_auth_failure_refreshes_once_then_debounces(monkeypatch):
     monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "monotonic", None)
     calls = []
 
-    def fake_refresh():
+    def fake_refresh(force=False):
         calls.append(1)
         valkey_auth._auth_failure_refresh_state.monotonic = time.monotonic()
         return True
@@ -405,7 +409,9 @@ def test_refresh_after_auth_failure_refreshes_after_debounce_window(monkeypatch)
     stale = time.monotonic() - valkey_auth._AUTH_FAILURE_REFRESH_DEBOUNCE - 1
     monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "monotonic", stale)
     calls = []
-    monkeypatch.setattr(valkey_auth, "_refresh_token_in_place", lambda: calls.append(1) or True)
+    monkeypatch.setattr(
+        valkey_auth, "_refresh_token_in_place", lambda force=False: calls.append(1) or True
+    )
     assert valkey_auth.refresh_after_auth_failure() is True
     assert len(calls) == 1
 
@@ -417,7 +423,7 @@ def test_refresh_after_auth_failure_swallows_and_debounces_refresh_errors(monkey
     monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "result", None)
     calls = []
 
-    def boom():
+    def boom(force=False):
         calls.append(1)
         raise RedisConnectionError("metadata server unreachable")
 
@@ -437,7 +443,7 @@ def test_refresh_after_auth_failure_is_single_flight(monkeypatch):
     calls = []
     results = []
 
-    def fake_refresh():
+    def fake_refresh(force=False):
         calls.append(1)
         first_started.set()
         assert release_first.wait(timeout=2)
@@ -563,3 +569,105 @@ def test_refresh_ping_failure_raises_and_keeps_old_expiry(monkeypatch):
 def test_refresh_delay_unknown_expiry_returns_float():
     """e808898: every return path of the ``-> float`` function returns a float."""
     assert isinstance(valkey_auth._refresh_delay(None, now=_NOW), float)
+
+
+# ── Unchanged token keeps the pool (KAN-268 connection reuse) ─────────────
+
+
+class _CountingPool:
+    def __init__(self, password):
+        self.connection_kwargs = {"password": password}
+        self._available_connections = []
+        self._in_use_connections = []
+        self.disconnects = 0
+
+    def disconnect(self):
+        self.disconnects += 1
+
+
+class _CountingClient:
+    def __init__(self, password):
+        self.connection_pool = _CountingPool(password)
+        self.pings = 0
+
+    def ping(self):
+        self.pings += 1
+        return True
+
+
+def _install_counting_client(monkeypatch, pool_password, fetched_token):
+    new_expiry = _NOW + timedelta(minutes=33)
+    client = _CountingClient(pool_password)
+    monkeypatch.setattr(valkey_auth, "_current_client", client)
+    monkeypatch.setattr(valkey_auth, "_token_expiry", None)
+    monkeypatch.setattr(valkey_auth, "_get_iam_token", lambda: ("sa", fetched_token, new_expiry))
+    return client, new_expiry
+
+
+def test_refresh_with_unchanged_token_keeps_pool_and_skips_ping(monkeypatch):
+    """Same token from the metadata server: no teardown, no re-dial, expiry published."""
+    client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok1")
+    generation = valkey_auth._refresh_generation
+
+    assert valkey_auth._refresh_token_in_place() is True
+    assert client.connection_pool.disconnects == 0
+    assert client.pings == 0
+    assert valkey_auth._token_expiry == new_expiry
+    assert valkey_auth._refresh_generation == generation
+
+
+def test_forced_refresh_with_unchanged_token_still_disconnects_and_verifies(monkeypatch):
+    """Auth-failure path: a just-rejected token is re-verified even if unchanged."""
+    client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok1")
+
+    assert valkey_auth._refresh_token_in_place(force=True) is True
+    assert client.connection_pool.disconnects == 1
+    assert client.pings == 1
+    assert valkey_auth._token_expiry == new_expiry
+
+
+def test_refresh_with_new_token_disconnects_and_verifies_once(monkeypatch):
+    client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok2")
+
+    assert valkey_auth._refresh_token_in_place() is True
+    assert client.connection_pool.connection_kwargs["password"] == "tok2"
+    assert client.connection_pool.disconnects == 1
+    assert client.pings == 1
+    assert valkey_auth._token_expiry == new_expiry
+
+
+def test_refresh_after_auth_failure_forces_verification(monkeypatch):
+    """refresh_after_auth_failure must never take the unchanged-token shortcut."""
+    monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "monotonic", None)
+    monkeypatch.setattr(valkey_auth._auth_failure_refresh_state, "result", None)
+    client, _ = _install_counting_client(monkeypatch, "tok1", "tok1")
+
+    assert valkey_auth.refresh_after_auth_failure() is True
+    assert client.connection_pool.disconnects == 1
+    assert client.pings == 1
+
+
+def test_scheduled_cycle_tears_down_pool_once_not_twice(monkeypatch):
+    """The production pattern: the first fetch of a cycle returns the old token
+    with little life left, the poll 60 s later returns the new one. That cycle
+    must disconnect + PING once (it did twice before KAN-268's reuse fix)."""
+    near_expiry = _NOW + timedelta(minutes=4)
+    fresh_expiry = _NOW + timedelta(minutes=35)
+    fetches = iter([("sa", "tok1", near_expiry), ("sa", "tok2", fresh_expiry)])
+    client = _CountingClient("tok1")
+    monkeypatch.setattr(valkey_auth, "_current_client", client)
+    monkeypatch.setattr(valkey_auth, "_token_expiry", None)
+    monkeypatch.setattr(valkey_auth, "_get_iam_token", lambda: next(fetches))
+
+    assert valkey_auth._refresh_token_in_place() is True
+    # Unchanged token inside the margin: the loop re-polls on the floor delay.
+    assert (
+        valkey_auth._refresh_delay(valkey_auth._token_expiry, now=_NOW)
+        == valkey_auth._MIN_REFRESH_DELAY
+    )
+    assert valkey_auth._refresh_token_in_place() is True
+
+    assert client.connection_pool.disconnects == 1
+    assert client.pings == 1
+    assert client.connection_pool.connection_kwargs["password"] == "tok2"
+    assert valkey_auth._token_expiry == fresh_expiry
