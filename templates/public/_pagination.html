@@ -1,0 +1,27 @@
+{# Numbered SSR pagination (KAN-296), shared by /browse and the tag hubs.
+   ``pagination`` comes from public_bp._pagination; every URL is built there,
+   so page 1 is always the bare listing URL, never ?page=1. #}
+{% if pagination %}
+<nav class="public-browse-pagination" aria-label="Pagination">
+    {% if pagination.prev_url %}
+    <a href="{{ pagination.prev_url }}" class="public-page-step" rel="prev">← Previous</a>
+    {% endif %}
+    <ol class="public-page-numbers">
+        {% for item in pagination.pages %}
+        <li>
+            {% if item.gap %}
+            <span class="public-page-gap" aria-hidden="true">…</span>
+            {% elif item.current %}
+            <span class="public-page-current" aria-current="page">{{ item.number }}</span>
+            {% else %}
+            <a href="{{ item.url }}" aria-label="Page {{ item.number }}">{{ item.number }}</a>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+    <span class="public-page-status">Page {{ pagination.page }} of {{ pagination.total_pages }}</span>
+    {% if pagination.next_url %}
+    <a href="{{ pagination.next_url }}" class="public-page-step" rel="next">Next →</a>
+    {% endif %}
+</nav>
+{% endif %}
