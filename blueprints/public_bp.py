@@ -1025,11 +1025,15 @@ def _carried_redirect_params(*, keep_save: bool) -> dict[str, str]:
 def _requested_page() -> int | None:
     """The ``?page=`` number: 1 when absent, ``None`` when not a canonical page (KAN-296).
 
-    Only the ``page`` key is read; any other query parameter is left alone.
+    Only the ``page`` key is read; any other query parameter is left alone. A
+    repeated key (``?page=2&page=3``) is not a canonical spelling either.
     """
-    raw = request.args.get("page")
-    if raw is None:
+    values = request.args.getlist("page")
+    if not values:
         return 1
+    if len(values) > 1:
+        return None
+    raw = values[0]
     return int(raw) if _PAGE_PARAM.fullmatch(raw) else None
 
 
@@ -1286,8 +1290,9 @@ def show_tag_hub(hub_slug):
     # Hydration can drop a concurrently unpublished, slug-cleared, or retagged
     # member; indexability must reflect what this response actually renders.
     # A later page exists only because the hub overflows page 1, so a short
-    # last page is not a thin hub and stays indexable.
-    indexable = page > 1 or len(recipes) >= MIN_INDEXABLE_RECIPES
+    # last page is not a thin hub and stays indexable — unless hydration left
+    # it with nothing to render.
+    indexable = (page > 1 and bool(recipes)) or len(recipes) >= MIN_INDEXABLE_RECIPES
     body = render_template(
         "public/tag_hub.html",
         hub=hub,

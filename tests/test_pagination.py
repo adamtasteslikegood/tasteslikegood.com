@@ -21,6 +21,7 @@ import pytest
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
+import blueprints.public_bp as public_module  # noqa: E402
 from blueprints.public_bp import BROWSE_PAGE_SIZE, HUB_PAGE_SIZE, _page_numbers  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
@@ -274,3 +275,29 @@ def test_hub_malformed_page_is_404(app, client, raw):
 def test_unknown_hub_with_page_is_404(app, client):
     assert client.get("/browse/tag/not-a-hub?page=1").status_code == 404
     assert client.get("/browse/tag/not-a-hub?page=2").status_code == 404
+
+
+def test_repeated_page_key_is_404(app, client):
+    """``?page=2&page=3`` is not a canonical spelling of any page."""
+    _seed(2 * BROWSE_PAGE_SIZE + 1, "dup")
+    assert client.get("/browse?page=2&page=3").status_code == 404
+    assert client.get("/browse?page=2&page=2").status_code == 404
+    assert client.get("/browse/tag/dinner?page=2&page=3").status_code == 404
+
+
+def test_hub_later_page_emptied_by_hydration_is_noindex(app, client, monkeypatch):
+    """A one-recipe last page unpublished mid-request renders nothing: noindex it."""
+    _seed(HUB_PAGE_SIZE + 1, "race")
+    # The oldest member is the only card on page 2.
+    catalog_snapshot = public_module._catalog_tag_rows()
+    oldest = Recipe.query.filter_by(slug="race-0").one()
+    oldest.is_public = False
+    db.session.commit()
+    monkeypatch.setattr(public_module, "_catalog_tag_rows", lambda: catalog_snapshot)
+
+    response = client.get("/browse/tag/dinner?page=2")
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert CARD.findall(body) == []
+    assert '<meta name="robots" content="noindex,follow">' in body
+    assert response.headers["X-Robots-Tag"] == "noindex, follow"
