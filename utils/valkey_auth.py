@@ -139,6 +139,11 @@ _token_expiry: datetime | None = None
 # Bumped under _lock each time a refresh installs a token on the pool, so a
 # refresh whose PING finishes after a newer one does not publish a stale expiry.
 _refresh_generation = 0
+# True only once a PING has succeeded with the token the pool currently holds.
+# A refresh clears it before installing a candidate token, so a failed PING
+# leaves it False and the unchanged-token shortcut cannot vouch for a token
+# that never verified (KAN-268, Backend #347 review).
+_pool_verified = False
 
 
 class _AuthFailureRefreshState:
@@ -233,7 +238,7 @@ def _refresh_token_in_place(force: bool = False) -> bool:
         bool: True if a client was present and successfully refreshed,
         False if there is no current client (nothing to refresh).
     """
-    global _token_expiry, _refresh_generation
+    global _token_expiry, _refresh_generation, _pool_verified
 
     with _lock:
         if _current_client is None:
@@ -250,9 +255,11 @@ def _refresh_token_in_place(force: bool = False) -> bool:
         token_changed = pool.connection_kwargs.get("password") != new_token
         _tag_refresh_root("token_changed", str(token_changed).lower())
 
-        if not force and not token_changed:
-            # Same credential the pool authenticated with: existing connections
-            # are still valid. Publish the expiry so the loop schedules from it.
+        if not force and not token_changed and _pool_verified:
+            # Same credential the pool authenticated with, and a PING proved it:
+            # existing connections are still valid. Publish the expiry so the
+            # loop schedules from it. An unverified token (its PING failed on an
+            # earlier attempt) falls through and is disconnected + PINGed again.
             _token_expiry = new_expiry
             _refresh_condition.notify_all()
             logger.info(
@@ -260,6 +267,9 @@ def _refresh_token_in_place(force: bool = False) -> bool:
                 int(_refresh_delay(new_expiry)),
             )
             return True
+
+        # Until the PING below succeeds, the pool's token is unproven.
+        _pool_verified = False
 
         # Update pool-level kwargs (used when creating NEW connections)
         pool.connection_kwargs["password"] = new_token
@@ -295,6 +305,7 @@ def _refresh_token_in_place(force: bool = False) -> bool:
     with _lock:
         if _current_client is client and _refresh_generation == generation:
             _token_expiry = new_expiry
+            _pool_verified = True
             _refresh_condition.notify_all()
     return True
 
@@ -389,9 +400,13 @@ def _traced_scheduled_refresh() -> bool:
     - ``thread_cpu_ms``: CPU this thread actually got (``time.thread_time``)
     - ``token_changed``: whether the metadata server returned a new token
 
-    If ``wall_ms`` is far above ``thread_cpu_ms`` (say 3,000 vs 20), the thread
-    spent the refresh waiting for CPU, so Cloud Run throttling between requests
-    is starving it. If the two are close, the work itself is expensive.
+    A large ``wall_ms - thread_cpu_ms`` gap (say 3,000 vs 20) means the thread
+    was not executing, which is not the same as CPU starvation: the gap also
+    holds the metadata-server request, Valkey TCP/TLS/AUTH and PING waits, and
+    ``_lock`` contention. Subtract the ``valkey.token_fetch``,
+    ``valkey.pool_disconnect`` and ``valkey.ping`` child spans first; only the
+    unattributed residual points at scheduler delay or Cloud Run CPU
+    throttling. If wall and CPU are close, the work itself is expensive.
     Exceptions propagate unchanged; the span records them as errors.
     """
     with tracer.trace(_REFRESH_ROOT_SPAN) as span:
@@ -420,7 +435,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
     Returns None if the connection cannot be established, allowing the
     caller to fall back to a different session backend.
     """
-    global _current_client, _refresh_thread, _token_expiry
+    global _current_client, _refresh_thread, _token_expiry, _pool_verified
 
     try:
         client, expiry = _build_client(host, port)
@@ -430,6 +445,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
         with _lock:
             _current_client = client
             _token_expiry = expiry
+            _pool_verified = True  # the PING above used this client's token
             _auth_failure_refresh_state.monotonic = None
             _auth_failure_refresh_state.result = None
             # Wake an already-running refresh loop so it recomputes its
