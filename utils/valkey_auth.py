@@ -404,8 +404,11 @@ def _traced_scheduled_refresh() -> bool:
     was not executing, which is not the same as CPU starvation: the gap also
     holds the metadata-server request, Valkey TCP/TLS/AUTH and PING waits, and
     ``_lock`` contention. Subtract the ``valkey.token_fetch``,
-    ``valkey.pool_disconnect`` and ``valkey.ping`` child spans first; only the
-    unattributed residual points at scheduler delay or Cloud Run CPU
+    ``valkey.pool_disconnect`` and ``valkey.ping`` child spans first. The
+    residual still contains the wait for ``_lock``, which is taken before the
+    first child span starts and has no span of its own, so rule out a
+    concurrent auth-failure refresh or client creation in the same window
+    before reading the residual as scheduler delay or Cloud Run CPU
     throttling. If wall and CPU are close, the work itself is expensive.
     Exceptions propagate unchanged; the span records them as errors.
     """
