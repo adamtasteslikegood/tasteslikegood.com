@@ -11,6 +11,8 @@ on Cloud Run (the service account already has storage.objectAdmin).
 import logging
 from typing import Optional
 
+from ddtrace import tracer
+from google.api_core.exceptions import NotFound
 from google.cloud import storage
 
 from utils.log_sanitizer import sanitize_log_value
@@ -28,8 +30,11 @@ def _init_gcs(bucket_name: str) -> bool:
     if _bucket is not None and _bucket_name == bucket_name:
         return True
     try:
-        client = storage.Client()
-        _bucket = client.bucket(bucket_name)
+        # First use per worker builds the client (ADC + metadata-server calls);
+        # a span makes that one-off cost visible in image traces (KAN-268).
+        with tracer.trace("image.gcs_init"):
+            client = storage.Client()
+            _bucket = client.bucket(bucket_name)
         _bucket_name = bucket_name
         logger.info("GCS initialized with bucket: %s", bucket_name)
         return True
@@ -125,6 +130,21 @@ def download_image(
     """
     Download raw PNG bytes from GCS.
 
+    Downloads directly rather than checking ``blob.exists()`` first: the
+    existence check was a separate metadata round trip on every cache miss
+    (up to ~1 s on a cold connection, KAN-268). A missing object surfaces as
+    ``NotFound`` from the download itself and is treated exactly like the old
+    ``exists() == False`` path — ``None``, no error log.
+
+    ``single_shot_download=True`` reads the body in one request instead of the
+    default streaming path (urllib3 ``iter_content`` under
+    ``download_as_bytes``), and the library still validates the checksum. The
+    trade-off is peak memory: the full body is buffered once before it is
+    copied into the ``BytesIO`` behind ``download_as_bytes``, so each in-flight
+    miss briefly holds one extra copy of the object (~2 MB for the largest
+    recipe images; at most 8 concurrent misses on one gthread worker, well
+    inside the 1 GiB instance).
+
     Args:
         bucket_name: GCS bucket name
         recipe_id: Recipe UUID
@@ -132,14 +152,29 @@ def download_image(
     Returns:
         Raw PNG bytes on success, None if not found or on failure
     """
+    # The span lives here, not at the call site, so every caller of
+    # download_image (route, repair job, audits) is traced the same way. It
+    # covers the whole download including the body read; ddtrace's requests
+    # span closes at the response headers (KAN-268).
+    with tracer.trace("image.gcs_fetch") as span:
+        image_bytes = _download_image_bytes(bucket_name, recipe_id, gcs_uri)
+        span.set_metric("image.bytes", len(image_bytes or b""))
+    return image_bytes
+
+
+def _download_image_bytes(
+    bucket_name: str,
+    recipe_id: str,
+    gcs_uri: Optional[str],
+) -> Optional[bytes]:
     if not _init_gcs(bucket_name):
         return None
     assert _bucket is not None
     try:
         blob = _bucket.blob(_object_name_from_uri(bucket_name, recipe_id, gcs_uri))
-        if not blob.exists():
-            return None
-        return blob.download_as_bytes()  # type: ignore[no-any-return]
+        return blob.download_as_bytes(single_shot_download=True)  # type: ignore[no-any-return]
+    except NotFound:
+        return None
     except Exception as e:
         logger.error(
             "Failed to download image for recipe %s: %s",
