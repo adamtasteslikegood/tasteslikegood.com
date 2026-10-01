@@ -318,6 +318,14 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
     return image_bytes
 
 
+def _traced_cache_get(key: str) -> bytes | None:
+    """Read image bytes from Valkey and record a consistent cache-hit tag."""
+    with tracer.trace("image.cache_read") as span:
+        cached = safe_get(key)
+        span.set_tag("image.cache_hit", str(cached is not None).lower())
+    return cached
+
+
 def _image_cache_version(recipe) -> str:
     """Cache identity of every byte source the image endpoint can serve.
 
@@ -353,9 +361,7 @@ def _serve_derived_image(
     if not isinstance(stored_uri, str):
         stored_uri = ""
 
-    with tracer.trace("image.cache_read") as span:
-        derived = safe_get(key)
-        span.set_tag("image.cache_hit", str(derived is not None).lower())
+    derived = _traced_cache_get(key)
     if derived is None:
         source = _load_stored_image_bytes(recipe, allow_legacy_fallback=not bool(stored_uri))
         if source is None:
@@ -364,6 +370,8 @@ def _serve_derived_image(
         with tracer.trace("image.variant_build") as span:
             derived = build(source)
             span.set_metric("image.source_bytes", len(source))
+            span.set_metric("image.output_bytes", len(derived or b""))
+            span.set_tag("image.variant_success", str(derived is not None).lower())
         if derived is None:
             return None
         with tracer.trace("image.cache_write") as span:
@@ -477,9 +485,7 @@ def serve_recipe_image(recipe_id):
         http_cache_control = "no-store"
 
     ck = recipe_image_key(recipe_id, _image_cache_version(recipe))
-    with tracer.trace("image.cache_read") as span:
-        cached_bytes = safe_get(ck)
-        span.set_tag("image.cache_hit", str(cached_bytes is not None).lower())
+    cached_bytes = _traced_cache_get(ck)
     if cached_bytes is not None:
         return Response(
             cached_bytes,
