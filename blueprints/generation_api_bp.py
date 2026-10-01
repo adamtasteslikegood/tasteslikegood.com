@@ -14,12 +14,18 @@ import logging
 import uuid
 from collections.abc import Callable
 
+from ddtrace import tracer
 from flask import Blueprint, Response, jsonify, request, session
 from flask.typing import ResponseReturnValue
 
 from config import DEFAULT_MODEL, GCS_BUCKET_NAME
 from blueprints.generation_bp import validate_generation_input
 from repositories import db_recipe_repository
+
+# Imported eagerly (not inside the image helper) so the google.cloud.storage
+# import cost lands at worker boot, not on the first image request of every
+# worker lifetime: ~1 s of unspanned time in pin trace 475f7f88 (KAN-268).
+from services import gcs_service
 from services.image_variants import (
     make_pin_variant,
     make_webp_variant,
@@ -288,9 +294,8 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
         stored_uri = ""
 
     if GCS_BUCKET_NAME and stored_uri:
-        from services.gcs_service import download_image
-
-        image_bytes = download_image(
+        # download_image traces itself (image.gcs_fetch, KAN-268).
+        image_bytes = gcs_service.download_image(
             GCS_BUCKET_NAME,
             recipe.id,
             stored_uri,
@@ -301,12 +306,21 @@ def _load_stored_image_bytes(recipe, *, allow_legacy_fallback: bool = True) -> b
         # Writable through the generic recipe PUT, so it can be any JSON value:
         # a non-string or malformed payload is "no image" (404), not a 500.
         if isinstance(image_b64, str) and image_b64:
-            try:
-                image_bytes = base64.b64decode(image_b64) or None
-            except (binascii.Error, ValueError):
-                image_bytes = None
+            with tracer.trace("image.legacy_decode"):
+                try:
+                    image_bytes = base64.b64decode(image_b64) or None
+                except (binascii.Error, ValueError):
+                    image_bytes = None
 
     return image_bytes
+
+
+def _traced_cache_get(key: str) -> bytes | None:
+    """Read image bytes from Valkey and record a consistent cache-hit tag."""
+    with tracer.trace("image.cache_read") as span:
+        cached = safe_get(key)
+        span.set_tag("image.cache_hit", str(cached is not None).lower())
+    return cached  # type: ignore[no-any-return]
 
 
 def _image_cache_version(recipe) -> str:
@@ -344,15 +358,22 @@ def _serve_derived_image(
     if not isinstance(stored_uri, str):
         stored_uri = ""
 
-    derived = safe_get(key)
+    derived = _traced_cache_get(key)
     if derived is None:
         source = _load_stored_image_bytes(recipe, allow_legacy_fallback=not bool(stored_uri))
         if source is None:
             return None
-        derived = build(source)
+        # Decode + resize + re-encode (PIL): CPU work, previously unspanned.
+        with tracer.trace("image.variant_build") as span:
+            derived = build(source)
+            span.set_metric("image.source_bytes", len(source))
+            span.set_metric("image.output_bytes", len(derived or b""))
+            span.set_tag("image.variant_success", str(derived is not None).lower())
         if derived is None:
             return None
-        safe_set(key, derived, timeout=TTL_IMAGE)
+        with tracer.trace("image.cache_write") as span:
+            span.set_metric("image.bytes", len(derived))
+            safe_set(key, derived, timeout=TTL_IMAGE)
 
     return Response(
         derived,
@@ -461,7 +482,7 @@ def serve_recipe_image(recipe_id):
         http_cache_control = "no-store"
 
     ck = recipe_image_key(recipe_id, _image_cache_version(recipe))
-    cached_bytes = safe_get(ck)
+    cached_bytes = _traced_cache_get(ck)
     if cached_bytes is not None:
         return Response(
             cached_bytes,
@@ -473,7 +494,12 @@ def serve_recipe_image(recipe_id):
     if image_bytes is None:
         return jsonify({"error": "No image available"}), 404
 
-    safe_set(ck, image_bytes, timeout=TTL_IMAGE)
+    # Synchronous on purpose: a background write would run between requests on
+    # Cloud Run's throttled CPU, the same starvation KAN-268 found in the token
+    # refresh thread. Spanned so its cost is attributable.
+    with tracer.trace("image.cache_write") as span:
+        span.set_metric("image.bytes", len(image_bytes))
+        safe_set(ck, image_bytes, timeout=TTL_IMAGE)
 
     return Response(
         image_bytes,

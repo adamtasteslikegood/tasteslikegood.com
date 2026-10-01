@@ -727,6 +727,19 @@ def _breadcrumbs(recipe: Recipe | None = None, hub: TagHub | None = None) -> lis
     return crumbs
 
 
+def _recipe_breadcrumbs(
+    recipe: Recipe, tags: list[str], catalog: list[Any]
+) -> list[dict[str, str]]:
+    """A published recipe's trail. KAN-274: it runs through the first indexable hub.
+
+    Shared by the SSR page and the public JSON payload, so the SPA's visible
+    breadcrumb (KAN-295) is the same trail as the page's BreadcrumbList.
+    """
+    linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
+    category = next((hub for hub in hubs_for_tags(tags) if hub.slug in linkable), None)
+    return _breadcrumbs(recipe, category)
+
+
 def _breadcrumb_json_ld(crumbs: list[dict[str, str]]) -> dict[str, Any]:
     return {
         "@context": "https://schema.org",
@@ -949,10 +962,7 @@ def show_public_recipe(slug):
         _pin_description(recipe.name, description, tags) if pinterest_image_url else None
     )
     catalog = _catalog_tag_rows()
-    linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
-    # KAN-274: the trail runs through the recipe's first indexable hub.
-    category = next((hub for hub in hubs_for_tags(tags) if hub.slug in linkable), None)
-    breadcrumbs = _breadcrumbs(recipe, category)
+    breadcrumbs = _recipe_breadcrumbs(recipe, tags, catalog)
 
     return render_template(
         "public/recipe.html",
@@ -1029,7 +1039,11 @@ def public_recipe_json(slug):
         return _missing_recipe_response(
             slug, "public.public_recipe_json", canonical=False, json=True
         )
-    return jsonify(_save_recipe_payload(recipe, _recipe_image_url(recipe)))
+    payload = _save_recipe_payload(recipe, _recipe_image_url(recipe))
+    # KAN-295: the SPA's visible breadcrumb. Not part of the save payload
+    # (the SPA mapper allowlists the fields it copies into a saved recipe).
+    payload["breadcrumbs"] = _recipe_breadcrumbs(recipe, payload["tags"], _catalog_tag_rows())
+    return jsonify(payload)
 
 
 @public_bp.route("/browse", methods=["GET"])

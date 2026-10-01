@@ -14,6 +14,7 @@ import time
 from datetime import datetime, timezone
 
 import redis
+from ddtrace import tracer
 from redis.backoff import ExponentialWithJitterBackoff
 from redis.exceptions import AuthenticationError
 from redis.retry import Retry
@@ -138,6 +139,11 @@ _token_expiry: datetime | None = None
 # Bumped under _lock each time a refresh installs a token on the pool, so a
 # refresh whose PING finishes after a newer one does not publish a stale expiry.
 _refresh_generation = 0
+# True only once a PING has succeeded with the token the pool currently holds.
+# A refresh clears it before installing a candidate token, so a failed PING
+# leaves it False and the unchanged-token shortcut cannot vouch for a token
+# that never verified (KAN-268, Backend #347 review).
+_pool_verified = False
 
 
 class _AuthFailureRefreshState:
@@ -191,7 +197,21 @@ def _build_client(host: str, port: int) -> tuple[redis.StrictRedis, datetime | N
     return client, expiry
 
 
-def _refresh_token_in_place() -> bool:
+_REFRESH_ROOT_SPAN = "valkey.token_refresh"
+
+
+def _tag_refresh_root(key: str, value: str) -> None:
+    """Tag the scheduled-refresh root span, if that is what is running.
+
+    The auth-failure path calls ``_refresh_token_in_place`` inside a request,
+    where the root span is the Flask request; leave that one alone.
+    """
+    root = tracer.current_root_span()
+    if root is not None and root.name == _REFRESH_ROOT_SPAN:
+        root.set_tag(key, value)
+
+
+def _refresh_token_in_place(force: bool = False) -> bool:
     """Refresh the IAM token on the EXISTING client's connection pool.
 
     This is critical because Flask-Caching holds a reference to the original
@@ -199,21 +219,57 @@ def _refresh_token_in_place() -> bool:
     password on the pool it is already using, then drop stale connections so
     new ones authenticate with the fresh token.
 
+    When the metadata server hands back the token the pool ALREADY uses, the
+    pool is left alone: only the expiry is republished. On Cloud Run the
+    scheduled refresh lands inside the metadata server's own reuse window, so
+    the first fetch of every cycle returns the unchanged token and, before this
+    check, tore down every pooled connection and re-dialled TCP+TLS+AUTH for
+    nothing — then did it again 60 s later when the real new token arrived
+    (KAN-268: refreshes in pairs ~67 s apart, 111 PINGs/day). ``force=True``
+    (the auth-failure path) always disconnects and verifies: a token that was
+    just rejected must be re-checked, not trusted because it is unchanged.
+
+    Diagnostics only (KAN-268): each step runs in a child span
+    (``valkey.token_fetch``, ``valkey.pool_disconnect``, ``valkey.ping``), and
+    when called from the refresh loop the ``valkey.token_refresh`` root span is
+    tagged ``token_changed``. None of this changes what the function does.
+
     Returns:
         bool: True if a client was present and successfully refreshed,
         False if there is no current client (nothing to refresh).
     """
-    global _token_expiry, _refresh_generation
+    global _token_expiry, _refresh_generation, _pool_verified
 
     with _lock:
         if _current_client is None:
             return False
 
-        _, new_token, new_expiry = _get_iam_token()
+        # Metadata-server round trip (google-auth refresh).
+        with tracer.trace("valkey.token_fetch"):
+            _, new_token, new_expiry = _get_iam_token()
 
         # Work with a local reference while holding the lock to avoid races.
         client = _current_client
         pool = client.connection_pool
+
+        token_changed = pool.connection_kwargs.get("password") != new_token
+        _tag_refresh_root("token_changed", str(token_changed).lower())
+
+        if not force and not token_changed and _pool_verified:
+            # Same credential the pool authenticated with, and a PING proved it:
+            # existing connections are still valid. Publish the expiry so the
+            # loop schedules from it. An unverified token (its PING failed on an
+            # earlier attempt) falls through and is disconnected + PINGed again.
+            _token_expiry = new_expiry
+            _refresh_condition.notify_all()
+            logger.info(
+                "Valkey token unchanged; pool kept (next refresh in %ds)",
+                int(_refresh_delay(new_expiry)),
+            )
+            return True
+
+        # Until the PING below succeeds, the pool's token is unproven.
+        _pool_verified = False
 
         # Update pool-level kwargs (used when creating NEW connections)
         pool.connection_kwargs["password"] = new_token
@@ -226,7 +282,8 @@ def _refresh_token_in_place() -> bool:
             conn.password = new_token
 
         # Close all sockets — next use triggers reconnect with the updated password
-        pool.disconnect()
+        with tracer.trace("valkey.pool_disconnect"):
+            pool.disconnect()
 
         _refresh_generation += 1
         generation = _refresh_generation
@@ -235,7 +292,12 @@ def _refresh_token_in_place() -> bool:
     # redis-py's connection retry (up to ~10 jittered attempts on a flaky
     # backend); holding the state lock across it would stall every other
     # refresh path. PING reads no module state, so it needs no lock.
-    client.ping()
+    # The pool was just emptied, so this PING also opens the new connection:
+    # TCP connect + TLS handshake + AUTH all happen inside this span. redis-py
+    # has no separate connect step here, and adding one would change behaviour.
+    with tracer.trace("valkey.ping") as ping_span:
+        ping_span.set_tag("valkey.includes_connect", "true")
+        client.ping()
 
     # Publish the expiry only if nothing superseded this refresh while the
     # lock was released: a newer in-place refresh (higher generation) or a
@@ -243,6 +305,7 @@ def _refresh_token_in_place() -> bool:
     with _lock:
         if _current_client is client and _refresh_generation == generation:
             _token_expiry = new_expiry
+            _pool_verified = True
             _refresh_condition.notify_all()
     return True
 
@@ -269,7 +332,7 @@ def refresh_after_auth_failure() -> bool:
         if last is not None and time.monotonic() - last < _AUTH_FAILURE_REFRESH_DEBOUNCE:
             return bool(last_result)
         try:
-            refreshed = _refresh_token_in_place()
+            refreshed = _refresh_token_in_place(force=True)
         except Exception as e:
             with _lock:
                 _auth_failure_refresh_state.monotonic = time.monotonic()
@@ -313,7 +376,7 @@ def _refresh_loop():
                 continue
 
         try:
-            refreshed = _refresh_token_in_place()
+            refreshed = _traced_scheduled_refresh()
             if not refreshed:
                 return  # no client to manage; stop the thread
             logger.info("Valkey token refreshed in-place successfully")
@@ -325,6 +388,38 @@ def _refresh_loop():
                 consecutive_failures,
                 e,
             )
+
+
+def _traced_scheduled_refresh() -> bool:
+    """One scheduled refresh, wrapped in a ``valkey.token_refresh`` root span.
+
+    Diagnostics only (KAN-268); the refresh itself is ``_refresh_token_in_place``
+    called exactly as before. The root span carries:
+
+    - ``wall_ms``: elapsed time (``time.monotonic``)
+    - ``thread_cpu_ms``: CPU this thread actually got (``time.thread_time``)
+    - ``token_changed``: whether the metadata server returned a new token
+
+    A large ``wall_ms - thread_cpu_ms`` gap (say 3,000 vs 20) means the thread
+    was not executing, which is not the same as CPU starvation: the gap also
+    holds the metadata-server request, Valkey TCP/TLS/AUTH and PING waits, and
+    ``_lock`` contention. Subtract the ``valkey.token_fetch``,
+    ``valkey.pool_disconnect`` and ``valkey.ping`` child spans first. The
+    residual still contains the wait for ``_lock``, which is taken before the
+    first child span starts and has no span of its own, so rule out a
+    concurrent auth-failure refresh or client creation in the same window
+    before reading the residual as scheduler delay or Cloud Run CPU
+    throttling. If wall and CPU are close, the work itself is expensive.
+    Exceptions propagate unchanged; the span records them as errors.
+    """
+    with tracer.trace(_REFRESH_ROOT_SPAN) as span:
+        cpu_start = time.thread_time()
+        wall_start = time.monotonic()
+        try:
+            return _refresh_token_in_place()
+        finally:
+            span.set_metric("thread_cpu_ms", (time.thread_time() - cpu_start) * 1000)
+            span.set_metric("wall_ms", (time.monotonic() - wall_start) * 1000)
 
 
 def get_valkey_client() -> redis.StrictRedis | None:
@@ -343,7 +438,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
     Returns None if the connection cannot be established, allowing the
     caller to fall back to a different session backend.
     """
-    global _current_client, _refresh_thread, _token_expiry
+    global _current_client, _refresh_thread, _token_expiry, _pool_verified
 
     try:
         client, expiry = _build_client(host, port)
@@ -353,6 +448,7 @@ def create_iam_redis_client(host: str, port: int = 6379) -> redis.StrictRedis | 
         with _lock:
             _current_client = client
             _token_expiry = expiry
+            _pool_verified = True  # the PING above used this client's token
             _auth_failure_refresh_state.monotonic = None
             _auth_failure_refresh_state.result = None
             # Wake an already-running refresh loop so it recomputes its
