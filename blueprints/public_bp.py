@@ -5,6 +5,7 @@ search-engine crawlers.
 Exposes:
     GET /r/<slug>    Single published recipe (is_public=True)
     GET /browse      Paginated index of all published recipes
+    GET /browse/tag/<slug>  Paginated curated category hub
     GET /sitemap.xml Dynamic XML sitemap of public recipe routes
 
 These endpoints serve HTML or XML directly so crawlers can index the content
