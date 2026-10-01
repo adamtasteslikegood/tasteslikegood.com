@@ -137,8 +137,12 @@ def download_image(
     ``exists() == False`` path — ``None``, no error log.
 
     ``single_shot_download=True`` reads the body in one call instead of 8 KiB
-    Python-level chunks. The library still validates the checksum, and memory
-    use is unchanged because the whole object is returned as bytes anyway.
+    Python-level chunks, and the library still validates the checksum. The
+    trade-off is peak memory: the full body is buffered once before it is
+    copied into the ``BytesIO`` behind ``download_as_bytes``, so each in-flight
+    miss briefly holds one extra copy of the object (~2 MB for the largest
+    recipe images; at most 8 concurrent misses on one gthread worker, well
+    inside the 1 GiB instance).
 
     Args:
         bucket_name: GCS bucket name
