@@ -11,6 +11,8 @@ on Cloud Run (the service account already has storage.objectAdmin).
 import logging
 from typing import Optional
 
+from ddtrace import tracer
+from google.api_core.exceptions import NotFound
 from google.cloud import storage
 
 from utils.log_sanitizer import sanitize_log_value
@@ -28,8 +30,11 @@ def _init_gcs(bucket_name: str) -> bool:
     if _bucket is not None and _bucket_name == bucket_name:
         return True
     try:
-        client = storage.Client()
-        _bucket = client.bucket(bucket_name)
+        # First use per worker builds the client (ADC + metadata-server calls);
+        # a span makes that one-off cost visible in image traces (KAN-268).
+        with tracer.trace("image.gcs_init"):
+            client = storage.Client()
+            _bucket = client.bucket(bucket_name)
         _bucket_name = bucket_name
         logger.info("GCS initialized with bucket: %s", bucket_name)
         return True
@@ -125,6 +130,16 @@ def download_image(
     """
     Download raw PNG bytes from GCS.
 
+    Downloads directly rather than checking ``blob.exists()`` first: the
+    existence check was a separate metadata round trip on every cache miss
+    (up to ~1 s on a cold connection, KAN-268). A missing object surfaces as
+    ``NotFound`` from the download itself and is treated exactly like the old
+    ``exists() == False`` path — ``None``, no error log.
+
+    ``single_shot_download=True`` reads the body in one call instead of 8 KiB
+    Python-level chunks. The library still validates the checksum, and memory
+    use is unchanged because the whole object is returned as bytes anyway.
+
     Args:
         bucket_name: GCS bucket name
         recipe_id: Recipe UUID
@@ -137,9 +152,9 @@ def download_image(
     assert _bucket is not None
     try:
         blob = _bucket.blob(_object_name_from_uri(bucket_name, recipe_id, gcs_uri))
-        if not blob.exists():
-            return None
-        return blob.download_as_bytes()  # type: ignore[no-any-return]
+        return blob.download_as_bytes(single_shot_download=True)  # type: ignore[no-any-return]
+    except NotFound:
+        return None
     except Exception as e:
         logger.error(
             "Failed to download image for recipe %s: %s",
