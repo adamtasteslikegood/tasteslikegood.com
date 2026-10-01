@@ -323,7 +323,7 @@ def _traced_cache_get(key: str) -> bytes | None:
     with tracer.trace("image.cache_read") as span:
         cached = safe_get(key)
         span.set_tag("image.cache_hit", str(cached is not None).lower())
-    return cached
+    return cached  # type: ignore[no-any-return]
 
 
 def _image_cache_version(recipe) -> str:
