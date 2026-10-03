@@ -139,9 +139,9 @@ def test_refresh_loop_retries_on_failure(monkeypatch):
     except StopIteration:
         pass
 
-    # First sleep is expiry-derived (35 min − 5 min margin), NOT the fixed
-    # 45 min that outlived the token (KAN-268).
-    assert 29 * 60 <= sleeps[0] <= 30 * 60
+    # First sleep is expiry-derived (35 min − the 2 min idle safety margin,
+    # KAN-318), NOT the fixed 45 min that outlived the token (KAN-268).
+    assert 32 * 60 <= sleeps[0] <= 33 * 60
     # After failure, retry backoff should be much shorter than 45 min
     assert sleeps[1] == valkey_auth._RETRY_BASE  # 30s first retry
     assert sleeps[2] == valkey_auth._RETRY_BASE * 2  # 60s second retry
@@ -178,7 +178,7 @@ def test_refresh_loop_recomputes_deadline_when_expiry_changes(monkeypatch):
         valkey_auth._refresh_loop()
 
     assert waits[0] == valkey_auth._TOKEN_REFRESH_INTERVAL
-    assert 29 * 60 <= waits[1] <= 30 * 60
+    assert 32 * 60 <= waits[1] <= 33 * 60  # 35 min − _IDLE_SAFETY_MARGIN
     assert refreshed == []
 
 
@@ -276,7 +276,7 @@ def test_refresh_in_place_records_new_expiry(monkeypatch):
             self.connection_kwargs = {}
             self.disconnected = False
 
-        def disconnect(self):
+        def disconnect(self, inuse_connections=True):
             self.disconnected = True
 
     class _Client:
@@ -487,7 +487,7 @@ def _refresh_fixture(monkeypatch, on_ping):
         def __init__(self):
             self.connection_kwargs = {}
 
-        def disconnect(self):
+        def disconnect(self, inuse_connections=True):
             pass
 
     class _Client:
@@ -581,7 +581,7 @@ class _CountingPool:
         self._in_use_connections = []
         self.disconnects = 0
 
-    def disconnect(self):
+    def disconnect(self, inuse_connections=True):
         self.disconnects += 1
 
 
@@ -757,6 +757,9 @@ class _FakeTracer:
     def current_root_span(self):
         return self.stack[0] if self.stack else None
 
+    def current_span(self):
+        return self.stack[-1] if self.stack else None
+
     def names(self):
         return [s.name for s in self.spans]
 
@@ -774,7 +777,7 @@ def fake_tracer(monkeypatch):
 def test_scheduled_refresh_new_token_emits_root_and_step_spans(monkeypatch, fake_tracer):
     client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok2")
 
-    assert valkey_auth._traced_scheduled_refresh() is True
+    assert valkey_auth._traced_refresh(trigger="scheduled") is True
 
     assert fake_tracer.names() == [
         "valkey.token_refresh",
@@ -797,7 +800,7 @@ def test_scheduled_refresh_new_token_emits_root_and_step_spans(monkeypatch, fake
 def test_scheduled_refresh_unchanged_token_tags_false_and_skips_steps(monkeypatch, fake_tracer):
     client, new_expiry = _install_counting_client(monkeypatch, "tok1", "tok1")
 
-    assert valkey_auth._traced_scheduled_refresh() is True
+    assert valkey_auth._traced_refresh(trigger="scheduled") is True
 
     assert fake_tracer.names() == ["valkey.token_refresh", "valkey.token_fetch"]
     assert fake_tracer.get("valkey.token_refresh").tags["token_changed"] == "false"
@@ -814,7 +817,7 @@ def test_scheduled_refresh_records_wall_and_thread_cpu_deltas(monkeypatch, fake_
     monkeypatch.setattr(valkey_auth.time, "monotonic", lambda: next(walls))
     monkeypatch.setattr(valkey_auth.time, "thread_time", lambda: next(cpus))
 
-    valkey_auth._traced_scheduled_refresh()
+    valkey_auth._traced_refresh(trigger="scheduled")
 
     root = fake_tracer.get("valkey.token_refresh")
     assert root.metrics["wall_ms"] == pytest.approx(3000.0)
@@ -830,7 +833,7 @@ def test_scheduled_refresh_failure_propagates_and_still_records_timing(monkeypat
     monkeypatch.setattr(client, "ping", failing_ping)
 
     with pytest.raises(RedisConnectionError):
-        valkey_auth._traced_scheduled_refresh()
+        valkey_auth._traced_refresh(trigger="scheduled")
 
     root = fake_tracer.get("valkey.token_refresh")
     assert isinstance(root.error, RedisConnectionError)
