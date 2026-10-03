@@ -115,7 +115,16 @@ jobs:
       # pip-installs them — a path uv sync never exercises. No push, no
       # registry credentials.
       - name: Build Docker image
-        run: docker build -f Dockerfile .
+        run: docker build -t backend-ci -f Dockerfile .
+
+      # KAN-324: tests run on SQLite, so nothing else imports the Postgres DBAPI
+      # the image ships. create_engine() imports it eagerly (no connection is
+      # made), so a dependency bump that changes the postgresql:// driver fails
+      # here instead of in the release's migrate job.
+      - name: Smoke - Postgres DBAPI loads in the image
+        run: |
+          docker run --rm --entrypoint python backend-ci -c \
+            "import sqlalchemy as sa; e = sa.create_engine('postgresql://smoke:smoke@127.0.0.1:1/smoke'); print(sa.__version__, e.dialect.driver)"
 
   security:
     name: Security Scan (pip-audit)
