@@ -340,7 +340,8 @@ def test_browse_paginates(app, client):
             db.session.add(_make_recipe(f"Recipe {idx:02d}", f"recipe-{idx:02d}"))
         db.session.commit()
 
-    first = client.get("/browse?page=1")
+    # Page 1 is the bare /browse; ?page=1 now 301s there (KAN-296).
+    first = client.get("/browse")
     assert first.status_code == 200
     first_body = first.get_data(as_text=True)
     assert "Page 1 of 2" in first_body
