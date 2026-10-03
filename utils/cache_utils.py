@@ -14,7 +14,7 @@ from redis.exceptions import AuthenticationError
 
 from extensions import cache
 from utils.log_sanitizer import sanitize_log_value
-from utils.valkey_auth import refresh_after_auth_failure
+from utils.valkey_auth import ensure_fresh_token, refresh_after_auth_failure
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,12 @@ def _call_with_auth_retry(op):
     on the first AuthenticationError and retry exactly once. Any error on the
     retry — or a refresh that did not happen — propagates to the caller's
     existing fault-tolerant handler. Never loops.
+
+    Before the op, ``ensure_fresh_token`` refreshes a token that is inside its
+    expiry margin on this request's CPU (KAN-318); it is a no-op otherwise and
+    never raises.
     """
+    ensure_fresh_token()
     try:
         return op()
     except AuthenticationError:
