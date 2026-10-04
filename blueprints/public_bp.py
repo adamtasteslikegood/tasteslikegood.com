@@ -357,11 +357,12 @@ def _versioned_image_url(owner: Recipe) -> str:
 
 # Sized WebP variants (KAN-271). ``sizes`` mirror recipe-site.css: the hero
 # spans ``.public-main`` (min(1200px, 100vw - 3rem)); browse cards are a
-# 3 / 2 / 1-column grid at >900px / >768px / phones.
+# 3-column grid above 900px and 2 columns at or below it, phones included
+# (KAN-297).
 HERO_IMAGE_WIDTHS = VARIANT_WIDTHS
 HERO_IMAGE_SIZES = "(max-width: 1248px) 100vw, 1200px"
 CARD_IMAGE_WIDTHS = (400, 800)
-CARD_IMAGE_SIZES = "(max-width: 768px) 100vw, (max-width: 900px) 50vw, 400px"
+CARD_IMAGE_SIZES = "(max-width: 900px) 50vw, 400px"
 
 
 def _image_variants(owner: Recipe, widths: tuple[int, ...]) -> dict[str, str]:
