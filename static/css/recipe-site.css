@@ -577,8 +577,44 @@ img {
     text-align: center;
   }
 
+  /* KAN-297: phones keep two cards per row. A ~160px column needs a tighter
+     gap and smaller card type, and long words must wrap rather than widen
+     the track into a horizontal scroll. */
   .public-browse-list {
-    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  /* Cards in a row share its height. Top-align the copy so the spare space
+     sits below it and never stretches the clamped description open. */
+  .public-browse-item a {
+    align-content: start;
+  }
+
+  .public-browse-card-copy {
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    overflow-wrap: anywhere;
+  }
+
+  .public-browse-card-copy h2,
+  .public-browse-card-copy h3 {
+    font-size: var(--text-base);
+  }
+
+  .public-browse-card-copy p {
+    margin: 0;
+    font-size: var(--text-sm);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+
+  .public-browse-meta {
+    gap: var(--space-2);
+    font-size: var(--text-xs);
   }
 
   /* On phones the 16/9 hero image is only ~190px tall while the title wraps
