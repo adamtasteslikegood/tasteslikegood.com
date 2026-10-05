@@ -1062,6 +1062,11 @@ def _browse_view() -> dict[str, str]:
     return view
 
 
+def _carries_tag(tags: list[Any], tag: str) -> bool:
+    """Whether ``tags`` holds ``tag``, compared the way ``_browse_view`` normalises it."""
+    return any(isinstance(t, str) and " ".join(t.split()).lower() == tag for t in tags)
+
+
 def _page_values(page: int) -> dict[str, int]:
     """``url_for`` values for a listing page: page 1 is the bare URL, never ``?page=1``."""
     return {"page": page} if page > 1 else {}
@@ -1182,11 +1187,7 @@ def browse_public_recipes():
     catalog = _catalog_tag_rows()
     tag = view.get("tag")
     if tag:
-        tagged = [
-            row.id
-            for row in catalog
-            if any(isinstance(t, str) and t.strip().lower() == tag for t in _row_tags(row))
-        ]
+        tagged = [row.id for row in catalog if _carries_tag(_row_tags(row), tag)]
         base_query = base_query.filter(Recipe.id.in_(tagged))
 
     total = base_query.with_entities(Recipe.id).count()
@@ -1208,6 +1209,10 @@ def browse_public_recipes():
         .offset((page - 1) * BROWSE_PAGE_SIZE)
         .all()
     )
+    if tag:
+        # As on the hubs: a recipe retagged between the catalog snapshot and
+        # this load is no longer in the view, so it is not rendered.
+        recipes = [r for r in recipes if _carries_tag(_recipe_tags(r.data or {}), tag)]
 
     # KAN-298: a ?sort / ?tag URL is a view of /browse and canonicalises to it.
     filtered = "sort" in request.args or "tag" in request.args

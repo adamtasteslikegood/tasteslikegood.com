@@ -250,6 +250,30 @@ def test_browse_tag_narrows_the_listing(app, client):
     assert CARD.findall(client.get("/browse?tag=dess").get_data(as_text=True)) == []
 
 
+def test_browse_tag_matches_multiword_tags_whatever_their_spacing(app, client):
+    _seed(1, "comfort", tags=("Comfort   Food ",))
+    _seed(1, "plain", tags=("comfort",))
+    for raw in ["comfort food", "  Comfort    FOOD "]:
+        body = client.get("/browse", query_string={"tag": raw}).get_data(as_text=True)
+        assert CARD.findall(body) == ["comfort-0"], raw
+
+
+def test_browse_tag_rechecks_membership_after_loading(app, client, monkeypatch):
+    """A recipe retagged after the catalog snapshot is not rendered in the view."""
+    _seed(2, "stay", tags=("dinner",))
+    _seed(1, "moved", tags=("dinner",))
+    snapshot = public_module._catalog_tag_rows()
+    moved = Recipe.query.filter_by(slug="moved-0").one()
+    moved.data = {**moved.data, "tags": ["dessert"]}
+    db.session.commit()
+
+    monkeypatch.setattr(public_module, "_catalog_tag_rows", lambda: snapshot)
+    body = client.get("/browse?tag=dinner").get_data(as_text=True)
+    assert CARD.findall(body) == _newest_first(2, "stay")
+    items = _json_ld(body, "CollectionPage")["mainEntity"]["itemListElement"]
+    assert all(not item["url"].endswith("/r/moved-0") for item in items)
+
+
 def test_browse_tag_with_no_match_renders_an_empty_page_one(app, client):
     _seed(1, "lonely")
     resp = client.get("/browse?tag=nope")
