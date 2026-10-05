@@ -33,7 +33,7 @@
         <h1>Browse Vegan Recipes</h1>
         <p>
             High-contrast, fast-loading public recipes. Showing {{ recipes|length }} of {{ total }}
-            published recipes.
+            published recipes{% if tag %} tagged &ldquo;{{ tag }}&rdquo;{% endif %}.
         </p>
         {# KAN-274: the indexable category hubs, linked from their parent page. #}
         {% if hubs %}
@@ -46,6 +46,27 @@
         </nav>
         {% endif %}
     </header>
+
+    {# KAN-298: sort and tag are views of /browse (canonical to /browse), so
+       this form is a plain GET and works without JavaScript. #}
+    <form class="public-browse-filter" method="get" action="{{ url_for('public.browse_public_recipes') }}">
+        <label>
+            Sort
+            <select name="sort">
+                {% for value, label in sorts.items() %}
+                <option value="{{ value }}"{% if value == sort %} selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </label>
+        <label>
+            Tag
+            <input type="text" name="tag" value="{{ tag }}" maxlength="60" placeholder="e.g. dessert" autocapitalize="none">
+        </label>
+        <button type="submit">Apply</button>
+        {% if tag %}
+        <a href="{{ url_for('public.browse_public_recipes') }}">Clear</a>
+        {% endif %}
+    </form>
 
     {% if recipes %}
     <ul class="public-browse-list">
@@ -102,7 +123,12 @@
     </ul>
     {% else %}
     <p class="public-browse-empty">
+        {% if tag %}
+        No published recipes are tagged &ldquo;{{ tag }}&rdquo;.
+        <a href="{{ url_for('public.browse_public_recipes') }}">Browse all recipes</a>.
+        {% else %}
         No public recipes yet. Check back soon, or <a href="/#kitchen">open the cookbook app</a>.
+        {% endif %}
     </p>
     {% endif %}
 
