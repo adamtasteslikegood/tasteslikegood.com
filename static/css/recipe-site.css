@@ -220,6 +220,8 @@ img {
   color: inherit;
   font: inherit;
   font-size: var(--text-base);
+  box-sizing: border-box;
+  min-height: 3.125rem;
 }
 
 .public-browse-filter input {
