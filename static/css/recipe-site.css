@@ -195,6 +195,52 @@ img {
   line-height: var(--leading-relaxed);
 }
 
+/* KAN-298: the sort and tag form above the browse grid. */
+.public-browse-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.public-browse-filter label {
+  display: grid;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
+.public-browse-filter select,
+.public-browse-filter input,
+.public-browse-filter button {
+  border: var(--ar-border);
+  border-radius: 0;
+  padding: 0.75rem 1rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-base);
+}
+
+.public-browse-filter input {
+  max-width: 100%;
+  width: 14rem;
+}
+
+.public-browse-filter button {
+  cursor: pointer;
+}
+
+.public-browse-filter button:hover {
+  background: var(--ar-black);
+  color: var(--fg-inverted);
+}
+
+.public-browse-filter a {
+  color: inherit;
+  padding: 0.75rem 0;
+}
+
 /* KAN-273: "More vegan recipes" cards reuse the browse grid. */
 .public-related {
   display: grid;

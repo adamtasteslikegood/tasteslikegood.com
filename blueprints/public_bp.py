@@ -35,6 +35,7 @@ from flask import (
     url_for,
 )
 from flask.typing import ResponseReturnValue
+from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
 from extensions import db
@@ -63,6 +64,11 @@ PAGINATION_WINDOW = 2
 # leading zero, no whitespace. Nine digits bounds the int() conversion; a page
 # that large is past the last page anyway, so it 404s like any other.
 _PAGE_PARAM = re.compile(r"[1-9][0-9]{0,8}")
+# KAN-298: the ``/browse?sort=`` orderings. ``newest`` is the default listing.
+BROWSE_SORT_LABELS = {"newest": "Newest first", "oldest": "Oldest first", "name": "Name A to Z"}
+BROWSE_SORTS = tuple(BROWSE_SORT_LABELS)
+# A recipe tag is a short label; anything longer in ``?tag=`` is cut here.
+MAX_TAG_FILTER_LENGTH = 60
 
 
 def _public_base_url() -> str:
@@ -1038,6 +1044,24 @@ def _requested_page() -> int | None:
     return int(raw) if _PAGE_PARAM.fullmatch(raw) else None
 
 
+def _browse_view() -> dict[str, str]:
+    """``url_for`` values for the requested ``/browse`` view: ``sort`` and ``tag`` (KAN-298).
+
+    Only a known sort and a non-blank tag survive, so page links and the
+    ``?page=1`` redirect are rebuilt from allow-listed keys, never the raw
+    query string. The tag is matched case-insensitively and is cut to
+    ``MAX_TAG_FILTER_LENGTH``.
+    """
+    view = {}
+    sort = request.args.get("sort", "")
+    if sort in BROWSE_SORTS:
+        view["sort"] = sort
+    tag = " ".join(request.args.get("tag", "").split()).lower()[:MAX_TAG_FILTER_LENGTH].strip()
+    if tag:
+        view["tag"] = tag
+    return view
+
+
 def _page_values(page: int) -> dict[str, int]:
     """``url_for`` values for a listing page: page 1 is the bare URL, never ``?page=1``."""
     return {"page": page} if page > 1 else {}
@@ -1133,13 +1157,21 @@ def browse_public_recipes():
     KAN-296: ``?page=N`` is self-canonical. ``?page=1`` 301s to the bare
     ``/browse`` (older Previous links emitted it); a page past the last, or a
     ``page`` that is not a positive integer, is a 404.
+
+    KAN-298: ``?sort=`` (``BROWSE_SORTS``) orders the listing and ``?tag=``
+    narrows it to recipes carrying that tag. Any URL with either key is a view
+    of ``/browse``, not a page of its own: it declares ``rel=canonical`` to the
+    bare ``/browse`` on every page, so filtered views are never indexed as
+    duplicates. The indexable tag pages are the curated hubs at
+    ``/browse/tag/<slug>``. An unknown sort falls back to the default order.
     """
     page = _requested_page()
     if page is None:
         abort(404)
+    view = _browse_view()
     if page == 1 and "page" in request.args:
         carried = _carried_redirect_params(keep_save=False)
-        return redirect(_canonical_url("public.browse_public_recipes", **carried), code=301)
+        return redirect(_canonical_url("public.browse_public_recipes", **view, **carried), code=301)
 
     # slug IS NOT NULL, like the sitemap: a slugless public row (legacy data;
     # publishing always mints a slug now) has no /r/ URL, and url_for on it
@@ -1147,20 +1179,41 @@ def browse_public_recipes():
     base_query = Recipe.query.filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None)).options(
         joinedload(Recipe.user)
     )
+    catalog = _catalog_tag_rows()
+    tag = view.get("tag")
+    if tag:
+        tagged = [
+            row.id
+            for row in catalog
+            if any(isinstance(t, str) and t.strip().lower() == tag for t in _row_tags(row))
+        ]
+        base_query = base_query.filter(Recipe.id.in_(tagged))
 
     total = base_query.with_entities(Recipe.id).count()
     total_pages = max(1, ceil(total / BROWSE_PAGE_SIZE))
     if page > total_pages:
         abort(404)
 
+    # ``Recipe.id`` breaks ties so equal names or timestamps page consistently.
+    sort = view.get("sort", "newest")
+    if sort == "name":
+        ordering = (func.lower(Recipe.name).asc(), Recipe.id.asc())
+    elif sort == "oldest":
+        ordering = (Recipe.created_at.asc(), Recipe.id.asc())
+    else:
+        ordering = (Recipe.created_at.desc(), Recipe.id.desc())
     recipes = (
-        base_query.order_by(Recipe.created_at.desc())
+        base_query.order_by(*ordering)
         .limit(BROWSE_PAGE_SIZE)
         .offset((page - 1) * BROWSE_PAGE_SIZE)
         .all()
     )
 
-    canonical_url = _canonical_url("public.browse_public_recipes", **_page_values(page))
+    # KAN-298: a ?sort / ?tag URL is a view of /browse and canonicalises to it.
+    filtered = "sort" in request.args or "tag" in request.args
+    canonical_url = _canonical_url(
+        "public.browse_public_recipes", **({} if filtered else _page_values(page))
+    )
     # KAN-273: the title and description say what the page is, with the live
     # count; the social card gets the newest photo on the page instead of none.
     recipe_noun = "Recipe" if total == 1 else "Recipes"
@@ -1179,7 +1232,7 @@ def browse_public_recipes():
     # On paginated browse pages, the current crumb is the current canonical
     # page, not page 1. Keep recipe-page breadcrumbs pointing to /browse.
     breadcrumbs[-1]["url"] = canonical_url
-    hubs = _linkable_hubs(_hub_counts(_catalog_tag_rows()))
+    hubs = _linkable_hubs(_hub_counts(catalog))
 
     return render_template(
         "public/browse.html",
@@ -1200,8 +1253,11 @@ def browse_public_recipes():
         pagination=_pagination(
             page,
             total_pages,
-            lambda number: url_for("public.browse_public_recipes", **_page_values(number)),
+            lambda number: url_for("public.browse_public_recipes", **view, **_page_values(number)),
         ),
+        sort=sort,
+        sorts=BROWSE_SORT_LABELS,
+        tag=tag or "",
         total=total,
         canonical_url=canonical_url,
         # /browse is subject to the same 155-char result-snippet cap that
