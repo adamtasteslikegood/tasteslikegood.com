@@ -1044,6 +1044,11 @@ def _requested_page() -> int | None:
     return int(raw) if _PAGE_PARAM.fullmatch(raw) else None
 
 
+def _normalise_tag(value: str) -> str:
+    """A tag as ``?tag=`` compares it: inner whitespace collapsed, lower-cased."""
+    return " ".join(value.split()).lower()
+
+
 def _browse_view() -> dict[str, str]:
     """``url_for`` values for the requested ``/browse`` view: ``sort`` and ``tag`` (KAN-298).
 
@@ -1056,7 +1061,7 @@ def _browse_view() -> dict[str, str]:
     sort = request.args.get("sort", "")
     if sort in BROWSE_SORTS:
         view["sort"] = sort
-    tag = " ".join(request.args.get("tag", "").split()).lower()[:MAX_TAG_FILTER_LENGTH].strip()
+    tag = _normalise_tag(request.args.get("tag", ""))[:MAX_TAG_FILTER_LENGTH].rstrip()
     if tag:
         view["tag"] = tag
     return view
@@ -1064,7 +1069,7 @@ def _browse_view() -> dict[str, str]:
 
 def _carries_tag(tags: list[Any], tag: str) -> bool:
     """Whether ``tags`` holds ``tag``, compared the way ``_browse_view`` normalises it."""
-    return any(isinstance(t, str) and " ".join(t.split()).lower() == tag for t in tags)
+    return any(isinstance(t, str) and _normalise_tag(t) == tag for t in tags)
 
 
 def _page_values(page: int) -> dict[str, int]:
