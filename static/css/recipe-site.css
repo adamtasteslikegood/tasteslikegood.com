@@ -229,13 +229,16 @@ img {
   width: 14rem;
 }
 
+/* Filled, so the one action does not read as a third text field. */
 .public-browse-filter button {
   cursor: pointer;
+  background: var(--ar-black);
+  color: var(--fg-inverted);
 }
 
 .public-browse-filter button:hover {
-  background: var(--ar-black);
-  color: var(--fg-inverted);
+  background: none;
+  color: inherit;
 }
 
 .public-browse-filter a {
