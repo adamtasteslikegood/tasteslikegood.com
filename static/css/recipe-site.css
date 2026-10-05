@@ -694,3 +694,28 @@ img {
     align-items: stretch;
   }
 }
+
+/* KAN-298: on phones the wrapped form left three boxes of different widths
+   and "Clear" alone on a third row. Sort and Tag share a row on the same two
+   columns as the cards below; Apply and Clear take the next row. */
+@media (max-width: 600px) {
+  .public-browse-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-browse-filter select,
+  .public-browse-filter input {
+    width: 100%;
+    padding-inline: 0.75rem;
+  }
+
+  /* Without a tag there is no Clear link, so Apply spans the row. */
+  .public-browse-filter button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .public-browse-filter a {
+    text-align: center;
+  }
+}
