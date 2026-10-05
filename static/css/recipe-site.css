@@ -201,12 +201,13 @@ img {
   flex-wrap: wrap;
   align-items: end;
   gap: var(--space-3);
+  /* Set on the form, so Apply and Clear match the fields beside them. */
+  font-family: var(--font-mono);
 }
 
 .public-browse-filter label {
   display: grid;
   gap: var(--space-1);
-  font-family: var(--font-mono);
   font-size: var(--text-xs);
 }
 
