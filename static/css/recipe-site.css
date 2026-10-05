@@ -237,9 +237,16 @@ img {
   color: var(--fg-inverted);
 }
 
-.public-browse-filter button:hover {
+.public-browse-filter button:hover,
+.public-browse-filter button:focus-visible {
   background: none;
   color: inherit;
+}
+
+/* The browser's dark focus ring disappears against the black fill. */
+.public-browse-filter button:focus-visible {
+  outline: 2px solid var(--ar-black);
+  outline-offset: 2px;
 }
 
 .public-browse-filter a {
