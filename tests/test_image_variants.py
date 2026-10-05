@@ -398,6 +398,16 @@ def test_browse_cards_use_small_variants_and_stay_lazy(app, client):
     assert f"w=800&amp;v={token} 800w" in img
     assert 'loading="lazy"' in img
     assert 'width="400"' in img and 'height="300"' in img
+    # KAN-297: cards are two per row at every width up to 900px, phones included.
+    assert 'sizes="(max-width: 900px) 50vw, 400px"' in img
+
+
+def test_browse_grid_never_collapses_to_one_column():
+    # KAN-297: the phone breakpoint used to reset the card grid to ``1fr``.
+    css = (Path(__file__).resolve().parents[1] / "static/css/recipe-site.css").read_text()
+    rules = re.findall(r"\.public-browse-list\s*\{([^}]*)\}", css)
+    columns = [m for rule in rules for m in re.findall(r"grid-template-columns:\s*([^;]+);", rule)]
+    assert columns == ["repeat(3, minmax(0, 1fr))", "repeat(2, minmax(0, 1fr))"]
 
 
 # ── Pinterest pin variant (KAN-284) ──────────────────────────────────────────

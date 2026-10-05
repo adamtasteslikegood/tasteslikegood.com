@@ -195,6 +195,65 @@ img {
   line-height: var(--leading-relaxed);
 }
 
+/* KAN-298: the sort and tag form above the browse grid. */
+.public-browse-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3);
+  /* Set on the form, so Apply and Clear match the fields beside them. */
+  font-family: var(--font-mono);
+}
+
+.public-browse-filter label {
+  display: grid;
+  gap: var(--space-1);
+  font-size: var(--text-xs);
+}
+
+.public-browse-filter select,
+.public-browse-filter input,
+.public-browse-filter button {
+  border: var(--ar-border);
+  border-radius: 0;
+  padding: 0.75rem 1rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: var(--text-base);
+  box-sizing: border-box;
+  min-height: 3.125rem;
+}
+
+.public-browse-filter input {
+  max-width: 100%;
+  width: 14rem;
+}
+
+/* Filled, so the one action does not read as a third text field. */
+.public-browse-filter button {
+  cursor: pointer;
+  background: var(--ar-black);
+  color: var(--fg-inverted);
+}
+
+.public-browse-filter button:hover,
+.public-browse-filter button:focus-visible {
+  background: none;
+  color: inherit;
+}
+
+/* The browser's dark focus ring disappears against the black fill. */
+.public-browse-filter button:focus-visible {
+  outline: 2px solid var(--ar-black);
+  outline-offset: 2px;
+}
+
+.public-browse-filter a {
+  color: inherit;
+  padding: 0.75rem 0;
+}
+
 /* KAN-273: "More vegan recipes" cards reuse the browse grid. */
 .public-related {
   display: grid;
@@ -577,8 +636,44 @@ img {
     text-align: center;
   }
 
+  /* KAN-297: phones keep two cards per row. A ~160px column needs a tighter
+     gap and smaller card type, and long words must wrap rather than widen
+     the track into a horizontal scroll. */
   .public-browse-list {
-    grid-template-columns: 1fr;
+    gap: var(--space-3);
+  }
+
+  /* Cards in a row share its height. Top-align the copy so the spare space
+     sits below it and never stretches the clamped description open. */
+  .public-browse-item a {
+    align-content: start;
+  }
+
+  .public-browse-card-copy {
+    align-content: start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    overflow-wrap: anywhere;
+  }
+
+  .public-browse-card-copy h2,
+  .public-browse-card-copy h3 {
+    font-size: var(--text-base);
+  }
+
+  .public-browse-card-copy p {
+    margin: 0;
+    font-size: var(--text-sm);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+
+  .public-browse-meta {
+    gap: var(--space-2);
+    font-size: var(--text-xs);
   }
 
   /* On phones the 16/9 hero image is only ~190px tall while the title wraps
@@ -608,5 +703,30 @@ img {
   .public-browse-pagination {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+/* KAN-298: on phones the wrapped form left three boxes of different widths
+   and "Clear" alone on a third row. Sort and Tag share a row on the same two
+   columns as the cards below; Apply and Clear take the next row. */
+@media (max-width: 600px) {
+  .public-browse-filter {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .public-browse-filter select,
+  .public-browse-filter input {
+    width: 100%;
+    padding-inline: 0.75rem;
+  }
+
+  /* Without a tag there is no Clear link, so Apply spans the row. */
+  .public-browse-filter button:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .public-browse-filter a {
+    text-align: center;
   }
 }
