@@ -508,6 +508,52 @@ def test_status_endpoint_exposes_origin_after_worker_write(client, logged_in):
     assert body["recipe"]["is_public"] is False
 
 
+def test_guest_laundering_through_login_merge_shows_only_worker_text(app, client, user):
+    """Guest generates, stuffs the placeholder, is overwritten by the worker,
+    tries again, signs in, publishes: the public page is the worker's text."""
+    from blueprints.auth_api_bp import _merge_guest_session_into_user
+
+    guest = app.test_client()
+    with guest.session_transaction() as sess:
+        sess["session_id"] = "guest-launder"
+    pending = {"id": "g-gen", "name": "Generating...", "user_id": None}
+    assert db_recipe_repository.create_recipe(pending, None, "guest-launder", status="generating")
+
+    # Before the worker: content POSTed to the placeholder is dropped.
+    assert guest.post("/api/recipes", json={**ATTACK_PAYLOAD, "id": "g-gen"}).status_code == 201
+    row = _worker_text_write("g-gen", None)
+    assert row.origin == "generated" and row.guest_session_id == "guest-launder"
+    _assert_worker_content_intact(row)
+
+    # After the worker: the row is locked, and a guest cannot publish at all.
+    resp = guest.put(
+        "/api/recipes/g-gen", json={**ATTACK_PAYLOAD, "id": "g-gen", "is_public": True}
+    )
+    assert resp.status_code == 200
+    db.session.expire_all()
+    row = db.session.get(Recipe, "g-gen")
+    assert row.is_public is False
+    _assert_worker_content_intact(row)
+
+    _merge_guest_session_into_user(user, "guest-launder")
+    db.session.expire_all()
+    row = db.session.get(Recipe, "g-gen")
+    assert row.user_id == user.id and row.origin == "generated"
+
+    with client.session_transaction() as sess:
+        sess["user_id"] = user.id
+    resp = client.post("/api/recipes", json={**ATTACK_PAYLOAD, "id": "g-gen", "is_public": True})
+    assert resp.status_code == 201
+    assert resp.get_json()["is_public"] is True
+    slug = resp.get_json()["slug"]
+    assert slug == "smoky-chili"
+
+    page = app.test_client().get(f"/r/{slug}")
+    assert page.status_code == 200
+    assert b"Smoky Chili" in page.data
+    assert b"Attacker" not in page.data and b"attacker" not in page.data
+
+
 def test_migrate_file_to_db_ignores_is_public(app, user):
     row = db_recipe_repository.migrate_file_to_db(
         "file-1.json", {"name": "From file", "is_public": True, "slug": "from-file"}, user.id
