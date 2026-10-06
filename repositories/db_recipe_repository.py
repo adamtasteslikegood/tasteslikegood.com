@@ -70,9 +70,12 @@ class PublishedRecipeDeleteError(ValueError):
 # Also returned verbatim by the API routes (fixed string, same rationale as
 # PUBLIC_SLUG_REQUIRED_ERROR above).
 MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
-    "Manually entered recipes cannot be published. Only generated recipes "
-    "can have a public page."
+    "Only recipes generated here can have a public page. Manually entered, "
+    "imported or still-generating recipes cannot be published."
 )
+
+# KAN-329: a row in one of these states has no finished worker text behind it.
+_UNPUBLISHABLE_STATUSES = frozenset({"generating", "processing", "error"})
 
 # RCP-74: saved copies inherit their public page from the source recipe.
 SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
@@ -252,17 +255,23 @@ def _resolve_origin(current_origin: Optional[str], recipe_data: Dict[str, Any]) 
     return candidate if candidate in _CLIENT_ORIGINS else None
 
 
-def _gate_manual_publish(origin: Optional[str], recipe_data: Dict[str, Any]) -> None:
-    """Reject publication of manually entered recipes (KAN-140).
+def _gate_publish_transition(existing: Recipe, recipe_data: Dict[str, Any]) -> None:
+    """Only a finished, worker-generated row may go private → public (KAN-329).
 
-    The manual-entry form is free-text content with no AI mediation; the
-    public /r/<slug> surface must not become an open publishing endpoint.
-    Raises (a 400 at the API) instead of silently forcing the flag off, so
-    the SPA's revert-and-toast path fires rather than diverging from the
-    server state.
+    Generalises the KAN-140 manual gate: the label a client wrote never
+    counts, only the origin the worker stamped and a status that says the
+    text landed. The check is on the TRANSITION alone — a row that is
+    already public may be re-saved as public (image generation moves it
+    through ``generating_image`` without unpublishing it), and unpublishing
+    is always allowed. Raises (a 400 at the API) instead of silently forcing
+    the flag off, so the SPA's revert-and-toast path fires rather than
+    diverging from the server state.
     """
-    if origin == "manual" and recipe_data.get("is_public") is True:
-        raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
+    if recipe_data.get("is_public") is not True or existing.is_public:
+        return
+    if existing.origin == "generated" and existing.status not in _UNPUBLISHABLE_STATUSES:
+        return
+    raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
 
 
 def _guard_canonical(recipe: Recipe, recipe_data: Dict[str, Any]) -> None:
@@ -1070,7 +1079,7 @@ def create_recipe(
             _pin_source_slug_to_column(merged, recipe_data, existing)
             recipe_data_with_id = _gate_is_public(merged, user_id, existing)
             next_origin = _resolve_origin(existing.origin, recipe_data)
-            _gate_manual_publish(next_origin, recipe_data_with_id)
+            _gate_publish_transition(existing, recipe_data_with_id)
             if next_origin is not None:
                 recipe_data_with_id["origin"] = next_origin
             else:
@@ -1104,8 +1113,17 @@ def create_recipe(
         recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
         # A client cannot mint its own canonical lock.
         recipe_data_with_id.pop("is_canonical", None)
+        # KAN-329: a new row has no worker text behind it, so it is never
+        # created public. Saved private rather than refused: old bundles POST
+        # new rows with the flag set, and a 400 would leave them a local
+        # "published" ghost the server never had.
+        if recipe_data_with_id.get("is_public") is True:
+            logger.info(
+                "New recipe %s asked to be public; saved private",
+                sanitize_log_value(recipe_id),
+            )
+            recipe_data_with_id["is_public"] = False
         origin_value = _resolve_origin(None, recipe_data)
-        _gate_manual_publish(origin_value, recipe_data_with_id)
         if origin_value is not None:
             recipe_data_with_id["origin"] = origin_value
         else:
@@ -1279,7 +1297,7 @@ def update_recipe(
                 recipe_data_with_id.pop("slug", None)
 
         next_origin = _resolve_origin(recipe.origin, recipe_data)
-        _gate_manual_publish(next_origin, recipe_data_with_id)
+        _gate_publish_transition(recipe, recipe_data_with_id)
         if next_origin is not None:
             recipe_data_with_id["origin"] = next_origin
         else:
@@ -1668,13 +1686,14 @@ def migrate_file_to_db(
             )
             return existing  # type: ignore[no-any-return]
 
+        # KAN-329: a file is client content; it never arrives public.
         recipe = Recipe(
             id=recipe_id,
             user_id=user_id,
             name=recipe_name,
             slug=recipe_data.get("slug"),
-            is_public=recipe_data.get("is_public", False),
-            data=recipe_data,
+            is_public=False,
+            data={**recipe_data, "is_public": False},
         )
 
         db.session.add(recipe)

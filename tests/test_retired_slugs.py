@@ -64,9 +64,34 @@ def other(app):
     return _client_for(app, _user("other@example.com"))
 
 
+def _stamp(recipe_id):
+    """Label a row the way the worker's text write does (KAN-329)."""
+    row = db.session.get(Recipe, recipe_id)
+    assert row is not None
+    row.origin = "generated"
+    row.data = {**(row.data or {}), "origin": "generated"}
+    db.session.commit()
+    return row
+
+
+def _rename(recipe_id, slug):
+    """A generated row's slug is server-owned (KAN-328): renames happen through
+    the ORM, as the backfill scripts do, never through a client payload."""
+    row = db.session.get(Recipe, recipe_id)
+    assert row is not None
+    row.slug = slug
+    row.data = {**(row.data or {}), "slug": slug}
+    db.session.commit()
+    return row
+
+
 def _publish(client, recipe_id, name="Zucchini Poppers"):
-    resp = client.post("/api/recipes", json={"id": recipe_id, "name": name, "is_public": True})
+    """Create private, stamp as generated, publish through the ordinary save."""
+    resp = client.post("/api/recipes", json={"id": recipe_id, "name": name})
     assert resp.status_code == 201, resp.get_json()
+    _stamp(recipe_id)
+    resp = client.put(f"/api/recipes/{recipe_id}", json={"is_public": True})
+    assert resp.status_code == 200, resp.get_json()
     return resp.get_json()
 
 
@@ -148,7 +173,8 @@ def test_deleted_slug_answers_410_and_is_never_given_to_another_recipe(app, adam
 
 
 def test_restoring_a_deleted_recipe_cannot_reclaim_its_slug(app, adam):
-    """The bin's restore re-POSTs the same id and slug; the URL stays retired."""
+    """The bin's restore re-POSTs the same id and slug; the URL stays retired,
+    and since KAN-329 the restored row is private-only (it is a new row)."""
     slug = _publish(adam, "zp-1")["slug"]
     _unpublish_and_delete(adam, "zp-1")
 
@@ -158,14 +184,14 @@ def test_restoring_a_deleted_recipe_cannot_reclaim_its_slug(app, adam):
     )
 
     assert resp.status_code == 201, resp.get_json()
-    assert resp.get_json()["slug"] == "zucchini-poppers-2"
+    assert resp.get_json()["is_public"] is False
+    assert resp.get_json()["slug"] is None, "a private row must not occupy a retired alias"
     assert app.test_client().get(f"/r/{slug}").status_code == 410
 
 
 def test_deleting_a_renamed_recipe_permanently_retires_every_alias(app, adam):
     _publish(adam, "zp-1")
-    renamed = adam.put("/api/recipes/zp-1", json={"slug": "zucchini-poppers-deluxe"})
-    assert renamed.status_code == 200, renamed.get_json()
+    _rename("zp-1", "zucchini-poppers-deluxe")
     _unpublish_and_delete(adam, "zp-1")
 
     assert db.session.get(RetiredSlug, "zucchini-poppers").recipe_id is None
@@ -182,7 +208,8 @@ def test_deleting_a_renamed_recipe_permanently_retires_every_alias(app, adam):
     )
 
     assert restored.status_code == 201, restored.get_json()
-    assert restored.get_json()["slug"] == "zucchini-poppers-2"
+    assert restored.get_json()["is_public"] is False
+    assert restored.get_json()["slug"] is None
     public = app.test_client()
     assert public.get("/r/zucchini-poppers").status_code == 410
     assert public.get("/r/zucchini-poppers-deluxe").status_code == 410
@@ -213,6 +240,7 @@ def test_private_row_carrying_a_retired_slug_cannot_publish_under_it(app, adam, 
     assert resp.status_code == 201, resp.get_json()
     assert resp.get_json()["slug"] is None, "a private row must not occupy a retired alias"
 
+    _stamp("sneaky")
     resp = other.put("/api/recipes/sneaky", json={"is_public": True})
 
     assert resp.status_code == 200, resp.get_json()
@@ -279,17 +307,15 @@ def test_list_flags_rows_whose_delete_would_make_a_slug_permanent(app, adam):
 def test_renamed_slug_temporarily_redirects_and_can_be_reclaimed(app, adam, other):
     _publish(adam, "zp-1")
 
-    resp = adam.put("/api/recipes/zp-1", json={"slug": "zucchini-poppers-deluxe"})
-    assert resp.status_code == 200, resp.get_json()
-    assert resp.get_json()["slug"] == "zucchini-poppers-deluxe"
+    assert _rename("zp-1", "zucchini-poppers-deluxe").slug == "zucchini-poppers-deluxe"
 
     old = app.test_client().get("/r/zucchini-poppers?utm_source=pin")
     assert old.status_code == 302
     assert old.headers["Location"].endswith("/r/zucchini-poppers-deluxe?utm_source=pin")
     assert _publish(other, "zp-other")["slug"] == "zucchini-poppers-2"
 
-    resp = adam.put("/api/recipes/zp-1", json={"slug": "zucchini-poppers"})
-    assert resp.get_json()["slug"] == "zucchini-poppers", "a renamed recipe may take its slug back"
+    row = _rename("zp-1", "zucchini-poppers")
+    assert row.slug == "zucchini-poppers", "a renamed recipe may take its slug back"
 
 
 def test_migration_backfill_marks_slugged_rows_and_retires_orphaned_source_slugs(app):

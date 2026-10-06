@@ -58,6 +58,39 @@ def _recipe_data(recipe_id="r-1", **overrides):
     return data
 
 
+def _stamp(recipe_id):
+    """Label a row the way the worker's text write does (KAN-329)."""
+    row = db.session.get(Recipe, recipe_id)
+    assert row is not None
+    row.origin = "generated"
+    row.data = {**(row.data or {}), "origin": "generated"}
+    db.session.commit()
+    return row
+
+
+def _generated(recipe_id="r-1", user_id=None, **overrides):
+    """A finished generated row, private, as the worker leaves it.
+
+    KAN-329: a new row is never created public and a client cannot label a
+    row generated, so publishable fixtures are created private through the
+    normal path and stamped. ``slug=None`` means "no slug in the payload".
+    """
+    data = _recipe_data(recipe_id, **overrides)
+    data.pop("is_public", None)
+    if data.get("slug") is None:
+        data.pop("slug", None)
+    row = db_recipe_repository.create_recipe(data, user_id=user_id)
+    assert row is not None
+    return _stamp(recipe_id)
+
+
+def _publish(recipe_id="r-1", user_id=None, **overrides):
+    """The private → public transition through the ordinary save path."""
+    return db_recipe_repository.update_recipe(
+        recipe_id, {**overrides, "is_public": True}, user_id=user_id
+    )
+
+
 # ─── Repository gate: create path ────────────────────────────────────────
 
 
@@ -71,11 +104,12 @@ def test_guest_create_cannot_publish(app):
     assert recipe.data["is_public"] is False
 
 
-def test_user_create_can_publish(app, user):
+def test_user_create_is_never_public(app, user):
+    """KAN-329: a new row has no worker text behind it; it is saved private."""
     recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
     assert recipe is not None
-    assert recipe.is_public is True
-    assert recipe.data["is_public"] is True
+    assert recipe.is_public is False
+    assert recipe.data["is_public"] is False
 
 
 @pytest.mark.parametrize("invalid_flag", ["true", "false", 1, 0, {}, []])
@@ -105,7 +139,7 @@ def test_guest_upsert_cannot_flip_public(app):
 
 def test_user_upsert_can_flip_public(app, user):
     """REGRESSION: authenticated publish via the same upsert branch still works."""
-    db_recipe_repository.create_recipe(_recipe_data(is_public=False), user_id=user.id)
+    _generated(user_id=user.id)
     recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
     assert recipe is not None
     assert recipe.is_public is True
@@ -137,7 +171,9 @@ def test_guest_update_blob_sanitized(app):
 
 
 def test_user_put_updates_publish_columns(app, user):
-    db_recipe_repository.create_recipe(_recipe_data(is_public=False), user_id=user.id)
+    """The slug is derived server-side: a client cannot pick one for a
+    generated row (KAN-328), so the payload slug below is ignored."""
+    _generated(user_id=user.id, slug=None)
     client = app.test_client()
     with client.session_transaction() as session:
         session["user_id"] = user.id
@@ -148,12 +184,12 @@ def test_user_put_updates_publish_columns(app, user):
     )
 
     assert response.status_code == 200
-    assert response.json["slug"] == "published-chili"
+    assert response.json["slug"] == "chili"
     assert response.json["is_public"] is True
     recipe = db.session.get(Recipe, "r-1")
-    assert recipe.slug == "published-chili"
+    assert recipe.slug == "chili"
     assert recipe.is_public is True
-    assert recipe.data["slug"] == "published-chili"
+    assert recipe.data["slug"] == "chili"
     assert recipe.data["is_public"] is True
 
     response = client.put(
@@ -162,12 +198,12 @@ def test_user_put_updates_publish_columns(app, user):
     )
 
     assert response.status_code == 200
-    assert response.json["slug"] == "private-chili"
+    assert response.json["slug"] == "chili"
     assert response.json["is_public"] is False
     db.session.refresh(recipe)
-    assert recipe.slug == "private-chili"
+    assert recipe.slug == "chili"
     assert recipe.is_public is False
-    assert recipe.data["slug"] == "private-chili"
+    assert recipe.data["slug"] == "chili"
     assert recipe.data["is_public"] is False
 
 
@@ -185,21 +221,18 @@ def test_guest_publish_attempt_is_logged(app, caplog):
 def test_publish_without_slug_derives_from_name(app, user):
     """PR #152 review: PUT with is_public=true and no slug must not persist
     a public row with slug=NULL (browsable but unlinkable via /r/<slug>)."""
-    data = _recipe_data(recipe_id="r-1", name="Spicy Chili!")
-    del data["slug"]
-    recipe = db_recipe_repository.create_recipe(data, user_id=user.id)
-    assert recipe is not None
+    _generated(user_id=user.id, name="Spicy Chili!", slug=None)
 
-    updated = db_recipe_repository.update_recipe(
-        "r-1", {**data, "is_public": True}, user_id=user.id
-    )
+    updated = _publish(user_id=user.id, name="Spicy Chili!")
     assert updated is not None
     assert updated.slug == "spicy-chili"
     assert updated.data["slug"] == "spicy-chili"
     assert updated.is_public is True
 
 
-def test_publish_create_without_slug_derives_from_name(app, user):
+def test_publish_upsert_without_slug_derives_from_name(app, user):
+    """The SPA publishes with a POST on the existing id, not a PUT."""
+    _generated(user_id=user.id, name="Spicy Chili!", slug=None)
     data = _recipe_data(recipe_id="r-1", name="Spicy Chili!", is_public=True)
     del data["slug"]
     recipe = db_recipe_repository.create_recipe(data, user_id=user.id)
@@ -209,9 +242,8 @@ def test_publish_create_without_slug_derives_from_name(app, user):
 
 
 def test_publish_update_without_slug_keeps_existing_slug(app, user):
-    db_recipe_repository.create_recipe(
-        _recipe_data(slug="chili-classic", is_public=True), user_id=user.id
-    )
+    _generated(user_id=user.id, slug="chili-classic")
+    assert _publish(user_id=user.id).slug == "chili-classic"
     data = _recipe_data(is_public=True)
     del data["slug"]
     updated = db_recipe_repository.update_recipe("r-1", data, user_id=user.id)
@@ -240,6 +272,7 @@ def test_publish_repairs_unusable_existing_private_slug(
         name="Spicy Chili",
         slug=existing_slug,
         is_public=False,
+        origin="generated",
         data={
             "id": "invalid-private-slug",
             "name": "Spicy Chili",
@@ -291,44 +324,42 @@ def test_partial_update_preserves_existing_unicode_slug(app, user):
 
 
 def test_publish_slug_collision_gets_suffix(app, user):
-    db_recipe_repository.create_recipe(
-        _recipe_data(recipe_id="r-1", is_public=True), user_id=user.id
-    )
-    data = _recipe_data(recipe_id="r-2", is_public=True)
-    del data["slug"]
-    second = db_recipe_repository.create_recipe(data, user_id=user.id)
+    _generated(recipe_id="r-1", user_id=user.id)
+    assert _publish("r-1", user_id=user.id).slug == "chili"
+    _generated(recipe_id="r-2", user_id=user.id, slug=None)
+    second = _publish("r-2", user_id=user.id)
     assert second is not None
     assert second.slug == "chili-2"
 
 
-def test_publish_provided_slug_is_sanitized(app, user):
-    recipe = db_recipe_repository.create_recipe(
-        _recipe_data(slug="Crème Brûlée!", is_public=True), user_id=user.id
-    )
+def test_publish_derived_slug_is_sanitized(app, user):
+    """A generated row has no client slug (KAN-328); the one derived from the
+    worker's name is sanitized."""
+    _generated(user_id=user.id, name="Crème Brûlée!", slug=None)
+    recipe = _publish(user_id=user.id)
     assert recipe is not None
     assert recipe.slug == "creme-brulee"
     assert recipe.data["slug"] == "creme-brulee"
 
 
-def test_publish_with_unusable_slug_and_name_raises(app, user):
+def test_publish_with_unusable_name_raises(app, user):
+    _generated(user_id=user.id, name="!!!", slug=None)
     with pytest.raises(db_recipe_repository.RecipeSlugError):
-        db_recipe_repository.create_recipe(
-            _recipe_data(name="!!!", slug="***", is_public=True), user_id=user.id
-        )
+        _publish(user_id=user.id)
 
 
 def test_put_publish_with_unusable_slug_returns_400(app, user):
-    slugless = _recipe_data(name="Chili")
-    del slugless["slug"]
-    db_recipe_repository.create_recipe(slugless, user_id=user.id)
+    """The worker's name is the only slug source for a generated row; when it
+    yields nothing usable the publish is rejected, not silently slugless."""
+    row = _generated(user_id=user.id, slug=None)
+    row.name = "!!!"
+    row.data = {**row.data, "name": "!!!"}
+    db.session.commit()
     client = app.test_client()
     with client.session_transaction() as session:
         session["user_id"] = user.id
 
-    response = client.put(
-        "/api/recipes/r-1",
-        json=_recipe_data(name="!!!", slug="***", is_public=True),
-    )
+    response = client.put("/api/recipes/r-1", json={"is_public": True})
 
     assert response.status_code == 400
     assert "slug" in response.json["error"].lower()
@@ -338,7 +369,7 @@ def test_put_publish_with_unusable_slug_returns_400(app, user):
 
 
 def test_put_publish_without_slug_returns_derived_slug(app, user):
-    db_recipe_repository.create_recipe(_recipe_data(name="Chili"), user_id=user.id)
+    _generated(user_id=user.id, name="Chili", slug=None)
     client = app.test_client()
     with client.session_transaction() as session:
         session["user_id"] = user.id
@@ -355,39 +386,37 @@ def test_put_publish_without_slug_returns_derived_slug(app, user):
 def test_post_publish_with_unusable_slug_returns_400(app, user):
     """PR #152 review: the POST error mapping needs route-level coverage too,
     not just the repository-level RecipeSlugError assertion."""
+    row = _generated(user_id=user.id, slug=None)
+    row.name = "!!!"
+    row.data = {**row.data, "name": "!!!"}
+    db.session.commit()
     client = app.test_client()
     with client.session_transaction() as session:
         session["user_id"] = user.id
 
-    response = client.post(
-        "/api/recipes",
-        json=_recipe_data(name="!!!", slug="***", is_public=True),
-    )
+    response = client.post("/api/recipes", json={"id": "r-1", "name": "!!!", "is_public": True})
 
     assert response.status_code == 400
     assert "slug" in response.json["error"].lower()
-    # Nothing was persisted.
-    assert db.session.get(Recipe, "r-1") is None
+    # Nothing was persisted: the row is still private.
+    assert db.session.get(Recipe, "r-1").is_public is False
 
 
 def test_publish_slug_truncated_to_column_limit(app, user):
-    """PR #152 review: Recipe.slug is String(255); an unbounded payload slug
+    """PR #152 review: Recipe.slug is String(255); an unbounded derived slug
     must be capped instead of blowing up at commit on PostgreSQL."""
-    recipe = db_recipe_repository.create_recipe(
-        _recipe_data(slug="x" * 300, is_public=True), user_id=user.id
-    )
+    _generated(user_id=user.id, name="x" * 300, slug=None)
+    recipe = _publish(user_id=user.id)
     assert recipe is not None
     assert recipe.slug == "x" * 255
 
 
 def test_publish_slug_suffix_respects_column_limit(app, user):
     """A collision suffix on a max-length base must not push past 255."""
-    db_recipe_repository.create_recipe(
-        _recipe_data(recipe_id="r-1", slug="x" * 300, is_public=True), user_id=user.id
-    )
-    second = db_recipe_repository.create_recipe(
-        _recipe_data(recipe_id="r-2", slug="x" * 300, is_public=True), user_id=user.id
-    )
+    _generated(recipe_id="r-1", user_id=user.id, name="x" * 300, slug=None)
+    _publish("r-1", user_id=user.id)
+    _generated(recipe_id="r-2", user_id=user.id, name="x" * 300, slug=None)
+    second = _publish("r-2", user_id=user.id)
     assert second is not None
     assert len(second.slug) == 255
     assert second.slug == "x" * 253 + "-2"
@@ -418,9 +447,10 @@ def test_publish_slug_race_retries_with_next_suffix(app, user, monkeypatch):
             db.session.commit()
         return slug
 
+    _generated(user_id=user.id, slug=None)
     monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", racing_resolve)
 
-    recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
+    recipe = _publish(user_id=user.id)
     assert recipe is not None
     assert recipe.slug == "chili-2"
     assert recipe.data["slug"] == "chili-2"
@@ -451,9 +481,10 @@ def test_publish_slug_double_race_uses_next_suffix(app, user, monkeypatch):
             db.session.commit()
         return slug
 
+    _generated(user_id=user.id, slug=None)
     monkeypatch.setattr(db_recipe_repository, "_resolve_public_slug", racing_resolve)
 
-    recipe = db_recipe_repository.create_recipe(_recipe_data(is_public=True), user_id=user.id)
+    recipe = _publish(user_id=user.id)
     assert recipe is not None
     assert recipe.slug == "chili-3"
     assert recipe.data["slug"] == "chili-3"
@@ -463,9 +494,7 @@ def test_put_publish_only_payload_derives_slug_from_persisted_name(app, user):
     """PR #152 review: a publish-only partial update ({"is_public": true},
     no name or slug) on a private slug-less row must derive the slug from
     the persisted name instead of raising RecipeSlugError."""
-    slugless = _recipe_data(name="Spicy Chili!")
-    del slugless["slug"]
-    db_recipe_repository.create_recipe(slugless, user_id=user.id)
+    _generated(user_id=user.id, name="Spicy Chili!", slug=None)
     client = app.test_client()
     with client.session_transaction() as session:
         session["user_id"] = user.id
@@ -486,9 +515,13 @@ def test_put_publish_only_payload_preserves_recipe_content(app, user):
     """PR #152 review: a publish-only PUT must not wipe the blob — the
     partial payload merges into the persisted recipe, so ingredients and
     instructions survive the moment of publishing."""
-    data = _recipe_data(name="Chili", ingredients=["beans"], instructions=["cook the beans"])
-    del data["slug"]
-    db_recipe_repository.create_recipe(data, user_id=user.id)
+    _generated(
+        user_id=user.id,
+        name="Chili",
+        ingredients=["beans"],
+        instructions=["cook the beans"],
+        slug=None,
+    )
     client = app.test_client()
     with client.session_transaction() as session:
         session["user_id"] = user.id
@@ -507,9 +540,8 @@ def test_partial_update_prefers_column_slug_over_stale_blob(app, user):
     """PR #152 review: backfill scripts rewrite the slug column without
     touching the blob. A partial PUT that omits slug must keep the column
     value, not revert it to the stale blob one."""
-    db_recipe_repository.create_recipe(
-        _recipe_data(slug="old-slug", is_public=True), user_id=user.id
-    )
+    _generated(user_id=user.id, slug="old-slug")
+    _publish(user_id=user.id)
     # Simulate a backfill that fixed the column but not the blob.
     recipe = db.session.get(Recipe, "r-1")
     recipe.slug = "new-slug"

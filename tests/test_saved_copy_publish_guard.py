@@ -50,12 +50,17 @@ def saver(app):
 
 
 @pytest.fixture
-def published_recipe(app, author):
-    """A published recipe that can be the source for saved copies."""
-    recipe = db_recipe_repository.create_recipe(
-        {"id": "orig-1", "name": "Chili", "is_public": True},
-        user_id=author.id,
+def published_recipe(app, author, mark_generated):
+    """A published recipe that can be the source for saved copies.
+
+    KAN-329: only a worker-generated row can be published, so the source is
+    created private, stamped, then published through the ordinary save."""
+    created = db_recipe_repository.create_recipe(
+        {"id": "orig-1", "name": "Chili"}, user_id=author.id
     )
+    assert created is not None
+    mark_generated("orig-1")
+    recipe = db_recipe_repository.update_recipe("orig-1", {"is_public": True}, user_id=author.id)
     assert recipe is not None
     assert recipe.is_public is True
     return recipe
@@ -118,12 +123,14 @@ def test_saved_copy_update_publish_raises(app, saver, published_recipe):
         )
 
 
-def test_original_publish_still_works(app, author):
-    """An original recipe (no source_slug) can still be published normally."""
-    recipe = db_recipe_repository.create_recipe(
-        {"id": "orig-2", "name": "Tacos", "is_public": True},
-        user_id=author.id,
+def test_original_publish_still_works(app, author, mark_generated):
+    """An original generated recipe (no source_slug) can still be published."""
+    created = db_recipe_repository.create_recipe(
+        {"id": "orig-2", "name": "Tacos"}, user_id=author.id
     )
+    assert created is not None
+    mark_generated("orig-2")
+    recipe = db_recipe_repository.update_recipe("orig-2", {"is_public": True}, user_id=author.id)
     assert recipe is not None
     assert recipe.is_public is True
 

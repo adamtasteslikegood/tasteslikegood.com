@@ -375,3 +375,143 @@ def test_admin_image_migration_does_not_promote_data_url(app, client, monkeypatc
     assert calls == []
     db.session.expire_all()
     assert db.session.get(Recipe, "data-url-1").data.get("ai_image_gcs") is None
+
+
+# ─── T3: publishing is a transition only a finished generated row may make ─
+
+
+def _legacy_row(user_id, recipe_id="legacy-1", is_public=False, status="ready", origin=None):
+    """A row written before the fix: client content, no worker-written origin."""
+    row = Recipe(
+        id=recipe_id,
+        user_id=user_id,
+        name="Legacy",
+        slug=recipe_id if is_public else None,
+        is_public=is_public,
+        origin=origin,
+        status=status,
+        data={"id": recipe_id, "name": "Legacy", "ingredients": ["x"], "is_public": is_public},
+    )
+    db.session.add(row)
+    db.session.commit()
+    return row
+
+
+def test_new_row_asking_public_is_saved_private(client, logged_in):
+    """Old bundles POST new rows with is_public: true; they get a private row, not a 400."""
+    resp = client.post("/api/recipes", json={"name": "Fresh", "is_public": True})
+    assert resp.status_code == 201
+    body = resp.get_json()
+    assert body["is_public"] is False
+    row = db.session.get(Recipe, body["id"])
+    assert row.is_public is False and row.data["is_public"] is False
+
+
+def test_new_row_with_forged_label_asking_public_is_saved_private(client, logged_in):
+    resp = client.post(
+        "/api/recipes", json={"name": "Forged", "origin": "generated", "is_public": True}
+    )
+    assert resp.status_code == 201
+    assert resp.get_json()["is_public"] is False
+    assert resp.get_json()["origin"] is None
+
+
+def test_new_manual_row_asking_public_is_saved_private(client, logged_in):
+    resp = client.post("/api/recipes", json={"name": "Mine", "origin": "manual", "is_public": True})
+    assert resp.status_code == 201
+    assert resp.get_json()["is_public"] is False
+    assert resp.get_json()["origin"] == "manual"
+
+
+def test_legacy_row_cannot_transition_to_public(client, logged_in):
+    _legacy_row(logged_in.id)
+    resp = client.put("/api/recipes/legacy-1", json={"is_public": True})
+    assert resp.status_code == 400
+    assert "generated" in resp.get_json()["error"].lower()
+    assert db.session.get(Recipe, "legacy-1").is_public is False
+
+
+def test_legacy_row_cannot_transition_via_upsert(client, logged_in):
+    _legacy_row(logged_in.id)
+    resp = client.post("/api/recipes", json={"id": "legacy-1", "name": "Legacy", "is_public": True})
+    assert resp.status_code == 400
+    assert db.session.get(Recipe, "legacy-1").is_public is False
+
+
+def test_still_generating_row_cannot_publish(client, logged_in):
+    _placeholder(logged_in.id)
+    resp = client.put("/api/recipes/gen-1", json={"is_public": True})
+    assert resp.status_code == 400
+    assert db.session.get(Recipe, "gen-1").is_public is False
+
+
+def test_failed_generation_cannot_publish(client, logged_in):
+    _placeholder(logged_in.id)
+    token = db_recipe_repository.claim_recipe_for_worker(
+        "gen-1",
+        expected_status="generating",
+        processing_status="processing",
+        stale_after_seconds=600,
+    )
+    assert db_recipe_repository.set_recipe_status_for_worker(
+        "gen-1", "error", token, expected_status="processing", release_claim=True
+    )
+    resp = client.put("/api/recipes/gen-1", json={"is_public": True})
+    assert resp.status_code == 400
+
+
+def test_generated_row_publishes_via_put(client, logged_in):
+    _generated_row(logged_in.id)
+    resp = client.put("/api/recipes/gen-1", json={"is_public": True})
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["is_public"] is True and body["origin"] == "generated"
+    assert body["slug"] == "smoky-chili"
+
+
+def test_public_generated_row_stays_public_during_image_generation(client, logged_in):
+    """Image generation moves ready → generating_image; a re-save is not a transition."""
+    row = _generated_row(logged_in.id, is_public=True, slug="smoky-chili")
+    row.status = "generating_image"
+    db.session.commit()
+    resp = client.post("/api/recipes", json={**row.data, "is_public": True})
+    assert resp.status_code == 201
+    assert resp.get_json()["is_public"] is True
+
+
+def test_public_legacy_row_resave_is_not_a_transition(client, logged_in):
+    """Transition-only: a row that is already public may be re-saved as public."""
+    row = _legacy_row(logged_in.id, is_public=True)
+    resp = client.put("/api/recipes/legacy-1", json={**row.data, "is_public": True})
+    assert resp.status_code == 200
+    assert resp.get_json()["is_public"] is True
+
+
+def test_unpublish_is_always_allowed(client, logged_in):
+    _legacy_row(logged_in.id, "pub-legacy", is_public=True)
+    _legacy_row(logged_in.id, "pub-error", is_public=True, status="error")
+    _legacy_row(logged_in.id, "pub-manual", is_public=True, origin="manual")
+    for recipe_id in ("pub-legacy", "pub-error", "pub-manual"):
+        resp = client.put(f"/api/recipes/{recipe_id}", json={"is_public": False})
+        assert resp.status_code == 200, recipe_id
+        row = db.session.get(Recipe, recipe_id)
+        assert row.is_public is False and row.data["is_public"] is False
+
+
+def test_status_endpoint_exposes_origin_after_worker_write(client, logged_in):
+    _generated_row(logged_in.id)
+    resp = client.get("/api/recipes/gen-1/status")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body["status"] == "ready"
+    assert body["recipe"]["origin"] == "generated"
+    assert body["recipe"]["is_public"] is False
+
+
+def test_migrate_file_to_db_ignores_is_public(app, user):
+    row = db_recipe_repository.migrate_file_to_db(
+        "file-1.json", {"name": "From file", "is_public": True, "slug": "from-file"}, user.id
+    )
+    assert row is not None
+    assert row.is_public is False
+    assert row.data["is_public"] is False
