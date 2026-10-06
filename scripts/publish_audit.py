@@ -105,7 +105,19 @@ DECISIONS = ("keep", "unpublish")
 # ``is_public``, ``origin`` and the timestamps are deliberately absent so a
 # notes edit between the listing and the cutover does not fail an approved
 # row; an image swap does, by design (D10).
-TEXT_FIELDS = ("description", "ingredients", "instructions", "notes")
+# ``tags``, ``servings`` and the two times are here because the public page
+# renders them too (page tags, JSON-LD keywords / recipeYield / durations,
+# the pin text): what a reader of the listing cannot see, they cannot bless.
+TEXT_FIELDS = (
+    "description",
+    "ingredients",
+    "instructions",
+    "notes",
+    "tags",
+    "servings",
+    "prepTime",
+    "cookTime",
+)
 MEDIA_FIELDS = ("ai_image_gcs", "stock_image_url", "image_keywords")
 
 BUSY_STATUSES = ("processing", "generating_image")
@@ -298,6 +310,14 @@ def render_markdown(listing: list[dict[str, Any]]) -> str:
         out.append("")
         text = e["text"]
         out.append(f"> {_md_cell(text.get('description'))}")
+        out.append("")
+        tags = text.get("tags")
+        tag_items = tags if isinstance(tags, list) else [tags] if tags else []
+        out.append("Tags: " + ", ".join(_md_item(tag) for tag in tag_items))
+        out.append(
+            f"servings {_md_cell(text.get('servings'))} · "
+            f"prep {_md_cell(text.get('prepTime'))} · cook {_md_cell(text.get('cookTime'))}"
+        )
         out.append("")
         out.append("Ingredients:")
         for item in text.get("ingredients") or []:

@@ -194,6 +194,10 @@ def test_fingerprint_ignores_notes_metadata_flags_and_timestamps(app, adam):
         ("ingredients", [{"name": "seitan", "amount": "2", "unit": "cups"}]),
         ("instructions", [{"step": 1, "text": "Different."}]),
         ("notes", "Serve cold."),
+        ("tags", ["dinner", "anything a client typed"]),
+        ("servings", "4 (or whatever a client typed)"),
+        ("prepTime", 10),
+        ("cookTime", 25),
         ("ai_image_gcs", "gs://bucket/recipes/swapped.png"),
         ("stock_image_url", "https://images.example/other.jpg"),
         ("image_keywords", ["seitan"]),
@@ -321,6 +325,19 @@ def test_markdown_puts_status_and_canonical_in_front_of_the_reader(app, adam):
     assert "generating_image" in text
     assert "canonical" in text.lower()
     assert "status generating_image" in text
+
+
+def test_markdown_shows_every_field_the_public_page_renders(app, adam):
+    # tags reach the page, JSON-LD keywords and the pin text; servings and the
+    # times reach JSON-LD. A reviewer has to see them to bless them.
+    data = {**_text("Tagged"), "tags": ["dinner", "planted | tag"], "servings": "4", "prepTime": 10}
+    _row("Tagged", owner=adam, data=data)
+    (entry,) = build_listing(db.session)
+    assert entry["text"]["tags"] == ["dinner", "planted | tag"]
+    text = render_markdown([entry])
+    assert "Tags: dinner, planted \\| tag" in text
+    assert "servings 4" in text
+    assert "prep 10" in text
 
 
 # ── manifest validation ───────────────────────────────────────────────
