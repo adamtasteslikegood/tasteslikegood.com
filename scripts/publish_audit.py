@@ -50,9 +50,14 @@ recipe-images bucket, which is private and read only by the app::
     gcloud run jobs execute flask-backend-publish-audit --region us-central1 --wait \
       --args=scripts/publish_audit.py,list,--out,gs://$BUCKET/audit/prod-$(date +%F)
     gsutil cp "gs://$BUCKET/audit/prod-*.md" "gs://$BUCKET/audit/prod-*.manifest.json" .
-    # ... decide every row, then upload the manifest and:
+    # ... decide every row, then upload the manifest and, under the write pause:
     gcloud run jobs execute flask-backend-publish-audit --region us-central1 --wait \
       --args=scripts/publish_audit.py,cutover,--manifest,gs://$BUCKET/audit/prod.manifest.json
+    # A keep row in the SECOND list for "content changed since the listing" is
+    # still public here and still in a fresh `list`: re-read it, update its
+    # fingerprint in the manifest, dry-run again. Once --apply has run that row
+    # is private, `list` no longer shows it, and the only way back is to
+    # regenerate — so finish re-blessing BEFORE this line:
     gcloud run jobs execute ... --args=scripts/publish_audit.py,cutover,--manifest,...,--apply
     gcloud run jobs execute ... --args=scripts/publish_audit.py,verify,--manifest,...
 
