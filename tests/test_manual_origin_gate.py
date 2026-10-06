@@ -95,16 +95,19 @@ class TestManualPublishGate:
         publish = client.put(f"/api/recipes/{created['id']}", json={"is_public": True})
         assert publish.status_code == 400
 
-    def test_generated_recipe_still_publishes(self, client, logged_in):
+    def test_client_generated_label_is_dropped(self, client, logged_in):
+        """KAN-329: 'generated' is written only by the worker's text write.
+        A payload claiming it is stored unlabelled, so it can never satisfy
+        the publish gate on that label."""
         resp = client.post(
             "/api/recipes",
-            json={"name": "AI Chili", "origin": "generated", "is_public": True},
+            json={"name": "AI Chili", "origin": "generated"},
         )
 
         assert resp.status_code == 201
         body = resp.get_json()
-        assert body["is_public"] is True
-        assert body["origin"] == "generated"
+        assert body["origin"] is None
+        assert db.session.get(Recipe, body["id"]).origin is None
 
     def test_legacy_null_origin_still_publishes(self, client, logged_in):
         resp = client.post("/api/recipes", json={"name": "Old Row", "is_public": True})
