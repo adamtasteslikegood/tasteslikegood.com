@@ -624,25 +624,9 @@ def migrate_image_urls():
                         )
                         errors.append({"id": recipe.id, "error": "Image upload failed"})
 
-                # Case 2: data: URL in ai_image_url — extract, upload, fix
-                elif url and url.startswith("data:image/"):
-                    try:
-                        parts = url.split(",", 1)
-                        if len(parts) == 2:
-                            image_bytes = base64.b64decode(parts[1])
-                            gcs_uri = upload_image(GCS_BUCKET_NAME, recipe.id, image_bytes)
-                            if gcs_uri:
-                                data["ai_image_gcs"] = gcs_uri
-                                data["ai_image_url"] = api_url
-                                data.pop("ai_image_data", None)
-                                changed = True
-                    except Exception as e:
-                        logger.error(
-                            "Image migration failed for recipe %s: %s",
-                            sanitize_log_value(recipe.id),
-                            sanitize_log_value(e),
-                        )
-                        errors.append({"id": recipe.id, "error": "Image upload failed"})
+                # KAN-329: a data: URL in ai_image_url is client-written and is
+                # never promoted into GCS as the recipe's image. It is left as
+                # is; only the image worker may populate media on a public row.
 
                 # Case 3: /static/ path or missing URL but has GCS — fix URL
                 elif (url and url.startswith("/static/")) or (not url and data.get("ai_image_gcs")):

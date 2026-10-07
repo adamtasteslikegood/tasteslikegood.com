@@ -70,16 +70,84 @@ class PublishedRecipeDeleteError(ValueError):
 # Also returned verbatim by the API routes (fixed string, same rationale as
 # PUBLIC_SLUG_REQUIRED_ERROR above).
 MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
-    "Manually entered recipes cannot be published. Only generated recipes "
-    "can have a public page."
+    "Only recipes generated here can have a public page. Manually entered, "
+    "imported or still-generating recipes cannot be published."
 )
+
+# KAN-329: a row in one of these states has no finished worker text behind it.
+_UNPUBLISHABLE_STATUSES = frozenset({"generating", "processing", "error"})
 
 # RCP-74: saved copies inherit their public page from the source recipe.
 SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
 
 # 'manual' gates publishing; the others exist so curation can query by
-# provenance. NULL = legacy/unknown, treated as publishable.
+# provenance. NULL = legacy/unknown.
 _ALLOWED_ORIGINS = frozenset({"manual", "generated", "saved"})
+
+# KAN-329: 'generated' is written only by update_recipe_for_worker, at the
+# moment the model's text lands. A payload may still label its own row
+# 'manual' or 'saved'; a client-supplied 'generated' is dropped, because that
+# label is what the publish gate trusts.
+_CLIENT_ORIGINS = frozenset({"manual", "saved"})
+
+# KAN-328: on a generated row (or a placeholder the worker still owns) a
+# client write can change only these keys. Everything else in the payload is
+# ignored rather than refused: the SPA echoes the whole recipe on every save,
+# so refusing would break the publish toggle on every old bundle.
+_LOCKED_CLIENT_FIELDS = frozenset({"id", "is_public", "personalNotes"})
+
+# The statuses between POST /api/generate and the worker's text write.
+_TEXT_GENERATION_STATUSES = frozenset({"generating", "processing"})
+
+# KAN-329: the text model's JSON is prompt-mediated, and a prompt can ask it
+# to echo an image URL or bytes. Only the image worker may populate media,
+# and only the columns may say anything about publication or provenance, so
+# these keys are dropped from the text worker's output before it is stamped.
+_WORKER_TEXT_DROP_FIELDS = frozenset(
+    {
+        "ai_image_url",
+        "ai_image_data",
+        "ai_image_gcs",
+        "stock_image_url",
+        "is_public",
+        "slug",
+        "origin",
+        "sourceSlug",
+        "sourceRecipeId",
+        "is_canonical",
+        "first_published_at",
+        "slug_reserved",
+        "personalNotes",
+    }
+)
+
+
+def _is_content_locked(recipe: Recipe) -> bool:
+    """True when a client write may change nothing but the locked-field set.
+
+    A generated row's content is the worker's; a placeholder the worker still
+    owns (no origin yet, TEXT generation in flight) must stay empty so the
+    stamp never lands on client text. Image generation on an origin-less row
+    does not lock it: that row is not generated, cannot be published, and its
+    owner may keep editing it while the image worker runs.
+    """
+    if recipe.origin == "generated":
+        return True
+    return recipe.origin is None and recipe.status in _TEXT_GENERATION_STATUSES
+
+
+def _lock_client_payload(recipe: Recipe, recipe_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Drop every payload key but the locked-field set on a locked row."""
+    if not _is_content_locked(recipe):
+        return recipe_data
+    dropped = sorted(k for k in recipe_data if k not in _LOCKED_CLIENT_FIELDS)
+    if dropped:
+        logger.info(
+            "Ignored %d client field(s) on locked recipe %s",
+            len(dropped),
+            sanitize_log_value(recipe.id),
+        )
+    return {k: v for k, v in recipe_data.items() if k in _LOCKED_CLIENT_FIELDS}
 
 
 class ManualRecipeError(ValueError):
@@ -184,20 +252,26 @@ def _resolve_origin(current_origin: Optional[str], recipe_data: Dict[str, Any]) 
     if current_origin:
         return current_origin
     candidate = recipe_data.get("origin")
-    return candidate if candidate in _ALLOWED_ORIGINS else None
+    return candidate if candidate in _CLIENT_ORIGINS else None
 
 
-def _gate_manual_publish(origin: Optional[str], recipe_data: Dict[str, Any]) -> None:
-    """Reject publication of manually entered recipes (KAN-140).
+def _gate_publish_transition(existing: Recipe, recipe_data: Dict[str, Any]) -> None:
+    """Only a finished, worker-generated row may go private → public (KAN-329).
 
-    The manual-entry form is free-text content with no AI mediation; the
-    public /r/<slug> surface must not become an open publishing endpoint.
-    Raises (a 400 at the API) instead of silently forcing the flag off, so
-    the SPA's revert-and-toast path fires rather than diverging from the
-    server state.
+    Generalises the KAN-140 manual gate: the label a client wrote never
+    counts, only the origin the worker stamped and a status that says the
+    text landed. The check is on the TRANSITION alone — a row that is
+    already public may be re-saved as public (image generation moves it
+    through ``generating_image`` without unpublishing it), and unpublishing
+    is always allowed. Raises (a 400 at the API) instead of silently forcing
+    the flag off, so the SPA's revert-and-toast path fires rather than
+    diverging from the server state.
     """
-    if origin == "manual" and recipe_data.get("is_public") is True:
-        raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
+    if recipe_data.get("is_public") is not True or existing.is_public:
+        return
+    if existing.origin == "generated" and existing.status not in _UNPUBLISHABLE_STATUSES:
+        return
+    raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
 
 
 def _guard_canonical(recipe: Recipe, recipe_data: Dict[str, Any]) -> None:
@@ -803,8 +877,16 @@ def update_recipe_for_worker(
 
     result = WorkerRecipeUpdate(recipe.user_id, recipe.guest_session_id)
     observed_updated_at = recipe.updated_at
-    merged = {**(recipe.data or {}), **recipe_data, "id": recipe_id}
+    # KAN-329: this write is what makes a recipe 'generated', so the blob is
+    # REPLACED, not merged — nothing a client managed to put in the placeholder
+    # survives — and the model's output is projected away from media,
+    # publication and provenance keys before the stamp lands. Ownership and
+    # visibility come from the row's columns, never from either payload.
+    merged = {k: v for k, v in recipe_data.items() if k not in _WORKER_TEXT_DROP_FIELDS}
+    merged["id"] = recipe_id
+    merged["user_id"] = recipe.user_id
     merged["is_public"] = recipe.is_public
+    merged["origin"] = "generated"
     if recipe.slug is not None:
         merged["slug"] = recipe.slug
     else:
@@ -821,6 +903,7 @@ def update_recipe_for_worker(
             {
                 "name": recipe_data.get("name", recipe.name),
                 "data": merged,
+                "origin": "generated",
                 "status": status,
                 "worker_claim_token": None,
                 "updated_at": datetime.utcnow(),
@@ -967,6 +1050,9 @@ def create_recipe(
                 )
                 raise RecipeOwnershipError(RECIPE_OWNERSHIP_ERROR, code)
 
+            # KAN-328: filter BEFORE anything reads the payload, so the name
+            # column, slug, sourceSlug and media below all see the locked set.
+            recipe_data = _lock_client_payload(existing, recipe_data)
             _guard_canonical(existing, recipe_data)
 
             merged = {**(existing.data or {}), **recipe_data, "id": recipe_id}
@@ -993,7 +1079,7 @@ def create_recipe(
             _pin_source_slug_to_column(merged, recipe_data, existing)
             recipe_data_with_id = _gate_is_public(merged, user_id, existing)
             next_origin = _resolve_origin(existing.origin, recipe_data)
-            _gate_manual_publish(next_origin, recipe_data_with_id)
+            _gate_publish_transition(existing, recipe_data_with_id)
             if next_origin is not None:
                 recipe_data_with_id["origin"] = next_origin
             else:
@@ -1027,8 +1113,17 @@ def create_recipe(
         recipe_data_with_id = _gate_is_public({**recipe_data, "id": recipe_id}, user_id)
         # A client cannot mint its own canonical lock.
         recipe_data_with_id.pop("is_canonical", None)
+        # KAN-329: a new row has no worker text behind it, so it is never
+        # created public. Saved private rather than refused: old bundles POST
+        # new rows with the flag set, and a 400 would leave them a local
+        # "published" ghost the server never had.
+        if recipe_data_with_id.get("is_public") is True:
+            logger.info(
+                "New recipe %s asked to be public; saved private",
+                sanitize_log_value(recipe_id),
+            )
+            recipe_data_with_id["is_public"] = False
         origin_value = _resolve_origin(None, recipe_data)
-        _gate_manual_publish(origin_value, recipe_data_with_id)
         if origin_value is not None:
             recipe_data_with_id["origin"] = origin_value
         else:
@@ -1148,6 +1243,8 @@ def update_recipe(
             )
             return None
 
+        # KAN-328: same lock as the upsert branch, applied before any read.
+        recipe_data = _lock_client_payload(recipe, recipe_data)
         _guard_canonical(recipe, recipe_data)
 
         # Merge the payload into the persisted blob (and pin the id): PUT
@@ -1200,7 +1297,7 @@ def update_recipe(
                 recipe_data_with_id.pop("slug", None)
 
         next_origin = _resolve_origin(recipe.origin, recipe_data)
-        _gate_manual_publish(next_origin, recipe_data_with_id)
+        _gate_publish_transition(recipe, recipe_data_with_id)
         if next_origin is not None:
             recipe_data_with_id["origin"] = next_origin
         else:
@@ -1589,13 +1686,14 @@ def migrate_file_to_db(
             )
             return existing  # type: ignore[no-any-return]
 
+        # KAN-329: a file is client content; it never arrives public.
         recipe = Recipe(
             id=recipe_id,
             user_id=user_id,
             name=recipe_name,
             slug=recipe_data.get("slug"),
-            is_public=recipe_data.get("is_public", False),
-            data=recipe_data,
+            is_public=False,
+            data={**recipe_data, "is_public": False},
         )
 
         db.session.add(recipe)
