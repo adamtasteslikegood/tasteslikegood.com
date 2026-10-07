@@ -180,7 +180,7 @@ def eligibility_problems(recipe: Recipe) -> list[str]:
 # ── listing ───────────────────────────────────────────────────────────
 
 
-def _owner_label(recipe: Recipe, email: Optional[str]) -> str:
+def _owner_label(recipe: Recipe) -> str:
     if recipe.user_id is not None:
         return f"user:{recipe.user_id}"
     return f"guest:{recipe.guest_session_id}"
@@ -200,7 +200,7 @@ def _entry(recipe: Recipe, email: Optional[str]) -> dict[str, Any]:
         "slug": recipe.slug,
         "slug_normalized": recipe.slug is None or normalize_slug(recipe.slug) == recipe.slug,
         "name": recipe.name,
-        "owner": _owner_label(recipe, email),
+        "owner": _owner_label(recipe),
         "owner_email": email,
         "origin": recipe.origin,
         "blob_origin": blob_origin,
@@ -546,7 +546,14 @@ def _write_text(path: str, text: str) -> None:
 
 
 def _load_manifest(path: str) -> dict[str, Any]:
-    manifest = json.loads(_read_text(path))
+    try:
+        text = _read_text(path)
+    except Exception as exc:
+        raise ManifestError(f"could not read manifest {path} ({type(exc).__name__})", []) from exc
+    try:
+        manifest = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise ManifestError(f"manifest {path} is not valid JSON", []) from exc
     if not isinstance(manifest, dict):
         raise ManifestError("manifest must be a JSON object", [])
     return manifest

@@ -631,6 +631,26 @@ def test_cli_undecided_manifest_exits_two(app, adam, tmp_path, capsys):
     assert _get(row.id).is_public is True
 
 
+@pytest.mark.parametrize("contents", ["{not-json", "[]"])
+def test_cli_invalid_manifest_file_exits_two(app, tmp_path, capsys, contents):
+    path = tmp_path / "manifest.json"
+    path.write_text(contents)
+
+    code = publish_audit.main(["cutover", "--manifest", str(path)], app=app)
+
+    assert code == 2
+    assert "manifest refused" in capsys.readouterr().err
+
+
+def test_cli_missing_manifest_file_exits_two(app, tmp_path, capsys):
+    path = tmp_path / "missing.json"
+
+    code = publish_audit.main(["cutover", "--manifest", str(path)], app=app)
+
+    assert code == 2
+    assert "manifest refused" in capsys.readouterr().err
+
+
 def test_cli_verify_exit_code_follows_the_problems(app, adam, other, tmp_path):
     import json
 

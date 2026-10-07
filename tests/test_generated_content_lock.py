@@ -491,6 +491,18 @@ def test_generated_row_publishes_via_put(client, logged_in):
     assert body["slug"] == "smoky-chili"
 
 
+def test_generated_row_can_first_publish_while_image_generation_runs(client, logged_in):
+    """The text is worker-authored before optional image generation starts."""
+    row = _generated_row(logged_in.id)
+    row.status = "generating_image"
+    db.session.commit()
+
+    resp = client.put("/api/recipes/gen-1", json={"is_public": True})
+
+    assert resp.status_code == 200
+    assert resp.get_json()["is_public"] is True
+
+
 def test_public_generated_row_stays_public_during_image_generation(client, logged_in):
     """Image generation moves ready → generating_image; a re-save is not a transition."""
     row = _generated_row(logged_in.id, is_public=True, slug="smoky-chili")
@@ -578,8 +590,17 @@ def test_guest_laundering_through_login_merge_shows_only_worker_text(app, client
 
 def test_migrate_file_to_db_ignores_is_public(app, user):
     row = db_recipe_repository.migrate_file_to_db(
-        "file-1.json", {"name": "From file", "is_public": True, "slug": "from-file"}, user.id
+        "file-1.json",
+        {
+            "name": "From file",
+            "is_public": True,
+            "slug": "from-file",
+            "origin": "generated",
+        },
+        user.id,
     )
     assert row is not None
     assert row.is_public is False
     assert row.data["is_public"] is False
+    assert row.origin is None
+    assert "origin" not in row.data

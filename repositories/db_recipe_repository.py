@@ -81,10 +81,6 @@ _PUBLISHABLE_STATUSES = frozenset({"ready", "generating_image"})
 # RCP-74: saved copies inherit their public page from the source recipe.
 SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
 
-# 'manual' gates publishing; the others exist so curation can query by
-# provenance. NULL = legacy/unknown.
-_ALLOWED_ORIGINS = frozenset({"manual", "generated", "saved"})
-
 # KAN-329: 'generated' is written only by update_recipe_for_worker, at the
 # moment the model's text lands. A payload may still label its own row
 # 'manual' or 'saved'; a client-supplied 'generated' is dropped, because that
@@ -1693,13 +1689,16 @@ def migrate_file_to_db(
             return existing  # type: ignore[no-any-return]
 
         # KAN-329: a file is client content; it never arrives public.
+        # File migrations are client-content imports. Do not preserve a
+        # forged worker-only provenance label inside the JSON blob.
+        migrated_data = {key: value for key, value in recipe_data.items() if key != "origin"}
         recipe = Recipe(
             id=recipe_id,
             user_id=user_id,
             name=recipe_name,
             slug=recipe_data.get("slug"),
             is_public=False,
-            data={**recipe_data, "is_public": False},
+            data={**migrated_data, "is_public": False},
         )
 
         db.session.add(recipe)
