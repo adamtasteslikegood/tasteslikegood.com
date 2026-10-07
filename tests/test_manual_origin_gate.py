@@ -51,15 +51,19 @@ def logged_in(client, app):
 
 
 class TestManualPublishGate:
-    def test_create_manual_and_public_returns_400(self, client, logged_in):
+    def test_create_manual_and_public_is_saved_private(self, client, logged_in):
+        """KAN-329: a new row is never created public; it is saved private
+        rather than refused so an old bundle is not left with a local ghost."""
         resp = client.post(
             "/api/recipes",
             json={"name": "Handwritten", "origin": "manual", "is_public": True},
         )
 
-        assert resp.status_code == 400
-        assert "Manually entered" in resp.get_json()["error"]
-        assert Recipe.query.count() == 0
+        assert resp.status_code == 201
+        body = resp.get_json()
+        assert body["is_public"] is False
+        assert body["origin"] == "manual"
+        assert db.session.get(Recipe, body["id"]).is_public is False
 
     def test_create_manual_private_persists_origin(self, client, logged_in):
         resp = client.post("/api/recipes", json={"name": "Handwritten", "origin": "manual"})
@@ -95,22 +99,26 @@ class TestManualPublishGate:
         publish = client.put(f"/api/recipes/{created['id']}", json={"is_public": True})
         assert publish.status_code == 400
 
-    def test_generated_recipe_still_publishes(self, client, logged_in):
+    def test_client_generated_label_is_dropped(self, client, logged_in):
+        """KAN-329: 'generated' is written only by the worker's text write.
+        A payload claiming it is stored unlabelled, so it can never satisfy
+        the publish gate on that label."""
         resp = client.post(
             "/api/recipes",
-            json={"name": "AI Chili", "origin": "generated", "is_public": True},
+            json={"name": "AI Chili", "origin": "generated"},
         )
 
         assert resp.status_code == 201
         body = resp.get_json()
-        assert body["is_public"] is True
-        assert body["origin"] == "generated"
+        assert body["origin"] is None
+        assert db.session.get(Recipe, body["id"]).origin is None
 
-    def test_legacy_null_origin_still_publishes(self, client, logged_in):
+    def test_unlabelled_row_is_saved_private(self, client, logged_in):
+        """KAN-329: NULL origin no longer means publishable."""
         resp = client.post("/api/recipes", json={"name": "Old Row", "is_public": True})
 
         assert resp.status_code == 201
-        assert resp.get_json()["is_public"] is True
+        assert resp.get_json()["is_public"] is False
         assert resp.get_json()["origin"] is None
 
     def test_unknown_origin_label_is_dropped(self, client, logged_in):
