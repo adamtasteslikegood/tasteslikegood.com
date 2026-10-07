@@ -343,6 +343,26 @@ def test_markdown_shows_every_field_the_public_page_renders(app, adam):
 # ── manifest validation ───────────────────────────────────────────────
 
 
+@pytest.mark.parametrize("version", [None, False, 0, True, 2, "1"])
+def test_manifest_refuses_unsupported_versions(app, version):
+    manifest = {"version": version, "rows": []}
+
+    with pytest.raises(ManifestError) as exc:
+        validate_manifest(db.session, manifest)
+
+    assert "version" in str(exc.value)
+
+
+@pytest.mark.parametrize("row", [None, "recipe-id", 42, []])
+def test_manifest_refuses_non_object_rows(app, row):
+    manifest = {"version": 1, "rows": [row]}
+
+    with pytest.raises(ManifestError) as exc:
+        validate_manifest(db.session, manifest)
+
+    assert "object" in str(exc.value)
+
+
 def test_undecided_manifest_row_is_refused_before_anything_changes(app, adam):
     keep = _row("Keep", owner=adam)
     blank = _row("Blank", owner=adam)

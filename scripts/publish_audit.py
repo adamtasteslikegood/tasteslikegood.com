@@ -340,12 +340,16 @@ def validate_manifest(session, manifest: dict[str, Any]) -> dict[str, dict[str, 
     """Every row decided, every id known, no duplicates. Returns rows by id."""
     if not isinstance(manifest, dict) or not isinstance(manifest.get("rows"), list):
         raise ManifestError("manifest must be an object with a rows list", [])
+    if type(manifest.get("version")) is not int or manifest["version"] != MANIFEST_VERSION:
+        raise ManifestError(f"unsupported manifest version; expected {MANIFEST_VERSION}", [])
     rows = manifest["rows"]
     by_id: dict[str, dict[str, Any]] = {}
     undecided: list[str] = []
     duplicates: list[str] = []
     unfingerprinted: list[str] = []
     for row in rows:
+        if not isinstance(row, dict):
+            raise ManifestError("every manifest row must be an object", [])
         rid = str(row.get("id") or "")
         if not rid:
             raise ManifestError("manifest row without an id", [])

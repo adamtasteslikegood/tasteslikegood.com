@@ -566,8 +566,9 @@ def migrate_image_urls():
     3. Set ai_image_gcs URI and ai_image_url API path
     4. Remove ai_image_data from the JSON (frees DB space)
 
-    Also fixes legacy URL patterns (data: URLs, /static/ paths).
-    Returns summary of migrated recipes.
+    Also fixes legacy /static/ URL paths. Client-written data: URLs in
+    ai_image_url are intentionally left unchanged and reported as skipped.
+    Returns a summary of migrated and skipped recipes.
     """
     auth_error = require_admin()
     if auth_error:
@@ -583,6 +584,7 @@ def migrate_image_urls():
     BATCH_SIZE = 100
     migrated = []
     errors = []
+    skipped_data_urls = 0
 
     try:
         offset = 0
@@ -627,6 +629,8 @@ def migrate_image_urls():
                 # KAN-329: a data: URL in ai_image_url is client-written and is
                 # never promoted into GCS as the recipe's image. It is left as
                 # is; only the image worker may populate media on a public row.
+                elif url and url.startswith("data:"):
+                    skipped_data_urls += 1
 
                 # Case 3: /static/ path or missing URL but has GCS — fix URL
                 elif (url and url.startswith("/static/")) or (not url and data.get("ai_image_gcs")):
@@ -642,11 +646,17 @@ def migrate_image_urls():
                 db.session.commit()
             offset += BATCH_SIZE
 
-        logger.info("Image migration complete: %d migrated, %d errors", len(migrated), len(errors))
+        logger.info(
+            "Image migration complete: %d migrated, %d data URLs skipped, %d errors",
+            len(migrated),
+            skipped_data_urls,
+            len(errors),
+        )
         return (
             jsonify(
                 {
                     "migrated": len(migrated),
+                    "skipped_data_urls": skipped_data_urls,
                     "errors": len(errors),
                     "recipes": migrated,
                     "error_details": errors,

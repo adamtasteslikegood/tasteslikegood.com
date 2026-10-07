@@ -132,7 +132,7 @@ def test_worker_text_write_stamps_generated_when_image_requested(app, user):
 
 
 def test_worker_text_write_replaces_placeholder_blob(app, user):
-    """Nothing planted in the placeholder survives into the generated row."""
+    """No client-planted public content survives into the generated row."""
     _placeholder(user.id, extra={"notes": "planted", "stock_image_url": "https://x/y.jpg"})
     row = _worker_text_write("gen-1", user.id)
     assert row.data["notes"] == "The model's notes"
@@ -140,6 +140,16 @@ def test_worker_text_write_replaces_placeholder_blob(app, user):
     assert row.data["id"] == "gen-1"
     assert row.data["is_public"] is False
     assert row.name == "Smoky Chili"
+
+
+def test_worker_text_write_preserves_user_personal_notes(app, client, logged_in):
+    _placeholder(logged_in.id)
+    resp = client.put("/api/recipes/gen-1", json={"personalNotes": "Make it less spicy"})
+    assert resp.status_code == 200
+
+    row = _worker_text_write("gen-1", logged_in.id)
+
+    assert row.data["personalNotes"] == "Make it less spicy"
 
 
 def test_worker_text_write_drops_media_and_visibility_keys(app, user):
@@ -372,6 +382,7 @@ def test_admin_image_migration_does_not_promote_data_url(app, client, monkeypatc
 
     resp = client.post("/api/admin/migrate-images", headers={"Authorization": "Bearer secret"})
     assert resp.status_code == 200
+    assert resp.get_json()["skipped_data_urls"] == 1
     assert calls == []
     db.session.expire_all()
     assert db.session.get(Recipe, "data-url-1").data.get("ai_image_gcs") is None
@@ -458,6 +469,17 @@ def test_failed_generation_cannot_publish(client, logged_in):
     )
     resp = client.put("/api/recipes/gen-1", json={"is_public": True})
     assert resp.status_code == 400
+
+
+def test_unknown_generation_status_cannot_publish(client, logged_in):
+    row = _generated_row(logged_in.id)
+    row.status = "unexpected"
+    db.session.commit()
+
+    resp = client.put("/api/recipes/gen-1", json={"is_public": True})
+
+    assert resp.status_code == 400
+    assert db.session.get(Recipe, "gen-1").is_public is False
 
 
 def test_generated_row_publishes_via_put(client, logged_in):

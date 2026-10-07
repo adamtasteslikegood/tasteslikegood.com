@@ -74,8 +74,9 @@ MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
     "imported or still-generating recipes cannot be published."
 )
 
-# KAN-329: a row in one of these states has no finished worker text behind it.
-_UNPUBLISHABLE_STATUSES = frozenset({"generating", "processing", "error"})
+# KAN-329: only these states prove the text worker finished. An allowlist keeps
+# a typo or a future workflow state from silently becoming publishable.
+_PUBLISHABLE_STATUSES = frozenset({"ready", "generating_image"})
 
 # RCP-74: saved copies inherit their public page from the source recipe.
 SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
@@ -269,7 +270,7 @@ def _gate_publish_transition(existing: Recipe, recipe_data: Dict[str, Any]) -> N
     """
     if recipe_data.get("is_public") is not True or existing.is_public:
         return
-    if existing.origin == "generated" and existing.status not in _UNPUBLISHABLE_STATUSES:
+    if existing.origin == "generated" and existing.status in _PUBLISHABLE_STATUSES:
         return
     raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
 
@@ -878,11 +879,16 @@ def update_recipe_for_worker(
     result = WorkerRecipeUpdate(recipe.user_id, recipe.guest_session_id)
     observed_updated_at = recipe.updated_at
     # KAN-329: this write is what makes a recipe 'generated', so the blob is
-    # REPLACED, not merged — nothing a client managed to put in the placeholder
-    # survives — and the model's output is projected away from media,
-    # publication and provenance keys before the stamp lands. Ownership and
-    # visibility come from the row's columns, never from either payload.
+    # REPLACED, not merged — no public content a client managed to put in the
+    # placeholder survives — and the model's output is projected away from
+    # media, publication and provenance keys before the stamp lands. The one
+    # client-owned private field, personalNotes, is carried forward explicitly.
+    # Ownership and visibility come from the row's columns, never from either
+    # payload.
+    existing_data = recipe.data if isinstance(recipe.data, dict) else {}
     merged = {k: v for k, v in recipe_data.items() if k not in _WORKER_TEXT_DROP_FIELDS}
+    if "personalNotes" in existing_data:
+        merged["personalNotes"] = existing_data["personalNotes"]
     merged["id"] = recipe_id
     merged["user_id"] = recipe.user_id
     merged["is_public"] = recipe.is_public
