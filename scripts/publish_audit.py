@@ -343,7 +343,8 @@ def validate_manifest(session, manifest: dict[str, Any]) -> dict[str, dict[str, 
     if not isinstance(manifest, dict) or not isinstance(manifest.get("rows"), list):
         raise ManifestError("manifest must be an object with a rows list", [])
     version = manifest.get("version")
-    if not isinstance(version, int) or isinstance(version, bool) or version != MANIFEST_VERSION:
+    # The on-disk schema requires a JSON integer, not bool or Python-only int subclasses.
+    if type(version) is not int or version != MANIFEST_VERSION:
         raise ManifestError(f"unsupported manifest version; expected {MANIFEST_VERSION}", [])
     rows = manifest["rows"]
     by_id: dict[str, dict[str, Any]] = {}
