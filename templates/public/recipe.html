@@ -92,6 +92,10 @@
         {% endif %}
     </section>
 
+    {% with step_label = "Previous and next recipe" %}
+    {% include "public/_recipe_step.html" %}
+    {% endwith %}
+
     <section class="public-recipe-intro">
         {% if not image_url %}
         <div class="public-recipe-title-block">
@@ -214,6 +218,10 @@
 
     {# KAN-273: recipe pages linked to no other recipe; these real anchors are
        what lets one incoming link reach the rest of the catalog. #}
+    {% with step_label = "Previous and next recipe, bottom" %}
+    {% include "public/_recipe_step.html" %}
+    {% endwith %}
+
     {% if related_recipes %}
     <section class="public-related" aria-labelledby="related-title">
         <h2 id="related-title">More vegan recipes</h2>

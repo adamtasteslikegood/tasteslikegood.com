@@ -1,0 +1,20 @@
+{# Previous / Next recipe (KAN-342). ``adjacent`` comes from
+   public_bp._adjacent_recipes: the neighbours in the default /browse order,
+   newest first. An end of the list omits its missing side. The caller sets
+   ``step_label`` so the two navs on the page are distinct landmarks. #}
+{% if adjacent %}
+<nav class="public-recipe-step" aria-label="{{ step_label }}">
+    {% if adjacent.previous %}
+    <a href="{{ adjacent.previous.url }}" class="public-recipe-step-link public-recipe-step-prev">
+        <span class="public-recipe-step-dir">← Previous</span>
+        <span class="public-recipe-step-name">{{ adjacent.previous.name }}</span>
+    </a>
+    {% endif %}
+    {% if adjacent.next %}
+    <a href="{{ adjacent.next.url }}" class="public-recipe-step-link public-recipe-step-next">
+        <span class="public-recipe-step-dir">Next →</span>
+        <span class="public-recipe-step-name">{{ adjacent.next.name }}</span>
+    </a>
+    {% endif %}
+</nav>
+{% endif %}

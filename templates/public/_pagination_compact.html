@@ -1,0 +1,21 @@
+{# Compact text page numbers for a listing header (KAN-343). Same
+   ``pagination`` data and URLs as _pagination.html, so page 1 is the bare
+   listing URL. ``pagination`` is None on a single page, so nothing renders. #}
+{% if pagination %}
+<nav class="public-page-compact" aria-label="Pages, top">
+    <span class="public-page-compact-label">Page</span>
+    <ol>
+        {% for item in pagination.pages %}
+        <li>
+            {% if item.gap %}
+            <span aria-hidden="true">…</span>
+            {% elif item.current %}
+            <span aria-current="page">{{ item.number }}</span>
+            {% else %}
+            <a href="{{ item.url }}">{{ item.number }}</a>
+            {% endif %}
+        </li>
+        {% endfor %}
+    </ol>
+</nav>
+{% endif %}

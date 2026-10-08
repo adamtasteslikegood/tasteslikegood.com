@@ -701,6 +701,35 @@ def _related_recipes(recipe: Recipe, catalog: list[Any]) -> list[Recipe]:
     return [by_id[recipe_id] for recipe_id in chosen if recipe_id in by_id]
 
 
+def _adjacent_recipes(recipe: Recipe, catalog: list[Any]) -> dict[str, Any] | None:
+    """The recipes listed directly before and after this one on ``/browse`` (KAN-342).
+
+    Default browse order: newest first, ``id`` breaking ties. ``previous`` is
+    the newer neighbour and ``next`` the older one; either is ``None`` at an
+    end of the list. Returns ``None`` when there is no neighbour at all.
+    """
+    ordered = sorted(
+        catalog, key=lambda row: (row.created_at or datetime.min, row.id), reverse=True
+    )
+    index = next((i for i, row in enumerate(ordered) if row.id == recipe.id), None)
+    if index is None:
+        return None
+    wanted = {
+        "previous": ordered[index - 1].id if index > 0 else None,
+        "next": ordered[index + 1].id if index + 1 < len(ordered) else None,
+    }
+    ids = [value for value in wanted.values() if value]
+    if not ids:
+        return None
+    found = {
+        row.id: {"name": row.name, "url": url_for("public.show_public_recipe", slug=row.slug)}
+        for row in Recipe.query.with_entities(Recipe.id, Recipe.name, Recipe.slug).filter(
+            Recipe.id.in_(ids), Recipe.is_public.is_(True), Recipe.slug.isnot(None)
+        )
+    }
+    return {side: found.get(value) for side, value in wanted.items()}
+
+
 def _hub_members(catalog: list[Any]) -> dict[str, list[Any]]:
     """Map each curated hub to its catalog rows in one catalog pass."""
     members: dict[str, list[Any]] = {hub.slug: [] for hub in TAG_HUBS}
@@ -989,6 +1018,7 @@ def show_public_recipe(slug):
         meta_description=_meta_description(description),
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
+        adjacent=_adjacent_recipes(recipe, catalog),
         related_recipes=[
             {"recipe": related, "image": _card_image(related)}
             for related in _related_recipes(recipe, catalog)
