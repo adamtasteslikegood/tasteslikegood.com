@@ -171,6 +171,32 @@ def test_neighbour_nav_does_not_share_a_class_with_the_method_steps(app, client)
     assert css.count(".public-recipe-step {") == 1, "only the method-step rule may use this name"
 
 
+def test_neighbour_links_follow_the_title_with_and_without_a_hero_image(app, client, monkeypatch):
+    for index, slug in enumerate(("older", "middle", "newer")):
+        _add(slug, index)
+    db.session.commit()
+
+    def positions():
+        body = client.get("/r/middle").get_data(as_text=True)
+        assert len(STEP_NAV.findall(body)) == 2
+        return (
+            body.index('<h1 class="public-recipe-title">'),
+            body.index('<nav class="public-recipe-neighbors"'),
+        )
+
+    # No image: the title sits in the intro, so the links come after it.
+    title, nav = positions()
+    assert title < nav
+
+    # Hero image: the title sits in the hero overlay, still ahead of the links.
+    monkeypatch.setattr(
+        "blueprints.public_bp._rendered_image",
+        lambda recipe: ("https://example.test/hero.jpg", None),
+    )
+    title, nav = positions()
+    assert title < nav
+
+
 def test_no_nav_when_neither_neighbour_can_be_loaded(app):
     """A neighbour unpublished between the catalog scan and the lookup leaves nothing to link."""
     _add("middle", 1)
@@ -201,8 +227,8 @@ def test_browse_header_repeats_the_page_numbers(app, client):
     assert len(navs) == 1
     nav = navs[0]
     # Same URLs as the main nav: page 1 is the bare listing, never ?page=1.
-    assert '<a href="/browse">1</a>' in nav
-    assert '<a href="/browse?page=3">3</a>' in nav
+    assert '<a href="/browse" aria-label="Page 1">1</a>' in nav
+    assert '<a href="/browse?page=3" aria-label="Page 3">3</a>' in nav
     assert '<span aria-current="page">2</span>' in nav
     assert "?page=1" not in nav
     # Two navs on the page must not share a landmark name.
@@ -217,7 +243,7 @@ def test_tag_hub_header_repeats_the_page_numbers(app, client):
     navs, _ = _compact(client, "/browse/tag/dinner")
     assert len(navs) == 1
     assert '<span aria-current="page">1</span>' in navs[0]
-    assert '<a href="/browse/tag/dinner?page=2">2</a>' in navs[0]
+    assert '<a href="/browse/tag/dinner?page=2" aria-label="Page 2">2</a>' in navs[0]
 
 
 def test_single_page_listing_has_no_compact_nav(app, client):
