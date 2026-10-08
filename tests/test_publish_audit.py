@@ -273,7 +273,7 @@ def test_listing_covers_public_rows_only_grouped_by_owner(app, adam, other):
 
 def test_listing_carries_the_full_text_and_flags_disagreement(app, adam):
     row = _row("Flagged", owner=adam, blob_origin="manual", blob_public=False)
-    forged = _row("Forged", owner=adam, origin=None, status="generating_image")
+    forged = _row("Forged", owner=adam, origin=None, status="error")
 
     listing = build_listing(db.session)
     by_id = {e["id"]: e for e in listing}
@@ -293,7 +293,7 @@ def test_listing_carries_the_full_text_and_flags_disagreement(app, adam):
     assert entry["fingerprint"] == fingerprint(row)
 
     assert by_id[forged.id]["origin"] is None
-    assert by_id[forged.id]["eligibility_problems"] == ["status generating_image"]
+    assert by_id[forged.id]["eligibility_problems"] == ["status error"]
 
 
 def test_listing_flags_an_unsanitized_slug(app, adam):
@@ -319,12 +319,12 @@ def test_manifest_skeleton_has_no_decisions_and_no_emails(app, adam):
 
 
 def test_markdown_puts_status_and_canonical_in_front_of_the_reader(app, adam):
-    _row("Canon", owner=adam, canonical=True, status="generating_image")
+    _row("Canon", owner=adam, canonical=True, status="error")
     text = render_markdown(build_listing(db.session))
     assert "adam@example.com" in text
-    assert "generating_image" in text
+    assert "error" in text
     assert "canonical" in text.lower()
-    assert "status generating_image" in text
+    assert "status error" in text
 
 
 def test_markdown_shows_every_field_the_public_page_renders(app, adam):
@@ -341,6 +341,26 @@ def test_markdown_shows_every_field_the_public_page_renders(app, adam):
 
 
 # ── manifest validation ───────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("version", [None, False, 0, True, 2, "1"])
+def test_manifest_refuses_unsupported_versions(app, version):
+    manifest = {"version": version, "rows": []}
+
+    with pytest.raises(ManifestError) as exc:
+        validate_manifest(db.session, manifest)
+
+    assert "version" in str(exc.value)
+
+
+@pytest.mark.parametrize("row", [None, "recipe-id", 42, []])
+def test_manifest_refuses_non_object_rows(app, row):
+    manifest = {"version": 1, "rows": [row]}
+
+    with pytest.raises(ManifestError) as exc:
+        validate_manifest(db.session, manifest)
+
+    assert "object" in str(exc.value)
 
 
 def test_undecided_manifest_row_is_refused_before_anything_changes(app, adam):
@@ -503,6 +523,19 @@ def test_cutover_is_dry_run_by_default(app, adam, cache_calls):
     assert cache_calls == {"recipe": [], "image": []}
 
 
+def test_cutover_keeps_a_publishable_row_while_its_image_is_generating(app, adam):
+    row = _row("Imaging", owner=adam, status="generating_image")
+    manifest = _manifest((row, "keep"))
+
+    report = run_cutover(db.session, manifest, apply=True)
+
+    assert report["restored"] == [row.id]
+    assert report["second_look"] == []
+    assert report["unpublished"] == []
+    assert _get(row.id).is_public is True
+    assert run_verify(db.session, manifest) == []
+
+
 def test_cutover_refuses_while_a_worker_holds_a_row(app, adam):
     approved = _row("Approved", owner=adam)
     _row("Busy", owner=adam, public=False, status="processing", claim_token="tok")
@@ -609,6 +642,26 @@ def test_cli_undecided_manifest_exits_two(app, adam, tmp_path, capsys):
     assert code == 2
     assert row.id in capsys.readouterr().err
     assert _get(row.id).is_public is True
+
+
+@pytest.mark.parametrize("contents", ["{not-json", "[]"])
+def test_cli_invalid_manifest_file_exits_two(app, tmp_path, capsys, contents):
+    path = tmp_path / "manifest.json"
+    path.write_text(contents)
+
+    code = publish_audit.main(["cutover", "--manifest", str(path)], app=app)
+
+    assert code == 2
+    assert "manifest refused" in capsys.readouterr().err
+
+
+def test_cli_missing_manifest_file_exits_two(app, tmp_path, capsys):
+    path = tmp_path / "missing.json"
+
+    code = publish_audit.main(["cutover", "--manifest", str(path)], app=app)
+
+    assert code == 2
+    assert "manifest refused" in capsys.readouterr().err
 
 
 def test_cli_verify_exit_code_follows_the_problems(app, adam, other, tmp_path):
