@@ -41,6 +41,7 @@
         </nav>
         <h1>{{ hub.title }}</h1>
         <p class="public-hub-intro">{{ hub.intro }}</p>
+        {% include "public/_pagination_compact.html" %}
     </header>
 
     {% if recipes %}
