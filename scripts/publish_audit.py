@@ -13,7 +13,8 @@ client labelled. The cutover therefore trusts nothing it finds in the table:
                   reset the ``generated`` label on every row that has it;
                   give it back only to a ``keep`` row whose fingerprint still
                   matches and that passes the eligibility rule (signed-in
-                  owner, not a saved copy, status ``ready``); unpublish every
+                  owner, not a saved copy, status ``ready`` or
+                  ``generating_image``); unpublish every
                   other public row, including rows published after the
                   listing was taken; bump ``updated_at`` on every touched row.
                   Dry-run unless ``--apply``. Refuses an undecided manifest and
@@ -92,6 +93,7 @@ from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 from models.user import User  # noqa: E402
+from repositories.db_recipe_repository import PUBLISHABLE_RECIPE_STATUSES  # noqa: E402
 from utils.cache_utils import invalidate_recipe, invalidate_recipe_image  # noqa: E402
 from utils.slug_utils import normalize_slug  # noqa: E402
 
@@ -172,7 +174,7 @@ def eligibility_problems(recipe: Recipe) -> list[str]:
         problems.append("saved copy (source_slug)")
     if recipe.source_recipe_id is not None:
         problems.append("saved copy (source_recipe_id)")
-    if recipe.status != "ready":
+    if recipe.status not in PUBLISHABLE_RECIPE_STATUSES:
         problems.append(f"status {recipe.status}")
     return problems
 
@@ -283,7 +285,7 @@ def render_markdown(listing: list[dict[str, Any]]) -> str:
         flags = []
         if e["is_canonical"]:
             flags.append("CANONICAL")
-        if e["status"] != "ready":
+        if e["status"] not in PUBLISHABLE_RECIPE_STATUSES:
             flags.append(f"STATUS {e['status']}")
         if e["disagreements"]:
             flags.append("column/blob disagree: " + ", ".join(e["disagreements"]))

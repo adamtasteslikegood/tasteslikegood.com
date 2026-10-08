@@ -75,8 +75,9 @@ MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
 )
 
 # KAN-329: only these states prove the text worker finished. An allowlist keeps
-# a typo or a future workflow state from silently becoming publishable.
-_PUBLISHABLE_STATUSES = frozenset({"ready", "generating_image"})
+# a typo or a future workflow state from silently becoming publishable. The
+# cutover audit imports this so its eligibility rule cannot drift from the API.
+PUBLISHABLE_RECIPE_STATUSES = frozenset({"ready", "generating_image"})
 
 # RCP-74: saved copies inherit their public page from the source recipe.
 SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
@@ -266,7 +267,7 @@ def _gate_publish_transition(existing: Recipe, recipe_data: Dict[str, Any]) -> N
     """
     if recipe_data.get("is_public") is not True or existing.is_public:
         return
-    if existing.origin == "generated" and existing.status in _PUBLISHABLE_STATUSES:
+    if existing.origin == "generated" and existing.status in PUBLISHABLE_RECIPE_STATUSES:
         return
     raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
 
