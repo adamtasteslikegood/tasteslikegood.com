@@ -11,18 +11,23 @@ import sys
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import create_app  # noqa: E402
-from blueprints.public_bp import BROWSE_PAGE_SIZE, HUB_PAGE_SIZE  # noqa: E402
+from blueprints.public_bp import (  # noqa: E402
+    BROWSE_PAGE_SIZE,
+    HUB_PAGE_SIZE,
+    _adjacent_recipes,
+)
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
 
 BASE = datetime(2026, 9, 1, 12, 0, 0)
-STEP_NAV = re.compile(r'<nav class="public-recipe-step"[^>]*>(.*?)</nav>', re.S)
+STEP_NAV = re.compile(r'<nav class="public-recipe-neighbors"[^>]*>(.*?)</nav>', re.S)
 HEADER = re.compile(r'<header class="public-browse-header">(.*?)</header>', re.S)
 COMPACT_NAV = re.compile(r'<nav class="public-page-compact"[^>]*>(.*?)</nav>', re.S)
 
@@ -141,6 +146,40 @@ def test_step_links_are_not_declared_as_pagination_in_the_head(app, client):
     db.session.commit()
     body = client.get("/r/middle").get_data(as_text=True)
     assert '<link rel="prev"' not in body and '<link rel="next"' not in body
+
+
+def test_neighbour_nav_does_not_share_a_class_with_the_method_steps(app, client):
+    """The method ``<li>`` rows are ``public-recipe-step``; sharing it corrupts both layouts."""
+    db.session.add(
+        Recipe(
+            id=str(uuid.uuid4()),
+            name="With steps",
+            slug="with-steps",
+            is_public=True,
+            created_at=BASE + timedelta(minutes=1),
+            data={"name": "With steps", "instructions": ["Chop.", "Cook."]},
+        )
+    )
+    _add("oldest", 0)
+    db.session.commit()
+
+    body = client.get("/r/with-steps").get_data(as_text=True)
+    assert '<li class="public-recipe-step">' in body
+    assert '<nav class="public-recipe-step"' not in body
+    css = (Path(__file__).resolve().parent.parent / "static/css/recipe-site.css").read_text()
+    assert ".public-recipe-neighbors {" in css
+    assert css.count(".public-recipe-step {") == 1, "only the method-step rule may use this name"
+
+
+def test_no_nav_when_neither_neighbour_can_be_loaded(app):
+    """A neighbour unpublished between the catalog scan and the lookup leaves nothing to link."""
+    _add("middle", 1)
+    db.session.commit()
+    middle = Recipe.query.filter_by(slug="middle").one()
+    ghost = SimpleNamespace(id="gone", created_at=BASE, updated_at=BASE, tags=[])
+    here = SimpleNamespace(id=middle.id, created_at=middle.created_at, updated_at=None, tags=[])
+    with app.test_request_context("/r/middle"):
+        assert _adjacent_recipes(middle, [here, ghost]) is None
 
 
 # ── KAN-343: compact page numbers in the header ──────────────────────────────

@@ -727,6 +727,9 @@ def _adjacent_recipes(recipe: Recipe, catalog: list[Any]) -> dict[str, Any] | No
             Recipe.id.in_(ids), Recipe.is_public.is_(True), Recipe.slug.isnot(None)
         )
     }
+    if not found:
+        # Both neighbours stopped being public between the two queries.
+        return None
     return {side: found.get(value) for side, value in wanted.items()}
 
 
