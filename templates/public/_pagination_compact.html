@@ -12,7 +12,7 @@
             {% elif item.current %}
             <span aria-current="page">{{ item.number }}</span>
             {% else %}
-            <a href="{{ item.url }}">{{ item.number }}</a>
+            <a href="{{ item.url }}" aria-label="Page {{ item.number }}">{{ item.number }}</a>
             {% endif %}
         </li>
         {% endfor %}

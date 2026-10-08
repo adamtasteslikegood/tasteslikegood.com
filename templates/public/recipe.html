@@ -92,9 +92,14 @@
         {% endif %}
     </section>
 
+    {# The neighbour links follow the recipe's title. With a hero image the
+       title is in the overlay above; without one it is in the intro below,
+       so the links move under it. #}
+    {% if image_url %}
     {% with step_label = "Previous and next recipe" %}
     {% include "public/_recipe_neighbors.html" %}
     {% endwith %}
+    {% endif %}
 
     <section class="public-recipe-intro">
         {% if not image_url %}
@@ -111,6 +116,9 @@
             <p class="public-recipe-description">{{ data.description }}</p>
             {% endif %}
         </div>
+        {% with step_label = "Previous and next recipe" %}
+        {% include "public/_recipe_neighbors.html" %}
+        {% endwith %}
         {% endif %}
 
         <div class="public-recipe-toolbar">
