@@ -171,9 +171,7 @@ def test_neighbour_nav_does_not_share_a_class_with_the_method_steps(app, client)
     assert css.count(".public-recipe-step {") == 1, "only the method-step rule may use this name"
 
 
-def test_neighbour_links_follow_the_title_with_and_without_a_hero_image(
-    app, client, monkeypatch
-):
+def test_neighbour_links_follow_the_title_with_and_without_a_hero_image(app, client, monkeypatch):
     for index, slug in enumerate(("older", "middle", "newer")):
         _add(slug, index)
     db.session.commit()
@@ -245,9 +243,7 @@ def test_tag_hub_header_repeats_the_page_numbers(app, client):
     navs, _ = _compact(client, "/browse/tag/dinner")
     assert len(navs) == 1
     assert '<span aria-current="page">1</span>' in navs[0]
-    assert (
-        '<a href="/browse/tag/dinner?page=2" aria-label="Page 2">2</a>' in navs[0]
-    )
+    assert '<a href="/browse/tag/dinner?page=2" aria-label="Page 2">2</a>' in navs[0]
 
 
 def test_single_page_listing_has_no_compact_nav(app, client):
