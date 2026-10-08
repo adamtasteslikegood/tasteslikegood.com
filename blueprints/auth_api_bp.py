@@ -362,6 +362,8 @@ def api_login():
     """
     Initiate OAuth login flow.
 
+    ``?prompt=select_account`` forces Google's account chooser (KAN-344).
+
     Returns:
         JSON with authorization URL that Angular frontend should redirect to.
 
@@ -396,7 +398,15 @@ def api_login():
         # Do NOT pass include_granted_scopes="true". We ask for the full scope
         # set up front (no incremental auth). Bundling previously-granted
         # scopes into the response trips oauthlib's scope-mismatch check.
-        authorization_url, state = flow.authorization_url(access_type="offline")
+        #
+        # KAN-344: "Switch user" asks for Google's account chooser. Without
+        # it Google reuses the browser's current account, so logging out and
+        # signing in again lands on the same user. Only this one literal is
+        # forwarded; ``prompt=none`` would attempt a silent sign-in.
+        auth_params = {"access_type": "offline"}
+        if request.args.get("prompt") == "select_account":
+            auth_params["prompt"] = "select_account"
+        authorization_url, state = flow.authorization_url(**auth_params)
         session["state"] = state
         # google-auth-oauthlib auto-generates a PKCE code_verifier and
         # embeds code_challenge in the auth URL. The callback must present

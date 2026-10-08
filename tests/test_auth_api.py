@@ -72,6 +72,34 @@ def test_login_does_not_request_include_granted_scopes(client):
     assert kwargs.get("access_type") == "offline"
 
 
+def _login_kwargs(client, query=""):
+    with patch(
+        "blueprints.auth_api_bp.Flow.authorization_url",
+        return_value=("https://accounts.google.com/o/oauth2/auth?state=x", "test-state"),
+    ) as mock_auth_url:
+        resp = client.get("/api/auth/login" + query)
+    assert resp.status_code == 200, resp.data
+    return mock_auth_url.call_args.kwargs
+
+
+def test_login_sends_no_prompt_by_default(client):
+    """KAN-344: ordinary sign-in is unchanged."""
+    assert "prompt" not in _login_kwargs(client)
+
+
+def test_login_forces_the_account_chooser_when_asked(client):
+    """KAN-344: Switch user must not land back on the browser's current Google account."""
+    kwargs = _login_kwargs(client, "?prompt=select_account")
+    assert kwargs.get("prompt") == "select_account"
+    assert kwargs.get("access_type") == "offline"
+
+
+@pytest.mark.parametrize("value", ["none", "consent", "select_account consent", "", "x"])
+def test_login_ignores_any_other_prompt_value(client, value):
+    """Only the one literal is forwarded; ``prompt=none`` would attempt a silent sign-in."""
+    assert "prompt" not in _login_kwargs(client, f"?prompt={value}")
+
+
 @pytest.fixture
 def db_app():
     """App with tables created — the callback persists a User row."""
