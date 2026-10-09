@@ -33,7 +33,7 @@ dependencies = [
     "flask-caching==2.5.1",
     # <2.1 (KAN-324): SQLAlchemy 2.1 maps postgresql:// to psycopg (v3); the image
     # ships psycopg2-binary (postgres extra), so 2.1.1 broke the migrate job.
-    "sqlalchemy>=2.0.51,<2.2", # Use stable 2.0.x with Python 3.13 support
+    "sqlalchemy>=2.0.51,<2.1", # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
     "google-genai==2.28.0",
     "google-generativeai==0.8.6",
