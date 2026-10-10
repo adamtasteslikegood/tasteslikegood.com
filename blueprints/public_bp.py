@@ -28,6 +28,7 @@ from flask import (
     Blueprint,
     Response,
     abort,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -36,6 +37,7 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
 from extensions import db
@@ -654,16 +656,20 @@ def _catalog_tag_rows() -> list[Any]:
     reads ``data -> 'tags'`` only — never the full ``data`` blob, which can still
     carry legacy base64 images.
     """
-    rows: list[Any] = (
-        Recipe.query.with_entities(
-            Recipe.id,
-            Recipe.created_at,
-            Recipe.updated_at,
-            Recipe.data["tags"].label("tags"),
+    if "public_catalog_tag_rows" not in g:
+        # One scan per request: the page's own blocks and the footer's hub
+        # links (``_footer_hubs``) read the same rows.
+        g.public_catalog_tag_rows = (
+            Recipe.query.with_entities(
+                Recipe.id,
+                Recipe.created_at,
+                Recipe.updated_at,
+                Recipe.data["tags"].label("tags"),
+            )
+            .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
+            .all()
         )
-        .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
-        .all()
-    )
+    rows: list[Any] = g.public_catalog_tag_rows
     return rows
 
 
@@ -755,6 +761,27 @@ def _linkable_hubs(counts: dict[str, int]) -> list[TagHub]:
     return [hub for hub in TAG_HUBS if counts[hub.slug] >= MIN_INDEXABLE_RECIPES]
 
 
+def _footer_hubs() -> list[dict[str, str]]:
+    """Hub links for the site footer of every page on ``base_public.html`` (KAN-319).
+
+    The same rule as every other hub link: a thin hub is ``noindex`` and gets
+    no link. Paths are literal, like the rest of the footer set. The error
+    pages extend the base template too, so a failed catalog read (the 500 page
+    after a database error) yields no hub links rather than a second failure.
+    """
+    try:
+        linkable = _linkable_hubs(_hub_counts(_catalog_tag_rows()))
+    except SQLAlchemyError:
+        logger.warning("footer hub links skipped: catalog read failed", exc_info=True)
+        return []
+    return [{"href": f"/browse/tag/{hub.slug}", "label": hub.label} for hub in linkable]
+
+
+@public_bp.app_context_processor
+def _inject_footer_hubs() -> dict[str, Any]:
+    return {"footer_hubs": _footer_hubs}
+
+
 def _hub_url(hub: TagHub) -> str:
     return _canonical_url("public.show_tag_hub", hub_slug=hub.slug)
 
@@ -788,6 +815,20 @@ def _recipe_breadcrumbs(
     linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
     category = next((hub for hub in hubs_for_tags(tags) if hub.slug in linkable), None)
     return _breadcrumbs(recipe, category)
+
+
+def _recipe_hubs(tags: list[str], catalog: list[Any]) -> list[dict[str, str]]:
+    """Every indexable hub a recipe belongs to, for its hub links (KAN-349).
+
+    The breadcrumb names only the first; the page links them all, at the top
+    and at the bottom, so each recipe page is a way into each of its hubs.
+    """
+    linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
+    return [
+        {"title": hub.title, "url": _hub_url(hub)}
+        for hub in hubs_for_tags(tags)
+        if hub.slug in linkable
+    ]
 
 
 def _breadcrumb_json_ld(crumbs: list[dict[str, str]]) -> dict[str, Any]:
@@ -1021,6 +1062,7 @@ def show_public_recipe(slug):
         meta_description=_meta_description(description),
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
+        recipe_hubs=_recipe_hubs(tags, catalog),
         adjacent=_adjacent_recipes(recipe, catalog),
         related_recipes=[
             {"recipe": related, "image": _card_image(related)}

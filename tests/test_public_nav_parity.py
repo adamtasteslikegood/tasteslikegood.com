@@ -10,7 +10,9 @@ submodule.
 Two layers, so the check can fail in both places it runs:
 
 1. ``EXPECTED_HEADER`` / ``EXPECTED_FOOTER`` are literal copies of that
-   manifest. A template edit that drifts fails here, in Backend CI.
+   manifest. A template edit that drifts fails here, in Backend CI. The footer's
+   tag hub links (KAN-319) are rendered from ``services/tag_hubs.py`` for the
+   hubs that are indexable; with every hub indexable they are the manifest's.
 2. When this checkout sits inside the cookbook superproject (the cookbook
    ``backend-test`` job runs pytest with ``submodules: recursive``, and local
    dev checkouts look the same), the literals are also compared against
@@ -36,6 +38,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from app import create_app  # noqa: E402
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
+from services.tag_hubs import MIN_INDEXABLE_RECIPES, TAG_HUBS  # noqa: E402
 
 EXPECTED_HEADER = [
     ("/", "VeganGenius Chef home"),
@@ -45,6 +48,18 @@ EXPECTED_HEADER = [
 ]
 EXPECTED_FOOTER = [
     ("/browse", "Browse recipes"),
+    ("/browse/tag/breakfast", "Breakfast"),
+    ("/browse/tag/lunch", "Lunch"),
+    ("/browse/tag/dinner", "Dinner"),
+    ("/browse/tag/comfort-food", "Comfort food"),
+    ("/browse/tag/pasta", "Pasta"),
+    ("/browse/tag/mexican", "Mexican"),
+    ("/browse/tag/sandwiches", "Sandwiches"),
+    ("/browse/tag/tofu", "Tofu"),
+    ("/browse/tag/high-protein", "High-protein"),
+    ("/browse/tag/gluten-free", "Gluten-free"),
+    ("/browse/tag/dessert", "Dessert"),
+    ("/browse/tag/snacks", "Snacks"),
     ("/about", "About"),
     ("/privacy-policy", "Privacy Policy"),
 ]
@@ -137,6 +152,19 @@ def app(monkeypatch):
                 },
             )
         )
+        # Every hub indexable, so the footer carries the full canonical set.
+        for hub in TAG_HUBS:
+            for index in range(MIN_INDEXABLE_RECIPES):
+                name = f"{hub.slug} parity {index}"
+                db.session.add(
+                    Recipe(
+                        id=str(uuid.uuid4()),
+                        name=name,
+                        slug=name.replace(" ", "-"),
+                        is_public=True,
+                        data={"name": name, "tags": [sorted(hub.aliases)[0]]},
+                    )
+                )
         db.session.commit()
         yield app
         db.session.remove()
@@ -171,6 +199,27 @@ def test_ssr_chrome_has_no_js_only_controls(client):
     body = client.get("/browse").get_data(as_text=True)
     assert "data-open-kitchen" not in body
     assert 'id="spa-modal"' not in body
+
+
+def test_footer_literals_are_the_defined_hubs():
+    """KAN-319: the hub entries in ``EXPECTED_FOOTER`` are every hub
+    services/tag_hubs.py defines, in its order, under its short label. A hub
+    added, renamed or removed there must change the manifest with it."""
+    prefix = "/browse/tag/"
+    hub_links = [link for link in EXPECTED_FOOTER if link[0].startswith(prefix)]
+    assert hub_links == [(f"{prefix}{hub.slug}", hub.label) for hub in TAG_HUBS]
+
+
+def test_footer_leaves_out_a_thin_hub(app, client):
+    """A hub below ``MIN_INDEXABLE_RECIPES`` is noindex and gets no link
+    anywhere, the footer included."""
+    with app.app_context():
+        thin = Recipe.query.filter(Recipe.slug.like("tofu-parity-%")).all()
+        for recipe in thin[1:]:
+            db.session.delete(recipe)
+        db.session.commit()
+    footer = chrome_links(client.get("/browse").get_data(as_text=True))["footer"]
+    assert footer == [link for link in EXPECTED_FOOTER if link[0] != "/browse/tag/tofu"]
 
 
 def test_literals_match_the_cookbook_manifest():
