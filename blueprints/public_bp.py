@@ -28,6 +28,7 @@ from flask import (
     Blueprint,
     Response,
     abort,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -36,6 +37,7 @@ from flask import (
 )
 from flask.typing import ResponseReturnValue
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 
 from extensions import db
@@ -654,16 +656,20 @@ def _catalog_tag_rows() -> list[Any]:
     reads ``data -> 'tags'`` only — never the full ``data`` blob, which can still
     carry legacy base64 images.
     """
-    rows: list[Any] = (
-        Recipe.query.with_entities(
-            Recipe.id,
-            Recipe.created_at,
-            Recipe.updated_at,
-            Recipe.data["tags"].label("tags"),
+    if "public_catalog_tag_rows" not in g:
+        # One scan per request: the page's own blocks and the footer's hub
+        # links (``_footer_hubs``) read the same rows.
+        g.public_catalog_tag_rows = (
+            Recipe.query.with_entities(
+                Recipe.id,
+                Recipe.created_at,
+                Recipe.updated_at,
+                Recipe.data["tags"].label("tags"),
+            )
+            .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
+            .all()
         )
-        .filter(Recipe.is_public.is_(True), Recipe.slug.isnot(None))
-        .all()
-    )
+    rows: list[Any] = g.public_catalog_tag_rows
     return rows
 
 
@@ -753,6 +759,27 @@ def _hub_counts(catalog: list[Any]) -> dict[str, int]:
 def _linkable_hubs(counts: dict[str, int]) -> list[TagHub]:
     """Hubs big enough to index, and so to link, list and put in the sitemap (KAN-274)."""
     return [hub for hub in TAG_HUBS if counts[hub.slug] >= MIN_INDEXABLE_RECIPES]
+
+
+def _footer_hubs() -> list[dict[str, str]]:
+    """Hub links for the site footer of every page on ``base_public.html`` (KAN-319).
+
+    The same rule as every other hub link: a thin hub is ``noindex`` and gets
+    no link. Paths are literal, like the rest of the footer set. The error
+    pages extend the base template too, so a failed catalog read (the 500 page
+    after a database error) yields no hub links rather than a second failure.
+    """
+    try:
+        linkable = _linkable_hubs(_hub_counts(_catalog_tag_rows()))
+    except SQLAlchemyError:
+        logger.warning("footer hub links skipped: catalog read failed", exc_info=True)
+        return []
+    return [{"href": f"/browse/tag/{hub.slug}", "label": hub.label} for hub in linkable]
+
+
+@public_bp.app_context_processor
+def _inject_footer_hubs() -> dict[str, Any]:
+    return {"footer_hubs": _footer_hubs}
 
 
 def _hub_url(hub: TagHub) -> str:

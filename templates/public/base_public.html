@@ -44,6 +44,11 @@
                     <p>TastesLikeGood.org · honest vegan recipes</p>
                     <nav class="public-footer-links" aria-label="Footer">
                         <a href="/browse">Browse recipes</a>
+                        {# KAN-319: every indexable tag hub, so each SSR page links them.
+                           Thin hubs are left out, as everywhere else (public_bp._footer_hubs). #}
+                        {% for hub in footer_hubs() %}
+                        <a href="{{ hub.href }}">{{ hub.label }}</a>
+                        {% endfor %}
                         <a href="/about">About</a>
                         <a href="/privacy-policy">Privacy Policy</a>
                     </nav>
