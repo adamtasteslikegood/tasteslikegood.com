@@ -28,6 +28,9 @@ MIN_INDEXABLE_RECIPES = 3
 class TagHub:
     slug: str
     title: str
+    # Short name for the site footer (KAN-319), where ``title`` would repeat
+    # "Vegan … Recipes" twelve times. The cookbook's src/site-nav.json mirrors it.
+    label: str
     aliases: frozenset[str]
     intro: str
 
@@ -37,9 +40,13 @@ def normalize_tag(tag: str) -> str:
     return re.sub(r"\s+", " ", tag.replace("-", " ")).strip().lower()
 
 
-def _hub(slug: str, title: str, aliases: Iterable[str], intro: str) -> TagHub:
+def _hub(slug: str, title: str, label: str, aliases: Iterable[str], intro: str) -> TagHub:
     return TagHub(
-        slug, title, frozenset(normalize_tag(a) for a in aliases), " ".join(intro.split())
+        slug,
+        title,
+        label,
+        frozenset(normalize_tag(a) for a in aliases),
+        " ".join(intro.split()),
     )
 
 
@@ -49,6 +56,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "breakfast",
         "Vegan Breakfast Recipes",
+        "Breakfast",
         ["breakfast", "brunch"],
         """
         Plant-based breakfasts that are worth getting up for: stacks of pancakes, biscuits
@@ -63,6 +71,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "lunch",
         "Vegan Lunch Recipes",
+        "Lunch",
         ["lunch"],
         """
         Vegan lunches with some substance: deli sandwiches piled with seitan pastrami, a
@@ -77,6 +86,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "dinner",
         "Vegan Dinner Recipes",
+        "Dinner",
         ["dinner", "main", "main course", "main dish", "entree"],
         """
         Vegan dinner ideas for nights when you want a proper meal: baked ziti and stuffed
@@ -91,6 +101,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "comfort-food",
         "Vegan Comfort Food Recipes",
+        "Comfort food",
         ["comfort food"],
         """
         Vegan comfort food, the heavy kind: country-fried steak under white pepper gravy,
@@ -105,6 +116,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "pasta",
         "Vegan Pasta and Italian Recipes",
+        "Pasta",
         ["pasta", "italian"],
         """
         Vegan pasta bakes and Italian favourites: baked ziti, stuffed shells with tofu
@@ -119,6 +131,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "mexican",
         "Vegan Mexican Recipes and Tacos",
+        "Mexican",
         ["mexican", "tacos", "taco", "tex mex"],
         """
         Vegan tacos and Mexican-inspired dishes: jackfruit carnitas with avocado crema,
@@ -134,6 +147,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "sandwiches",
         "Vegan Sandwich Recipes",
+        "Sandwiches",
         ["sandwich", "sandwiches"],
         """
         Vegan sandwiches built like the deli classics: seitan pastrami on rye, a Reuben with
@@ -148,6 +162,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "tofu",
         "Vegan Tofu Recipes",
+        "Tofu",
         ["tofu"],
         """
         Tofu recipes that show how much range one block has: crisp fried tofu sandwiches,
@@ -162,6 +177,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "high-protein",
         "High-Protein Vegan Recipes",
+        "High-protein",
         ["high protein", "protein rich", "protein packed", "high in protein"],
         """
         AI-generated high-protein vegan recipes built on seitan, tofu, tempeh and lentils:
@@ -176,6 +192,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "gluten-free",
         "Gluten-Free Vegan Recipes",
+        "Gluten-free",
         ["gluten free"],
         """
         Vegan recipes tagged gluten-free: tacos on corn tortillas, enchiladas, huevos
@@ -191,6 +208,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "dessert",
         "Vegan Dessert Recipes",
+        "Dessert",
         ["dessert", "desserts"],
         """
         Vegan desserts with nothing to apologise for: fudgy peanut butter swirl brownies,
@@ -205,6 +223,7 @@ TAG_HUBS: tuple[TagHub, ...] = (
     _hub(
         "snacks",
         "Vegan Snacks and Appetizers",
+        "Snacks",
         ["snack", "snacks", "appetizer", "appetizers", "party food", "finger food"],
         """
         Vegan snacks and party food: zucchini poppers, blooming onions, baked onion rings,
