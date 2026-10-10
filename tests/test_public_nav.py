@@ -81,7 +81,7 @@ def test_middle_recipe_links_both_neighbours_in_browse_order(app, client):
     db.session.commit()
 
     navs = _step_navs(client, "middle")
-    assert len(navs) == 2, "expected the nav under the hero and again at the foot"
+    assert len(navs) == 1, "expected one nav, under the recipe"
     for nav in navs:
         # Newest first, like /browse: the newer recipe is Previous.
         assert 'href="/r/newest"' in nav and 'href="/r/oldest"' in nav
@@ -100,8 +100,8 @@ def test_first_and_last_recipe_omit_the_missing_side(app, client):
     _add("newest", 1)
     db.session.commit()
 
-    assert len(_step_navs(client, "newest")) == 2
-    assert len(_step_navs(client, "oldest")) == 2
+    assert len(_step_navs(client, "newest")) == 1
+    assert len(_step_navs(client, "oldest")) == 1
     for nav in _step_navs(client, "newest"):
         assert "Previous" not in nav
         assert 'href="/r/oldest"' in nav and "Next" in nav
@@ -127,7 +127,7 @@ def test_unpublished_and_slugless_rows_are_skipped(app, client):
     _add("newest", 4)
     db.session.commit()
 
-    assert len(_step_navs(client, "middle")) == 2
+    assert len(_step_navs(client, "middle")) == 1
     for nav in _step_navs(client, "middle"):
         assert 'href="/r/newest"' in nav and 'href="/r/oldest"' in nav
         assert "private" not in nav and "No slug" not in nav
@@ -171,30 +171,37 @@ def test_neighbour_nav_does_not_share_a_class_with_the_method_steps(app, client)
     assert css.count(".public-recipe-step {") == 1, "only the method-step rule may use this name"
 
 
-def test_neighbour_links_follow_the_title_with_and_without_a_hero_image(app, client, monkeypatch):
+def test_one_neighbour_row_sits_under_the_recipe_with_and_without_a_hero_image(
+    app, client, monkeypatch
+):
+    """Adam's staging check (2026-10-10): the row under the title unbalanced the
+    page. One row, after the recipe's tags and before the related recipes."""
     for index, slug in enumerate(("older", "middle", "newer")):
         _add(slug, index)
     db.session.commit()
 
-    def positions():
+    def check():
         body = client.get("/r/middle").get_data(as_text=True)
-        assert len(STEP_NAV.findall(body)) == 2
-        return (
-            body.index('<h1 class="public-recipe-title">'),
-            body.index('<nav class="public-recipe-neighbors"'),
-        )
+        assert len(STEP_NAV.findall(body)) == 1
+        nav = body.index('<nav class="public-recipe-neighbors"')
+        assert body.index('<section class="public-recipe-tags">') < nav
+        assert nav < body.index('<section class="public-related"')
 
-    # No image: the title sits in the intro, so the links come after it.
-    title, nav = positions()
-    assert title < nav
-
-    # Hero image: the title sits in the hero overlay, still ahead of the links.
+    check()
     monkeypatch.setattr(
         "blueprints.public_bp._rendered_image",
         lambda recipe: ("https://example.test/hero.jpg", None),
     )
-    title, nav = positions()
-    assert title < nav
+    check()
+
+
+def test_neighbour_buttons_name_the_recipe_they_lead_to(app, client):
+    for index, slug in enumerate(("older", "middle", "newer")):
+        _add(slug, index)
+    db.session.commit()
+    (nav,) = _step_navs(client, "middle")
+    assert 'aria-label="Previous recipe: ' in nav and 'aria-label="Next recipe: ' in nav
+    assert "← Previous" in nav and "Next →" in nav
 
 
 def test_no_nav_when_neither_neighbour_can_be_loaded(app):
