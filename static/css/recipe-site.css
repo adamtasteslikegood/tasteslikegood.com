@@ -190,6 +190,12 @@ img {
   color: var(--fg-inverted);
 }
 
+/* KAN-349: on a recipe the hub links sit beside the plain tag chips, so they
+   are underlined to read as links. */
+.public-recipe-hubs a {
+  text-decoration: underline;
+}
+
 .public-hub-intro {
   max-width: 70ch;
   line-height: var(--leading-relaxed);

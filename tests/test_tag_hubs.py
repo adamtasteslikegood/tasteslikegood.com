@@ -231,6 +231,47 @@ def test_thin_hub_is_noindex_and_unlinked(app, client):
     assert 'href="http://localhost/browse/tag/dinner"' in browse
 
 
+RECIPE_HUBS_NAV = re.compile(
+    r'<nav class="public-hub-links public-recipe-hubs"[^>]*>(.*?)</nav>', re.S
+)
+
+
+def _recipe_hub_navs(client, slug):
+    body = client.get(f"/r/{slug}").get_data(as_text=True)
+    return [re.findall(r'href="([^"]+)"', nav) for nav in RECIPE_HUBS_NAV.findall(body)]
+
+
+def test_recipe_links_each_of_its_indexable_hubs_top_and_bottom(app, client):
+    """KAN-349: a recipe in k indexable hubs links those k, twice; a thin hub
+    and a tag that is no hub get no link."""
+    with app.app_context():
+        _add("two-hub-recipe", ["dinner", "Tofu", "brunch", "weeknight"])
+        for index in range(2):
+            _add(f"dinner-{index}", ["dinner"], days=index + 1)
+            _add(f"tofu-{index}", ["tofu"], days=index + 1)
+
+    navs = _recipe_hub_navs(client, "two-hub-recipe")
+    expected = ["http://localhost/browse/tag/dinner", "http://localhost/browse/tag/tofu"]
+    assert navs == [expected, expected]
+
+    body = client.get("/r/two-hub-recipe").get_data(as_text=True)
+    # breakfast (via "brunch") has one recipe: thin, so unlinked.
+    assert "/browse/tag/breakfast" not in body
+    top, bottom = (match.start() for match in RECIPE_HUBS_NAV.finditer(body))
+    assert top < body.index('<section class="public-recipe-tags">') < bottom
+    assert 'aria-label="Recipe categories"' in body
+    assert 'aria-label="Recipe categories, bottom"' in body
+
+
+def test_recipe_in_no_indexable_hub_has_no_hub_block(app, client):
+    with app.app_context():
+        _add("untagged", ["weeknight"])
+        _add("lonely-breakfast", ["breakfast"])
+
+    assert _recipe_hub_navs(client, "untagged") == []
+    assert _recipe_hub_navs(client, "lonely-breakfast") == []
+
+
 def test_unknown_hub_is_404(client):
     assert client.get("/browse/tag/not-a-hub").status_code == 404
 

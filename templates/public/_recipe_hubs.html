@@ -1,0 +1,13 @@
+{# The hubs this recipe belongs to (KAN-349), from public_bp._recipe_hubs:
+   indexable hubs only, in TAG_HUBS order. Included at the top and at the
+   bottom of the recipe; the caller sets ``hubs_label`` so the two navs are
+   distinct landmarks. #}
+{% if recipe_hubs %}
+<nav class="public-hub-links public-recipe-hubs" aria-label="{{ hubs_label }}">
+    <ul>
+        {% for hub in recipe_hubs %}
+        <li><a href="{{ hub.url }}" class="public-tag">{{ hub.title }}</a></li>
+        {% endfor %}
+    </ul>
+</nav>
+{% endif %}

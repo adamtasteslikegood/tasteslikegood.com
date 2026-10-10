@@ -790,6 +790,20 @@ def _recipe_breadcrumbs(
     return _breadcrumbs(recipe, category)
 
 
+def _recipe_hubs(tags: list[str], catalog: list[Any]) -> list[dict[str, str]]:
+    """Every indexable hub a recipe belongs to, for its hub links (KAN-349).
+
+    The breadcrumb names only the first; the page links them all, at the top
+    and at the bottom, so each recipe page is a way into each of its hubs.
+    """
+    linkable = {hub.slug for hub in _linkable_hubs(_hub_counts(catalog))}
+    return [
+        {"title": hub.title, "url": _hub_url(hub)}
+        for hub in hubs_for_tags(tags)
+        if hub.slug in linkable
+    ]
+
+
 def _breadcrumb_json_ld(crumbs: list[dict[str, str]]) -> dict[str, Any]:
     return {
         "@context": "https://schema.org",
@@ -1021,6 +1035,7 @@ def show_public_recipe(slug):
         meta_description=_meta_description(description),
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
+        recipe_hubs=_recipe_hubs(tags, catalog),
         adjacent=_adjacent_recipes(recipe, catalog),
         related_recipes=[
             {"recipe": related, "image": _card_image(related)}
