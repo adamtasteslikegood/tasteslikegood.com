@@ -23,20 +23,33 @@ def _digest(path: str, mtime_ns: int, size: int) -> str:
         return hashlib.sha256(handle.read()).hexdigest()[:12]
 
 
+@lru_cache(maxsize=4)
+def _static_files(folder: str) -> dict[str, str]:
+    """URL filename -> absolute path, for every file in the static folder.
+
+    Built by walking the folder once per process, so a requested filename is
+    only ever used as a dictionary key and never joined into a path.
+    """
+    root = os.path.realpath(folder)
+    files: dict[str, str] = {}
+    for directory, _subdirs, names in os.walk(root):
+        for name in names:
+            path = os.path.join(directory, name)
+            files[os.path.relpath(path, root).replace(os.sep, "/")] = path
+    return files
+
+
 def static_version(app: Flask, filename: str) -> str | None:
-    """Content hash of a static file, or None when it is not a readable file."""
+    """Content hash of a static file, or None when the folder has no such file."""
     folder = app.static_folder
     if not folder:
         return None
-    root = os.path.realpath(folder)
-    path = os.path.realpath(os.path.join(root, filename))
-    if os.path.commonpath([root, path]) != root:
+    path = _static_files(folder).get(filename)
+    if path is None:
         return None
     try:
         stat = os.stat(path)
     except OSError:
-        return None
-    if not os.path.isfile(path):
         return None
     return _digest(path, stat.st_mtime_ns, stat.st_size)
 
