@@ -78,6 +78,14 @@ def test_current_version_is_immutable_and_anything_else_revalidates(app, client)
         assert resp.status_code == 200
         assert "immutable" not in resp.headers.get("Cache-Control", "")
 
+    # A revalidation keeps the year: a 304's headers replace the stored ones.
+    revalidated = client.get(
+        f"/static/css/recipe-site.css?v={version}",
+        headers={"If-None-Match": current.headers["ETag"]},
+    )
+    assert revalidated.status_code == 304
+    assert revalidated.headers["Cache-Control"] == IMMUTABLE_CACHE_CONTROL
+
     missing = client.get(f"/static/css/nope.css?v={version}")
     assert missing.status_code == 404
     assert "immutable" not in missing.headers.get("Cache-Control", "")
@@ -116,4 +124,28 @@ def test_first_row_of_cards_loads_eagerly_and_the_rest_lazily(app, client, monke
     for tag in images[1:]:
         assert "fetchpriority" not in tag
     for tag in images[3:]:
+        assert 'loading="lazy"' in tag
+
+
+@pytest.mark.parametrize("url", ["/browse", "/browse/tag/dinner"])
+def test_priority_goes_to_the_first_image_when_the_first_card_has_none(
+    app, client, monkeypatch, url
+):
+    for index in range(5):
+        _add(f"stew-{index}", index)
+    db.session.commit()
+    # Newest first, so stew-4 is the first card; it has no image.
+    monkeypatch.setattr(
+        "blueprints.public_bp._card_image",
+        lambda recipe: (
+            None if recipe.slug == "stew-4" else {"src": f"https://example.test/{recipe.slug}.webp"}
+        ),
+    )
+
+    images = IMG.findall(client.get(url).get_data(as_text=True))
+    assert len(images) == 4
+    assert 'fetchpriority="high"' in images[0] and "stew-3" in images[0]
+    assert sum("fetchpriority" in tag for tag in images) == 1
+    assert "loading=" not in images[1]
+    for tag in images[2:]:
         assert 'loading="lazy"' in tag

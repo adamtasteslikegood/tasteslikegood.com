@@ -69,8 +69,10 @@ def register_static_versioning(app: Flask) -> None:
     def cache_versioned_static(response: Response) -> Response:
         # Only a URL naming the file's current hash is immutable. A stale or
         # made-up ``v`` keeps Flask's revalidating default, so an old page can
-        # never pin old CSS under a URL a new page also uses.
-        if request.endpoint != "static" or response.status_code != 200:
+        # never pin old CSS under a URL a new page also uses. A 304 is covered
+        # too: its headers replace the ones the cache stored, so a
+        # revalidation that answered ``no-cache`` would end the year early.
+        if request.endpoint != "static" or response.status_code not in (200, 304):
             return response
         filename = (request.view_args or {}).get("filename")
         version = request.args.get("v")
