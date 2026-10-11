@@ -360,7 +360,7 @@ def test_hub_page_boundaries(app, client):
     assert first.status_code == 200
     body = first.get_data(as_text=True)
     assert '<link rel="canonical" href="http://localhost/browse/tag/dinner">' in body
-    assert "<title>Vegan Dinner Recipes · TastesLikeGood</title>" in body
+    assert "<title>Vegan Dinner Recipes · Tasteslikegood.org</title>" in body
     assert CARD.findall(body) == newest[:HUB_PAGE_SIZE]
     assert _item_list_slugs(body) == newest[:HUB_PAGE_SIZE]
     nav = _pagination_nav(body)
@@ -371,7 +371,7 @@ def test_hub_page_boundaries(app, client):
     body = middle.get_data(as_text=True)
     canonical = "http://localhost/browse/tag/dinner?page=2"
     assert f'<link rel="canonical" href="{canonical}">' in body
-    assert "<title>Vegan Dinner Recipes, Page 2 of 3 · TastesLikeGood</title>" in body
+    assert "<title>Vegan Dinner Recipes, Page 2 of 3 · Tasteslikegood.org</title>" in body
     assert _item_list_slugs(body) == newest[HUB_PAGE_SIZE : 2 * HUB_PAGE_SIZE]
     assert _json_ld(body, "CollectionPage")["url"] == canonical
     crumbs = _json_ld(body, "BreadcrumbList")["itemListElement"]

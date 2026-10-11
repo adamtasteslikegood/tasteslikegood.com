@@ -46,6 +46,8 @@ EXPECTED_HEADER = [
     ("/kitchen", "My Kitchen"),
     ("/browse", "Browse"),
 ]
+# The site name in the footer's copyright line, linked home (KAN-374).
+EXPECTED_FOOTER_BRAND = ("/", "Tasteslikegood.org")
 EXPECTED_FOOTER = [
     ("/browse", "Browse recipes"),
     ("/browse/tag/breakfast", "Breakfast"),
@@ -190,7 +192,7 @@ def test_ssr_chrome_renders_the_canonical_link_set(client, path, status):
     assert resp.status_code == status
     links = chrome_links(resp.get_data(as_text=True))
     assert links["header"] == EXPECTED_HEADER
-    assert links["footer"] == EXPECTED_FOOTER
+    assert links["footer"] == [EXPECTED_FOOTER_BRAND, *EXPECTED_FOOTER]
 
 
 def test_ssr_chrome_has_no_js_only_controls(client):
@@ -219,7 +221,10 @@ def test_footer_leaves_out_a_thin_hub(app, client):
             db.session.delete(recipe)
         db.session.commit()
     footer = chrome_links(client.get("/browse").get_data(as_text=True))["footer"]
-    assert footer == [link for link in EXPECTED_FOOTER if link[0] != "/browse/tag/tofu"]
+    assert footer == [
+        EXPECTED_FOOTER_BRAND,
+        *(link for link in EXPECTED_FOOTER if link[0] != "/browse/tag/tofu"),
+    ]
 
 
 def test_literals_match_the_cookbook_manifest():
@@ -236,3 +241,7 @@ def test_literals_match_the_cookbook_manifest():
     }
     assert as_pairs["header"] == EXPECTED_HEADER
     assert as_pairs["footer"] == EXPECTED_FOOTER
+    # Absent from a cookbook checkout that predates KAN-374.
+    brand = manifest.get("footerBrand")
+    if brand is not None:
+        assert (brand["href"], brand["label"]) == EXPECTED_FOOTER_BRAND

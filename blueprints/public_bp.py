@@ -472,7 +472,7 @@ def _recipe_tags(data: dict[str, Any]) -> list[str]:
     return [tag.strip() for tag in raw_tags if isinstance(tag, str) and tag.strip()]
 
 
-DEFAULT_RECIPE_DESCRIPTION = "A vegan recipe from TastesLikeGood."
+DEFAULT_RECIPE_DESCRIPTION = "A vegan recipe from Tasteslikegood.org."
 
 
 def _recipe_description(data: dict[str, Any]) -> str:
@@ -522,7 +522,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         "author": (
             {"@type": "Person", "name": author_name}
             if author_name
-            else {"@type": "Organization", "name": "TastesLikeGood"}
+            else {"@type": "Organization", "name": "Tasteslikegood.org"}
         ),
         "datePublished": recipe.created_at.date().isoformat() if recipe.created_at else None,
         "dateModified": recipe.updated_at.date().isoformat() if recipe.updated_at else None,
@@ -613,14 +613,14 @@ def _tag_labels(data: dict[str, Any], mapping: Mapping[str, str]) -> list[str]:
     return labels
 
 
-SITE_TITLE_SUFFIX = " · TastesLikeGood"
+SITE_TITLE_SUFFIX = " · Tasteslikegood.org"
 MAX_TITLE_LENGTH = 60
 MAX_DESCRIPTION_LENGTH = 155
 _SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 
 
 def _page_title(name: str) -> str:
-    """``name · TastesLikeGood`` when that fits a result line, else just ``name``.
+    """``name · Tasteslikegood.org`` when that fits a result line, else just ``name``.
 
     Results truncate near 60 characters, and 25 of 96 recipe titles lost their
     ending to the unconditional suffix (SEO audit 2026-09-13, O3).

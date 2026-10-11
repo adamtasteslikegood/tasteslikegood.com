@@ -175,7 +175,7 @@ def test_show_public_recipe_includes_seo_meta_and_json_ld(app, client):
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert '<link rel="canonical" href="http://localhost/r/thai-peanut-noodles">' in body
-    assert '<meta property="og:title" content="Thai Peanut Noodles · TastesLikeGood">' in body
+    assert '<meta property="og:title" content="Thai Peanut Noodles · Tasteslikegood.org">' in body
     # KAN-195: the rendered image URL carries a ?v=<marker> so a regenerated
     # photo is not hidden behind the endpoint's 24h Cache-Control.
     assert re.search(
