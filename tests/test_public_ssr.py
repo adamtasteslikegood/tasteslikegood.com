@@ -120,7 +120,8 @@ def test_show_public_recipe_renders_html(app, client):
     body = resp.get_data(as_text=True)
     assert "Thai Peanut Noodles" in body
     assert "Thai Peanut Noodles description" in body
-    assert '<script defer src="/static/js/public.js"></script>' in body
+    # KAN-362: static URLs carry the file's content hash.
+    assert re.search(r'<script defer src="/static/js/public\.js\?v=[0-9a-f]{12}"></script>', body)
     assert "document.querySelectorAll('[data-open-kitchen]')" not in body
     # KAN-292: the shared same-origin consent gate is the only other script, and
     # the footer offers a way to reopen (and withdraw) the analytics choice.

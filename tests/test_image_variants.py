@@ -385,7 +385,7 @@ def test_stock_image_hero_has_no_srcset_or_preload(app, client):
     assert 'rel="preload"' not in body
 
 
-def test_browse_cards_use_small_variants_and_stay_lazy(app, client):
+def test_browse_cards_use_small_variants(app, client):
     with app.app_context():
         recipe_id = _add_image_recipe("card-pie", _jpeg())
         token = _image_version_token(db.session.get(Recipe, recipe_id))
@@ -396,7 +396,9 @@ def test_browse_cards_use_small_variants_and_stay_lazy(app, client):
     img = card.group(1)
     assert f'src="/api/recipes/{recipe_id}/image?w=400&amp;v={token}"' in img
     assert f"w=800&amp;v={token} 800w" in img
-    assert 'loading="lazy"' in img
+    # KAN-362: the first card is on screen at load, so it is not lazy. The
+    # lazy cards below the first row are covered in test_static_assets.py.
+    assert "loading=" not in img and 'fetchpriority="high"' in img
     assert 'width="400"' in img and 'height="300"' in img
     # KAN-297: cards are two per row at every width up to 900px, phones included.
     assert 'sizes="(max-width: 900px) 50vw, 400px"' in img

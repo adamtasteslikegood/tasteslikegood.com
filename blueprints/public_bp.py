@@ -1232,6 +1232,49 @@ def public_recipe_json(slug):
     return jsonify(payload)
 
 
+NEWEST_RECIPES_DEFAULT = 8
+NEWEST_RECIPES_MAX = 12
+
+
+@public_bp.route("/api/public/newest-recipes", methods=["GET"])
+def newest_public_recipes_json():
+    """The most recently published public recipes, for the home page row (KAN-348).
+
+    Ordered by ``first_published_at``, not ``created_at``: a recipe created in
+    July and published today is new to a reader and to a crawler. Rows without
+    a publication date or a slug are left out. Visibility is read on every
+    call, so an unpublished recipe drops out as soon as the caller's own cache
+    expires.
+    """
+    limit = request.args.get("limit", type=int)
+    if limit is None:
+        limit = NEWEST_RECIPES_DEFAULT
+    limit = max(1, min(limit, NEWEST_RECIPES_MAX))
+    rows = (
+        Recipe.query.with_entities(Recipe.slug, Recipe.name, Recipe.first_published_at)
+        .filter(
+            Recipe.is_public.is_(True),
+            Recipe.slug.isnot(None),
+            Recipe.first_published_at.isnot(None),
+        )
+        .order_by(Recipe.first_published_at.desc(), Recipe.id.desc())
+        .limit(limit)
+        .all()
+    )
+    return jsonify(
+        {
+            "recipes": [
+                {
+                    "slug": row.slug,
+                    "name": row.name,
+                    "first_published_at": row.first_published_at.isoformat(),
+                }
+                for row in rows
+            ]
+        }
+    )
+
+
 @public_bp.route("/browse", methods=["GET"])
 def browse_public_recipes():
     """Paginated SSR index of published recipes.

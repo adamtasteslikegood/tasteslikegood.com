@@ -70,6 +70,7 @@
     </form>
 
     {% if recipes %}
+    {% set card_priority = namespace(given=false) %}
     <ul class="public-browse-list">
         {% for recipe in recipes %}
         {% set data = recipe.data or {} %}
@@ -89,7 +90,10 @@
                         width="400"
                         height="300"
                         alt="{{ recipe.name }}"
-                        loading="lazy"
+                        {# KAN-362: the first row is on screen at load (three columns
+                           on desktop), and its first image is the desktop LCP image; a
+                           card without an image does not use up the hint. #}
+                        {% if loop.index <= 3 %}{% if not card_priority.given %}fetchpriority="high"{% set card_priority.given = true %}{% endif %}{% else %}loading="lazy"{% endif %}
                         decoding="async"
                     />
                 </div>
