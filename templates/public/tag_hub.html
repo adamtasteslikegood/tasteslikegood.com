@@ -59,7 +59,9 @@
                         width="400"
                         height="300"
                         alt="{{ recipe.name }}"
-                        loading="lazy"
+                        {# KAN-362: the first row is on screen at load (three columns
+                           on desktop), and the first card is the desktop LCP image. #}
+                        {% if loop.index <= 3 %}{% if loop.first %}fetchpriority="high"{% endif %}{% else %}loading="lazy"{% endif %}
                         decoding="async"
                     />
                 </div>

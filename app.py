@@ -32,6 +32,7 @@ from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
 from blueprints.worker_api_bp import worker_api_bp
 from utils.logging_config import setup_logging
+from utils.static_assets import register_static_versioning
 
 # Import session utilities
 from utils.session_utils import get_or_create_session_id
@@ -266,6 +267,7 @@ def create_app(**config_overrides):
 
     # Must stay before CORS(app) — see _register_image_cache_hygiene.
     _register_image_cache_hygiene(app)
+    register_static_versioning(app)
 
     CORS(
         app,
