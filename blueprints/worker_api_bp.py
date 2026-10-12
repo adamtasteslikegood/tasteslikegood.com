@@ -754,3 +754,42 @@ def process_image():
         return jsonify({"status": "retry"}), 500
 
     return jsonify({"status": "ok"}), 200
+
+
+@worker_api_bp.route("/metadata", methods=["POST"])
+@require_pubsub_oidc
+def process_metadata():
+    """Build search metadata for one published recipe (KAN-388).
+
+    A 500 asks Pub/Sub to redeliver: the model call failed, and the rule
+    version is already saved. Everything else is acknowledged.
+    """
+    from extensions import db
+    from models.recipe import Recipe
+    from services.recipe_metadata import build_metadata
+
+    envelope = request.get_json(silent=True) or {}
+    message = envelope.get("message")
+    if not message:
+        return jsonify({"status": "error", "message": "Bad Request: missing 'message'"}), 400
+    try:
+        data = json.loads(base64.b64decode(message["data"]).decode("utf-8"))
+        recipe_id = data.get("recipe_id")
+    except Exception as e:
+        logger.error("Failed to decode push message: %s", sanitize_log_value(e))
+        return jsonify({"status": "ok"}), 200
+
+    recipe = db.session.get(Recipe, recipe_id) if isinstance(recipe_id, str) else None
+    if recipe is None or not recipe.is_public:
+        return jsonify({"status": "ok"}), 200
+    try:
+        build_metadata(recipe)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(
+            "Metadata build failed for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
+        return jsonify({"status": "error"}), 500
+    return jsonify({"status": "ok"}), 200

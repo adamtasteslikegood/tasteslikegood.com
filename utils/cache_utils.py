@@ -169,6 +169,11 @@ def recipe_image_pin_key(recipe_id, version):
 # ── Invalidation helpers ──────────────────────────────────────────────────────
 
 
+def recipe_metadata_queued_key(recipe_id, inputs_hash):
+    """Marks a metadata build as queued for this recipe and content version (KAN-388)."""
+    return f"vgc:meta:queued:{recipe_id}:{inputs_hash}"
+
+
 def invalidate_recipe(user_id, guest_session_id, recipe_id):
     """Invalidate caches after a recipe is created, updated, or deleted."""
     keys = [

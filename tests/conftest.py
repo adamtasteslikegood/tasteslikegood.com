@@ -15,6 +15,22 @@ from ddtrace.trace import tracer
 tracer.enabled = False
 
 
+@pytest.fixture(autouse=True)
+def no_metadata_queue(monkeypatch):
+    """Keep the metadata engine's queue publish (KAN-388) off the network.
+
+    Rendering or saving a public recipe queues a metadata build. A developer's
+    .env can carry a real ``GCP_PROJECT_ID``, so without this every such test
+    would publish to the live topic. Tests of the queue patch it themselves.
+    """
+    calls = []
+    monkeypatch.setattr(
+        "services.recipe_metadata.publish_message",
+        lambda topic, data: calls.append((topic, data)) or "test-message",
+    )
+    return calls
+
+
 @pytest.fixture
 def mark_generated():
     """Stamp a row the way the worker's text write does (KAN-329).
