@@ -50,6 +50,7 @@ from services.tag_hubs import (
     TagHub,
     hubs_for_tags,
 )
+from utils.cache_utils import PIN_VARIANT_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +344,7 @@ def _pin_image_url(owner: Recipe) -> str:
         recipe_id=owner.id,
         pin=1,
         v=token,
+        pv=PIN_VARIANT_VERSION,
     )
 
 

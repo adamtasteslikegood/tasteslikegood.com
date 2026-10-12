@@ -23,6 +23,11 @@ TTL_SHORT = 300  # 5 minutes — recipe stats, collections list
 TTL_MEDIUM = 600  # 10 minutes — individual recipes, collections
 TTL_IMAGE = 86400  # 24 hours — recipe images (rarely change)
 
+# Bump whenever the rendered Pinterest image changes independently of its
+# source bytes. This versions both the Valkey key and the public URL so neither
+# internal nor HTTP caches can serve an older transformation.
+PIN_VARIANT_VERSION = 2
+
 # Ceiling for cached JSON response payloads. Recipe rows written before the
 # GCS migration can still carry a base64 image under data["ai_image_data"]
 # (generation_api_bp still reads that fallback), so an unguarded set would put
@@ -158,7 +163,7 @@ def recipe_image_pin_key(recipe_id, version):
     ``pin2``: the pin shape changed (landscape photos are cropped to a square
     before padding), so pins cached under the old shape must not be served.
     """
-    return f"vgc:img:{recipe_id}:pin2:{version}"
+    return f"vgc:img:{recipe_id}:pin{PIN_VARIANT_VERSION}:{version}"
 
 
 # ── Invalidation helpers ──────────────────────────────────────────────────────
