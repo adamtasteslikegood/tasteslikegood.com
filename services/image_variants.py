@@ -111,16 +111,21 @@ def make_pin_variant(image_bytes: bytes) -> bytes | None:
 
     Generated photos are 1408x768 landscape or 1024x1024 square. A 2:3 centre
     crop of a landscape source keeps a 512 px sliver of the dish and upscales it
-    2x, so instead the whole photo is fitted into the frame and centred on a
-    blurred, cover-scaled copy of itself: the familiar "blurred pad" pin shape.
-    JPEG has no alpha, so a transparent source is composited onto that
-    background rather than onto black.
+    2x, while fitting the whole landscape photo leaves a ~545 px strip in a
+    1500 px frame, most of the pin blurred pad. So a landscape source is first
+    cropped to its centre square, then the photo is fitted into the frame and
+    centred on a blurred, cover-scaled copy of itself: every pin is at least
+    two-thirds photo. JPEG has no alpha, so a transparent source is composited
+    onto that background rather than onto black.
 
     Returns ``None`` when the bytes cannot be decoded, like ``make_webp_variant``.
     """
     pin_w, pin_h = PIN_SIZE
     try:
         photo = _open_source(image_bytes).convert("RGBA")
+        if photo.width > photo.height:
+            left = (photo.width - photo.height) // 2
+            photo = photo.crop((left, 0, left + photo.height, photo.height))
         # Composite the cover-scaled copy onto an opaque canvas *before* blurring:
         # blurring RGBA would smear the alpha channel too, which for a hard 0/255
         # edge (opaque subject on transparent field) leaks white through the pad
