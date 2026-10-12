@@ -12,9 +12,9 @@ back to plain truncation when there is none.
 import hashlib
 import json
 import logging
+import queue
 import re
 import threading
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Optional
 
 from flask import current_app
@@ -79,35 +79,47 @@ _QUANTITY_WORD = re.compile(
     r"|forty|fifty|sixty|ninety|hundred|dozen|half|minutes?|mins?|hours?|overnight)\b"
 )
 
-_background = ThreadPoolExecutor(max_workers=1, thread_name_prefix="recipe-metadata-queue")
-_background_jobs = 0
+_background_jobs: "queue.Queue[Callable[[], None]]" = queue.Queue(maxsize=MAX_BACKGROUND_JOBS)
+_background_thread: Optional[threading.Thread] = None
 _background_lock = threading.Lock()
 
 
+def _drain_background_jobs() -> None:
+    while True:
+        job = _background_jobs.get()
+        try:
+            job()
+        except Exception as e:
+            logger.warning("Background metadata job failed: %s", sanitize_log_value(e))
+
+
 def _run_in_background(job: Callable[[], None]) -> None:
-    """Run ``job`` off the request, inside the app context. Drops it when the line is long.
+    """Run ``job`` off the request, inside the app context. Drops it when the line is full.
 
     A page render must not wait on the cache or the queue: with the cache
     unreachable, each call can block for many seconds. One thread takes those
     waits instead, and a full line means the cache is already struggling.
+
+    The thread is a daemon, so waiting jobs never hold up a worker that is
+    exiting: an executor's thread is joined at exit and would run them all first.
     """
-    global _background_jobs
+    global _background_thread
     app = current_app._get_current_object()  # type: ignore[attr-defined]
-    with _background_lock:
-        if _background_jobs >= MAX_BACKGROUND_JOBS:
-            return
-        _background_jobs += 1
 
     def run() -> None:
-        global _background_jobs
-        try:
-            with app.app_context():
-                job()
-        finally:
-            with _background_lock:
-                _background_jobs -= 1
+        with app.app_context():
+            job()
 
-    _background.submit(run)
+    try:
+        _background_jobs.put_nowait(run)
+    except queue.Full:
+        return
+    with _background_lock:
+        if _background_thread is None or not _background_thread.is_alive():
+            _background_thread = threading.Thread(
+                target=_drain_background_jobs, name="recipe-metadata-queue", daemon=True
+            )
+            _background_thread.start()
 
 
 def truncate_description(text: str) -> str:

@@ -535,3 +535,30 @@ def test_safe_add_is_one_atomic_command_on_redis(app, monkeypatch):
 
     assert cache_utils.safe_add("vgc:meta:queued:x:y", 1, timeout=60) is True
     assert commands == [("vgc:meta:queued:x:y", True, 60)]
+
+
+def test_background_jobs_run_on_a_daemon_thread_and_a_full_line_drops_new_ones(app, monkeypatch):
+    import queue as queue_module
+    import threading
+
+    monkeypatch.undo()  # the real background runner
+    release = threading.Event()
+    started = threading.Event()
+    ran = []
+    monkeypatch.setattr(engine, "_background_jobs", queue_module.Queue(maxsize=1))
+    monkeypatch.setattr(engine, "_background_thread", None)
+
+    def blocked():
+        started.set()
+        release.wait(5)
+
+    engine._run_in_background(blocked)
+    assert started.wait(5)
+    # A daemon thread is not joined at exit, so a blocked job cannot hold the worker.
+    assert engine._background_thread.daemon
+    engine._run_in_background(lambda: ran.append("waiting"))
+    engine._run_in_background(lambda: ran.append("dropped"))
+    release.set()
+    engine._background_thread.join(0.5)
+
+    assert ran == ["waiting"]
