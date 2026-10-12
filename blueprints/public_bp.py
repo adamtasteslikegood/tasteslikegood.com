@@ -42,7 +42,6 @@ from sqlalchemy.orm import joinedload
 
 from extensions import db
 from models import Recipe, RetiredSlug
-from services.image_variants import VARIANT_WIDTHS
 from services.tag_hubs import (
     HUBS_BY_SLUG,
     MIN_INDEXABLE_RECIPES,
@@ -369,10 +368,23 @@ def _versioned_image_url(owner: Recipe) -> str:
 # spans ``.public-main`` (min(1200px, 100vw - 3rem)); browse cards are a
 # 3-column grid above 900px and 2 columns at or below it, phones included
 # (KAN-297).
-HERO_IMAGE_WIDTHS = VARIANT_WIDTHS
+#
+# Card ``sizes`` give the image's own slot, not a share of the viewport
+# (KAN-371). From recipe-site.css: ``.public-main`` is 100vw - 1.5rem up to
+# 768px and 100vw - 3rem above it, capped at 1200px; the grid gap is 0.75rem
+# up to 768px and 1.5rem above it; each card has a 1px border either side of
+# the image. That makes the image 50vw - 20px, then 50vw - 38px, then a third
+# of (100vw - 96px) less 2px, then 382px. "50vw" overstated a 412px phone's
+# slot by 20px, which at DPR 2 is the difference between the 400 file and the
+# 800 one. The 600 width is for phones at DPR 2.6-3, whose slot is 480-585
+# device pixels. tests/test_image_variants.py pins the CSS these come from.
+HERO_IMAGE_WIDTHS = (400, 800, 1200)
 HERO_IMAGE_SIZES = "(max-width: 1248px) 100vw, 1200px"
-CARD_IMAGE_WIDTHS = (400, 800)
-CARD_IMAGE_SIZES = "(max-width: 900px) 50vw, 400px"
+CARD_IMAGE_WIDTHS = (400, 600, 800)
+CARD_IMAGE_SIZES = (
+    "(max-width: 768px) calc(50vw - 20px), (max-width: 900px) calc(50vw - 38px), "
+    "(max-width: 1248px) calc(33.4vw - 34px), 382px"
+)
 
 
 def _image_variants(owner: Recipe, widths: tuple[int, ...]) -> dict[str, str]:

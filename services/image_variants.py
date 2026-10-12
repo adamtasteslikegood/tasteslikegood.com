@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # The only widths the image route will produce. A fixed allow-list keeps the
 # cache keyspace bounded and stops ``?w=`` from being used to make the server
 # resize to arbitrary sizes.
-VARIANT_WIDTHS: tuple[int, ...] = (400, 800, 1200)
+VARIANT_WIDTHS: tuple[int, ...] = (400, 600, 800, 1200)
 
 WEBP_QUALITY = 80
 
