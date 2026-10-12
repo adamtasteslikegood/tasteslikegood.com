@@ -722,11 +722,23 @@ def _gate_is_public(
     return {**recipe_data, "is_public": wants_public}
 
 
+# KAN-381: statuses of a row that has no recipe in it. POST /api/generate
+# writes a "Generating..." placeholder first; the worker fills it in and sets
+# "ready". A placeholder whose generation is still running, or died, is not a
+# recipe, so the owner's list and count leave it out. "generating_image" is a
+# finished recipe waiting for its picture and stays in.
+UNFINISHED_GENERATION_STATUSES = frozenset({"generating", "processing", "error"})
+
+
+def _listed_recipes(query):
+    return query.filter(Recipe.status.notin_(UNFINISHED_GENERATION_STATUSES))
+
+
 def get_user_recipes(
     user_id: Optional[int], guest_session_id: Optional[str] = None
 ) -> List[Recipe]:
     """
-    Get all recipes for a specific user.
+    Get a user's recipes, without rows that never finished generating.
 
     Args:
         user_id: Database ID of the user (None for anonymous recipes)
@@ -735,9 +747,9 @@ def get_user_recipes(
         List of Recipe objects sorted by creation date (newest first)
     """
     try:
-        query = _apply_recipe_scope(Recipe.query, user_id, guest_session_id).order_by(
-            Recipe.created_at.desc()
-        )
+        query = _listed_recipes(
+            _apply_recipe_scope(Recipe.query, user_id, guest_session_id)
+        ).order_by(Recipe.created_at.desc())
         return query.all()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(
@@ -1639,7 +1651,7 @@ def get_all_recipes(limit: int = 100) -> List[Recipe]:
 
 def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] = None) -> int:
     """
-    Count the number of recipes for a user.
+    Count a user's recipes: the same rows get_user_recipes() lists.
 
     Args:
         user_id: Database ID of the user
@@ -1648,7 +1660,7 @@ def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] =
         Number of recipes
     """
     try:
-        scoped = _apply_recipe_scope(Recipe.query, user_id, guest_session_id)
+        scoped = _listed_recipes(_apply_recipe_scope(Recipe.query, user_id, guest_session_id))
         return scoped.count()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(

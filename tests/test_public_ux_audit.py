@@ -206,7 +206,7 @@ def test_404_page_renders_from_public_base_with_org_branding(client):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 404
-    assert "TastesLikeGood.org" in body
+    assert "Tasteslikegood.org" in body
     assert "TastesLikeGood.com" not in body
     assert 'href="/browse"' in body
     assert 'href="/#kitchen"' in body
@@ -228,7 +228,7 @@ def test_500_page_renders_from_public_base_with_org_branding(app):
     body = resp.get_data(as_text=True)
 
     assert resp.status_code == 500
-    assert "TastesLikeGood.org" in body
+    assert "Tasteslikegood.org" in body
     assert "TastesLikeGood.com" not in body
     assert 'href="/browse"' in body
     assert "/generate_recipe" not in body

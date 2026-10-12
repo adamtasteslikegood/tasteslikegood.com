@@ -183,10 +183,12 @@ def test_unmapped_tags_omit_category_and_cuisine(app, client):
 
 
 def test_page_title_keeps_suffix_only_when_it_fits():
-    assert _page_title("Vegan Cornbread") == "Vegan Cornbread · TastesLikeGood"
+    assert _page_title("Vegan Cornbread") == "Vegan Cornbread · Tasteslikegood.org"
     long_name = "Vegan Double Chocolate Chip Cookies with Baked-On Chocolate Drizzle"
     assert _page_title(long_name) == long_name
-    assert len(_page_title("x" * 43)) == 60
+    # The longest name that still takes the 21-character suffix.
+    assert len(_page_title("x" * 39)) == 60
+    assert _page_title("x" * 40) == "x" * 40
 
 
 def test_long_recipe_title_drops_suffix_on_the_page(app, client):
@@ -249,7 +251,7 @@ def test_malformed_description_uses_text_fallback(app, client):
     resp = client.get("/r/malformed-description")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    fallback = "A vegan recipe from TastesLikeGood."
+    fallback = "A vegan recipe from Tasteslikegood.org."
     assert f'<meta name="description" content="{fallback}">' in body
     assert _json_ld(body, "Recipe")["description"] == fallback
 
@@ -276,7 +278,7 @@ def test_browse_title_description_and_collection_json_ld(app, client):
         _add("hidden-soup", public=False, days=3)
 
     body = client.get("/browse").get_data(as_text=True)
-    assert "<title>Browse 2 Vegan Recipes · TastesLikeGood</title>" in body
+    assert "<title>Browse 2 Vegan Recipes · Tasteslikegood.org</title>" in body
     description = html.unescape(
         re.search(r'<meta name="description" content="([^"]*)">', body).group(1)
     )
@@ -297,7 +299,7 @@ def test_browse_title_description_and_collection_json_ld(app, client):
     assert '<meta name="twitter:card" content="summary_large_image">' in body
     # og:image is a specific dish photo, not a shot of the browse page — so its
     # alt names that dish, otherwise a plate of soup is announced as "Browse N
-    # Vegan Recipes · TastesLikeGood" on social cards and screen readers.
+    # Vegan Recipes · Tasteslikegood.org" on social cards and screen readers.
     og_image_alt = html.unescape(
         re.search(r'<meta property="og:image:alt" content="([^"]+)">', body).group(1)
     )
@@ -323,7 +325,7 @@ def test_browse_later_pages_say_which_page(app, client):
             _add(f"soup-{index}", days=index)
 
     body = client.get("/browse?page=2").get_data(as_text=True)
-    assert "<title>Vegan Recipes, Page 2 of 2 · TastesLikeGood</title>" in body
+    assert "<title>Vegan Recipes, Page 2 of 2 · Tasteslikegood.org</title>" in body
 
 
 def test_browse_later_page_breadcrumb_uses_its_canonical_url(app, client):
@@ -355,7 +357,9 @@ def test_browse_skips_a_public_row_without_a_slug(app, client):
     resp = client.get("/browse")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert "<title>Browse 1 Vegan Recipe · TastesLikeGood</title>" in body  # slugless not counted
+    assert (
+        "<title>Browse 1 Vegan Recipe · Tasteslikegood.org</title>" in body
+    )  # slugless not counted
     description = html.unescape(
         re.search(r'<meta name="description" content="([^"]*)">', body).group(1)
     )
