@@ -106,10 +106,10 @@ def generate_recipe_json():
     if not db_recipe:
         return jsonify({"error": "Failed to save recipe to database"}), 500
 
-    # KAN-151: this is the second path that adds a row to an owner's scope, and
-    # count_user_recipes() has no status filter, so a "generating" placeholder
-    # already changes the answer GET /api/recipes/stats caches. Mirrors the
-    # invalidation recipes_api_bp.create_recipe does for the same reason.
+    # KAN-151: this is the second path that adds a row to an owner's scope.
+    # Since KAN-381 the placeholder is not counted or listed until the worker
+    # sets it "ready" (and invalidates again), so this clears nothing that is
+    # stale today; it stays so the owner's keys never depend on that filter.
     invalidate_recipe(user_id, guest_session_id, recipe_id)
 
     # Publish message to Pub/Sub
