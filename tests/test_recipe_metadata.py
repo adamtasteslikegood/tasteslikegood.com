@@ -175,6 +175,8 @@ def test_build_with_a_valid_model_answer_adds_a_model_version(app, monkeypatch):
         json.dumps({"title": "Cornbread Recipe", "description": "x" * 120 + "…"}),
         # "30" is in neither the name, the description nor the tags.
         json.dumps({"title": "30-Minute Cornbread Recipe", "description": "x" * 120 + "."}),
+        # The recipe never says it is gluten-free.
+        json.dumps({"title": "Gluten-Free Cornbread Recipe", "description": "x" * 120 + "."}),
     ],
 )
 def test_an_invalid_model_answer_keeps_the_rule_version(app, monkeypatch, answer):

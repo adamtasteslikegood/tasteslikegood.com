@@ -45,6 +45,7 @@ _SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 _CLAUSE_END = re.compile(r"[,;:](?=\s)")
 _DANGLING_WORD = re.compile(r"\s+(?:and|or|with|then|plus|but)$", re.IGNORECASE)
 _NUMBER = re.compile(r"\d+")
+_FREE_FROM = re.compile(r"\b[a-z]+[- ]free\b")
 
 
 def truncate_description(text: str) -> str:
@@ -187,7 +188,7 @@ def _model_prompt(inputs: dict[str, Any]) -> str:
         "characters, complete sentences ending in a full stop. Say what the dish is and what "
         "makes it worth cooking. Do not end with an ellipsis.\n"
         "- Use only facts stated above. Do not add times, quantities, ingredients or claims "
-        "that are not there.\n"
+        "that are not there. Make no dietary, allergen or health claim beyond what is stated.\n"
         'Return only a JSON object: {"title": "...", "description": "..."}'
     )
 
@@ -220,6 +221,11 @@ def _parse_model_output(text: str, inputs: dict[str, Any]) -> Optional[tuple[str
     source_text = " ".join([inputs["name"], inputs["description"], *inputs["tags"]])
     known = set(_NUMBER.findall(source_text))
     if any(n not in known for n in _NUMBER.findall(f"{title} {description}")):
+        return None
+    # Likewise a "nut-free" or "gluten free" the recipe never claimed.
+    stated = {c.replace("-", " ") for c in _FREE_FROM.findall(source_text.lower())}
+    claimed = _FREE_FROM.findall(f"{title} {description}".lower())
+    if any(c.replace("-", " ") not in stated for c in claimed):
         return None
     if len(f"{title}{SITE_TITLE_SUFFIX}") <= MAX_TITLE_LENGTH:
         title = f"{title}{SITE_TITLE_SUFFIX}"
@@ -274,6 +280,9 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     client = get_genai_client(None)
     if client is None:
         return latest
+    # End the read transaction: the model call can take minutes and must not
+    # hold a pooled database connection while it does.
+    db.session.commit()
     answer = _parse_model_output(
         attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs)), inputs
     )
