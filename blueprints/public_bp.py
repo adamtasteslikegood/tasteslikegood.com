@@ -42,6 +42,12 @@ from sqlalchemy.orm import joinedload
 
 from extensions import db
 from models import Recipe, RetiredSlug
+from services.recipe_metadata import (
+    MAX_TITLE_LENGTH,
+    SITE_TITLE_SUFFIX,
+    metadata_for_page,
+    truncate_description,
+)
 from services.tag_hubs import (
     HUBS_BY_SLUG,
     MIN_INDEXABLE_RECIPES,
@@ -627,12 +633,6 @@ def _tag_labels(data: dict[str, Any], mapping: Mapping[str, str]) -> list[str]:
     return labels
 
 
-SITE_TITLE_SUFFIX = " · Tasteslikegood.org"
-MAX_TITLE_LENGTH = 60
-MAX_DESCRIPTION_LENGTH = 155
-_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
-
-
 def _page_title(name: str) -> str:
     """``name · Tasteslikegood.org`` when that fits a result line, else just ``name``.
 
@@ -649,15 +649,7 @@ def _meta_description(text: str) -> str:
     Recipe pages and Recipe JSON-LD keep their full descriptions. Browse
     reuses the bounded copy for both metadata and CollectionPage JSON-LD.
     """
-    text = " ".join(text.split())
-    if len(text) <= MAX_DESCRIPTION_LENGTH:
-        return text
-    head = text[: MAX_DESCRIPTION_LENGTH + 1]
-    ends = [m.end() for m in _SENTENCE_END.finditer(head) if m.end() <= MAX_DESCRIPTION_LENGTH]
-    if ends and ends[-1] >= 60:
-        return head[: ends[-1]]
-    cut = head[: MAX_DESCRIPTION_LENGTH - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
-    return f"{cut}…"
+    return truncate_description(text)
 
 
 RELATED_RECIPE_COUNT = 6
@@ -896,6 +888,7 @@ MAX_PIN_TAIL_LENGTH = 200
 # Common title/word abbreviations must not terminate the pin's first sentence.
 # Multi-initial abbreviations such as "e.g." and "U.S." are recognized separately.
 _PIN_ABBREVIATIONS = frozenset({"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."})
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 _PIN_INITIALISM = re.compile(r"(?:[a-z]\.){2,}")
 
 
@@ -1068,12 +1061,15 @@ def show_public_recipe(slug):
     )
     catalog = _catalog_tag_rows()
     breadcrumbs = _recipe_breadcrumbs(recipe, tags, catalog)
+    # KAN-388: the title and description the metadata engine wrote, when it has
+    # a version for this content; plain truncation until then.
+    metadata = metadata_for_page(recipe)
 
     return render_template(
         "public/recipe.html",
         recipe=recipe,
-        page_title=_page_title(recipe.name),
-        meta_description=_meta_description(description),
+        page_title=metadata.seo_title if metadata else _page_title(recipe.name),
+        meta_description=(metadata and metadata.meta_description) or _meta_description(description),
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
         recipe_hubs=_recipe_hubs(tags, catalog),

@@ -110,6 +110,90 @@ def safe_set(key, value, timeout=None, max_bytes=None):
 # ── Key builders ──────────────────────────────────────────────────────────────
 
 
+def safe_add(key, value, timeout=None):
+    """Set ``key`` only if it is absent. True when this call set it; False on any failure.
+
+    On Redis/Valkey this is one ``SET NX EX`` command. Cachelib's own ``add``
+    sends SETNX and then EXPIRE: if the second fails, the key stays forever.
+    """
+
+    def add():
+        backend = cache.cache
+        client = getattr(backend, "_write_client", None)
+        if client is None or not timeout:
+            return cache.add(key, value, timeout=timeout)
+        return client.set(
+            f"{backend._get_prefix()}{key}",
+            backend.serializer.dumps(value),
+            nx=True,
+            ex=int(timeout),
+        )
+
+    try:
+        return bool(_call_with_auth_retry(add))
+    except Exception as e:
+        logger.warning(
+            "Cache ADD failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+        return False
+
+
+def safe_compare_delete(key, expected_value):
+    """Delete ``key`` only when it still contains ``expected_value``.
+
+    Redis/Valkey executes the comparison and deletion in one Lua command so a
+    lease that expires and is reacquired cannot be deleted by its former
+    owner. Simpler local cache backends use the equivalent best-effort pair of
+    operations because they do not expose a scripting client.
+    """
+
+    def compare_delete():
+        backend = cache.cache
+        client = getattr(backend, "_write_client", None)
+        if client is None:
+            if cache.get(key) != expected_value:
+                return False
+            return bool(cache.delete(key))
+        script = """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            end
+            return 0
+        """
+        return bool(
+            client.eval(
+                script,
+                1,
+                f"{backend._get_prefix()}{key}",
+                backend.serializer.dumps(expected_value),
+            )
+        )
+
+    try:
+        return bool(_call_with_auth_retry(compare_delete))
+    except Exception as e:
+        logger.warning(
+            "Cache compare-and-delete failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+        return False
+
+
+def safe_delete(key):
+    """Delete from cache. Silently ignores failures."""
+    try:
+        _call_with_auth_retry(lambda: cache.delete(key))
+    except Exception as e:
+        logger.warning(
+            "Cache DELETE failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+
+
 def _owner_prefix(user_id, guest_session_id):
     """Build a cache key prefix scoped to the current user or guest."""
     if user_id is not None:
@@ -167,6 +251,15 @@ def recipe_image_pin_key(recipe_id, version):
 
 
 # ── Invalidation helpers ──────────────────────────────────────────────────────
+
+
+def recipe_metadata_building_key(recipe_id, inputs_hash):
+    return f"vgc:meta:building:{recipe_id}:{inputs_hash}"
+
+
+def recipe_metadata_queued_key(recipe_id, inputs_hash):
+    """Marks a metadata build as queued for this recipe and content version (KAN-388)."""
+    return f"vgc:meta:queued:{recipe_id}:{inputs_hash}"
 
 
 def invalidate_recipe(user_id, guest_session_id, recipe_id):

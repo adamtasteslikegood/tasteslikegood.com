@@ -22,13 +22,16 @@ def _get_publisher() -> pubsub_v1.PublisherClient:
     return _publisher
 
 
-def publish_message(topic_name: str, data: dict) -> str:
+def publish_message(topic_name: str, data: dict, timeout: Optional[float] = None) -> str:
     """
     Publish a JSON message to a Pub/Sub topic.
 
     Args:
         topic_name: The ID of the topic (e.g., 'recipe-generation').
         data: The dictionary to publish as JSON.
+        timeout: Seconds to wait for the publish to be confirmed. None waits
+            out the client's own retry deadline (minutes), which is right for
+            a job the caller cannot proceed without and wrong on a page render.
 
     Returns:
         The message ID as a string.
@@ -43,7 +46,7 @@ def publish_message(topic_name: str, data: dict) -> str:
 
     try:
         future = publisher.publish(topic_path, data=data_bytes)
-        message_id = str(future.result())
+        message_id = str(future.result(timeout=timeout))
         logger.info(f"Published message {message_id} to {topic_name}")
         return message_id
     except Exception as e:
