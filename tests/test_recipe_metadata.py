@@ -248,17 +248,22 @@ def test_queue_is_throttled_and_never_raises(app, monkeypatch):
 
     monkeypatch.setattr(engine, "publish_message", fail)
 
-    engine.queue_metadata(recipe)
-    engine.queue_metadata(recipe)
+    digest = engine.inputs_hash(engine.metadata_inputs(recipe))
+    backoffs = []
+    monkeypatch.setattr(engine, "safe_set", lambda key, _v, timeout=None: backoffs.append(timeout))
+    engine.queue_metadata(recipe.id, digest)
+    engine.queue_metadata(recipe.id, digest)
 
-    # One bounded attempt: a queue outage must not hold a page for minutes.
+    # One bounded attempt, and the failure shortens the wait before the next one.
     assert calls == [("recipe-metadata", engine.QUEUE_PUBLISH_TIMEOUT_SECONDS)]
+    assert backoffs == [engine.QUEUE_FAILED_BACKOFF_SECONDS]
 
 
 def test_queue_is_skipped_when_the_cache_cannot_throttle(app, monkeypatch, no_metadata_queue):
     monkeypatch.setattr(engine, "safe_add", lambda _key, _value, timeout=None: False)
 
-    engine.queue_metadata(_recipe())
+    recipe = _recipe()
+    engine.queue_metadata(recipe.id, engine.inputs_hash(engine.metadata_inputs(recipe)))
 
     assert no_metadata_queue == []
 
@@ -409,3 +414,124 @@ def test_worker_does_not_ask_for_redelivery_when_the_model_refuses_the_request(
         _model_answers(monkeypatch, ClientError(transient, {"error": {"message": "later"}}))
         assert _push(client, recipe.id).status_code == 500
     assert [v.source for v in _versions(recipe)] == ["rule"]
+
+
+@pytest.mark.parametrize(
+    "description",
+    [
+        "This creamy peanut and tofu curry is made without nuts or gluten and is full of flavor.",
+        "This creamy peanut and tofu curry has no dairy and comes together with warm spices.",
+        "This creamy peanut and tofu curry is ready in ten minutes and is full of warm spices.",
+    ],
+)
+def test_reworded_absence_claims_and_spelled_out_times_are_rejected(description):
+    inputs = {
+        "name": "Peanut Tofu Curry",
+        "description": "A creamy curry of peanuts, tofu and wheat noodles with warm spices.",
+        "tags": ["dinner"],
+    }
+    answer = json.dumps({"title": "Peanut Tofu Curry Recipe", "description": description})
+
+    assert engine._parse_model_output(answer, inputs) is None
+
+
+def test_an_absence_phrase_in_the_recipes_name_is_allowed():
+    inputs = {"name": "No-Bake Vegan Cheesecake", "description": "A chilled dessert.", "tags": []}
+    answer = json.dumps(
+        {
+            "title": "No-Bake Vegan Cheesecake Recipe",
+            "description": "This no-bake vegan cheesecake is a chilled dessert with a smooth, "
+            "creamy filling on a crisp base.",
+        }
+    )
+
+    assert engine._parse_model_output(answer, inputs) is not None
+
+
+def test_a_second_build_does_not_call_the_model_while_the_first_holds_the_claim(app, monkeypatch):
+    recipe = _recipe()
+    calls = []
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+
+    def overlapping(_client, _model, _prompt):
+        calls.append(1)
+        # A second delivery arrives while this call is running.
+        engine.build_metadata(db.session.get(Recipe, recipe.id))
+        return GOOD_ANSWER
+
+    monkeypatch.setattr(engine, "attempt_generation", overlapping)
+
+    assert engine.build_metadata(recipe).source == "model"
+    assert calls == [1]
+
+
+def test_a_failed_model_call_releases_the_claim_for_the_redelivery(app, monkeypatch):
+    recipe = _recipe()
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+
+    def fail(_client, _model, _prompt):
+        raise RuntimeError("model unavailable")
+
+    monkeypatch.setattr(engine, "attempt_generation", fail)
+    with pytest.raises(RuntimeError):
+        engine.build_metadata(recipe)
+
+    monkeypatch.setattr(engine, "attempt_generation", lambda _c, _m, _p: GOOD_ANSWER)
+    assert engine.build_metadata(recipe).source == "model"
+
+
+def test_deleting_a_recipe_deletes_its_metadata(app, no_model):
+    recipe = _recipe()
+    engine.build_metadata(recipe)
+    recipe.is_public = False
+    db.session.delete(recipe)
+    db.session.commit()
+
+    assert RecipeMetadata.query.count() == 0
+
+
+def test_page_queueing_runs_off_the_request_thread(app, monkeypatch):
+    import threading
+
+    recipe = _recipe()
+    seen = threading.Event()
+    threads = []
+
+    def record(_recipe_id, _digest, model_retry=False):
+        threads.append(threading.current_thread().name)
+        seen.set()
+
+    monkeypatch.undo()  # the real background runner, not the inline test one
+    monkeypatch.setattr(engine, "queue_metadata", record)
+
+    assert engine.metadata_for_page(recipe) is None
+    assert seen.wait(5)
+    assert threads[0].startswith("recipe-metadata-queue")
+
+
+def test_safe_add_is_one_atomic_command_on_redis(app, monkeypatch):
+    from cachelib.serializers import RedisSerializer
+
+    from utils import cache_utils
+
+    commands = []
+
+    class Client:
+        def set(self, name, value, nx=False, ex=None):
+            commands.append((name, nx, ex))
+            return True
+
+    class Backend:
+        _write_client = Client()
+        serializer = RedisSerializer()
+
+        def _get_prefix(self):
+            return ""
+
+    class Cache:
+        cache = Backend()
+
+    monkeypatch.setattr(cache_utils, "cache", Cache())
+
+    assert cache_utils.safe_add("vgc:meta:queued:x:y", 1, timeout=60) is True
+    assert commands == [("vgc:meta:queued:x:y", True, 60)]

@@ -24,6 +24,8 @@ def no_metadata_queue(monkeypatch):
     would publish to the live topic. Tests of the queue patch it themselves.
     """
     calls = []
+    # Page renders queue on a background thread; tests run that work inline.
+    monkeypatch.setattr("services.recipe_metadata._run_in_background", lambda job: job())
     monkeypatch.setattr(
         "services.recipe_metadata.publish_message",
         lambda topic, data, timeout=None: calls.append((topic, data)) or "test-message",

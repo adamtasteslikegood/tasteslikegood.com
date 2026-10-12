@@ -13,8 +13,11 @@ import hashlib
 import json
 import logging
 import re
-from typing import Any, Optional
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable, Optional
 
+from flask import current_app
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
@@ -24,7 +27,13 @@ from models.recipe import Recipe
 from models.recipe_metadata import RecipeMetadata
 from services.gemini_service import attempt_generation, get_genai_client
 from services.pubsub_service import publish_message
-from utils.cache_utils import recipe_metadata_queued_key, safe_add
+from utils.cache_utils import (
+    recipe_metadata_building_key,
+    recipe_metadata_queued_key,
+    safe_add,
+    safe_delete,
+    safe_set,
+)
 from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
@@ -40,6 +49,13 @@ QUEUE_THROTTLE_SECONDS = 3600
 MODEL_RETRY_THROTTLE_SECONDS = 86400
 # Queueing runs inside page renders and saves; it must not hold them up.
 QUEUE_PUBLISH_TIMEOUT_SECONDS = 2
+# After a publish that failed, the next attempt waits this long, not the full window.
+QUEUE_FAILED_BACKOFF_SECONDS = 300
+# One worker at a time calls the model for a recipe and content version.
+BUILD_CLAIM_SECONDS = 600
+# Page renders hand queueing to one background thread; beyond this many
+# waiting jobs a render drops its own (a later render asks again).
+MAX_BACKGROUND_JOBS = 50
 
 SITE_TITLE_SUFFIX = " · Tasteslikegood.org"
 MAX_TITLE_LENGTH = 60
@@ -55,6 +71,43 @@ _UNICODE_HYPHENS = re.compile("[\u2010-\u2015\u2212]")
 _SAFETY_CLAIM = re.compile(
     r"allerg|celiac|coeliac|intoleran|safe for|\bcures?\b|detox|disease|diabet"
 )
+# "without nuts", "free of gluten", "no dairy", "non-dairy": the same claim as "x-free".
+_ABSENCE = re.compile(r"\b(?:without|free (?:of|from)|no|zero|non)[- ]+[a-z]+")
+# A time or quantity in words is as invented as one in digits.
+_QUANTITY_WORD = re.compile(
+    r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty"
+    r"|forty|fifty|sixty|ninety|hundred|dozen|half|minutes?|mins?|hours?|overnight)\b"
+)
+
+_background = ThreadPoolExecutor(max_workers=1, thread_name_prefix="recipe-metadata-queue")
+_background_jobs = 0
+_background_lock = threading.Lock()
+
+
+def _run_in_background(job: Callable[[], None]) -> None:
+    """Run ``job`` off the request, inside the app context. Drops it when the line is long.
+
+    A page render must not wait on the cache or the queue: with the cache
+    unreachable, each call can block for many seconds. One thread takes those
+    waits instead, and a full line means the cache is already struggling.
+    """
+    global _background_jobs
+    app = current_app._get_current_object()  # type: ignore[attr-defined]
+    with _background_lock:
+        if _background_jobs >= MAX_BACKGROUND_JOBS:
+            return
+        _background_jobs += 1
+
+    def run() -> None:
+        global _background_jobs
+        try:
+            with app.app_context():
+                job()
+        finally:
+            with _background_lock:
+                _background_jobs -= 1
+
+    _background.submit(run)
 
 
 def truncate_description(text: str) -> str:
@@ -161,15 +214,15 @@ def _current(recipe: Recipe) -> Optional[RecipeMetadata]:
     return _usable(_versions(recipe.id, digest), digest)
 
 
-def queue_metadata(recipe: Recipe, *, model_retry: bool = False) -> None:
-    """Ask the worker to build ``recipe``'s metadata. Never raises.
+def queue_metadata(recipe_id: str, digest: str, *, model_retry: bool = False) -> None:
+    """Ask the worker to build metadata for a recipe and content version. Never raises.
 
     Throttled per recipe and content version, so a page that renders often or a
-    recipe that saves often queues once, and a queue outage costs one failed
-    publish per window rather than one per request.
+    recipe that saves often queues once. Takes plain values, not the recipe, so
+    it can run on the background thread without a database session.
     """
     try:
-        key = recipe_metadata_queued_key(recipe.id, inputs_hash(metadata_inputs(recipe)))
+        key = recipe_metadata_queued_key(recipe_id, digest)
         window = QUEUE_THROTTLE_SECONDS
         if model_retry:
             key, window = f"{key}:model", MODEL_RETRY_THROTTLE_SECONDS
@@ -177,13 +230,19 @@ def queue_metadata(recipe: Recipe, *, model_retry: bool = False) -> None:
         # sets nothing, so nothing is published rather than once per request.
         if not safe_add(key, 1, timeout=window):
             return
-        publish_message(
-            METADATA_TOPIC, {"recipe_id": recipe.id}, timeout=QUEUE_PUBLISH_TIMEOUT_SECONDS
-        )
+        try:
+            publish_message(
+                METADATA_TOPIC, {"recipe_id": recipe_id}, timeout=QUEUE_PUBLISH_TIMEOUT_SECONDS
+            )
+        except Exception:
+            # Nothing reached the worker: shorten the marker so the next
+            # attempt comes after a short backoff, not the whole window.
+            safe_set(key, 1, timeout=QUEUE_FAILED_BACKOFF_SECONDS)
+            raise
     except Exception as e:
         logger.warning(
             "Could not queue metadata for recipe %s: %s",
-            sanitize_log_value(recipe.id),
+            sanitize_log_value(recipe_id),
             sanitize_log_value(e),
         )
 
@@ -192,13 +251,14 @@ def metadata_for_page(recipe: Recipe) -> Optional[RecipeMetadata]:
     """Current metadata for a public page, queueing a build when one is owed.
 
     None owes a build now. A rule version owes another try at the model
-    rewrite, at most once a day.
+    rewrite, at most once a day. The queueing runs in the background, so the
+    render never waits on the cache or the queue.
     """
-    current = _current(recipe)
-    if current is None:
-        queue_metadata(recipe)
-    elif current.source == "rule":
-        queue_metadata(recipe, model_retry=True)
+    digest = inputs_hash(metadata_inputs(recipe))
+    current = _usable(_versions(recipe.id, digest), digest)
+    if current is None or current.source == "rule":
+        recipe_id, retry = recipe.id, current is not None
+        _run_in_background(lambda: queue_metadata(recipe_id, digest, model_retry=retry))
     return current
 
 
@@ -206,7 +266,7 @@ def queue_if_missing(recipe: Recipe) -> None:
     """After a save: queue a build when a public recipe has no current metadata."""
     try:
         if recipe.is_public and _current(recipe) is None:
-            queue_metadata(recipe)
+            queue_metadata(recipe.id, inputs_hash(metadata_inputs(recipe)))
     except Exception as e:
         db.session.rollback()
         logger.warning(
@@ -270,6 +330,17 @@ def _parse_model_output(text: str, inputs: dict[str, Any]) -> Optional[tuple[str
     tagged = {" ".join(tag.lower().replace("-", " ").split()) for tag in inputs["tags"]}
     if any(c.replace("-", " ") not in tagged for c in _FREE_FROM.findall(answer_lower)):
         return None
+    # The same claim in other words ("without nuts", "no dairy") must be in the
+    # recipe's name or tags, and a time or quantity in words must be in its text.
+    stated = " ".join([inputs["name"], *inputs["tags"]]).lower().replace("-", " ")
+    stated = " ".join(_UNICODE_HYPHENS.sub(" ", stated).split())
+    if any(
+        " ".join(c.replace("-", " ").split()) not in stated for c in _ABSENCE.findall(answer_lower)
+    ):
+        return None
+    source_words = set(re.findall(r"[a-z]+", _UNICODE_HYPHENS.sub("-", source_text.lower())))
+    if any(w not in source_words for w in _QUANTITY_WORD.findall(answer_lower)):
+        return None
     if _SAFETY_CLAIM.search(answer_lower):
         return None
     if len(f"{title}{SITE_TITLE_SUFFIX}") <= MAX_TITLE_LENGTH:
@@ -311,10 +382,11 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
                 return row
             except IntegrityError:
                 # Another build took this version number. If it was for this
-                # content, use it; if not, take the next number.
+                # content and no weaker than this one, use it; if not, take
+                # the next number.
                 db.session.rollback()
                 theirs = _usable(_versions(recipe.id, digest), digest)
-                if theirs is not None:
+                if theirs is not None and (theirs.source != "rule" or source == "rule"):
                     return theirs
         raise RuntimeError("could not allocate a metadata version")
 
@@ -333,9 +405,18 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     # End the read transaction: the model call can take minutes and must not
     # hold a pooled database connection while it does.
     db.session.commit()
-    answer = _parse_model_output(
-        attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs)), inputs
-    )
+    # One model call at a time per recipe and content: a second delivery that
+    # arrives while this one is running leaves the work to it.
+    claim = recipe_metadata_building_key(recipe.id, digest)
+    if not safe_add(claim, 1, timeout=BUILD_CLAIM_SECONDS):
+        return latest
+    try:
+        text = attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs))
+    except Exception:
+        # Let the redelivery try again rather than find the claim still held.
+        safe_delete(claim)
+        raise
+    answer = _parse_model_output(text, inputs)
     if answer is None:
         logger.info(
             "Model metadata for recipe %s failed validation; keeping the rule version",

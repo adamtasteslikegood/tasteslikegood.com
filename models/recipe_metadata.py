@@ -1,6 +1,9 @@
 from datetime import datetime
 
+from sqlalchemy import delete, event
+
 from extensions import db
+from models.recipe import Recipe
 
 
 class RecipeMetadata(db.Model):  # type: ignore[name-defined]
@@ -37,3 +40,17 @@ class RecipeMetadata(db.Model):  # type: ignore[name-defined]
     inputs = db.Column(db.JSON, nullable=False)
     scores = db.Column(db.JSON, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+
+@event.listens_for(Recipe, "before_delete")
+def _delete_metadata_with_recipe(_mapper, connection, recipe):  # type: ignore[no-untyped-def]
+    """Remove a deleted recipe's metadata on databases that do not enforce the cascade.
+
+    PostgreSQL does it through the foreign key. Local SQLite runs without
+    foreign-key enforcement, and a recipe restored under the same id would
+    otherwise pick the old rows up again. A relationship cascade is not used:
+    loading it autoflushes, which breaks a rename and delete in one flush.
+    """
+    connection.execute(
+        delete(RecipeMetadata.__table__).where(RecipeMetadata.recipe_id == recipe.id)
+    )
