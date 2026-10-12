@@ -562,3 +562,32 @@ def test_background_jobs_run_on_a_daemon_thread_and_a_full_line_drops_new_ones(a
     engine._background_thread.join(0.5)
 
     assert ran == ["waiting"]
+
+
+def test_a_failed_save_after_the_model_call_releases_the_claim(app, monkeypatch):
+    recipe = _recipe()
+    _model_answers(monkeypatch, GOOD_ANSWER)
+    real_refresh = db.session.refresh
+    monkeypatch.setattr(
+        db.session, "refresh", lambda _obj: (_ for _ in ()).throw(RuntimeError("database down"))
+    )
+    with pytest.raises(RuntimeError):
+        engine.build_metadata(recipe)
+
+    monkeypatch.setattr(db.session, "refresh", real_refresh)
+    assert engine.build_metadata(recipe).source == "model"
+
+
+def test_the_model_call_runs_with_no_database_connection_checked_out(app, monkeypatch):
+    recipe = _recipe()
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+    in_transaction = []
+
+    def generate(_client, _model, _prompt):
+        in_transaction.append(db.session().in_transaction())
+        return GOOD_ANSWER
+
+    monkeypatch.setattr(engine, "attempt_generation", generate)
+    engine.build_metadata(recipe)
+
+    assert in_transaction == [False]

@@ -415,32 +415,36 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     if client is None:
         return latest
     # End the read transaction: the model call can take minutes and must not
-    # hold a pooled database connection while it does.
+    # hold a pooled database connection while it does. The id is read first:
+    # a commit expires the recipe, and reading it afterwards opens a new one.
+    recipe_id = recipe.id
     db.session.commit()
     # One model call at a time per recipe and content: a second delivery that
     # arrives while this one is running leaves the work to it.
-    claim = recipe_metadata_building_key(recipe.id, digest)
+    claim = recipe_metadata_building_key(recipe_id, digest)
     if not safe_add(claim, 1, timeout=BUILD_CLAIM_SECONDS):
         return latest
     try:
-        text = attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs))
+        answer = _parse_model_output(
+            attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs)), inputs
+        )
+        if answer is None:
+            logger.info(
+                "Model metadata for recipe %s failed validation; keeping the rule version",
+                sanitize_log_value(recipe_id),
+            )
+            return latest
+        # The model call takes seconds. Whatever was written meanwhile wins: a
+        # person's version, or a build from content the recipe has since moved to.
+        db.session.refresh(recipe)
+        newest = _usable(_versions(recipe_id, digest), digest)
+        if inputs_hash(metadata_inputs(recipe)) != digest or (
+            newest is not None and newest.source != "rule"
+        ):
+            return newest
+        return save(answer[0], answer[1], "model", DEFAULT_MODEL)
     except Exception:
-        # Let the redelivery try again rather than find the claim still held.
+        # The model call or the save failed: let the redelivery try again
+        # rather than find the claim still held.
         safe_delete(claim)
         raise
-    answer = _parse_model_output(text, inputs)
-    if answer is None:
-        logger.info(
-            "Model metadata for recipe %s failed validation; keeping the rule version",
-            sanitize_log_value(recipe.id),
-        )
-        return latest
-    # The model call takes seconds. Whatever was written meanwhile wins: a
-    # person's version, or a build from content the recipe has since moved to.
-    db.session.refresh(recipe)
-    newest = _usable(_versions(recipe.id, digest), digest)
-    if inputs_hash(metadata_inputs(recipe)) != digest or (
-        newest is not None and newest.source != "rule"
-    ):
-        return newest
-    return save(answer[0], answer[1], "model", DEFAULT_MODEL)
