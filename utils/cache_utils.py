@@ -140,6 +140,48 @@ def safe_add(key, value, timeout=None):
         return False
 
 
+def safe_compare_delete(key, expected_value):
+    """Delete ``key`` only when it still contains ``expected_value``.
+
+    Redis/Valkey executes the comparison and deletion in one Lua command so a
+    lease that expires and is reacquired cannot be deleted by its former
+    owner. Simpler local cache backends use the equivalent best-effort pair of
+    operations because they do not expose a scripting client.
+    """
+
+    def compare_delete():
+        backend = cache.cache
+        client = getattr(backend, "_write_client", None)
+        if client is None:
+            if cache.get(key) != expected_value:
+                return False
+            return bool(cache.delete(key))
+        script = """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            end
+            return 0
+        """
+        return bool(
+            client.eval(
+                script,
+                1,
+                f"{backend._get_prefix()}{key}",
+                backend.serializer.dumps(expected_value),
+            )
+        )
+
+    try:
+        return bool(_call_with_auth_retry(compare_delete))
+    except Exception as e:
+        logger.warning(
+            "Cache compare-and-delete failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+        return False
+
+
 def safe_delete(key):
     """Delete from cache. Silently ignores failures."""
     try:

@@ -32,8 +32,7 @@ from utils.cache_utils import (
     recipe_metadata_building_key,
     recipe_metadata_queued_key,
     safe_add,
-    safe_delete,
-    safe_get,
+    safe_compare_delete,
     safe_set,
 )
 from utils.log_sanitizer import sanitize_log_value
@@ -468,9 +467,9 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
         raise MetadataBuildBusy(recipe_id)
 
     def release() -> None:
-        # Only its owner: a claim that expired may now belong to another worker.
-        if safe_get(claim) == token:
-            safe_delete(claim)
+        # Atomically release only this worker's claim: an expired claim may
+        # already have been acquired by another worker.
+        safe_compare_delete(claim, token)
 
     try:
         answer = _parse_model_output(

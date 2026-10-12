@@ -538,6 +538,39 @@ def test_safe_add_is_one_atomic_command_on_redis(app, monkeypatch):
     assert commands == [("vgc:meta:queued:x:y", True, 60)]
 
 
+def test_safe_compare_delete_is_one_atomic_command_on_redis(app, monkeypatch):
+    from cachelib.serializers import RedisSerializer
+
+    from utils import cache_utils
+
+    commands = []
+
+    class Client:
+        def eval(self, script, numkeys, name, value):
+            commands.append((script, numkeys, name, value))
+            return 1
+
+    class Backend:
+        _write_client = Client()
+        serializer = RedisSerializer()
+
+        def _get_prefix(self):
+            return "prefix:"
+
+    class Cache:
+        cache = Backend()
+
+    monkeypatch.setattr(cache_utils, "cache", Cache())
+
+    assert cache_utils.safe_compare_delete("claim", "owner-token") is True
+    assert len(commands) == 1
+    script, numkeys, name, value = commands[0]
+    assert "get" in script.lower() and "del" in script.lower()
+    assert numkeys == 1
+    assert name == "prefix:claim"
+    assert value == Backend.serializer.dumps("owner-token")
+
+
 def test_background_jobs_run_on_a_daemon_thread_and_a_full_line_drops_new_ones(app, monkeypatch):
     import queue as queue_module
     import threading
@@ -662,6 +695,42 @@ def test_a_worker_does_not_release_a_claim_it_no_longer_owns(app, monkeypatch):
         engine.build_metadata(recipe)
 
     assert cache.get(claim) == "another-worker"
+
+
+def test_build_releases_its_claim_with_atomic_compare_delete(app, monkeypatch):
+    recipe = _recipe()
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+    released = []
+    monkeypatch.setattr(
+        engine,
+        "safe_compare_delete",
+        lambda key, token: released.append((key, token)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        engine,
+        "safe_get",
+        lambda _key: pytest.fail("claim release must not use a separate GET"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        engine,
+        "safe_delete",
+        lambda _key: pytest.fail("claim release must not use a separate DELETE"),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        engine,
+        "attempt_generation",
+        lambda _client, _model, _prompt: (_ for _ in ()).throw(RuntimeError("model down")),
+    )
+
+    with pytest.raises(RuntimeError, match="model down"):
+        engine.build_metadata(recipe)
+
+    assert len(released) == 1
+    assert released[0][0].startswith("vgc:meta:building:")
+    assert len(released[0][1]) == 32
 
 
 def test_a_failed_metadata_check_never_fails_the_save(app, monkeypatch):
