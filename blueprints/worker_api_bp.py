@@ -761,12 +761,13 @@ def process_image():
 def process_metadata():
     """Build search metadata for one published recipe (KAN-388).
 
-    A 500 asks Pub/Sub to redeliver: the model call failed, and the rule
-    version is already saved. Everything else is acknowledged.
+    A 500 or 503 asks Pub/Sub to redeliver: the model call failed or another
+    delivery holds it, and the rule version is already saved. Everything else
+    is acknowledged.
     """
     from extensions import db
     from models.recipe import Recipe
-    from services.recipe_metadata import build_metadata
+    from services.recipe_metadata import MetadataBuildBusy, build_metadata
 
     envelope = request.get_json(silent=True) or {}
     message = envelope.get("message")
@@ -784,6 +785,11 @@ def process_metadata():
         return jsonify({"status": "ok"}), 200
     try:
         build_metadata(recipe)
+    except MetadataBuildBusy:
+        # Another delivery holds the model call, or the cache could not say.
+        # Not finished work: redelivery finds the model version once it is saved.
+        db.session.rollback()
+        return jsonify({"status": "busy"}), 503
     except ClientError as e:
         if e.code not in (408, 429):
             # The request itself was refused (bad model name, bad key): the same

@@ -15,6 +15,7 @@ import logging
 import queue
 import re
 import threading
+import uuid
 from typing import Any, Callable, Optional
 
 from flask import current_app
@@ -32,6 +33,7 @@ from utils.cache_utils import (
     recipe_metadata_queued_key,
     safe_add,
     safe_delete,
+    safe_get,
     safe_set,
 )
 from utils.log_sanitizer import sanitize_log_value
@@ -73,6 +75,19 @@ _SAFETY_CLAIM = re.compile(
 )
 # "without nuts", "free of gluten", "no dairy", "non-dairy": the same claim as "x-free".
 _ABSENCE = re.compile(r"\b(?:without|free (?:of|from)|no|zero|non)[- ]+[a-z]+")
+# Any other way of saying something is absent needs one of these words.
+_NEGATION = re.compile(
+    r"\b(?:neither|nor|not|never|none|lacks?|lacking|omits?|minus|excludes?|excluding"
+    r"|avoids?|skips?|leaves? out|[a-z]+less)\b|n't\b"
+)
+_WORD = re.compile(r"[a-z]+")
+_TITLE_FILLER = frozenset({"recipe", "recipes", "vegan", "and", "with", "the", "for", "style"})
+
+
+class MetadataBuildBusy(Exception):
+    """The model call for this recipe is claimed, or the claim could not be made."""
+
+
 # A time or quantity in words is as invented as one in digits.
 _QUANTITY_WORD = re.compile(
     r"\b(?:two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty"
@@ -276,14 +291,23 @@ def metadata_for_page(recipe: Recipe) -> Optional[RecipeMetadata]:
 
 def queue_if_missing(recipe: Recipe) -> None:
     """After a save: queue a build when a public recipe has no current metadata."""
+    # Read before anything can fail: after a rollback the id would need the
+    # database again, and an error here must never fail a save that committed.
+    recipe_id = recipe.id
     try:
-        if recipe.is_public and _current(recipe) is None:
-            queue_metadata(recipe.id, inputs_hash(metadata_inputs(recipe)))
+        if not recipe.is_public:
+            return
+        digest = inputs_hash(metadata_inputs(recipe))
+        missing = _usable(_versions(recipe_id, digest), digest) is None
+        # End the read transaction so the cache and queue calls hold no connection.
+        db.session.commit()
+        if missing:
+            queue_metadata(recipe_id, digest)
     except Exception as e:
         db.session.rollback()
         logger.warning(
             "Could not check metadata for recipe %s: %s",
-            sanitize_log_value(recipe.id),
+            sanitize_log_value(recipe_id),
             sanitize_log_value(e),
         )
 
@@ -323,6 +347,9 @@ def _parse_model_output(text: str, inputs: dict[str, Any]) -> Optional[tuple[str
         return None
     title = " ".join(title.split())
     description = " ".join(description.split())
+    # Control characters: PostgreSQL cannot store a NUL, and none belong in a snippet.
+    if any(ord(c) < 32 for c in f"{title}{description}"):
+        return None
     if not title or len(title) > MAX_TITLE_LENGTH or "recipe" not in title.lower():
         return None
     if "tasteslikegood" in title.lower():
@@ -354,6 +381,17 @@ def _parse_model_output(text: str, inputs: dict[str, Any]) -> Optional[tuple[str
     if any(w not in source_words for w in _QUANTITY_WORD.findall(answer_lower)):
         return None
     if _SAFETY_CLAIM.search(answer_lower):
+        return None
+    # Negation in any other form ("neither nuts nor gluten", "dairyless") is
+    # refused unless the recipe's name or tags use the same word.
+    stated_words = set(_WORD.findall(stated))
+    if any(w not in stated_words for m in _NEGATION.findall(answer_lower) for w in m.split()):
+        return None
+    # The title names this dish: its words come from the recipe, not from elsewhere.
+    if any(
+        w not in source_words and w not in _TITLE_FILLER
+        for w in _WORD.findall(_UNICODE_HYPHENS.sub("-", title.lower()))
+    ):
         return None
     if len(f"{title}{SITE_TITLE_SUFFIX}") <= MAX_TITLE_LENGTH:
         title = f"{title}{SITE_TITLE_SUFFIX}"
@@ -421,9 +459,18 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     db.session.commit()
     # One model call at a time per recipe and content: a second delivery that
     # arrives while this one is running leaves the work to it.
+    # A claim that is held or cannot be made is not finished work: the caller
+    # asks for redelivery, which finds the model version once the holder saves it.
     claim = recipe_metadata_building_key(recipe_id, digest)
-    if not safe_add(claim, 1, timeout=BUILD_CLAIM_SECONDS):
-        return latest
+    token = uuid.uuid4().hex
+    if not safe_add(claim, token, timeout=BUILD_CLAIM_SECONDS):
+        raise MetadataBuildBusy(recipe_id)
+
+    def release() -> None:
+        # Only its owner: a claim that expired may now belong to another worker.
+        if safe_get(claim) == token:
+            safe_delete(claim)
+
     try:
         answer = _parse_model_output(
             attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs)), inputs
@@ -433,6 +480,7 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
                 "Model metadata for recipe %s failed validation; keeping the rule version",
                 sanitize_log_value(recipe_id),
             )
+            # Keep the claim: the same content would get the same answer.
             return latest
         # The model call takes seconds. Whatever was written meanwhile wins: a
         # person's version, or a build from content the recipe has since moved to.
@@ -441,10 +489,13 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
         if inputs_hash(metadata_inputs(recipe)) != digest or (
             newest is not None and newest.source != "rule"
         ):
+            release()
             return newest
-        return save(answer[0], answer[1], "model", DEFAULT_MODEL)
+        row = save(answer[0], answer[1], "model", DEFAULT_MODEL)
+        release()
+        return row
     except Exception:
         # The model call or the save failed: let the redelivery try again
         # rather than find the claim still held.
-        safe_delete(claim)
+        release()
         raise

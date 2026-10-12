@@ -24,7 +24,7 @@ LONG_SENTENCE = (
 )
 GOOD_ANSWER = json.dumps(
     {
-        "title": "Three-Grain Vegan Cornbread Recipe",
+        "title": "Hearty Vegan Cornbread Recipe",
         "description": (
             "A hearty vegan cornbread made with three organic flours and creamed corn, "
             "baked in a cast iron skillet for a golden, crisp crust."
@@ -159,7 +159,7 @@ def test_build_with_a_valid_model_answer_adds_a_model_version(app, monkeypatch):
     row = engine.build_metadata(recipe)
 
     assert [v.source for v in _versions(recipe)] == ["rule", "model"]
-    assert row.seo_title == "Three-Grain Vegan Cornbread Recipe · Tasteslikegood.org"
+    assert row.seo_title == "Hearty Vegan Cornbread Recipe · Tasteslikegood.org"
     assert row.meta_description.endswith("crisp crust.")
     engine.build_metadata(recipe)
     assert len(_versions(recipe)) == 2
@@ -455,8 +455,9 @@ def test_a_second_build_does_not_call_the_model_while_the_first_holds_the_claim(
 
     def overlapping(_client, _model, _prompt):
         calls.append(1)
-        # A second delivery arrives while this call is running.
-        engine.build_metadata(db.session.get(Recipe, recipe.id))
+        # A second delivery arrives while this call is running: it is told to come back.
+        with pytest.raises(engine.MetadataBuildBusy):
+            engine.build_metadata(db.session.get(Recipe, recipe.id))
         return GOOD_ANSWER
 
     monkeypatch.setattr(engine, "attempt_generation", overlapping)
@@ -591,3 +592,79 @@ def test_the_model_call_runs_with_no_database_connection_checked_out(app, monkey
     engine.build_metadata(recipe)
 
     assert in_transaction == [False]
+
+
+@pytest.mark.parametrize(
+    "title, description",
+    [
+        (
+            "Peanut Tofu Curry Recipe",
+            "This creamy peanut curry contains neither nuts nor gluten and makes a cozy dinner "
+            "with warm spices.",
+        ),
+        (
+            "Peanut Tofu Curry Recipe",
+            "This creamy peanut curry is a dairyless dinner of tofu and noodles with warm spices "
+            "in every bite.",
+        ),
+        (
+            "Chocolate Cake Recipe",
+            "A creamy curry of peanuts, tofu and wheat noodles with warm spices for dinner any "
+            "night of the week.",
+        ),
+        (
+            "Peanut Tofu Curry Recipe\u0000",
+            "A creamy curry of peanuts, tofu and wheat noodles with warm spices for dinner any "
+            "night of the week.",
+        ),
+    ],
+)
+def test_negation_unrelated_titles_and_control_characters_are_rejected(title, description):
+    inputs = {
+        "name": "Peanut Tofu Curry",
+        "description": "A creamy curry of peanuts, tofu and wheat noodles with warm spices.",
+        "tags": ["dinner"],
+    }
+    answer = json.dumps({"title": title, "description": description})
+
+    assert engine._parse_model_output(answer, inputs) is None
+
+
+def test_worker_asks_for_redelivery_when_the_build_is_claimed_or_the_cache_is_down(
+    app, client, monkeypatch
+):
+    recipe = _recipe()
+    _model_answers(monkeypatch, GOOD_ANSWER)
+    monkeypatch.setattr(engine, "safe_add", lambda _key, _value, timeout=None: False)
+
+    assert _push(client, recipe.id).status_code == 503
+    assert [row.source for row in _versions(recipe)] == ["rule"]
+
+
+def test_a_worker_does_not_release_a_claim_it_no_longer_owns(app, monkeypatch):
+    recipe = _recipe()
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+    claim = engine.recipe_metadata_building_key(
+        recipe.id, engine.inputs_hash(engine.metadata_inputs(recipe))
+    )
+
+    def expire_then_fail(_client, _model, _prompt):
+        cache.set(claim, "another-worker", timeout=600)
+        raise RuntimeError("model unavailable")
+
+    monkeypatch.setattr(engine, "attempt_generation", expire_then_fail)
+    with pytest.raises(RuntimeError):
+        engine.build_metadata(recipe)
+
+    assert cache.get(claim) == "another-worker"
+
+
+def test_a_failed_metadata_check_never_fails_the_save(app, monkeypatch):
+    recipe = _recipe()
+
+    def down(_recipe_id, _digest):
+        raise RuntimeError("database down")
+
+    monkeypatch.setattr(engine, "_versions", down)
+
+    engine.queue_if_missing(recipe)
