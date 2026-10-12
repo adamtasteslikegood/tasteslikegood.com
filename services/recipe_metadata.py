@@ -23,7 +23,7 @@ from models.recipe import Recipe
 from models.recipe_metadata import RecipeMetadata
 from services.gemini_service import attempt_generation, get_genai_client
 from services.pubsub_service import publish_message
-from utils.cache_utils import recipe_metadata_queued_key, safe_get, safe_set
+from utils.cache_utils import recipe_metadata_queued_key, safe_add
 from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,9 @@ _CLAUSE_END = re.compile(r"[,;:](?=\s)")
 _DANGLING_WORD = re.compile(r"\s+(?:and|or|with|then|plus|but)$", re.IGNORECASE)
 _NUMBER = re.compile(r"\d+")
 _FREE_FROM = re.compile(r"\b[a-z]+[- ]free\b")
+_NEGATION = re.compile(r"\b(?:not|never|no longer|isn't|aren't|is not|are not)\b")
+# Safety wording a search snippet must not introduce on its own.
+_SAFETY_CLAIM = re.compile(r"allerg|celiac|coeliac|intoleran|safe for")
 
 
 def truncate_description(text: str) -> str:
@@ -116,14 +119,35 @@ def _latest(recipe_id: str) -> Optional[RecipeMetadata]:
     return row
 
 
+def _versions(recipe_id: str) -> list[RecipeMetadata]:
+    rows: list[RecipeMetadata] = (
+        RecipeMetadata.query.filter_by(recipe_id=recipe_id)
+        .order_by(RecipeMetadata.version.desc())
+        .all()
+    )
+    return rows
+
+
+def _usable(rows: list[RecipeMetadata], digest: str) -> Optional[RecipeMetadata]:
+    """The version to use for content ``digest`` out of ``rows`` (newest first).
+
+    A person's version wins over any build. Otherwise only builds from this
+    content count, a model's before a rule's. Choosing by content rather than
+    by highest version means a build that lands late or out of order cannot
+    hide a good version written before it.
+    """
+    for row in rows:
+        if row.source == "human":
+            return row
+    matching = [row for row in rows if row.inputs_hash == digest]
+    return next((row for row in matching if row.source == "model"), None) or (
+        matching[0] if matching else None
+    )
+
+
 def _current(recipe: Recipe) -> Optional[RecipeMetadata]:
     """The version a page may use: a person's, or one built from today's content."""
-    latest = _latest(recipe.id)
-    if latest is None:
-        return None
-    if latest.source == "human" or latest.inputs_hash == inputs_hash(metadata_inputs(recipe)):
-        return latest
-    return None
+    return _usable(_versions(recipe.id), inputs_hash(metadata_inputs(recipe)))
 
 
 def queue_metadata(recipe: Recipe) -> None:
@@ -135,11 +159,9 @@ def queue_metadata(recipe: Recipe) -> None:
     """
     try:
         key = recipe_metadata_queued_key(recipe.id, inputs_hash(metadata_inputs(recipe)))
-        if safe_get(key):
-            return
-        safe_set(key, 1, timeout=QUEUE_THROTTLE_SECONDS)
-        if not safe_get(key):
-            # No working cache means no throttle; skip rather than publish per request.
+        # Only the caller that sets the marker publishes. A cache that is down
+        # sets nothing, so nothing is published rather than once per request.
+        if not safe_add(key, 1, timeout=QUEUE_THROTTLE_SECONDS):
             return
         publish_message(
             METADATA_TOPIC, {"recipe_id": recipe.id}, timeout=QUEUE_PUBLISH_TIMEOUT_SECONDS
@@ -223,9 +245,16 @@ def _parse_model_output(text: str, inputs: dict[str, Any]) -> Optional[tuple[str
     if any(n not in known for n in _NUMBER.findall(f"{title} {description}")):
         return None
     # Likewise a "nut-free" or "gluten free" the recipe never claimed.
-    stated = {c.replace("-", " ") for c in _FREE_FROM.findall(source_text.lower())}
-    claimed = _FREE_FROM.findall(f"{title} {description}".lower())
-    if any(c.replace("-", " ") not in stated for c in claimed):
+    # A recipe that negates anything ("not nut-free") states no claim we can trust.
+    source_lower, answer_lower = source_text.lower(), f"{title} {description}".lower()
+    stated = (
+        set()
+        if _NEGATION.search(source_lower)
+        else {c.replace("-", " ") for c in _FREE_FROM.findall(source_lower)}
+    )
+    if any(c.replace("-", " ") not in stated for c in _FREE_FROM.findall(answer_lower)):
+        return None
+    if _SAFETY_CLAIM.search(answer_lower):
         return None
     if len(f"{title}{SITE_TITLE_SUFFIX}") <= MAX_TITLE_LENGTH:
         title = f"{title}{SITE_TITLE_SUFFIX}"
@@ -242,9 +271,9 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     """
     inputs = metadata_inputs(recipe)
     digest = inputs_hash(inputs)
-    latest = _latest(recipe.id)
-    fresh = latest is not None and latest.inputs_hash == digest
-    if latest is not None and (latest.source == "human" or (fresh and latest.source == "model")):
+    latest = _usable(_versions(recipe.id), digest)
+    fresh = latest is not None
+    if latest is not None and latest.source != "rule":
         return latest
 
     def save(title: str, description: str, source: str, model: Optional[str]) -> RecipeMetadata:
@@ -295,9 +324,9 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     # The model call takes seconds. Whatever was written meanwhile wins: a
     # person's version, or a build from content the recipe has since moved to.
     db.session.refresh(recipe)
-    newest = _latest(recipe.id)
+    newest = _usable(_versions(recipe.id), digest)
     if inputs_hash(metadata_inputs(recipe)) != digest or (
-        newest is not None and (newest.source != "rule" or newest.inputs_hash != digest)
+        newest is not None and newest.source != "rule"
     ):
         return newest
     return save(answer[0], answer[1], "model", DEFAULT_MODEL)

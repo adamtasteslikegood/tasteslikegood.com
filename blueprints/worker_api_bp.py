@@ -9,7 +9,7 @@ from flask import Blueprint, request, jsonify, abort
 
 from google.auth.transport import requests as g_requests
 from google.genai import types as genai_types
-from google.genai.errors import APIError, ServerError
+from google.genai.errors import APIError, ClientError, ServerError
 from google.oauth2 import id_token
 from httpx import TransportError
 
@@ -784,6 +784,19 @@ def process_metadata():
         return jsonify({"status": "ok"}), 200
     try:
         build_metadata(recipe)
+    except ClientError as e:
+        if e.code != 429:
+            # The request itself was refused (bad model name, bad key): the same
+            # message would fail the same way, and the rule version is saved.
+            db.session.rollback()
+            logger.error(
+                "Metadata model call refused for recipe %s: %s",
+                sanitize_log_value(recipe_id),
+                sanitize_log_value(e),
+            )
+            return jsonify({"status": "ok"}), 200
+        db.session.rollback()
+        return jsonify({"status": "error"}), 500
     except Exception as e:
         db.session.rollback()
         logger.error(

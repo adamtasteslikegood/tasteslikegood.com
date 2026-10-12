@@ -177,6 +177,9 @@ def test_build_with_a_valid_model_answer_adds_a_model_version(app, monkeypatch):
         json.dumps({"title": "30-Minute Cornbread Recipe", "description": "x" * 120 + "."}),
         # The recipe never says it is gluten-free.
         json.dumps({"title": "Gluten-Free Cornbread Recipe", "description": "x" * 120 + "."}),
+        json.dumps(
+            {"title": "Cornbread Recipe", "description": "Safe for allergies " + "x" * 110 + "."}
+        ),
     ],
 )
 def test_an_invalid_model_answer_keeps_the_rule_version(app, monkeypatch, answer):
@@ -251,7 +254,7 @@ def test_queue_is_throttled_and_never_raises(app, monkeypatch):
 
 
 def test_queue_is_skipped_when_the_cache_cannot_throttle(app, monkeypatch, no_metadata_queue):
-    monkeypatch.setattr(engine, "safe_get", lambda _key: None)
+    monkeypatch.setattr(engine, "safe_add", lambda _key, _value, timeout=None: False)
 
     engine.queue_metadata(_recipe())
 
@@ -312,3 +315,68 @@ def test_worker_asks_for_redelivery_when_the_model_call_fails(app, client, monke
     _model_answers(monkeypatch, GOOD_ANSWER)
     assert _push(client, recipe.id).status_code == 200
     assert [v.source for v in _versions(recipe)] == ["rule", "model"]
+
+
+def test_a_free_from_claim_needs_the_recipe_to_state_it_without_negation():
+    answer = json.dumps({"title": "Nut-Free Curry Recipe", "description": "x" * 120 + "."})
+
+    def inputs(description):
+        return {"name": "Cashew Curry", "description": description, "tags": []}
+
+    assert engine._parse_model_output(answer, inputs("A mild, nut-free curry.")) is not None
+    assert engine._parse_model_output(answer, inputs("Not nut-free: has cashews.")) is None
+
+
+def test_a_late_stale_build_does_not_hide_newer_metadata(app, no_model):
+    recipe = _recipe()
+    engine.build_metadata(recipe)
+    current = engine.metadata_for_page(recipe)
+    # A build from content the recipe no longer has, saved afterwards.
+    db.session.add(
+        RecipeMetadata(
+            recipe_id=recipe.id,
+            version=2,
+            seo_title="Stale",
+            meta_description="Stale.",
+            source="rule",
+            inputs_hash="older-content",
+            inputs={},
+        )
+    )
+    db.session.commit()
+
+    assert engine.metadata_for_page(recipe).id == current.id
+
+
+def test_a_rule_version_saved_after_a_model_version_does_not_replace_it(app, monkeypatch):
+    recipe = _recipe()
+    _model_answers(monkeypatch, GOOD_ANSWER)
+    model_row = engine.build_metadata(recipe)
+    db.session.add(
+        RecipeMetadata(
+            recipe_id=recipe.id,
+            version=3,
+            seo_title="Late rule",
+            meta_description="Late rule.",
+            source="rule",
+            inputs_hash=model_row.inputs_hash,
+            inputs={},
+        )
+    )
+    db.session.commit()
+
+    assert engine.metadata_for_page(recipe).id == model_row.id
+
+
+def test_worker_does_not_ask_for_redelivery_when_the_model_refuses_the_request(
+    app, client, monkeypatch
+):
+    from google.genai.errors import ClientError
+
+    recipe = _recipe()
+    _model_answers(monkeypatch, ClientError(400, {"error": {"message": "bad model"}}))
+    assert _push(client, recipe.id).status_code == 200
+
+    _model_answers(monkeypatch, ClientError(429, {"error": {"message": "slow down"}}))
+    assert _push(client, recipe.id).status_code == 500
+    assert [v.source for v in _versions(recipe)] == ["rule"]

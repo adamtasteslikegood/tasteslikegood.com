@@ -110,6 +110,19 @@ def safe_set(key, value, timeout=None, max_bytes=None):
 # ── Key builders ──────────────────────────────────────────────────────────────
 
 
+def safe_add(key, value, timeout=None):
+    """Set ``key`` only if it is absent. True when this call set it; False on any failure."""
+    try:
+        return bool(_call_with_auth_retry(lambda: cache.add(key, value, timeout=timeout)))
+    except Exception as e:
+        logger.warning(
+            "Cache ADD failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+        return False
+
+
 def _owner_prefix(user_id, guest_session_id):
     """Build a cache key prefix scoped to the current user or guest."""
     if user_id is not None:
