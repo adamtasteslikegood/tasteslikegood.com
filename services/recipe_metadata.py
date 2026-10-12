@@ -34,6 +34,8 @@ METADATA_TOPIC = "recipe-metadata"
 ENGINE_VERSION = 1
 # One queue message per recipe and content version in this window.
 QUEUE_THROTTLE_SECONDS = 3600
+# Queueing runs inside page renders and saves; it must not hold them up.
+QUEUE_PUBLISH_TIMEOUT_SECONDS = 2
 
 SITE_TITLE_SUFFIX = " · Tasteslikegood.org"
 MAX_TITLE_LENGTH = 60
@@ -135,7 +137,12 @@ def queue_metadata(recipe: Recipe) -> None:
         if safe_get(key):
             return
         safe_set(key, 1, timeout=QUEUE_THROTTLE_SECONDS)
-        publish_message(METADATA_TOPIC, {"recipe_id": recipe.id})
+        if not safe_get(key):
+            # No working cache means no throttle; skip rather than publish per request.
+            return
+        publish_message(
+            METADATA_TOPIC, {"recipe_id": recipe.id}, timeout=QUEUE_PUBLISH_TIMEOUT_SECONDS
+        )
     except Exception as e:
         logger.warning(
             "Could not queue metadata for recipe %s: %s",
@@ -276,4 +283,12 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
             sanitize_log_value(recipe.id),
         )
         return latest
+    # The model call takes seconds. Whatever was written meanwhile wins: a
+    # person's version, or a build from content the recipe has since moved to.
+    db.session.refresh(recipe)
+    newest = _latest(recipe.id)
+    if inputs_hash(metadata_inputs(recipe)) != digest or (
+        newest is not None and (newest.source != "rule" or newest.inputs_hash != digest)
+    ):
+        return newest
     return save(answer[0], answer[1], "model", DEFAULT_MODEL)

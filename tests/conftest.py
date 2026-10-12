@@ -26,7 +26,7 @@ def no_metadata_queue(monkeypatch):
     calls = []
     monkeypatch.setattr(
         "services.recipe_metadata.publish_message",
-        lambda topic, data: calls.append((topic, data)) or "test-message",
+        lambda topic, data, timeout=None: calls.append((topic, data)) or "test-message",
     )
     return calls
 

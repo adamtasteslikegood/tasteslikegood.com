@@ -235,8 +235,8 @@ def test_queue_is_throttled_and_never_raises(app, monkeypatch):
     recipe = _recipe()
     calls = []
 
-    def fail(topic, data):
-        calls.append(topic)
+    def fail(topic, data, timeout=None):
+        calls.append((topic, timeout))
         raise RuntimeError("topic missing")
 
     monkeypatch.setattr(engine, "publish_message", fail)
@@ -244,7 +244,48 @@ def test_queue_is_throttled_and_never_raises(app, monkeypatch):
     engine.queue_metadata(recipe)
     engine.queue_metadata(recipe)
 
-    assert calls == ["recipe-metadata"]
+    # One bounded attempt: a queue outage must not hold a page for minutes.
+    assert calls == [("recipe-metadata", engine.QUEUE_PUBLISH_TIMEOUT_SECONDS)]
+
+
+def test_queue_is_skipped_when_the_cache_cannot_throttle(app, monkeypatch, no_metadata_queue):
+    monkeypatch.setattr(engine, "safe_get", lambda _key: None)
+
+    engine.queue_metadata(_recipe())
+
+    assert no_metadata_queue == []
+
+
+@pytest.mark.parametrize("meanwhile", ["human", "edited"])
+def test_a_model_answer_does_not_replace_what_was_written_during_the_call(
+    app, monkeypatch, meanwhile
+):
+    recipe = _recipe()
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+
+    def generate(_client, _model, _prompt):
+        if meanwhile == "human":
+            db.session.add(
+                RecipeMetadata(
+                    recipe_id=recipe.id,
+                    version=2,
+                    seo_title="Hand-written title",
+                    meta_description="Hand-written description.",
+                    source="human",
+                    inputs_hash="",
+                    inputs={},
+                )
+            )
+        else:
+            recipe.name = "Crispy Polenta Fries"
+        db.session.commit()
+        return GOOD_ANSWER
+
+    monkeypatch.setattr(engine, "attempt_generation", generate)
+
+    engine.build_metadata(recipe)
+
+    assert "model" not in [v.source for v in _versions(recipe)]
 
 
 def test_worker_builds_for_public_recipes_only(app, client, no_model):
