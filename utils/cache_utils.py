@@ -153,8 +153,12 @@ def recipe_image_variant_key(recipe_id, width, version):
 
 
 def recipe_image_pin_key(recipe_id, version):
-    """The 2:3 Pinterest pin JPEG (KAN-284), versioned like the sized variants."""
-    return f"vgc:img:{recipe_id}:pin:{version}"
+    """The 2:3 Pinterest pin JPEG (KAN-284), versioned like the sized variants.
+
+    ``pin2``: the pin shape changed (landscape photos are cropped to a square
+    before padding), so pins cached under the old shape must not be served.
+    """
+    return f"vgc:img:{recipe_id}:pin2:{version}"
 
 
 # ── Invalidation helpers ──────────────────────────────────────────────────────
