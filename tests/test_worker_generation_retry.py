@@ -120,13 +120,16 @@ def test_worker_retries_transient_generation_failure(app, client):
             "blueprints.worker_api_bp.attempt_recipe_generation",
             side_effect=attempts,
         ) as mock_attempt,
-        patch("blueprints.worker_api_bp.invalidate_recipe"),
+        patch("blueprints.worker_api_bp.invalidate_recipe") as mock_invalidate,
         patch("services.pubsub_service.publish_message"),
     ):
         resp = client.post("/api/worker/recipe", json=_push_envelope(recipe_id))
 
     assert resp.status_code == 200
     assert mock_attempt.call_count == 2
+    # KAN-381: the recipe is first listed and counted when it turns "ready",
+    # so this is the call that puts it in the owner's cached list and stats.
+    mock_invalidate.assert_called_once_with(None, "guest-1", recipe_id)
     from blueprints import worker_api_bp
 
     assert all(
