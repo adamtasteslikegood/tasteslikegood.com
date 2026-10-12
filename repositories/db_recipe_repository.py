@@ -727,10 +727,10 @@ def _gate_is_public(
 # "ready". A placeholder whose generation is still running, or died, is not a
 # recipe, so the owner's list and count leave it out. "generating_image" is a
 # finished recipe waiting for its picture and stays in.
-UNFINISHED_GENERATION_STATUSES = ("generating", "processing", "error")
+UNFINISHED_GENERATION_STATUSES = frozenset({"generating", "processing", "error"})
 
 
-def _finished_recipes(query):
+def _listed_recipes(query):
     return query.filter(Recipe.status.notin_(UNFINISHED_GENERATION_STATUSES))
 
 
@@ -747,7 +747,7 @@ def get_user_recipes(
         List of Recipe objects sorted by creation date (newest first)
     """
     try:
-        query = _finished_recipes(
+        query = _listed_recipes(
             _apply_recipe_scope(Recipe.query, user_id, guest_session_id)
         ).order_by(Recipe.created_at.desc())
         return query.all()  # type: ignore[no-any-return]
@@ -1660,7 +1660,7 @@ def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] =
         Number of recipes
     """
     try:
-        scoped = _finished_recipes(_apply_recipe_scope(Recipe.query, user_id, guest_session_id))
+        scoped = _listed_recipes(_apply_recipe_scope(Recipe.query, user_id, guest_session_id))
         return scoped.count()  # type: ignore[no-any-return]
     except Exception as e:
         logger.error(
