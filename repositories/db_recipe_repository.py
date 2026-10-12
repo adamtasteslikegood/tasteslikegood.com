@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 from extensions import db
 from models import Recipe, RetiredSlug
 from models.retired_slug import lock_slug
+from services.recipe_metadata import queue_if_missing
 from utils.log_sanitizer import sanitize_log_value
 from utils.slug_utils import normalize_slug
 
@@ -631,6 +632,8 @@ def _commit_publish_retrying(
         recipe = stage(recipe_data)
         try:
             db.session.commit()
+            # KAN-388: a public recipe with no current search metadata gets a build.
+            queue_if_missing(recipe)
             return recipe
         except IntegrityError:
             db.session.rollback()

@@ -171,6 +171,17 @@ def test_variant_is_webp_at_the_requested_width(app, client):
     assert resp.headers["Cache-Control"] == "public, max-age=86400"
 
 
+@pytest.mark.parametrize("width", [400, 600, 800, 1200])
+def test_every_listed_width_is_served(app, client, width):
+    with app.app_context():
+        recipe_id = _add_image_recipe(f"width-{width}-pie", _jpeg())
+
+    resp = client.get(f"/api/recipes/{recipe_id}/image?w={width}")
+    assert resp.status_code == 200
+    with Image.open(io.BytesIO(resp.data)) as image:
+        assert image.width == width
+
+
 def test_unlisted_width_is_rejected(app, client):
     with app.app_context():
         recipe_id = _add_image_recipe("odd-width-pie", _jpeg())
@@ -395,13 +406,70 @@ def test_browse_cards_use_small_variants(app, client):
     assert card, body
     img = card.group(1)
     assert f'src="/api/recipes/{recipe_id}/image?w=400&amp;v={token}"' in img
-    assert f"w=800&amp;v={token} 800w" in img
+    # KAN-371: 600 sits between the two so a phone at DPR 2.6-3 (a 480-570 px
+    # slot) is not sent the 800 px file.
+    for width in (400, 600, 800):
+        assert f"w={width}&amp;v={token} {width}w" in img
+    assert "1200w" not in img
     # KAN-362: the first card is on screen at load, so it is not lazy. The
     # lazy cards below the first row are covered in test_static_assets.py.
     assert "loading=" not in img and 'fetchpriority="high"' in img
     assert 'width="400"' in img and 'height="300"' in img
     # KAN-297: cards are two per row at every width up to 900px, phones included.
-    assert 'sizes="(max-width: 900px) 50vw, 400px"' in img
+    # KAN-371: the slot is the image's own box, not half the viewport. "50vw"
+    # overstated it by the page padding, the gap and the card border, enough to
+    # tip a 412 px phone at DPR 2 from the 400 px file to the 800 px one.
+    assert (
+        'sizes="(max-width: 768px) calc(50vw - 20px), (max-width: 900px) calc(50vw - 38px), '
+        '(max-width: 1248px) calc(33.4vw - 34px), 382px"'
+    ) in img
+
+
+def test_every_width_a_page_asks_for_is_one_the_route_serves():
+    # The page constants and the route's allow-list live in different modules;
+    # a width in a srcset that the route refuses is a broken image.
+    from blueprints.public_bp import CARD_IMAGE_WIDTHS, HERO_IMAGE_WIDTHS
+    from services.image_variants import VARIANT_WIDTHS
+
+    assert set(CARD_IMAGE_WIDTHS) | set(HERO_IMAGE_WIDTHS) == set(VARIANT_WIDTHS)
+
+
+def test_card_sizes_match_the_browse_grid_css():
+    # KAN-371: CARD_IMAGE_SIZES is worked out by hand from these rules. If one
+    # of them changes, the slot widths the browser is told are wrong again.
+    static = Path(__file__).resolve().parents[1] / "static/css"
+    css = re.sub(r"\s+", " ", (static / "recipe-site.css").read_text())
+    tokens = (static / "tokens.css").read_text()
+    # Page width: 100vw - 3rem capped at 1200px, 100vw - 1.5rem up to 768px.
+    assert ".public-main { width: min(1200px, calc(100vw - 3rem));" in css
+    assert re.search(
+        r"@media \(max-width: 768px\) \{[^@]*"
+        r"\.public-main \{ width: min\(100vw - 1\.5rem, 100%\); \}",
+        css,
+    )
+    # Columns: three, two at or below 900px.
+    assert "@media (max-width: 900px) { .public-browse-list {" in css
+    # Gap: 1.5rem, 0.75rem up to 768px.
+    assert re.search(r"\.public-browse-list \{[^}]*gap: var\(--space-6\);", css)
+    assert re.search(
+        r"@media \(max-width: 768px\) \{[^@]*\.public-browse-list \{ gap: var\(--space-3\); \}",
+        css,
+    )
+    assert "--space-6: 1.5rem;" in tokens and "--space-3: 0.75rem;" in tokens
+    # Border: 1px either side of the image.
+    assert re.search(r"\.public-browse-item \{[^}]*border: var\(--ar-border\);", css)
+    assert "--ar-border: 1px solid" in tokens
+
+
+def test_hero_srcset_does_not_carry_the_card_only_width(app, client):
+    # KAN-371: 600 was added for cards. The hero keeps its three widths.
+    with app.app_context():
+        _add_image_recipe("hero-widths-pie", _jpeg())
+
+    body = client.get("/r/hero-widths-pie").get_data(as_text=True)
+    assert "600w" not in _hero_img(body)
+    preload = re.search(r'<link rel="preload" as="image"[^>]*>', body)
+    assert preload and "600w" not in preload.group(0)
 
 
 def test_browse_grid_never_collapses_to_one_column():
@@ -435,27 +503,28 @@ def test_pin_variant_is_a_2_by_3_jpeg_for_any_source_shape(size):
         assert image.size == PIN_SIZE == (1000, 1500)
 
 
-def test_pin_variant_keeps_the_whole_landscape_photo_centred():
-    # A 1408x768 photo with a blue left edge band, a green right edge band and a
-    # red middle. Fitted to 1000 px wide it is ~545 px tall, centred, so both
-    # bands must survive sharp at the pin's edges. A 2:3 centre crop (a 512 px
-    # slice of the middle) would lose both and leave only red.
+def test_pin_variant_crops_a_landscape_photo_to_its_centre_square():
+    # A 1408x768 photo with a blue left edge band, a green right edge band, a
+    # yellow strip along the top and a red middle. Fitted whole it would be a
+    # ~545 px strip in a 1500 px frame, so the pin keeps the centre 768x768
+    # instead: it fills the frame's width from y=250 to y=1250, the yellow strip
+    # is sharp at its top, and the side bands are cropped away.
     source = Image.new("RGB", (1408, 768), (200, 30, 30))
     source.paste((30, 30, 200), (0, 0, 141, 768))
     source.paste((30, 170, 30), (1267, 0, 1408, 768))
+    source.paste((230, 220, 30), (320, 0, 1088, 40))
     out = io.BytesIO()
     source.save(out, format="JPEG", quality=95)
 
     pin = make_pin_variant(out.getvalue())
     with Image.open(io.BytesIO(pin)) as image:
-        r, g, b = image.getpixel((500, 750))
-        assert r > 150 and g < 80 and b < 80  # centre of the photo
-        r, g, b = image.getpixel((20, 750))
-        assert b > 150 and r < 80 and g < 80  # left edge band kept
-        r, g, b = image.getpixel((980, 750))
-        assert g > 120 and r < 80 and b < 80  # right edge band kept
-        # Above the ~545 px photo is the blurred pad, not the sharp band.
-        assert image.getpixel((20, 300)) != image.getpixel((20, 750))
+        for x in (20, 500, 980):
+            r, g, b = image.getpixel((x, 750))
+            assert r > 150 and g < 80 and b < 80  # red all the way across
+        r, g, b = image.getpixel((500, 270))
+        assert r > 180 and g > 170 and b < 90  # the photo's top edge, sharp
+        r, g, b = image.getpixel((500, 1230))
+        assert r > 150 and g < 80 and b < 80  # the photo's bottom edge
 
 
 def test_pin_variant_flattens_transparency_onto_the_pad():

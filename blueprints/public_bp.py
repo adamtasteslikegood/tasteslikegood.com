@@ -42,7 +42,12 @@ from sqlalchemy.orm import joinedload
 
 from extensions import db
 from models import Recipe, RetiredSlug
-from services.image_variants import VARIANT_WIDTHS
+from services.recipe_metadata import (
+    MAX_TITLE_LENGTH,
+    SITE_TITLE_SUFFIX,
+    metadata_for_page,
+    truncate_description,
+)
 from services.tag_hubs import (
     HUBS_BY_SLUG,
     MIN_INDEXABLE_RECIPES,
@@ -50,6 +55,7 @@ from services.tag_hubs import (
     TagHub,
     hubs_for_tags,
 )
+from utils.cache_utils import PIN_VARIANT_VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -343,6 +349,7 @@ def _pin_image_url(owner: Recipe) -> str:
         recipe_id=owner.id,
         pin=1,
         v=token,
+        pv=PIN_VARIANT_VERSION,
     )
 
 
@@ -367,10 +374,23 @@ def _versioned_image_url(owner: Recipe) -> str:
 # spans ``.public-main`` (min(1200px, 100vw - 3rem)); browse cards are a
 # 3-column grid above 900px and 2 columns at or below it, phones included
 # (KAN-297).
-HERO_IMAGE_WIDTHS = VARIANT_WIDTHS
+#
+# Card ``sizes`` give the image's own slot, not a share of the viewport
+# (KAN-371). From recipe-site.css: ``.public-main`` is 100vw - 1.5rem up to
+# 768px and 100vw - 3rem above it, capped at 1200px; the grid gap is 0.75rem
+# up to 768px and 1.5rem above it; each card has a 1px border either side of
+# the image. That makes the image 50vw - 20px, then 50vw - 38px, then a third
+# of (100vw - 96px) less 2px, then 382px. "50vw" overstated a 412px phone's
+# slot by 20px, which at DPR 2 is the difference between the 400 file and the
+# 800 one. The 600 width is for phones at DPR 2.6-3, whose slot is 480-585
+# device pixels. tests/test_image_variants.py pins the CSS these come from.
+HERO_IMAGE_WIDTHS = (400, 800, 1200)
 HERO_IMAGE_SIZES = "(max-width: 1248px) 100vw, 1200px"
-CARD_IMAGE_WIDTHS = (400, 800)
-CARD_IMAGE_SIZES = "(max-width: 900px) 50vw, 400px"
+CARD_IMAGE_WIDTHS = (400, 600, 800)
+CARD_IMAGE_SIZES = (
+    "(max-width: 768px) calc(50vw - 20px), (max-width: 900px) calc(50vw - 38px), "
+    "(max-width: 1248px) calc(33.4vw - 34px), 382px"
+)
 
 
 def _image_variants(owner: Recipe, widths: tuple[int, ...]) -> dict[str, str]:
@@ -613,12 +633,6 @@ def _tag_labels(data: dict[str, Any], mapping: Mapping[str, str]) -> list[str]:
     return labels
 
 
-SITE_TITLE_SUFFIX = " · Tasteslikegood.org"
-MAX_TITLE_LENGTH = 60
-MAX_DESCRIPTION_LENGTH = 155
-_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
-
-
 def _page_title(name: str) -> str:
     """``name · Tasteslikegood.org`` when that fits a result line, else just ``name``.
 
@@ -635,15 +649,7 @@ def _meta_description(text: str) -> str:
     Recipe pages and Recipe JSON-LD keep their full descriptions. Browse
     reuses the bounded copy for both metadata and CollectionPage JSON-LD.
     """
-    text = " ".join(text.split())
-    if len(text) <= MAX_DESCRIPTION_LENGTH:
-        return text
-    head = text[: MAX_DESCRIPTION_LENGTH + 1]
-    ends = [m.end() for m in _SENTENCE_END.finditer(head) if m.end() <= MAX_DESCRIPTION_LENGTH]
-    if ends and ends[-1] >= 60:
-        return head[: ends[-1]]
-    cut = head[: MAX_DESCRIPTION_LENGTH - 1].rsplit(" ", 1)[0].rstrip(" ,;:-–—")
-    return f"{cut}…"
+    return truncate_description(text)
 
 
 RELATED_RECIPE_COUNT = 6
@@ -882,6 +888,7 @@ MAX_PIN_TAIL_LENGTH = 200
 # Common title/word abbreviations must not terminate the pin's first sentence.
 # Multi-initial abbreviations such as "e.g." and "U.S." are recognized separately.
 _PIN_ABBREVIATIONS = frozenset({"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."})
+_SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 _PIN_INITIALISM = re.compile(r"(?:[a-z]\.){2,}")
 
 
@@ -1054,12 +1061,15 @@ def show_public_recipe(slug):
     )
     catalog = _catalog_tag_rows()
     breadcrumbs = _recipe_breadcrumbs(recipe, tags, catalog)
+    # KAN-388: the title and description the metadata engine wrote, when it has
+    # a version for this content; plain truncation until then.
+    metadata = metadata_for_page(recipe)
 
     return render_template(
         "public/recipe.html",
         recipe=recipe,
-        page_title=_page_title(recipe.name),
-        meta_description=_meta_description(description),
+        page_title=metadata.seo_title if metadata else _page_title(recipe.name),
+        meta_description=(metadata and metadata.meta_description) or _meta_description(description),
         breadcrumbs=breadcrumbs,
         breadcrumb_json_ld=_breadcrumb_json_ld(breadcrumbs),
         recipe_hubs=_recipe_hubs(tags, catalog),

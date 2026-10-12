@@ -23,6 +23,11 @@ TTL_SHORT = 300  # 5 minutes — recipe stats, collections list
 TTL_MEDIUM = 600  # 10 minutes — individual recipes, collections
 TTL_IMAGE = 86400  # 24 hours — recipe images (rarely change)
 
+# Bump whenever the rendered Pinterest image changes independently of its
+# source bytes. This versions both the Valkey key and the public URL so neither
+# internal nor HTTP caches can serve an older transformation.
+PIN_VARIANT_VERSION = 2
+
 # Ceiling for cached JSON response payloads. Recipe rows written before the
 # GCS migration can still carry a base64 image under data["ai_image_data"]
 # (generation_api_bp still reads that fallback), so an unguarded set would put
@@ -105,6 +110,90 @@ def safe_set(key, value, timeout=None, max_bytes=None):
 # ── Key builders ──────────────────────────────────────────────────────────────
 
 
+def safe_add(key, value, timeout=None):
+    """Set ``key`` only if it is absent. True when this call set it; False on any failure.
+
+    On Redis/Valkey this is one ``SET NX EX`` command. Cachelib's own ``add``
+    sends SETNX and then EXPIRE: if the second fails, the key stays forever.
+    """
+
+    def add():
+        backend = cache.cache
+        client = getattr(backend, "_write_client", None)
+        if client is None or not timeout:
+            return cache.add(key, value, timeout=timeout)
+        return client.set(
+            f"{backend._get_prefix()}{key}",
+            backend.serializer.dumps(value),
+            nx=True,
+            ex=int(timeout),
+        )
+
+    try:
+        return bool(_call_with_auth_retry(add))
+    except Exception as e:
+        logger.warning(
+            "Cache ADD failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+        return False
+
+
+def safe_compare_delete(key, expected_value):
+    """Delete ``key`` only when it still contains ``expected_value``.
+
+    Redis/Valkey executes the comparison and deletion in one Lua command so a
+    lease that expires and is reacquired cannot be deleted by its former
+    owner. Simpler local cache backends use the equivalent best-effort pair of
+    operations because they do not expose a scripting client.
+    """
+
+    def compare_delete():
+        backend = cache.cache
+        client = getattr(backend, "_write_client", None)
+        if client is None:
+            if cache.get(key) != expected_value:
+                return False
+            return bool(cache.delete(key))
+        script = """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            end
+            return 0
+        """
+        return bool(
+            client.eval(
+                script,
+                1,
+                f"{backend._get_prefix()}{key}",
+                backend.serializer.dumps(expected_value),
+            )
+        )
+
+    try:
+        return bool(_call_with_auth_retry(compare_delete))
+    except Exception as e:
+        logger.warning(
+            "Cache compare-and-delete failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+        return False
+
+
+def safe_delete(key):
+    """Delete from cache. Silently ignores failures."""
+    try:
+        _call_with_auth_retry(lambda: cache.delete(key))
+    except Exception as e:
+        logger.warning(
+            "Cache DELETE failed for %s: %s",
+            sanitize_log_value(key),
+            sanitize_log_value(e),
+        )
+
+
 def _owner_prefix(user_id, guest_session_id):
     """Build a cache key prefix scoped to the current user or guest."""
     if user_id is not None:
@@ -153,11 +242,24 @@ def recipe_image_variant_key(recipe_id, width, version):
 
 
 def recipe_image_pin_key(recipe_id, version):
-    """The 2:3 Pinterest pin JPEG (KAN-284), versioned like the sized variants."""
-    return f"vgc:img:{recipe_id}:pin:{version}"
+    """The 2:3 Pinterest pin JPEG (KAN-284), versioned like the sized variants.
+
+    ``pin2``: the pin shape changed (landscape photos are cropped to a square
+    before padding), so pins cached under the old shape must not be served.
+    """
+    return f"vgc:img:{recipe_id}:pin{PIN_VARIANT_VERSION}:{version}"
 
 
 # ── Invalidation helpers ──────────────────────────────────────────────────────
+
+
+def recipe_metadata_building_key(recipe_id, inputs_hash):
+    return f"vgc:meta:building:{recipe_id}:{inputs_hash}"
+
+
+def recipe_metadata_queued_key(recipe_id, inputs_hash):
+    """Marks a metadata build as queued for this recipe and content version (KAN-388)."""
+    return f"vgc:meta:queued:{recipe_id}:{inputs_hash}"
 
 
 def invalidate_recipe(user_id, guest_session_id, recipe_id):

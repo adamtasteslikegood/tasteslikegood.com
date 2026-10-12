@@ -9,7 +9,7 @@ from flask import Blueprint, request, jsonify, abort
 
 from google.auth.transport import requests as g_requests
 from google.genai import types as genai_types
-from google.genai.errors import APIError, ServerError
+from google.genai.errors import APIError, ClientError, ServerError
 from google.oauth2 import id_token
 from httpx import TransportError
 
@@ -753,4 +753,62 @@ def process_image():
             )
         return jsonify({"status": "retry"}), 500
 
+    return jsonify({"status": "ok"}), 200
+
+
+@worker_api_bp.route("/metadata", methods=["POST"])
+@require_pubsub_oidc
+def process_metadata():
+    """Build search metadata for one published recipe (KAN-388).
+
+    A 500 or 503 asks Pub/Sub to redeliver: the model call failed or another
+    delivery holds it, and the rule version is already saved. Everything else
+    is acknowledged.
+    """
+    from extensions import db
+    from models.recipe import Recipe
+    from services.recipe_metadata import MetadataBuildBusy, build_metadata
+
+    envelope = request.get_json(silent=True) or {}
+    message = envelope.get("message")
+    if not message:
+        return jsonify({"status": "error", "message": "Bad Request: missing 'message'"}), 400
+    try:
+        data = json.loads(base64.b64decode(message["data"]).decode("utf-8"))
+        recipe_id = data.get("recipe_id")
+    except Exception as e:
+        logger.error("Failed to decode push message: %s", sanitize_log_value(e))
+        return jsonify({"status": "ok"}), 200
+
+    recipe = db.session.get(Recipe, recipe_id) if isinstance(recipe_id, str) else None
+    if recipe is None or not recipe.is_public:
+        return jsonify({"status": "ok"}), 200
+    try:
+        build_metadata(recipe)
+    except MetadataBuildBusy:
+        # Another delivery holds the model call, or the cache could not say.
+        # Not finished work: redelivery finds the model version once it is saved.
+        db.session.rollback()
+        return jsonify({"status": "busy"}), 503
+    except ClientError as e:
+        if e.code not in (408, 429):
+            # The request itself was refused (bad model name, bad key): the same
+            # message would fail the same way, and the rule version is saved.
+            db.session.rollback()
+            logger.error(
+                "Metadata model call refused for recipe %s: %s",
+                sanitize_log_value(recipe_id),
+                sanitize_log_value(e),
+            )
+            return jsonify({"status": "ok"}), 200
+        db.session.rollback()
+        return jsonify({"status": "error"}), 500
+    except Exception as e:
+        db.session.rollback()
+        logger.error(
+            "Metadata build failed for recipe %s: %s",
+            sanitize_log_value(recipe_id),
+            sanitize_log_value(e),
+        )
+        return jsonify({"status": "error"}), 500
     return jsonify({"status": "ok"}), 200

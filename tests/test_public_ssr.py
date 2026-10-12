@@ -264,8 +264,10 @@ def test_pinterest_button_shown_when_recipe_has_image(app, client, image_field, 
         # KAN-195: our own image endpoint is versioned; the stock-image case
         # below is someone else's host and must be passed through untouched.
         # KAN-284: the pin uses the 2:3 variant, versioned like the hero.
+        # KAN-387: ``pv`` also changes when the pin transformation changes so
+        # public HTTP caches do not keep serving the previous rendering.
         assert re.fullmatch(
-            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?pin=1&v=[0-9a-f]+",
+            rf"http://localhost/api/recipes/{re.escape(recipe_id)}/image\?pin=1&v=[0-9a-f]+&pv=2",
             media,
         ), media
         assert f'data-pin-media="{html.escape(media)}"' in body
