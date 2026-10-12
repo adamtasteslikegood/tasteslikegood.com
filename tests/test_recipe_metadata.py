@@ -232,8 +232,10 @@ def test_page_uses_metadata_and_falls_back_without_it(app, client, no_model, no_
     assert "<title>Vegan Polenta Fries Recipe · Tasteslikegood.org</title>" in after
     assert 'content="A hearty, artisan vegan cornbread' in after
     assert "sweet organic creamed corn." in after
-    # Built and current: nothing more is queued, and the throttle held before that.
-    assert len(no_metadata_queue) == 1
+    # One more message: a rule version asks for the model rewrite again, once a day.
+    assert len(no_metadata_queue) == 2
+    client.get(f"/r/{recipe.slug}")
+    assert len(no_metadata_queue) == 2
 
 
 def test_queue_is_throttled_and_never_raises(app, monkeypatch):
@@ -317,14 +319,40 @@ def test_worker_asks_for_redelivery_when_the_model_call_fails(app, client, monke
     assert [v.source for v in _versions(recipe)] == ["rule", "model"]
 
 
-def test_a_free_from_claim_needs_the_recipe_to_state_it_without_negation():
-    answer = json.dumps({"title": "Nut-Free Curry Recipe", "description": "x" * 120 + "."})
+def test_a_free_from_claim_must_be_one_of_the_recipes_tags():
+    def answer(title):
+        return json.dumps({"title": title, "description": "x" * 120 + "."})
 
-    def inputs(description):
-        return {"name": "Cashew Curry", "description": description, "tags": []}
+    def inputs(description, tags):
+        return {"name": "Cashew Curry", "description": description, "tags": tags}
 
-    assert engine._parse_model_output(answer, inputs("A mild, nut-free curry.")) is not None
-    assert engine._parse_model_output(answer, inputs("Not nut-free: has cashews.")) is None
+    nut_free = answer("Nut-Free Curry Recipe")
+    assert engine._parse_model_output(nut_free, inputs("A mild curry.", ["Nut Free"])) is not None
+    assert engine._parse_model_output(nut_free, inputs("A mild, nut-free curry.", [])) is None
+    assert engine._parse_model_output(nut_free, inputs("Cannot be called nut-free.", [])) is None
+    # U+2011, a non-breaking hyphen.
+    assert engine._parse_model_output(answer("Nut\u2011Free Curry Recipe"), inputs("", [])) is None
+    assert (
+        engine._parse_model_output(answer("Curry Recipe That Cures Colds"), inputs("", [])) is None
+    )
+
+
+def test_a_page_on_its_rule_version_asks_for_the_model_again_once_a_day(
+    app, client, no_model, no_metadata_queue, monkeypatch
+):
+    recipe = _recipe()
+    engine.build_metadata(recipe)
+
+    client.get(f"/r/{recipe.slug}")
+    client.get(f"/r/{recipe.slug}")
+
+    assert no_metadata_queue == [("recipe-metadata", {"recipe_id": recipe.id})]
+
+    _model_answers(monkeypatch, GOOD_ANSWER)
+    engine.build_metadata(recipe)
+    cache.clear()
+    client.get(f"/r/{recipe.slug}")
+    assert len(no_metadata_queue) == 1
 
 
 def test_a_late_stale_build_does_not_hide_newer_metadata(app, no_model):
@@ -377,6 +405,7 @@ def test_worker_does_not_ask_for_redelivery_when_the_model_refuses_the_request(
     _model_answers(monkeypatch, ClientError(400, {"error": {"message": "bad model"}}))
     assert _push(client, recipe.id).status_code == 200
 
-    _model_answers(monkeypatch, ClientError(429, {"error": {"message": "slow down"}}))
-    assert _push(client, recipe.id).status_code == 500
+    for transient in (408, 429):
+        _model_answers(monkeypatch, ClientError(transient, {"error": {"message": "later"}}))
+        assert _push(client, recipe.id).status_code == 500
     assert [v.source for v in _versions(recipe)] == ["rule"]

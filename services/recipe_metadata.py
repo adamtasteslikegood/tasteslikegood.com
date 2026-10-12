@@ -15,6 +15,7 @@ import logging
 import re
 from typing import Any, Optional
 
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
 from config import DEFAULT_MODEL
@@ -34,6 +35,9 @@ METADATA_TOPIC = "recipe-metadata"
 ENGINE_VERSION = 1
 # One queue message per recipe and content version in this window.
 QUEUE_THROTTLE_SECONDS = 3600
+# A recipe still on its rule version gets another try at the model rewrite this
+# often, when its page is read: after an outage outlasts the queue's retries.
+MODEL_RETRY_THROTTLE_SECONDS = 86400
 # Queueing runs inside page renders and saves; it must not hold them up.
 QUEUE_PUBLISH_TIMEOUT_SECONDS = 2
 
@@ -46,9 +50,11 @@ _CLAUSE_END = re.compile(r"[,;:](?=\s)")
 _DANGLING_WORD = re.compile(r"\s+(?:and|or|with|then|plus|but)$", re.IGNORECASE)
 _NUMBER = re.compile(r"\d+")
 _FREE_FROM = re.compile(r"\b[a-z]+[- ]free\b")
-_NEGATION = re.compile(r"\b(?:not|never|no longer|isn't|aren't|is not|are not)\b")
-# Safety wording a search snippet must not introduce on its own.
-_SAFETY_CLAIM = re.compile(r"allerg|celiac|coeliac|intoleran|safe for")
+_UNICODE_HYPHENS = re.compile("[\u2010-\u2015\u2212]")
+# Safety and health wording a search snippet must not introduce on its own.
+_SAFETY_CLAIM = re.compile(
+    r"allerg|celiac|coeliac|intoleran|safe for|\bcures?\b|detox|disease|diabet"
+)
 
 
 def truncate_description(text: str) -> str:
@@ -119,9 +125,13 @@ def _latest(recipe_id: str) -> Optional[RecipeMetadata]:
     return row
 
 
-def _versions(recipe_id: str) -> list[RecipeMetadata]:
+def _versions(recipe_id: str, digest: str) -> list[RecipeMetadata]:
+    """Newest first: the versions that could be used for content ``digest``."""
     rows: list[RecipeMetadata] = (
-        RecipeMetadata.query.filter_by(recipe_id=recipe_id)
+        RecipeMetadata.query.filter(
+            RecipeMetadata.recipe_id == recipe_id,
+            or_(RecipeMetadata.source == "human", RecipeMetadata.inputs_hash == digest),
+        )
         .order_by(RecipeMetadata.version.desc())
         .all()
     )
@@ -147,10 +157,11 @@ def _usable(rows: list[RecipeMetadata], digest: str) -> Optional[RecipeMetadata]
 
 def _current(recipe: Recipe) -> Optional[RecipeMetadata]:
     """The version a page may use: a person's, or one built from today's content."""
-    return _usable(_versions(recipe.id), inputs_hash(metadata_inputs(recipe)))
+    digest = inputs_hash(metadata_inputs(recipe))
+    return _usable(_versions(recipe.id, digest), digest)
 
 
-def queue_metadata(recipe: Recipe) -> None:
+def queue_metadata(recipe: Recipe, *, model_retry: bool = False) -> None:
     """Ask the worker to build ``recipe``'s metadata. Never raises.
 
     Throttled per recipe and content version, so a page that renders often or a
@@ -159,9 +170,12 @@ def queue_metadata(recipe: Recipe) -> None:
     """
     try:
         key = recipe_metadata_queued_key(recipe.id, inputs_hash(metadata_inputs(recipe)))
+        window = QUEUE_THROTTLE_SECONDS
+        if model_retry:
+            key, window = f"{key}:model", MODEL_RETRY_THROTTLE_SECONDS
         # Only the caller that sets the marker publishes. A cache that is down
         # sets nothing, so nothing is published rather than once per request.
-        if not safe_add(key, 1, timeout=QUEUE_THROTTLE_SECONDS):
+        if not safe_add(key, 1, timeout=window):
             return
         publish_message(
             METADATA_TOPIC, {"recipe_id": recipe.id}, timeout=QUEUE_PUBLISH_TIMEOUT_SECONDS
@@ -175,10 +189,16 @@ def queue_metadata(recipe: Recipe) -> None:
 
 
 def metadata_for_page(recipe: Recipe) -> Optional[RecipeMetadata]:
-    """Current metadata for a public page, queueing a build when there is none."""
+    """Current metadata for a public page, queueing a build when one is owed.
+
+    None owes a build now. A rule version owes another try at the model
+    rewrite, at most once a day.
+    """
     current = _current(recipe)
     if current is None:
         queue_metadata(recipe)
+    elif current.source == "rule":
+        queue_metadata(recipe, model_retry=True)
     return current
 
 
@@ -244,15 +264,11 @@ def _parse_model_output(text: str, inputs: dict[str, Any]) -> Optional[tuple[str
     known = set(_NUMBER.findall(source_text))
     if any(n not in known for n in _NUMBER.findall(f"{title} {description}")):
         return None
-    # Likewise a "nut-free" or "gluten free" the recipe never claimed.
-    # A recipe that negates anything ("not nut-free") states no claim we can trust.
-    source_lower, answer_lower = source_text.lower(), f"{title} {description}".lower()
-    stated = (
-        set()
-        if _NEGATION.search(source_lower)
-        else {c.replace("-", " ") for c in _FREE_FROM.findall(source_lower)}
-    )
-    if any(c.replace("-", " ") not in stated for c in _FREE_FROM.findall(answer_lower)):
+    # Likewise a "nut-free" or "gluten free" that is not one of the recipe's tags.
+    # Only a tag states one plainly: prose can negate it ("cannot be called nut-free").
+    answer_lower = _UNICODE_HYPHENS.sub("-", f"{title} {description}".lower())
+    tagged = {" ".join(tag.lower().replace("-", " ").split()) for tag in inputs["tags"]}
+    if any(c.replace("-", " ") not in tagged for c in _FREE_FROM.findall(answer_lower)):
         return None
     if _SAFETY_CLAIM.search(answer_lower):
         return None
@@ -271,31 +287,36 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     """
     inputs = metadata_inputs(recipe)
     digest = inputs_hash(inputs)
-    latest = _usable(_versions(recipe.id), digest)
+    latest = _usable(_versions(recipe.id, digest), digest)
     fresh = latest is not None
     if latest is not None and latest.source != "rule":
         return latest
 
     def save(title: str, description: str, source: str, model: Optional[str]) -> RecipeMetadata:
-        newest = _latest(recipe.id)
-        row = RecipeMetadata(
-            recipe_id=recipe.id,
-            version=(newest.version + 1) if newest else 1,
-            seo_title=title,
-            meta_description=description,
-            source=source,
-            model=model,
-            inputs_hash=digest,
-            inputs=inputs,
-        )
-        db.session.add(row)
-        try:
-            db.session.commit()
-        except IntegrityError:
-            # Another delivery of the same message wrote this version first.
-            db.session.rollback()
-            return _latest(recipe.id) or row
-        return row
+        for _attempt in range(3):
+            newest = _latest(recipe.id)
+            row = RecipeMetadata(
+                recipe_id=recipe.id,
+                version=(newest.version + 1) if newest else 1,
+                seo_title=title,
+                meta_description=description,
+                source=source,
+                model=model,
+                inputs_hash=digest,
+                inputs=inputs,
+            )
+            db.session.add(row)
+            try:
+                db.session.commit()
+                return row
+            except IntegrityError:
+                # Another build took this version number. If it was for this
+                # content, use it; if not, take the next number.
+                db.session.rollback()
+                theirs = _usable(_versions(recipe.id, digest), digest)
+                if theirs is not None:
+                    return theirs
+        raise RuntimeError("could not allocate a metadata version")
 
     if not fresh:
         latest = save(
@@ -324,7 +345,7 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     # The model call takes seconds. Whatever was written meanwhile wins: a
     # person's version, or a build from content the recipe has since moved to.
     db.session.refresh(recipe)
-    newest = _usable(_versions(recipe.id), digest)
+    newest = _usable(_versions(recipe.id, digest), digest)
     if inputs_hash(metadata_inputs(recipe)) != digest or (
         newest is not None and newest.source != "rule"
     ):

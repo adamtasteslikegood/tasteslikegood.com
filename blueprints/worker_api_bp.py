@@ -785,7 +785,7 @@ def process_metadata():
     try:
         build_metadata(recipe)
     except ClientError as e:
-        if e.code != 429:
+        if e.code not in (408, 429):
             # The request itself was refused (bad model name, bad key): the same
             # message would fail the same way, and the rule version is saved.
             db.session.rollback()
