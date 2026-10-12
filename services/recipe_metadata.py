@@ -347,8 +347,9 @@ def _parse_model_output(text: str, inputs: dict[str, Any]) -> Optional[tuple[str
         return None
     title = " ".join(title.split())
     description = " ".join(description.split())
-    # Control characters: PostgreSQL cannot store a NUL, and none belong in a snippet.
-    if any(ord(c) < 32 for c in f"{title}{description}"):
+    # Text PostgreSQL cannot store: a NUL or other control character, or a lone
+    # surrogate (not valid UTF-8). None of them belong in a snippet either.
+    if any(ord(c) < 32 or 0xD800 <= ord(c) <= 0xDFFF for c in f"{title}{description}"):
         return None
     if not title or len(title) > MAX_TITLE_LENGTH or "recipe" not in title.lower():
         return None

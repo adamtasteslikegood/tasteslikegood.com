@@ -613,6 +613,11 @@ def test_the_model_call_runs_with_no_database_connection_checked_out(app, monkey
             "night of the week.",
         ),
         (
+            "Peanut Tofu Curry Recipe\ud800",
+            "A creamy curry of peanuts, tofu and wheat noodles with warm spices for dinner any "
+            "night of the week.",
+        ),
+        (
             "Peanut Tofu Curry Recipe\u0000",
             "A creamy curry of peanuts, tofu and wheat noodles with warm spices for dinner any "
             "night of the week.",
