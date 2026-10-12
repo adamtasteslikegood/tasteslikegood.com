@@ -554,13 +554,15 @@ def test_duplicate_collection_add_does_not_evict(app, client):
     assert client.get(f"/api/collections/{cid}").get_json()["name"] == "Shelf"
 
 
-def test_async_generate_invalidates_stats(app, client, monkeypatch):
-    """POST /api/generate adds a row, so the cached recipe count is stale.
+def test_async_generate_counts_the_recipe_once_it_is_ready(app, client, monkeypatch):
+    """POST /api/generate adds a placeholder; the worker turns it into a recipe.
 
-    count_user_recipes() has no status filter, so the "generating" placeholder
-    already changes the answer — this is the second writer into an owner's
-    scope and it was not on the invalidation map.
+    KAN-381: the placeholder is not a recipe, so the cached count is still
+    right after the POST. It goes stale when the worker sets the row "ready",
+    and the worker's invalidation (KAN-151) is what clears it.
     """
+    from utils.cache_utils import invalidate_recipe
+
     monkeypatch.setattr("services.pubsub_service.publish_message", lambda *a, **kw: None)
     with app.app_context():
         owner_id = _owner()
@@ -570,6 +572,14 @@ def test_async_generate_invalidates_stats(app, client, monkeypatch):
 
     resp = client.post("/api/generate", json={"prompt": "a hearty vegan winter stew"})
     assert resp.status_code == 202
+    recipe_id = resp.get_json()["recipe_id"]
+
+    assert client.get("/api/recipes/stats").get_json()["total_recipes"] == 0
+
+    with app.app_context():
+        db.session.get(Recipe, recipe_id).status = "ready"
+        db.session.commit()
+        invalidate_recipe(owner_id, None, recipe_id)
 
     assert client.get("/api/recipes/stats").get_json()["total_recipes"] == 1
 
