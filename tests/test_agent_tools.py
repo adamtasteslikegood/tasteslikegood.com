@@ -307,3 +307,13 @@ def test_get_recipe_returns_a_published_recipe_and_hides_a_private_one(make_clie
 def test_tool_call_rejects_a_body_that_is_not_an_object(make_client):
     client = make_client()
     assert client.post("/api/agent/tools/search_recipes", json=["chili"]).status_code == 400
+
+
+def test_every_generating_tool_is_named_generate():
+    """Express applies the generation limit and the write pause by this prefix."""
+    from services.agent_tools import TOOLS
+
+    needs_sign_in = {tool.name for tool in TOOLS if tool.requires_sign_in}
+    assert needs_sign_in - {"get_generation_status"} == {
+        tool.name for tool in TOOLS if tool.name.startswith("generate_")
+    }

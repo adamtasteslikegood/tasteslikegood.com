@@ -78,3 +78,42 @@ Displays or returns the raw JSON for a recipe.
 - `200 OK`: HTML viewer (default) or JSON content (if `raw=true`).
 - `404 Not Found`: If the recipe does not exist.
 - `500 Internal Server Error`: If the recipe file is corrupt.
+
+---
+
+## Agent tools (`/api/agent`)
+
+Tools for AI agents. Three switches decide which tools are offered:
+`AGENT_TOOLS_READ` (default on), `AGENT_TOOLS_GENERATE_TEXT` and
+`AGENT_TOOLS_GENERATE_IMAGE` (both default off). The tool definitions and the
+access check are in `services/agent_tools.py`.
+
+### GET `/api/agent/tools`
+Lists the tools that are switched on.
+
+**Response:**
+- `200 OK`: `{"tools": [{"name", "description", "inputSchema", "requiresSignIn"}], "attribution"}`.
+
+### POST `/api/agent/tools/<name>`
+Calls a tool. The body is a JSON object of the tool's arguments.
+
+| Tool | Switch | Sign-in | Arguments |
+| ---- | ------ | ------- | --------- |
+| `search_recipes` | read | no | `query` (optional), `limit` (1 to 20, default 10) |
+| `get_recipe` | read | no | `slug` |
+| `generate_recipe` | text | yes | `prompt` |
+| `generate_recipe_image` | image | yes | `recipe_id` |
+| `get_generation_status` | text or image | yes | `recipe_id` |
+
+Generation is asynchronous: the tool returns `202` with a `recipe_id`, and the
+caller polls `get_generation_status`. A generated recipe is saved to the
+signed-in account. Results carry the recipe's URL and an attribution line.
+
+The Express proxy holds every `generate_*` tool to the same rate limit and
+recipe write pause as `/api/generate`.
+
+**Response:**
+- `200 OK` or `202 Accepted`: the tool's result.
+- `400 Bad Request`: the body is not a JSON object, or an argument is missing or invalid.
+- `401 Unauthorized`: the tool needs a signed-in account.
+- `404 Not Found`: the tool does not exist or is switched off, or the recipe was not found.

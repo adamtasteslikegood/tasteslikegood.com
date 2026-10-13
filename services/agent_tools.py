@@ -61,6 +61,9 @@ def _schema(properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
 
 _RECIPE_ID = {"type": "string", "description": "The recipe id returned by generate_recipe."}
 
+# A tool that generates must be named generate_*. The Express proxy matches that
+# prefix (cookbook server/agent-tools.ts) to apply the generation rate limit and
+# the recipe write pause; a generation tool under another name would skip both.
 TOOLS: tuple[AgentTool, ...] = (
     AgentTool(
         name="search_recipes",
