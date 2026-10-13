@@ -99,7 +99,7 @@ Calls a tool. The body is a JSON object of the tool's arguments.
 
 | Tool | Switch | Sign-in | Arguments |
 | ---- | ------ | ------- | --------- |
-| `search_recipes` | read | no | `query` (optional), `limit` (1 to 20, default 10) |
+| `search_recipes` | read | no | `query` (optional, at most 100 characters), `limit` (1 to 20, default 10) |
 | `get_recipe` | read | no | `slug` |
 | `generate_recipe` | text | yes | `prompt` |
 | `generate_recipe_image` | image | yes | `recipe_id` |
@@ -109,6 +109,9 @@ Generation is asynchronous: the tool returns `202` with a `recipe_id`, and the
 caller polls `get_generation_status`. A generated recipe is saved to the
 signed-in account. Results carry the recipe's URL and an attribution line.
 
+`generate_recipe` makes the text only. It does not queue a photo, whatever the
+image switch says; a photo is a separate `generate_recipe_image` call.
+
 The Express proxy holds every `generate_*` tool to the same rate limit and
 recipe write pause as `/api/generate`.
 
@@ -117,3 +120,4 @@ recipe write pause as `/api/generate`.
 - `400 Bad Request`: the body is not a JSON object, or an argument is missing or invalid.
 - `401 Unauthorized`: the tool needs a signed-in account.
 - `404 Not Found`: the tool does not exist or is switched off, or the recipe was not found.
+- `413 Content Too Large`: the body is over 10 KB.

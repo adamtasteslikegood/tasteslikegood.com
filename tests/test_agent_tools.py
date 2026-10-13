@@ -1,5 +1,7 @@
 """Agent tools: the switches, the access check and the tool calls (KAN-401)."""
 
+import io
+import json
 import sys
 import uuid
 from pathlib import Path
@@ -177,6 +179,16 @@ def test_signed_in_caller_queues_a_recipe_owned_by_the_account(make_client):
     assert topic == "recipe-generation"
     assert message["user_id"] == recipe.user_id
     assert message["guest_session_id"] is None
+    assert message["with_image"] is False
+
+
+def test_text_generation_asks_for_no_image_even_with_the_image_switch_on(make_client):
+    client = make_client(
+        signed_in=True, AGENT_TOOLS_GENERATE_TEXT=True, AGENT_TOOLS_GENERATE_IMAGE=True
+    )
+    with patch("services.pubsub_service.publish_message") as publish:
+        _call(client, "generate_recipe", prompt="A bright summer pasta")
+    assert publish.call_args.args[1]["with_image"] is False
 
 
 def test_agent_does_not_choose_the_model(make_client):
@@ -238,10 +250,11 @@ def test_web_generation_ignores_the_agent_switches(make_client, switch):
     client = make_client(AGENT_TOOLS_GENERATE_TEXT=switch, AGENT_TOOLS_READ=switch)
     with client.session_transaction() as session:
         session["session_id"] = "guest-1"
-    with patch("services.pubsub_service.publish_message"):
+    with patch("services.pubsub_service.publish_message") as publish:
         response = client.post("/api/generate", json={"prompt": "A bright summer pasta"})
     assert response.status_code == 202
     assert db.session.get(Recipe, response.get_json()["recipe_id"]).guest_session_id == "guest-1"
+    assert publish.call_args.args[1]["with_image"] is True
 
 
 # --- reading ----------------------------------------------------------------
@@ -317,3 +330,50 @@ def test_every_generating_tool_is_named_generate():
     assert needs_sign_in - {"get_generation_status"} == {
         tool.name for tool in TOOLS if tool.name.startswith("generate_")
     }
+
+
+def test_tool_call_refuses_a_body_over_the_size_limit(make_client):
+    from blueprints.agent_api_bp import MAX_BODY_BYTES
+
+    client = make_client()
+    padding = "x" * MAX_BODY_BYTES
+    sized = client.post("/api/agent/tools/search_recipes", json={"query": "chili", "pad": padding})
+    assert sized.status_code == 413
+
+    # The same body with no Content-Length, as a chunked upload arrives.
+    body = json.dumps({"query": "chili", "pad": padding}).encode()
+    streamed = client.post(
+        "/api/agent/tools/search_recipes",
+        input_stream=io.BytesIO(body),
+        content_type="application/json",
+        environ_overrides={"wsgi.input_terminated": True},
+    )
+    assert streamed.status_code == 413
+
+
+def test_search_refuses_a_query_over_the_length_limit(make_client):
+    from blueprints.agent_api_bp import SEARCH_QUERY_MAX_CHARS
+
+    client = make_client()
+    assert _call(client, "search_recipes", query="a" * SEARCH_QUERY_MAX_CHARS).status_code == 200
+    assert (
+        _call(client, "search_recipes", query="a" * (SEARCH_QUERY_MAX_CHARS + 1)).status_code == 400
+    )
+
+
+def test_search_returns_the_description_and_copes_without_one(make_client):
+    client = make_client()
+    _published_recipe()
+    db.session.add(
+        Recipe(
+            id=str(uuid.uuid4()),
+            name="Plain Chili",
+            slug="plain-chili",
+            is_public=True,
+            data={"name": "Plain Chili"},
+        )
+    )
+    db.session.commit()
+    found = {r["slug"]: r for r in _call(client, "search_recipes").get_json()["recipes"]}
+    assert found["smoky-chili"]["description"] == "A pot of chili."
+    assert found["plain-chili"]["description"] == ""

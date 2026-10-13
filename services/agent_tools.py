@@ -90,7 +90,8 @@ TOOLS: tuple[AgentTool, ...] = (
         name="generate_recipe",
         description=(
             "Generate a new vegan recipe for the signed-in user. The recipe is saved to their "
-            "account. Generation takes a while: poll get_generation_status with the returned id."
+            "account, without a photo. Generation takes a while: poll get_generation_status with "
+            "the returned id."
         ),
         offerings=(GENERATE_TEXT,),
         input_schema=_schema(

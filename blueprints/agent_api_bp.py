@@ -12,6 +12,7 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request, session, url_for
 from flask.typing import ResponseReturnValue
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from blueprints.generation_api_bp import queue_recipe_generation, queue_recipe_image
 from blueprints.generation_bp import validate_generation_input
@@ -25,6 +26,10 @@ agent_api_bp = Blueprint("agent_api", __name__, url_prefix="/api/agent")
 
 SEARCH_LIMIT_DEFAULT = 10
 SEARCH_LIMIT_MAX = 20
+SEARCH_QUERY_MAX_CHARS = 100
+# Tool arguments are a prompt, a slug or an id. Express applies the same size
+# to /api/generate (server/validation.ts); it does not parse these routes.
+MAX_BODY_BYTES = 10 * 1024
 
 
 def _error(status: int, message: str) -> ResponseReturnValue:
@@ -49,23 +54,31 @@ def _search_recipes(arguments: dict[str, Any], user_id: int | None) -> ResponseR
     limit = arguments.get("limit", SEARCH_LIMIT_DEFAULT)
     if not isinstance(query, str) or type(limit) is not int:
         return _error(400, "query must be a string and limit an integer")
+    words = query.strip()
+    if len(words) > SEARCH_QUERY_MAX_CHARS:
+        return _error(400, f"query must be at most {SEARCH_QUERY_MAX_CHARS} characters")
     limit = max(1, min(limit, SEARCH_LIMIT_MAX))
 
     rows = _published()
-    words = query.strip()
     if words:
         rows = rows.filter(Recipe.name.icontains(words, autoescape=True))
-    found = rows.order_by(Recipe.created_at.desc(), Recipe.id.desc()).limit(limit).all()
+    # Three values per recipe, not the row: `data` holds the whole recipe.
+    found = (
+        rows.with_entities(Recipe.name, Recipe.slug, Recipe.data["description"].as_string())
+        .order_by(Recipe.created_at.desc(), Recipe.id.desc())
+        .limit(limit)
+        .all()
+    )
     return jsonify(
         {
             "recipes": [
                 {
-                    "name": recipe.name,
-                    "slug": recipe.slug,
-                    "url": _public_recipe_url(recipe.slug),
-                    "description": (recipe.data or {}).get("description", ""),
+                    "name": name,
+                    "slug": slug,
+                    "url": _public_recipe_url(slug),
+                    "description": description or "",
                 }
-                for recipe in found
+                for name, slug, description in found
             ],
             "attribution": ATTRIBUTION,
         }
@@ -100,9 +113,11 @@ def _generate_recipe(arguments: dict[str, Any], user_id: int | None) -> Response
         return _error(400, error_message)
 
     # No guest session: the recipe belongs to the signed-in account. The model
-    # is the configured one; an agent does not choose it.
+    # is the configured one; an agent does not choose it. Text only: the web
+    # app's flow queues a photo after the text, and here that would generate
+    # an image with the image switch off. A photo is generate_recipe_image.
     response = current_app.make_response(
-        queue_recipe_generation(prompt, DEFAULT_MODEL, user_id, None)
+        queue_recipe_generation(prompt, DEFAULT_MODEL, user_id, None, with_image=False)
     )
     if response.status_code != 202:
         return response
@@ -173,7 +188,12 @@ def call_agent_tool(name: str) -> ResponseReturnValue:
     if isinstance(tool, Refusal):
         return _error(tool.status, tool.error)
 
-    arguments = request.get_json(silent=True)
+    # Werkzeug enforces this while reading, with or without a Content-Length.
+    request.max_content_length = MAX_BODY_BYTES
+    try:
+        arguments = request.get_json(silent=True)
+    except RequestEntityTooLarge:
+        return _error(413, "The request body is too large")
     if arguments is None:
         arguments = {}
     if not isinstance(arguments, dict):

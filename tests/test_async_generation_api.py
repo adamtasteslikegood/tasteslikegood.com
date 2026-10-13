@@ -78,6 +78,7 @@ def test_generate_recipe_creates_pending_row_and_queues_message(app, client):
             "model": "models/test-model",
             "user_id": None,
             "guest_session_id": "guest-1",
+            "with_image": True,
         },
     )
     update_status.assert_not_called()

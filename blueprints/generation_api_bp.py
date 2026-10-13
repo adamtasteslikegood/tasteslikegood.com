@@ -96,11 +96,13 @@ def queue_recipe_generation(
     selected_model: str,
     user_id: int | None,
     guest_session_id: str | None,
+    with_image: bool = True,
 ) -> ResponseReturnValue:
     """Save a pending recipe for this owner and queue its text generation.
 
     Shared by the web app's route above and the agent tools (KAN-401). The
-    caller validates the prompt and decides who the owner is.
+    caller validates the prompt and decides who the owner is. The worker
+    queues a photo after the text unless ``with_image`` is False.
     """
     # The Pub/Sub worker rebuilds the full schema prompt from the raw prompt
     # (worker_api_bp), so only the raw prompt is published here.
@@ -136,6 +138,7 @@ def queue_recipe_generation(
         "model": selected_model,
         "user_id": user_id,
         "guest_session_id": guest_session_id,
+        "with_image": with_image,
     }
 
     try:

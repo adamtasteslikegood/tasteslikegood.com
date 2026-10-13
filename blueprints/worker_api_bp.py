@@ -421,6 +421,9 @@ def process_recipe():
 
     prompt = data.get("prompt")
     selected_model = data.get("model")
+    # A message without the field is from the web app, or was queued before
+    # the field existed: both get a photo.
+    with_image = data.get("with_image") is not False
     logger.info("Processing recipe generation for %s", sanitize_log_value(recipe_id))
 
     claim_token = None
@@ -518,8 +521,10 @@ def process_recipe():
                 "success": True,
             },
             "image_generation": None,
+            # "skipped" is not "pending", so a redelivered message does not
+            # queue the photo either (_existing_recipe_delivery_response).
             "image_enqueue": {
-                "status": "pending",
+                "status": "pending" if with_image else "skipped",
                 "timestamp": datetime.datetime.now().isoformat(),
             },
             "stock_image_generation": None,
@@ -539,6 +544,9 @@ def process_recipe():
         guest_session_id = updated.guest_session_id
         invalidate_recipe(user_id, guest_session_id, recipe_id)
         logger.info("Successfully generated recipe %s", sanitize_log_value(recipe_id))
+
+        if not with_image:
+            return jsonify({"status": "ok"}), 200
 
         try:
             _publish_image_generation(recipe_id, user_id, guest_session_id)
