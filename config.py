@@ -70,6 +70,10 @@ def _env_switch(name: str, default: bool) -> bool:
 # One switch per offering, so text and image generation turn on and off
 # independently. These never affect /api/generate, which the web app uses.
 AGENT_TOOLS_READ = _env_switch("AGENT_TOOLS_READ", True)
+# Before turning a generation switch on: the cookbook's Express proxy must be
+# the version that applies the generation rate limit and the recipe write
+# pause to /api/agent/tools/generate_* (cookbook server/agent-tools.ts). Flask
+# has neither guard of its own.
 AGENT_TOOLS_GENERATE_TEXT = _env_switch("AGENT_TOOLS_GENERATE_TEXT", False)
 AGENT_TOOLS_GENERATE_IMAGE = _env_switch("AGENT_TOOLS_GENERATE_IMAGE", False)
 

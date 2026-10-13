@@ -13,7 +13,6 @@ from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request, session, url_for
 from flask.typing import ResponseReturnValue
-from werkzeug.exceptions import RequestEntityTooLarge
 
 from blueprints.generation_api_bp import queue_recipe_generation, queue_recipe_image
 from blueprints.generation_bp import validate_generation_input
@@ -197,11 +196,12 @@ def call_agent_tool(name: str) -> ResponseReturnValue:
     if isinstance(tool, Refusal):
         return _error(tool.status, tool.error)
 
-    # Werkzeug enforces this while reading, with or without a Content-Length.
-    request.max_content_length = MAX_BODY_BYTES
-    try:
-        body = request.get_data()
-    except RequestEntityTooLarge:
+    # Read one byte past the limit and count, so a body sent without a
+    # Content-Length (chunked) is refused too, not cut short and parsed.
+    if (request.content_length or 0) > MAX_BODY_BYTES:
+        return _error(413, "The request body is too large")
+    body = request.stream.read(MAX_BODY_BYTES + 1)
+    if len(body) > MAX_BODY_BYTES:
         return _error(413, "The request body is too large")
     # No body means no arguments. A body that is present must be a JSON
     # object: a malformed one must not run the tool with defaults.

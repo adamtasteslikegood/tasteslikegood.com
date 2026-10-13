@@ -1,13 +1,13 @@
 """Agent tools: the switches, the access check and the tool calls (KAN-401)."""
 
 import io
-import json
 import sys
 import uuid
 from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+from werkzeug.test import EnvironBuilder
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -345,14 +345,19 @@ def test_tool_call_refuses_a_body_over_the_size_limit(make_client):
     sized = client.post("/api/agent/tools/search_recipes", json={"query": "chili", "pad": padding})
     assert sized.status_code == 413
 
-    # The same body with no Content-Length, as a chunked upload arrives.
-    body = json.dumps({"query": "chili", "pad": padding}).encode()
-    streamed = client.post(
-        "/api/agent/tools/search_recipes",
+    # No Content-Length, as a chunked upload arrives: a valid object, then
+    # whitespace past the limit. It must be refused, not cut short and run.
+    body = b'{"query": "chili"}' + b" " * MAX_BODY_BYTES
+    builder = EnvironBuilder(
+        path="/api/agent/tools/search_recipes",
+        method="POST",
         input_stream=io.BytesIO(body),
         content_type="application/json",
-        environ_overrides={"wsgi.input_terminated": True},
     )
+    environ = builder.get_environ()
+    environ.pop("CONTENT_LENGTH", None)
+    environ["wsgi.input_terminated"] = True
+    streamed = client.open(environ)
     assert streamed.status_code == 413
 
 
@@ -398,3 +403,22 @@ def test_tool_call_rejects_malformed_json_instead_of_running_with_defaults(make_
 def test_search_rejects_a_query_that_is_not_a_string(make_client, query):
     client = make_client()
     assert _call(client, "search_recipes", query=query).status_code == 400
+
+
+def test_image_tool_reports_a_photo_that_already_exists(make_client):
+    client = make_client(signed_in=True, AGENT_TOOLS_GENERATE_IMAGE=True)
+    recipe = _owned_recipe(User.query.one().id)
+    recipe.data = {
+        **recipe.data,
+        "ai_image_url": "/api/recipes/x/image",
+        "ai_image_gcs": "recipes/x.png",
+    }
+    db.session.commit()
+    with patch("services.pubsub_service.publish_message") as publish:
+        response = _call(client, "generate_recipe_image", recipe_id=recipe.id)
+    assert response.status_code == 200
+    publish.assert_not_called()
+    body = response.get_json()
+    assert body["image_url"] == "/api/recipes/x/image"
+    assert body["recipe_id"] == recipe.id
+    assert body["url"].endswith(f"/recipe/{recipe.id}")
