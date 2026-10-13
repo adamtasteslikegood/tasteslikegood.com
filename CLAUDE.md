@@ -130,6 +130,7 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `GOOGLE_API_KEY`                 | Gemini fallback when user has no OAuth                                                           |
 | `GEMINI_DEFAULT_MODEL`           | Overrides the default generation model. Defaults to `gemini-3.8-flash` when unset/empty.         |
 | `GEMINI_IMAGE_MODEL`             | Overrides the image generation model. Defaults to `gemini-3-pro-image` when unset/empty.         |
+| `AGENT_TOOLS_READ`, `AGENT_TOOLS_GENERATE_TEXT`, `AGENT_TOOLS_GENERATE_IMAGE` | Switches for the agent tools under `/api/agent/tools` (`services/agent_tools.py`). Read defaults on; both generation switches default off. On is `1`/`true`/`yes`/`on`; anything else is off. They do not affect `/api/generate`. |
 | `FLASK_SECRET_KEY`               | Session signing. **Required in prod** — fails fast if missing.                                   |
 | `FLASK_ENV`                      | `production` activates guards + secret-key fail-fast.                                            |
 | `GCS_BUCKET_NAME`               | Recipe image storage (`tasteslikegood-recipe-images` in prod)                                    |

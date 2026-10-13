@@ -16,7 +16,9 @@ class RecipeMetadata(db.Model):  # type: ignore[name-defined]
     Rows are append-only versions; the highest ``version`` for a recipe is the
     one in use. ``inputs`` and ``inputs_hash`` record what a version was built
     from, so a later edit to the recipe makes it stale instead of wrong.
-    ``scores`` is empty until something grades a version.
+    ``scores`` holds what is recorded about a version after it is written: so
+    far, on a rule version, how many model answers for the same content failed
+    validation (``model_rejections``, KAN-393).
     """
 
     __tablename__ = "recipe_metadata"

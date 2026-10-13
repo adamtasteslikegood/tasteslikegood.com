@@ -66,13 +66,14 @@ VALID_RECIPE = {
 }
 
 
-def _push_envelope(recipe_id):
+def _push_envelope(recipe_id, **extra):
     payload = {
         "recipe_id": recipe_id,
         "prompt": "peach salsa",
         "model": "gemini-3.1-pro-preview",
         "user_id": None,
         "guest_session_id": "guest-1",
+        **extra,
     }
     data = base64.b64encode(json.dumps(payload).encode()).decode()
     return {"message": {"data": data}}
@@ -1203,3 +1204,49 @@ def test_image_failure_invalidates_cached_recipe(app, client):
         recipe = db.session.get(Recipe, recipe_id)
         assert recipe.data["ai_metadata"]["image_generation"]["success"] is False
         assert cache_utils.safe_get(key) is None
+
+
+def test_recipe_worker_queues_no_image_when_the_message_says_so(app, client):
+    """KAN-401: a text-only request stays text-only, on redelivery too."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    envelope = _push_envelope(recipe_id, with_image=False)
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            return_value=(VALID_RECIPE, json.dumps(VALID_RECIPE), None),
+        ) as mock_attempt,
+        patch("services.pubsub_service.publish_message") as publish,
+    ):
+        first = client.post("/api/worker/recipe", json=envelope)
+        redelivered = client.post("/api/worker/recipe", json=envelope)
+
+    assert (first.status_code, redelivered.status_code) == (200, 200)
+    assert mock_attempt.call_count == 1
+    publish.assert_not_called()
+    with app.app_context():
+        recipe = db.session.get(Recipe, recipe_id)
+        assert recipe.status == "ready"
+        assert recipe.data["ai_metadata"]["image_enqueue"]["status"] == "skipped"
+
+
+@pytest.mark.parametrize("extra", [{}, {"with_image": True}, {"with_image": None}])
+def test_recipe_worker_queues_an_image_unless_told_not_to(app, client, extra):
+    """Web app messages, and ones queued before the field existed, get a photo."""
+    recipe_id = str(uuid.uuid4())
+    with app.app_context():
+        _make_pending_recipe(recipe_id)
+
+    with (
+        patch(
+            "blueprints.worker_api_bp.attempt_recipe_generation",
+            return_value=(VALID_RECIPE, json.dumps(VALID_RECIPE), None),
+        ),
+        patch("services.pubsub_service.publish_message") as publish,
+    ):
+        resp = client.post("/api/worker/recipe", json=_push_envelope(recipe_id, **extra))
+
+    assert resp.status_code == 200
+    assert publish.call_args.args[0] == "image-generation"

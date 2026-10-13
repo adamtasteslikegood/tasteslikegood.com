@@ -11,6 +11,7 @@ Handles API routes for:
 """
 
 import csv
+import functools
 import logging
 import os
 
@@ -36,6 +37,23 @@ from utils.log_sanitizer import sanitize_log_value
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+def legacy_ui_only(view):
+    """Answer 404 in production for a route only the legacy HTML UI calls.
+
+    The legacy UI (templates/recipe.html) is for local development. Its routes
+    work on recipe files, not database rows, and take no account, so they are
+    not part of the production API.
+    """
+
+    @functools.wraps(view)
+    def wrapper(*args, **kwargs):
+        if os.environ.get("FLASK_ENV") == "production":
+            return jsonify({"error": "Not found"}), 404
+        return view(*args, **kwargs)
+
+    return wrapper
 
 
 @api_bp.route("/models", methods=["GET"])
@@ -84,6 +102,7 @@ def refresh_models():
 
 
 @api_bp.route("/generate_image/<filename>", methods=["POST"])
+@legacy_ui_only
 def generate_recipe_image(filename):
     """
     Generates an AI image for a recipe asynchronously.
@@ -122,6 +141,7 @@ def generate_recipe_image(filename):
 
 
 @api_bp.route("/regenerate_image/<filename>", methods=["POST"])
+@legacy_ui_only
 def regenerate_recipe_image(filename):
     """Force regeneration of an AI image, even if one already exists."""
     try:
@@ -153,6 +173,7 @@ def regenerate_recipe_image(filename):
 
 
 @api_bp.route("/report_recipe/<filename>", methods=["POST"])
+@legacy_ui_only
 def report_recipe(filename):
     """Log a user report about a recipe or image."""
     try:
