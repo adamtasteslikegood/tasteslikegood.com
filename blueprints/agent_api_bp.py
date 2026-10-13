@@ -188,16 +188,6 @@ def list_agent_tools() -> ResponseReturnValue:
     )
 
 
-def _has_nul(value: Any) -> bool:
-    if isinstance(value, str):
-        return "\x00" in value
-    if isinstance(value, dict):
-        return any(_has_nul(key) or _has_nul(item) for key, item in value.items())
-    if isinstance(value, list):
-        return any(_has_nul(item) for item in value)
-    return False
-
-
 @agent_api_bp.route("/tools/<name>", methods=["POST"])
 def call_agent_tool(name: str) -> ResponseReturnValue:
     """Call one tool. The JSON body is the tool's arguments object."""
@@ -226,11 +216,13 @@ def call_agent_tool(name: str) -> ResponseReturnValue:
             # A lone surrogate (an escape such as \ud800) parses, then fails
             # in the database driver. Refuse it here.
             json.dumps(arguments, ensure_ascii=False).encode("utf-8")
-        except ValueError:
+        except (ValueError, RecursionError):
+            # RecursionError: a body nested a few hundred levels deep.
             return _error(400, "The request body must be a JSON object")
-        # PostgreSQL refuses a NUL in a string parameter (also a 500).
-        if _has_nul(arguments):
-            return _error(400, "Arguments must not contain NUL characters")
     if not isinstance(arguments, dict):
         return _error(400, "The request body must be a JSON object")
+    # PostgreSQL refuses a NUL in a string parameter (also a 500). Every tool
+    # argument is a top-level value, so nothing nested reaches a query.
+    if any(isinstance(value, str) and "\x00" in value for value in arguments.values()):
+        return _error(400, "Arguments must not contain NUL characters")
     return _HANDLERS[tool.name](arguments, user_id)

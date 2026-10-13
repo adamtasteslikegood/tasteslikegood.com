@@ -445,10 +445,20 @@ def test_tool_call_refuses_a_body_that_is_not_sent_as_json(make_client, content_
         ("get_recipe", '{"slug": "\\ud800"}'),
         ("search_recipes", '{"query": "chili\\u0000"}'),
         ("get_recipe", '{"slug": "\\u0000"}'),
-        ("search_recipes", '{"query": "chili", "extra": ["\\u0000"]}'),
     ],
 )
 def test_tool_call_refuses_text_the_database_cannot_take(make_client, name, body):
     client = make_client()
     response = client.post(f"/api/agent/tools/{name}", data=body, content_type="application/json")
     assert response.status_code == 400
+
+
+@pytest.mark.parametrize("depth", [600, 4000])
+def test_tool_call_refuses_or_ignores_deeply_nested_json(make_client, depth):
+    """Nesting must never be a 500: it is refused, or ignored as an unused argument."""
+    client = make_client()
+    body = '{"query": "chili", "extra": ' + "[" * depth + "]" * depth + "}"
+    response = client.post(
+        "/api/agent/tools/search_recipes", data=body, content_type="application/json"
+    )
+    assert response.status_code in (200, 400)

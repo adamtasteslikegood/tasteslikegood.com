@@ -78,9 +78,21 @@ class TestSelectCandidates:
             "failed",
             data={"name": "f", "ai_metadata": {"image_enqueue": {"status": "complete"}}},
         )
+        # The owner asked for a photo and the request never reached the worker
+        # (publish failed): the marker is still "skipped", but it was asked for.
+        asked = _recipe(
+            "asked",
+            data={
+                "name": "a",
+                "ai_metadata": {
+                    "image_enqueue": {"status": "skipped"},
+                    "image_request": {"id": "r1", "status": "pending"},
+                },
+            },
+        )
         db.session.commit()
 
-        assert [r.id for r in select_candidates(10)] == [failed.id]
+        assert {r.id for r in select_candidates(10)} == {failed.id, asked.id}
 
     def test_respects_limit(self, app):
         for i in range(5):

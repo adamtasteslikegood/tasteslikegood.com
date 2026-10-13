@@ -45,14 +45,18 @@ def _is_imageless(data: dict) -> bool:
 
 
 def _image_was_declined(data: dict) -> bool:
-    """True for a recipe generated as text only (KAN-401).
+    """True for a recipe generated as text only that nobody asked a photo for.
 
-    The recipe worker marks it ``image_enqueue.status = "skipped"``. It has no
-    image because none was asked for, so there is nothing to repair. Once its
-    owner asks for one, the image worker overwrites the marker.
+    The recipe worker marks a text-only recipe (KAN-401) with
+    ``image_enqueue.status = "skipped"``. It has no image because none was
+    asked for, so there is nothing to repair. A later request for a photo
+    records ``image_request``; from then on the recipe is repaired like any
+    other, including when that request failed before reaching the worker.
     """
     metadata = data.get("ai_metadata")
-    enqueue = metadata.get("image_enqueue") if isinstance(metadata, dict) else None
+    if not isinstance(metadata, dict) or isinstance(metadata.get("image_request"), dict):
+        return False
+    enqueue = metadata.get("image_enqueue")
     return isinstance(enqueue, dict) and enqueue.get("status") == "skipped"
 
 
