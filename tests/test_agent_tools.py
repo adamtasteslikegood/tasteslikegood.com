@@ -440,9 +440,15 @@ def test_tool_call_refuses_a_body_that_is_not_sent_as_json(make_client, content_
 
 @pytest.mark.parametrize(
     "name, body",
-    [("search_recipes", '{"query": "\\ud800"}'), ("get_recipe", '{"slug": "\\ud800"}')],
+    [
+        ("search_recipes", '{"query": "\\ud800"}'),
+        ("get_recipe", '{"slug": "\\ud800"}'),
+        ("search_recipes", '{"query": "chili\\u0000"}'),
+        ("get_recipe", '{"slug": "\\u0000"}'),
+        ("search_recipes", '{"query": "chili", "extra": ["\\u0000"]}'),
+    ],
 )
-def test_tool_call_refuses_text_that_is_not_valid_unicode(make_client, name, body):
+def test_tool_call_refuses_text_the_database_cannot_take(make_client, name, body):
     client = make_client()
     response = client.post(f"/api/agent/tools/{name}", data=body, content_type="application/json")
     assert response.status_code == 400
