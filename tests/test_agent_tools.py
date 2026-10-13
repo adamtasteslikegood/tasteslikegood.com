@@ -169,7 +169,7 @@ def test_signed_in_caller_queues_a_recipe_owned_by_the_account(make_client):
     body = response.get_json()
     recipe = db.session.get(Recipe, body["recipe_id"])
     assert recipe.status == "generating"
-    assert recipe.user_id is not None
+    assert recipe.user_id == User.query.one().id
     assert recipe.guest_session_id is None
     assert body["url"].endswith(f"/recipe/{recipe.id}")
     assert "Tasteslikegood.org" in body["attribution"]
