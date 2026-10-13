@@ -207,8 +207,15 @@ def call_agent_tool(name: str) -> ResponseReturnValue:
     # object: a malformed one must not run the tool with defaults.
     arguments: Any = {}
     if body.strip():
+        # A JSON media type, as /api/generate requires: a browser cannot send
+        # one across origins without a preflight.
+        if not request.is_json:
+            return _error(415, "The request body must be sent as application/json")
         try:
             arguments = json.loads(body)
+            # A lone surrogate (an escape such as \ud800) parses, then fails
+            # in the database driver. Refuse it here.
+            json.dumps(arguments, ensure_ascii=False).encode("utf-8")
         except ValueError:
             return _error(400, "The request body must be a JSON object")
     if not isinstance(arguments, dict):

@@ -422,3 +422,27 @@ def test_image_tool_reports_a_photo_that_already_exists(make_client):
     assert body["image_url"] == "/api/recipes/x/image"
     assert body["recipe_id"] == recipe.id
     assert body["url"].endswith(f"/recipe/{recipe.id}")
+
+
+@pytest.mark.parametrize("content_type", ["text/plain", "application/x-www-form-urlencoded", None])
+def test_tool_call_refuses_a_body_that_is_not_sent_as_json(make_client, content_type):
+    client = make_client(signed_in=True, AGENT_TOOLS_GENERATE_TEXT=True)
+    with patch("services.pubsub_service.publish_message") as publish:
+        response = client.post(
+            "/api/agent/tools/generate_recipe",
+            data='{"prompt": "A bright summer pasta"}',
+            content_type=content_type,
+        )
+    assert response.status_code == 415
+    publish.assert_not_called()
+    assert Recipe.query.count() == 0
+
+
+@pytest.mark.parametrize(
+    "name, body",
+    [("search_recipes", '{"query": "\\ud800"}'), ("get_recipe", '{"slug": "\\ud800"}')],
+)
+def test_tool_call_refuses_text_that_is_not_valid_unicode(make_client, name, body):
+    client = make_client()
+    response = client.post(f"/api/agent/tools/{name}", data=body, content_type="application/json")
+    assert response.status_code == 400

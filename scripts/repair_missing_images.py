@@ -44,6 +44,18 @@ def _is_imageless(data: dict) -> bool:
     return not data.get("ai_image_data") and not data.get("ai_image_gcs")
 
 
+def _image_was_declined(data: dict) -> bool:
+    """True for a recipe generated as text only (KAN-401).
+
+    The recipe worker marks it ``image_enqueue.status = "skipped"``. It has no
+    image because none was asked for, so there is nothing to repair. Once its
+    owner asks for one, the image worker overwrites the marker.
+    """
+    metadata = data.get("ai_metadata")
+    enqueue = metadata.get("image_enqueue") if isinstance(metadata, dict) else None
+    return isinstance(enqueue, dict) and enqueue.get("status") == "skipped"
+
+
 def select_candidates(limit: int):
     """Imageless, generation-idle recipes, most publicly visible first.
 
@@ -64,7 +76,8 @@ def select_candidates(limit: int):
     )
     picked = []
     for recipe in stream:
-        if _is_imageless(recipe.data or {}):
+        data = recipe.data or {}
+        if _is_imageless(data) and not _image_was_declined(data):
             picked.append(recipe)
             if len(picked) >= limit:
                 break

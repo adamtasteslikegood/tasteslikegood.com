@@ -121,3 +121,4 @@ recipe write pause as `/api/generate`.
 - `401 Unauthorized`: the tool needs a signed-in account.
 - `404 Not Found`: the tool does not exist or is switched off, or the recipe was not found.
 - `413 Content Too Large`: the body is over 10 KB.
+- `415 Unsupported Media Type`: the body is not sent as `application/json`.
