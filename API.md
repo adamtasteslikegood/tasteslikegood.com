@@ -109,6 +109,11 @@ Generation is asynchronous: the tool returns `202` with a `recipe_id`, and the
 caller polls `get_generation_status`. A generated recipe is saved to the
 signed-in account. Results carry the recipe's URL and an attribution line.
 
+`get_generation_status` answers for any recipe the signed-in account owns. It
+always returns `status` and `image_url`. It returns `recipe` only when the text
+switch is on, and then with the fields a published recipe shows, not the
+stored row.
+
 `generate_recipe` makes the text only. It does not queue a photo, whatever the
 image switch says; a photo is a separate `generate_recipe_image` call.
 

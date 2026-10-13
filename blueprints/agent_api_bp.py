@@ -20,7 +20,14 @@ from blueprints.public_bp import _public_base_url, _recipe_image_url, _save_reci
 from config import DEFAULT_MODEL
 from models.recipe import Recipe
 from repositories import db_recipe_repository
-from services.agent_tools import ATTRIBUTION, Refusal, check_access, enabled_tools
+from services.agent_tools import (
+    ATTRIBUTION,
+    GENERATE_TEXT,
+    SWITCHES,
+    Refusal,
+    check_access,
+    enabled_tools,
+)
 
 agent_api_bp = Blueprint("agent_api", __name__, url_prefix="/api/agent")
 
@@ -149,15 +156,22 @@ def _get_generation_status(arguments: dict[str, Any], user_id: int | None) -> Re
     recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, None)
     if recipe is None:
         return _error(404, "Recipe not found")
-    return jsonify(
-        {
-            "recipe_id": recipe.id,
-            "status": recipe.status,
-            "recipe": recipe.data,
-            "url": _account_recipe_url(recipe.id),
-            "attribution": ATTRIBUTION,
-        }
-    )
+    # The status tool is on when either generation switch is on, so it gives
+    # no more than that switch's offering. Always: the status and the photo.
+    # The recipe text only with the text switch, and then only the fields a
+    # published recipe shows, never the stored row (notes the owner wrote,
+    # generation metadata).
+    image_url = _recipe_image_url(recipe)
+    body: dict[str, Any] = {
+        "recipe_id": recipe.id,
+        "status": recipe.status,
+        "image_url": image_url,
+        "url": _account_recipe_url(recipe.id),
+        "attribution": ATTRIBUTION,
+    }
+    if current_app.config.get(SWITCHES[GENERATE_TEXT]) is True:
+        body["recipe"] = _save_recipe_payload(recipe, image_url)
+    return jsonify(body)
 
 
 _HANDLERS = {

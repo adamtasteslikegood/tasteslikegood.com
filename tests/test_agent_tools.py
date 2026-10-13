@@ -247,6 +247,51 @@ def test_status_tool_reads_only_the_accounts_own_generation(make_client):
     assert _call(client, "get_generation_status", recipe_id=theirs.id).status_code == 404
 
 
+def _recipe_with_private_fields(user_id):
+    recipe = Recipe(
+        id=str(uuid.uuid4()),
+        user_id=user_id,
+        name="Mine",
+        status="ready",
+        data={
+            "name": "Mine",
+            "description": "Soup.",
+            "ingredients": {"main": ["1 onion"]},
+            "personalNotes": "for Sam's birthday",
+            "ai_metadata": {"prompt": "secret prompt"},
+        },
+    )
+    db.session.add(recipe)
+    db.session.commit()
+    return recipe
+
+
+def test_status_tool_with_only_the_image_switch_returns_no_recipe_text(make_client):
+    client = make_client(signed_in=True, AGENT_TOOLS_READ=False, AGENT_TOOLS_GENERATE_IMAGE=True)
+    recipe = _recipe_with_private_fields(User.query.one().id)
+
+    response = _call(client, "get_generation_status", recipe_id=recipe.id)
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert set(body) == {"recipe_id", "status", "image_url", "url", "attribution"}
+    assert "onion" not in response.get_data(as_text=True)
+    assert "birthday" not in response.get_data(as_text=True)
+
+
+def test_status_tool_with_the_text_switch_returns_the_recipe_without_private_fields(make_client):
+    client = make_client(signed_in=True, AGENT_TOOLS_GENERATE_TEXT=True)
+    recipe = _recipe_with_private_fields(User.query.one().id)
+
+    response = _call(client, "get_generation_status", recipe_id=recipe.id)
+
+    assert response.status_code == 200
+    assert response.get_json()["recipe"]["ingredients"] == {"main": ["1 onion"]}
+    text = response.get_data(as_text=True)
+    assert "birthday" not in text
+    assert "secret prompt" not in text
+
+
 # --- the web app's own routes are untouched ---------------------------------
 
 
