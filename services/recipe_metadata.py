@@ -16,7 +16,6 @@ import queue
 import re
 import threading
 import uuid
-from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 from flask import current_app
@@ -263,7 +262,6 @@ def _record_model_rejection(recipe_id: str, digest: str) -> None:
     row.scores = {
         **(row.scores if isinstance(row.scores, dict) else {}),
         "model_rejections": _model_rejections(row) + 1,
-        "model_rejected_at": datetime.now(timezone.utc).isoformat(),
     }
     db.session.commit()
 
