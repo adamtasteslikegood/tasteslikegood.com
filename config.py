@@ -77,6 +77,10 @@ AGENT_TOOLS_READ = _env_switch("AGENT_TOOLS_READ", True)
 AGENT_TOOLS_GENERATE_TEXT = _env_switch("AGENT_TOOLS_GENERATE_TEXT", False)
 AGENT_TOOLS_GENERATE_IMAGE = _env_switch("AGENT_TOOLS_GENERATE_IMAGE", False)
 
+# Markdown for agents (KAN-397): a GET for /r/<slug>, /browse or a hub that
+# sends Accept: text/markdown gets the page as Markdown. Off serves HTML only.
+MARKDOWN_FOR_AGENTS = _env_switch("MARKDOWN_FOR_AGENTS", True)
+
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
 

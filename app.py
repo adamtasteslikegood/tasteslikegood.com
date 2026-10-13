@@ -130,8 +130,18 @@ def create_app(**config_overrides):
 
     # Apply caller-supplied overrides (e.g. test fixtures binding to
     # sqlite:///:memory:) before extensions latch on to the URI.
+    from config import MARKDOWN_FOR_AGENTS
+
+    app.config["MARKDOWN_FOR_AGENTS"] = MARKDOWN_FOR_AGENTS
+
     if config_overrides:
         app.config.update(config_overrides)
+
+    if app.config["MARKDOWN_FOR_AGENTS"] is True:
+        from utils.markdown_for_agents import PublicPagesMarkdown
+
+        # Outside ProxyFix, so it adds one frame to the public pages only.
+        app.wsgi_app = PublicPagesMarkdown(app.wsgi_app)
 
     # Initialize extensions
     from extensions import cache, db, migrate
