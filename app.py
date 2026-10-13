@@ -22,6 +22,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Import blueprints
 from auth import auth_bp
+from blueprints.agent_api_bp import agent_api_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
@@ -118,6 +119,14 @@ def create_app(**config_overrides):
 
     app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
+
+    # Agent tool switches (KAN-401). Held in app.config, not read from the
+    # module at request time, so a test can set them per app.
+    from config import AGENT_TOOLS_GENERATE_IMAGE, AGENT_TOOLS_GENERATE_TEXT, AGENT_TOOLS_READ
+
+    app.config["AGENT_TOOLS_READ"] = AGENT_TOOLS_READ
+    app.config["AGENT_TOOLS_GENERATE_TEXT"] = AGENT_TOOLS_GENERATE_TEXT
+    app.config["AGENT_TOOLS_GENERATE_IMAGE"] = AGENT_TOOLS_GENERATE_IMAGE
 
     # Apply caller-supplied overrides (e.g. test fixtures binding to
     # sqlite:///:memory:) before extensions latch on to the URI.
@@ -310,6 +319,7 @@ def create_app(**config_overrides):
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
     app.register_blueprint(generation_api_bp)  # Prefix '/api' - Angular JSON endpoints
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
+    app.register_blueprint(agent_api_bp)  # Prefix '/api/agent' set in blueprint
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
     app.register_blueprint(worker_api_bp)  # Prefix '/api/worker' set in blueprint

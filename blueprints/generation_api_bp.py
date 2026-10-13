@@ -83,15 +83,30 @@ def generate_recipe_json():
     if not is_valid:
         return jsonify({"error": error_message}), 400
 
-    selected_model = data.get("model", DEFAULT_MODEL)
+    return queue_recipe_generation(
+        prompt,
+        data.get("model", DEFAULT_MODEL),
+        _current_user_id(),
+        _current_guest_session_id(),
+    )
 
+
+def queue_recipe_generation(
+    prompt: str,
+    selected_model: str,
+    user_id: int | None,
+    guest_session_id: str | None,
+) -> ResponseReturnValue:
+    """Save a pending recipe for this owner and queue its text generation.
+
+    Shared by the web app's route above and the agent tools (KAN-401). The
+    caller validates the prompt and decides who the owner is.
+    """
     # The Pub/Sub worker rebuilds the full schema prompt from the raw prompt
     # (worker_api_bp), so only the raw prompt is published here.
 
     # Assign an ID
     recipe_id = str(uuid.uuid4())
-    user_id = _current_user_id()
-    guest_session_id = _current_guest_session_id()
 
     # Save a pending recipe to database
     pending_data = {"id": recipe_id, "name": "Generating...", "user_id": user_id}
@@ -164,12 +179,24 @@ def generate_image_for_recipe():
     if not data or not data.get("recipe_id"):
         return jsonify({"error": "recipe_id is required"}), 400
 
-    recipe_id = data["recipe_id"]
-    force_regenerate = data.get("force_regenerate") is True
+    return queue_recipe_image(
+        data["recipe_id"],
+        data.get("force_regenerate") is True,
+        _current_user_id(),
+        _current_guest_session_id(),
+    )
 
-    user_id = _current_user_id()
-    guest_session_id = _current_guest_session_id()
 
+def queue_recipe_image(
+    recipe_id: str,
+    force_regenerate: bool,
+    user_id: int | None,
+    guest_session_id: str | None,
+) -> ResponseReturnValue:
+    """Queue an AI image for a recipe this owner holds.
+
+    Shared by the web app's route above and the agent tools (KAN-401).
+    """
     # Load recipe from DB
     db_recipe = db_recipe_repository.get_recipe_by_id(recipe_id, user_id, guest_session_id)
     if not db_recipe:
