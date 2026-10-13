@@ -79,6 +79,8 @@ recipes/            # Storage for generated recipes (JSON files)
 - `POST /api/generate_image/<filename>` - Triggers async AI image generation
 - `POST /api/regenerate_image/<filename>` - Forces regeneration of the AI image
 - `POST /api/report_recipe/<filename>` - Logs user reports
+
+The three `<filename>` routes above belong to the legacy HTML UI and work on recipe files. They answer `404` when `FLASK_ENV=production`.
 - `POST /api/migrate` - Migrates old recipe JSONs to the latest schema
 
 ### Authentication Routes (`/auth`)
