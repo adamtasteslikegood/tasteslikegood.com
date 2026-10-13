@@ -8,6 +8,7 @@ Generation here never falls back to a guest session, unlike /api/generate: an
 agent generates for a signed-in account or not at all.
 """
 
+import json
 from typing import Any
 
 from flask import Blueprint, current_app, jsonify, request, session, url_for
@@ -50,7 +51,7 @@ def _published() -> Any:
 
 
 def _search_recipes(arguments: dict[str, Any], user_id: int | None) -> ResponseReturnValue:
-    query = arguments.get("query") or ""
+    query = arguments.get("query", "")
     limit = arguments.get("limit", SEARCH_LIMIT_DEFAULT)
     if not isinstance(query, str) or type(limit) is not int:
         return _error(400, "query must be a string and limit an integer")
@@ -131,7 +132,15 @@ def _generate_recipe_image(arguments: dict[str, Any], user_id: int | None) -> Re
     recipe_id = _recipe_id_argument(arguments)
     if recipe_id is None:
         return _error(400, "recipe_id is required")
-    return queue_recipe_image(recipe_id, False, user_id, None)
+    response = current_app.make_response(queue_recipe_image(recipe_id, False, user_id, None))
+    if response.status_code not in (200, 202):
+        return response
+    # 202: queued. 200: the recipe already has a photo (image_url).
+    body = response.get_json()
+    body["recipe_id"] = recipe_id
+    body["url"] = _account_recipe_url(recipe_id)
+    body["attribution"] = ATTRIBUTION
+    return jsonify(body), response.status_code
 
 
 def _get_generation_status(arguments: dict[str, Any], user_id: int | None) -> ResponseReturnValue:
@@ -191,11 +200,17 @@ def call_agent_tool(name: str) -> ResponseReturnValue:
     # Werkzeug enforces this while reading, with or without a Content-Length.
     request.max_content_length = MAX_BODY_BYTES
     try:
-        arguments = request.get_json(silent=True)
+        body = request.get_data()
     except RequestEntityTooLarge:
         return _error(413, "The request body is too large")
-    if arguments is None:
-        arguments = {}
+    # No body means no arguments. A body that is present must be a JSON
+    # object: a malformed one must not run the tool with defaults.
+    arguments: Any = {}
+    if body.strip():
+        try:
+            arguments = json.loads(body)
+        except ValueError:
+            return _error(400, "The request body must be a JSON object")
     if not isinstance(arguments, dict):
         return _error(400, "The request body must be a JSON object")
     return _HANDLERS[tool.name](arguments, user_id)

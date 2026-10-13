@@ -214,6 +214,11 @@ def test_image_tool_queues_for_a_recipe_the_account_owns(make_client):
         response = _call(client, "generate_recipe_image", recipe_id=recipe.id)
     assert response.status_code == 202
     assert publish.call_args.args[0] == "image-generation"
+    body = response.get_json()
+    assert body["status"] == "generating_image"
+    assert body["recipe_id"] == recipe.id
+    assert body["url"].endswith(f"/recipe/{recipe.id}")
+    assert "Tasteslikegood.org" in body["attribution"]
 
 
 def test_image_tool_does_not_reach_another_owners_recipe(make_client):
@@ -377,3 +382,19 @@ def test_search_returns_the_description_and_copes_without_one(make_client):
     found = {r["slug"]: r for r in _call(client, "search_recipes").get_json()["recipes"]}
     assert found["smoky-chili"]["description"] == "A pot of chili."
     assert found["plain-chili"]["description"] == ""
+
+
+@pytest.mark.parametrize("body", ['{"query":"chili"', "null", "[]", '"chili"', "7"])
+def test_tool_call_rejects_malformed_json_instead_of_running_with_defaults(make_client, body):
+    client = make_client()
+    _published_recipe()
+    response = client.post(
+        "/api/agent/tools/search_recipes", data=body, content_type="application/json"
+    )
+    assert response.status_code == 400
+
+
+@pytest.mark.parametrize("query", [0, False, None, ["chili"]])
+def test_search_rejects_a_query_that_is_not_a_string(make_client, query):
+    client = make_client()
+    assert _call(client, "search_recipes", query=query).status_code == 400

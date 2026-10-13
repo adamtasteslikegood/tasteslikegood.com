@@ -117,7 +117,7 @@ recipe write pause as `/api/generate`.
 
 **Response:**
 - `200 OK` or `202 Accepted`: the tool's result.
-- `400 Bad Request`: the body is not a JSON object, or an argument is missing or invalid.
+- `400 Bad Request`: the body is present but is not a JSON object, or an argument is missing or invalid. An empty body means no arguments.
 - `401 Unauthorized`: the tool needs a signed-in account.
 - `404 Not Found`: the tool does not exist or is switched off, or the recipe was not found.
 - `413 Content Too Large`: the body is over 10 KB.
