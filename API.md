@@ -81,6 +81,20 @@ Displays or returns the raw JSON for a recipe.
 
 ---
 
+## Public API description
+
+### GET `/api/public/openapi.json`
+An OpenAPI 3.1 description of what a caller with no account may use:
+`/api/public/newest-recipes`, `/api/recipes/public/<slug>`, and the agent
+tools that read published recipes. The tool entries are built from
+`services/agent_tools.py` on each request, so a tool that is switched off or
+needs sign-in is not described.
+
+**Response:**
+- `200 OK`: the OpenAPI document.
+
+---
+
 ## Agent tools (`/api/agent`)
 
 Tools for AI agents. Three switches decide which tools are offered:
