@@ -1,6 +1,6 @@
 """MCP endpoint over the published recipes (KAN-399).
 
-- POST /mcp   One JSON-RPC message in, one JSON response out
+- POST /mcp   One JSON-RPC message (or a batch) in, one JSON response out
 
 The Streamable HTTP transport of the Model Context Protocol, in its smallest
 form: no session, no event stream, no server-to-client messages. The tools are
@@ -13,14 +13,15 @@ generation switches say.
 """
 
 import json
+import os
 from typing import Any
 from urllib.parse import urlsplit
 
 from flask import Blueprint, current_app, jsonify, request
 from flask.typing import ResponseReturnValue
+from jsonschema import Draft7Validator
 
-from blueprints.agent_api_bp import read_arguments, run_tool
-from blueprints.public_bp import _public_base_url
+from blueprints.agent_api_bp import NO_BODY, read_json_body, run_tool
 from services.agent_tools import ATTRIBUTION, AgentTool, enabled_tools
 
 mcp_bp = Blueprint("mcp", __name__)
@@ -40,46 +41,60 @@ METHOD_NOT_FOUND = -32601
 INVALID_PARAMS = -32602
 
 
-def _result(message_id: Any, result: dict[str, Any]) -> ResponseReturnValue:
-    return jsonify({"jsonrpc": "2.0", "id": message_id, "result": result})
+# Protocol version 2025-03-26 lets a client send several messages as one JSON
+# array; 2025-06-18 took that out. The body size limit already bounds a batch.
+BATCH_VERSION = "2025-03-26"
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+
+Reply = dict[str, Any] | None
 
 
-def _rpc_error(message_id: Any, code: int, message: str, status: int = 200) -> ResponseReturnValue:
-    body = {"jsonrpc": "2.0", "id": message_id, "error": {"code": code, "message": message}}
-    return jsonify(body), status
+def _result(message_id: Any, result: dict[str, Any]) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": message_id, "result": result}
+
+
+def _error(message_id: Any, code: int, message: str) -> dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": message_id, "error": {"code": code, "message": message}}
+
+
+def _refuse(code: int, message: str, status: int) -> ResponseReturnValue:
+    """A refusal of the whole HTTP request: an error with no id."""
+    return jsonify(_error(None, code, message)), status
 
 
 def _tools() -> list[AgentTool]:
     return [tool for tool in enabled_tools(current_app.config) if not tool.requires_sign_in]
 
 
-def _canonical_netloc(scheme: str, netloc: str) -> str:
-    """Lowercase netloc with the scheme's default port stripped."""
-    netloc = netloc.lower()
-    default = {"http": ":80", "https": ":443"}.get(scheme.lower())
-    if default and netloc.endswith(default):
-        return netloc[: -len(default)]
-    return netloc
+def _site(url: str) -> tuple[str, str, int | None]:
+    """Scheme, host and port of a URL, with the scheme's default port filled in."""
+    parts = urlsplit(url)
+    scheme = parts.scheme.lower()
+    try:
+        port = parts.port
+    except ValueError:
+        port = -1
+    return scheme, (parts.hostname or "").lower(), port or {"http": 80, "https": 443}.get(scheme)
 
 
 def _foreign_origin() -> bool:
     """True for a browser page on another site.
 
-    The transport requires the check. A program sends no Origin and is let
-    through; nothing here depends on a cookie either way.
+    The transport requires the check, against DNS rebinding: a page that
+    points its own name at this server sends that name as Origin and as Host,
+    so the Host of the request proves nothing and is not consulted. Allowed
+    are the site's configured address and a loopback page (local development).
+    A program sends no Origin and is let through; nothing here depends on a
+    cookie either way.
     """
     origin = request.headers.get("Origin")
     if origin is None:
         return False
-    origin_parts = urlsplit(origin)
-    public_parts = urlsplit(_public_base_url())
-    # Default ports differ between the Origin header (bare host) and
-    # request.host when a proxy forwards an explicit :80/:443; strip both.
-    allowed = {
-        _canonical_netloc(public_parts.scheme, public_parts.netloc),
-        _canonical_netloc(request.scheme, request.host),
-    }
-    return _canonical_netloc(origin_parts.scheme, origin_parts.netloc) not in allowed
+    site = _site(origin)
+    if site[1] in LOOPBACK_HOSTS:
+        return False
+    configured = os.environ.get("FRONTEND_URL", "").strip()
+    return not configured or site != _site(configured)
 
 
 def _initialize(params: dict[str, Any]) -> dict[str, Any]:
@@ -108,15 +123,21 @@ def _list_tools() -> dict[str, Any]:
     }
 
 
-def _call_tool(message_id: Any, params: dict[str, Any]) -> ResponseReturnValue:
+def _call_tool(message_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     name = params.get("name")
     arguments = params.get("arguments", {})
     if not isinstance(name, str) or not isinstance(arguments, dict):
-        return _rpc_error(message_id, INVALID_PARAMS, "name and an arguments object are required")
+        return _error(message_id, INVALID_PARAMS, "name and an arguments object are required")
     # Not offered here means unknown here: a tool that needs sign-in is not
     # reachable through this endpoint even by name.
-    if name not in {tool.name for tool in _tools()}:
-        return _rpc_error(message_id, INVALID_PARAMS, f"Unknown tool: {name}")
+    tool = next((tool for tool in _tools() if tool.name == name), None)
+    if tool is None:
+        return _error(message_id, INVALID_PARAMS, f"Unknown tool: {name}")
+    # Arguments that do not fit the schema the tool list published are the
+    # caller's mistake, reported as one, before the tool runs.
+    problem = next(Draft7Validator(tool.input_schema).iter_errors(arguments), None)
+    if problem is not None:
+        return _error(message_id, INVALID_PARAMS, f"Invalid arguments: {problem.message}")
 
     response = current_app.make_response(run_tool(name, arguments, None))
     payload = response.get_json(silent=True)
@@ -136,44 +157,32 @@ def _call_tool(message_id: Any, params: dict[str, Any]) -> ResponseReturnValue:
     )
 
 
-@mcp_bp.route("/mcp", methods=["POST"])
-def mcp() -> ResponseReturnValue:
-    """Answer one JSON-RPC message. GET and DELETE get 405: no stream, no session."""
-    if _foreign_origin():
-        return _rpc_error(None, INVALID_REQUEST, "Origin not allowed", 403)
-    version = request.headers.get("MCP-Protocol-Version")
-    if version is not None and version not in PROTOCOL_VERSIONS:
-        return _rpc_error(None, INVALID_REQUEST, "Unsupported MCP-Protocol-Version", 400)
-
-    message, refusal = read_arguments()
-    if refusal is not None:
-        status = current_app.make_response(refusal).status_code
-        # 400 is a real JSON parse failure; 413/415 are transport-level
-        # refusals that JSON-RPC classifies as invalid-request, not parse.
-        code = PARSE_ERROR if status == 400 else INVALID_REQUEST
-        return _rpc_error(None, code, "The body must be one JSON-RPC message", status)
-    if message.get("jsonrpc") != "2.0":
-        return _rpc_error(None, INVALID_REQUEST, "Not a JSON-RPC 2.0 message", 400)
+def _answer(message: Any, *, in_batch: bool = False) -> Reply:
+    """The reply to one message, or None when it asks for none."""
+    if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
+        return _error(None, INVALID_REQUEST, "Not a JSON-RPC 2.0 message")
 
     method = message.get("method")
-    message_id = message.get("id")
     if not isinstance(method, str):
         # A response from the client. This server asks the client nothing, so
         # there is nothing to match it to; accept it as the transport says.
         if "result" in message or "error" in message:
-            return "", 202
-        return _rpc_error(None, INVALID_REQUEST, "method is required", 400)
+            return None
+        return _error(None, INVALID_REQUEST, "method is required")
     if "id" not in message:
         # A notification (notifications/initialized, cancelled, ...).
-        return "", 202
+        return None
+    message_id = message["id"]
     if isinstance(message_id, bool) or not isinstance(message_id, (str, int)):
-        return _rpc_error(None, INVALID_REQUEST, "id must be a string or an integer", 400)
+        return _error(None, INVALID_REQUEST, "id must be a string or an integer")
 
     params = message.get("params", {})
     if not isinstance(params, dict):
-        return _rpc_error(message_id, INVALID_PARAMS, "params must be an object")
+        return _error(message_id, INVALID_PARAMS, "params must be an object")
 
     if method == "initialize":
+        if in_batch:
+            return _error(message_id, INVALID_REQUEST, "initialize must not be sent in a batch")
         return _result(message_id, _initialize(params))
     if method == "ping":
         return _result(message_id, {})
@@ -181,4 +190,42 @@ def mcp() -> ResponseReturnValue:
         return _result(message_id, _list_tools())
     if method == "tools/call":
         return _call_tool(message_id, params)
-    return _rpc_error(message_id, METHOD_NOT_FOUND, f"Method not found: {method}")
+    return _error(message_id, METHOD_NOT_FOUND, f"Method not found: {method}")
+
+
+def _malformed(reply: Reply) -> bool:
+    """True for a refusal that names no request: it has no id to answer to."""
+    return reply is not None and "error" in reply and reply["id"] is None
+
+
+@mcp_bp.route("/mcp", methods=["POST"])
+def mcp() -> ResponseReturnValue:
+    """Answer one request body. GET and DELETE get 405: no stream, no session."""
+    if _foreign_origin():
+        return _refuse(INVALID_REQUEST, "Origin not allowed", 403)
+    version = request.headers.get("MCP-Protocol-Version")
+    if version is not None and version not in PROTOCOL_VERSIONS:
+        return _refuse(INVALID_REQUEST, "Unsupported MCP-Protocol-Version", 400)
+
+    body, refusal = read_json_body()
+    if refusal is not None:
+        status = current_app.make_response(refusal).status_code
+        # 400 is a real JSON parse failure; 413/415 are transport-level
+        # refusals that JSON-RPC classifies as invalid-request, not parse.
+        code = PARSE_ERROR if status == 400 else INVALID_REQUEST
+        return _refuse(code, "The body must be a JSON-RPC message", status)
+    if body is NO_BODY:
+        return _refuse(PARSE_ERROR, "The body must be a JSON-RPC message", 400)
+
+    if isinstance(body, list):
+        # A header naming the newer version rules a batch out; without one the
+        # transport says to assume the older version, which allows it.
+        if version not in (None, BATCH_VERSION) or not body:
+            return _refuse(INVALID_REQUEST, "A batch is not accepted here", 400)
+        replies = [reply for message in body if (reply := _answer(message, in_batch=True))]
+        return (jsonify(replies), 200) if replies else ("", 202)
+
+    reply = _answer(body)
+    if reply is None:
+        return "", 202
+    return jsonify(reply), 400 if _malformed(reply) else 200

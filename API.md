@@ -148,8 +148,8 @@ recipe write pause as `/api/generate`.
 
 ### POST `/mcp`
 A Model Context Protocol server over the published recipes (Streamable HTTP,
-protocol versions `2025-06-18` and `2025-03-26`). One JSON-RPC message per
-request, one JSON response; no session and no event stream, so `GET` and
+protocol versions `2025-06-18` and `2025-03-26`). One request body in, one
+JSON response out; no session and no event stream, so `GET` and
 `DELETE` answer `405`.
 
 Methods: `initialize`, `ping`, `tools/list`, `tools/call`. Notifications are
@@ -161,5 +161,12 @@ read here, so a tool that needs an account is not listed and cannot be called,
 whatever the generation switches say. With `AGENT_TOOLS_READ` off the list is
 empty.
 
-A request with an `Origin` header from another site is refused with `403`.
+Arguments are checked against the tool's published schema before the tool
+runs; ones that do not fit get JSON-RPC error `-32602`. A batch (a JSON array
+of messages) is answered for protocol version `2025-03-26`, which allows it,
+and refused with `400` when the `MCP-Protocol-Version` header says `2025-06-18`.
+
+A request with an `Origin` header is refused with `403` unless the origin is
+`FRONTEND_URL` or a loopback address. The request's own `Host` is not
+consulted.
 

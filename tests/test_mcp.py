@@ -227,10 +227,99 @@ def test_an_unsupported_protocol_version_header_is_refused(make_client):
     assert good.status_code == 200
 
 
-def test_a_page_on_another_site_is_refused_and_the_site_itself_is_not(make_client):
+def test_a_page_on_another_site_is_refused(make_client, monkeypatch):
+    monkeypatch.setenv("FRONTEND_URL", "https://www.tasteslikegood.org")
     client = make_client()
 
-    foreign = _rpc(client, "tools/list", headers={"Origin": "https://evil.example"})
-    assert foreign.status_code == 403
-    own = _rpc(client, "tools/list", headers={"Origin": "http://localhost"})
-    assert own.status_code == 200
+    def status(origin, **extra):
+        return _rpc(client, "tools/list", headers={"Origin": origin, **extra}).status_code
+
+    assert status("https://evil.example") == 403
+    assert status("https://www.tasteslikegood.org") == 200
+    # The default port, written out or not, is the same site.
+    assert status("https://www.tasteslikegood.org:443") == 200
+    assert status("http://www.tasteslikegood.org") == 403
+    assert status("https://www.tasteslikegood.org:8443") == 403
+    assert status("http://localhost:3000") == 200
+    assert status("null") == 403
+
+
+def test_the_request_host_does_not_vouch_for_an_origin(make_client, monkeypatch):
+    """DNS rebinding: the page's own name arrives as both Origin and Host."""
+    monkeypatch.delenv("FRONTEND_URL", raising=False)
+    client = make_client()
+
+    rebound = _rpc(
+        client,
+        "tools/list",
+        headers={"Origin": "http://evil.example", "Host": "evil.example"},
+    )
+    assert rebound.status_code == 403
+    assert _rpc(client, "tools/list").status_code == 200
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [{"limit": 0}, {"limit": "3"}, {"query": "tofu", "extra": 1}, {"query": 5}],
+)
+def test_arguments_that_do_not_fit_the_schema_are_a_protocol_error(make_client, arguments):
+    call = _rpc(make_client(), "tools/call", {"name": "search_recipes", "arguments": arguments})
+
+    body = call.get_json()
+    assert body["error"]["code"] == -32602
+    assert "result" not in body
+
+
+def test_a_missing_required_argument_is_a_protocol_error(make_client):
+    body = _rpc(make_client(), "tools/call", {"name": "get_recipe"}).get_json()
+
+    assert body["error"]["code"] == -32602
+
+
+def test_a_batch_gets_one_reply_per_request(make_client):
+    batch = [
+        {"jsonrpc": "2.0", "id": "a", "method": "ping"},
+        {"jsonrpc": "2.0", "method": "notifications/initialized"},
+        {"jsonrpc": "2.0", "id": "b", "method": "tools/list"},
+        {"jsonrpc": "2.0", "id": "c", "method": "nope"},
+        "not a message",
+    ]
+    response = make_client().post(
+        "/mcp", json=batch, headers={"MCP-Protocol-Version": "2025-03-26"}
+    )
+
+    assert response.status_code == 200
+    replies = response.get_json()
+    assert [reply["id"] for reply in replies] == ["a", "b", "c", None]
+    assert replies[0]["result"] == {}
+    assert len(replies[1]["result"]["tools"]) == 2
+    assert replies[2]["error"]["code"] == -32601
+    assert replies[3]["error"]["code"] == -32600
+
+
+def test_a_batch_of_notifications_is_accepted_with_no_body(make_client):
+    batch = [{"jsonrpc": "2.0", "method": "notifications/initialized"}]
+
+    response = make_client().post("/mcp", json=batch)
+
+    assert response.status_code == 202
+    assert response.data == b""
+
+
+def test_initialize_is_refused_inside_a_batch(make_client):
+    batch = [{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}]
+
+    replies = make_client().post("/mcp", json=batch).get_json()
+
+    assert replies[0]["error"]["code"] == -32600
+
+
+def test_a_batch_is_refused_under_the_version_that_removed_it(make_client):
+    batch = [{"jsonrpc": "2.0", "id": 1, "method": "ping"}]
+
+    response = make_client().post(
+        "/mcp", json=batch, headers={"MCP-Protocol-Version": "2025-06-18"}
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"]["code"] == -32600

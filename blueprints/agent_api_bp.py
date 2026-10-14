@@ -202,35 +202,48 @@ def list_agent_tools() -> ResponseReturnValue:
     )
 
 
-def read_arguments() -> tuple[dict[str, Any], ResponseReturnValue | None]:
-    """The request body as a JSON object, or the refusal to send back.
+NO_BODY: Any = object()
+
+
+def read_json_body() -> tuple[Any, ResponseReturnValue | None]:
+    """The request body parsed as JSON (NO_BODY when empty), or the refusal to send back.
 
     Shared with the MCP endpoint (``blueprints/mcp_bp.py``), which reads its
-    JSON-RPC message through the same checks.
+    JSON-RPC messages through the same checks.
     """
     # Read one byte past the limit and count, so a body sent without a
     # Content-Length (chunked) is refused too, not cut short and parsed.
     if (request.content_length or 0) > MAX_BODY_BYTES:
-        return {}, _error(413, "The request body is too large")
+        return None, _error(413, "The request body is too large")
     body = request.stream.read(MAX_BODY_BYTES + 1)
     if len(body) > MAX_BODY_BYTES:
-        return {}, _error(413, "The request body is too large")
+        return None, _error(413, "The request body is too large")
+    if not body.strip():
+        return NO_BODY, None
+    # A JSON media type, as /api/generate requires: a browser cannot send
+    # one across origins without a preflight.
+    if not request.is_json:
+        return None, _error(415, "The request body must be sent as application/json")
+    try:
+        parsed = json.loads(body)
+        # A lone surrogate (an escape such as \ud800) parses, then fails
+        # in the database driver. Refuse it here.
+        json.dumps(parsed, ensure_ascii=False).encode("utf-8")
+    except (ValueError, RecursionError):
+        # RecursionError: a body nested a few hundred levels deep.
+        return None, _error(400, "The request body must be a JSON object")
+    return parsed, None
+
+
+def read_arguments() -> tuple[dict[str, Any], ResponseReturnValue | None]:
+    """The request body as a tool's arguments object, or the refusal to send back."""
+    arguments, refusal = read_json_body()
+    if refusal is not None:
+        return {}, refusal
     # No body means no arguments. A body that is present must be a JSON
     # object: a malformed one must not run the tool with defaults.
-    arguments: Any = {}
-    if body.strip():
-        # A JSON media type, as /api/generate requires: a browser cannot send
-        # one across origins without a preflight.
-        if not request.is_json:
-            return {}, _error(415, "The request body must be sent as application/json")
-        try:
-            arguments = json.loads(body)
-            # A lone surrogate (an escape such as \ud800) parses, then fails
-            # in the database driver. Refuse it here.
-            json.dumps(arguments, ensure_ascii=False).encode("utf-8")
-        except (ValueError, RecursionError):
-            # RecursionError: a body nested a few hundred levels deep.
-            return {}, _error(400, "The request body must be a JSON object")
+    if arguments is NO_BODY:
+        return {}, None
     if not isinstance(arguments, dict):
         return {}, _error(400, "The request body must be a JSON object")
     return arguments, None
