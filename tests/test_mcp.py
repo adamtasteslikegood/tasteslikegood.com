@@ -241,6 +241,7 @@ def test_a_page_on_another_site_is_refused(make_client, monkeypatch):
     assert status("http://www.tasteslikegood.org") == 403
     assert status("https://www.tasteslikegood.org:8443") == 403
     assert status("http://localhost:3000") == 200
+    assert status("http://[::1]:3000") == 200
     assert status("null") == 403
 
 

@@ -169,4 +169,3 @@ and refused with `400` when the `MCP-Protocol-Version` header says `2025-06-18`.
 A request with an `Origin` header is refused with `403` unless the origin is
 `FRONTEND_URL` or a loopback address. The request's own `Host` is not
 consulted.
-

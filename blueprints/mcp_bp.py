@@ -44,7 +44,7 @@ INVALID_PARAMS = -32602
 # Protocol version 2025-03-26 lets a client send several messages as one JSON
 # array; 2025-06-18 took that out. The body size limit already bounds a batch.
 BATCH_VERSION = "2025-03-26"
-LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "[::1]"}
+LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
 Reply = dict[str, Any] | None
 
