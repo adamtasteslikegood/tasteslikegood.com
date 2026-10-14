@@ -215,8 +215,14 @@ def _answer_safely(message: Any, *, in_batch: bool) -> Reply:
 
 
 def _is_tool_call(message: Any) -> bool:
-    """A tools/call request that expects a reply, with an id fit to answer."""
-    if not isinstance(message, dict) or message.get("method") != "tools/call":
+    """A JSON-RPC 2.0 tools/call request with an id fit to answer.
+
+    A message _answer() would refuse anyway is not counted, so it cannot use
+    up the batch's one tool call.
+    """
+    if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
+        return False
+    if message.get("method") != "tools/call":
         return False
     message_id = message.get("id")
     return isinstance(message_id, (str, int)) and not isinstance(message_id, bool)

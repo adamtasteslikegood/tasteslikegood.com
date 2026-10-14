@@ -374,6 +374,28 @@ def test_a_batch_runs_one_tool_call_and_refuses_the_rest(make_client):
         assert reply["error"] == {"code": -32600, "message": "One tool call per request"}
 
 
+def test_a_malformed_tool_call_does_not_use_up_the_batch_tool_call(make_client):
+    batch = [
+        {"jsonrpc": "1.0", "id": 1, "method": "tools/call", "params": {}},
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {"query": "tofu"}},
+        },
+    ]
+
+    replies = make_client().post("/mcp", json=batch).get_json()
+
+    assert replies[0] == {
+        "jsonrpc": "2.0",
+        "id": None,
+        "error": {"code": -32600, "message": "Not a JSON-RPC 2.0 message"},
+    }
+    assert replies[1]["id"] == 2
+    assert replies[1]["result"]["isError"] is False
+
+
 def test_a_failing_single_message_is_an_internal_error_not_an_html_500(make_client):
     """A JSON-RPC client must receive a JSON-RPC error, never Flask's HTML 500."""
     from unittest.mock import patch
