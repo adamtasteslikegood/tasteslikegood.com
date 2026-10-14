@@ -28,6 +28,7 @@ from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
 from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
+from blueprints.openapi_bp import openapi_bp
 from blueprints.public_bp import public_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
@@ -330,6 +331,7 @@ def create_app(**config_overrides):
     app.register_blueprint(generation_api_bp)  # Prefix '/api' - Angular JSON endpoints
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
     app.register_blueprint(agent_api_bp)  # Prefix '/api/agent' set in blueprint
+    app.register_blueprint(openapi_bp)  # /api/public/openapi.json
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
     app.register_blueprint(worker_api_bp)  # Prefix '/api/worker' set in blueprint
