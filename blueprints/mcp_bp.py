@@ -214,6 +214,14 @@ def _answer_safely(message: Any, *, in_batch: bool) -> Reply:
         return _error(message_id, INTERNAL_ERROR, "Internal error")
 
 
+def _is_tool_call(message: Any) -> bool:
+    """A tools/call request that expects a reply, with an id fit to answer."""
+    if not isinstance(message, dict) or message.get("method") != "tools/call":
+        return False
+    message_id = message.get("id")
+    return isinstance(message_id, (str, int)) and not isinstance(message_id, bool)
+
+
 def _malformed(reply: Reply) -> bool:
     """True for a refusal that names no request: it has no id to answer to."""
     return reply is not None and "error" in reply and reply["id"] is None
@@ -243,7 +251,20 @@ def mcp() -> ResponseReturnValue:
         # transport says to assume the older version, which allows it.
         if version not in (None, BATCH_VERSION) or not body:
             return _refuse(INVALID_REQUEST, "A batch is not accepted here", 400)
-        replies = [reply for message in body if (reply := _answer_safely(message, in_batch=True))]
+        replies = []
+        tool_called = False
+        for message in body:
+            if _is_tool_call(message):
+                # One tool call per HTTP request, so the rate limit in front
+                # of /mcp counts tool work, not envelopes (KAN-399 review).
+                if tool_called:
+                    replies.append(
+                        _error(message.get("id"), INVALID_REQUEST, "One tool call per request")
+                    )
+                    continue
+                tool_called = True
+            if reply := _answer_safely(message, in_batch=True):
+                replies.append(reply)
         return (jsonify(replies), 200) if replies else ("", 202)
 
     reply = _answer_safely(body, in_batch=False)
