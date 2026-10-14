@@ -46,9 +46,13 @@ _TOOLS_WITH_NOT_FOUND = {"get_recipe"}
 
 
 def _tool_path(tool: Any) -> dict[str, Any]:
+    # 413/415 come from the dispatcher in blueprints/agent_api_bp.py, so every
+    # tool can answer with them regardless of the tool's own handler.
     responses: dict[str, Any] = {
         "200": _json_response("The tool's result, with an `attribution` line."),
         "400": _ERROR,
+        "413": _ERROR,
+        "415": _ERROR,
     }
     if tool.name in _TOOLS_WITH_NOT_FOUND:
         responses["404"] = _ERROR
@@ -110,7 +114,7 @@ def public_openapi() -> ResponseReturnValue:
                         "headers": {"Location": {"schema": {"type": "string"}}},
                     },
                     "404": _ERROR,
-                    "410": _json_response("The recipe was removed."),
+                    "410": _ERROR,
                 },
             }
         },
