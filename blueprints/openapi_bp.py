@@ -39,8 +39,19 @@ def _json_response(description: str) -> dict[str, Any]:
 
 _ERROR = _json_response("An error: an object with an `error` message.")
 
+# get_recipe is the only read-only tool whose handler returns 404 (slug not
+# found in blueprints/agent_api_bp.py); search_recipes answers 200 even for
+# a no-match query.
+_TOOLS_WITH_NOT_FOUND = {"get_recipe"}
+
 
 def _tool_path(tool: Any) -> dict[str, Any]:
+    responses: dict[str, Any] = {
+        "200": _json_response("The tool's result, with an `attribution` line."),
+        "400": _ERROR,
+    }
+    if tool.name in _TOOLS_WITH_NOT_FOUND:
+        responses["404"] = _ERROR
     return {
         "post": {
             "operationId": tool.name,
@@ -49,11 +60,7 @@ def _tool_path(tool: Any) -> dict[str, Any]:
                 "required": bool(tool.input_schema.get("required")),
                 "content": {"application/json": {"schema": tool.input_schema}},
             },
-            "responses": {
-                "200": _json_response("The tool's result, with an `attribution` line."),
-                "400": _ERROR,
-                "404": _ERROR,
-            },
+            "responses": responses,
         }
     }
 
