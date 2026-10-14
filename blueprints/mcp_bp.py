@@ -22,7 +22,8 @@ from flask.typing import ResponseReturnValue
 from jsonschema import Draft7Validator
 
 from blueprints.agent_api_bp import NO_BODY, read_json_body, run_tool
-from services.agent_tools import ATTRIBUTION, AgentTool, enabled_tools
+from extensions import db
+from services.agent_tools import ATTRIBUTION, TOOLS, AgentTool, enabled_tools
 
 mcp_bp = Blueprint("mcp", __name__)
 
@@ -39,6 +40,10 @@ PARSE_ERROR = -32700
 INVALID_REQUEST = -32600
 METHOD_NOT_FOUND = -32601
 INVALID_PARAMS = -32602
+INTERNAL_ERROR = -32603
+
+# The schemas are fixed, so each validator is built once.
+_VALIDATORS = {tool.name: Draft7Validator(tool.input_schema) for tool in TOOLS}
 
 
 # Protocol version 2025-03-26 lets a client send several messages as one JSON
@@ -74,7 +79,9 @@ def _site(url: str) -> tuple[str, str, int | None]:
         port = parts.port
     except ValueError:
         port = -1
-    return scheme, (parts.hostname or "").lower(), port or {"http": 80, "https": 443}.get(scheme)
+    if port is None:
+        port = {"http": 80, "https": 443}.get(scheme)
+    return scheme, (parts.hostname or "").lower(), port
 
 
 def _foreign_origin() -> bool:
@@ -135,7 +142,7 @@ def _call_tool(message_id: Any, params: dict[str, Any]) -> dict[str, Any]:
         return _error(message_id, INVALID_PARAMS, f"Unknown tool: {name}")
     # Arguments that do not fit the schema the tool list published are the
     # caller's mistake, reported as one, before the tool runs.
-    problem = next(Draft7Validator(tool.input_schema).iter_errors(arguments), None)
+    problem = next(_VALIDATORS[tool.name].iter_errors(arguments), None)
     if problem is not None:
         return _error(message_id, INVALID_PARAMS, f"Invalid arguments: {problem.message}")
 
@@ -193,6 +200,20 @@ def _answer(message: Any, *, in_batch: bool = False) -> Reply:
     return _error(message_id, METHOD_NOT_FOUND, f"Method not found: {method}")
 
 
+def _answer_in_batch(message: Any) -> Reply:
+    """One message of a batch. A failure answers that message, not the batch."""
+    try:
+        return _answer(message, in_batch=True)
+    except Exception:
+        current_app.logger.exception("MCP batch message failed")
+        # Leave the session usable for the messages that follow.
+        db.session.rollback()
+        message_id = message.get("id") if isinstance(message, dict) else None
+        if isinstance(message_id, bool) or not isinstance(message_id, (str, int)):
+            message_id = None
+        return _error(message_id, INTERNAL_ERROR, "Internal error")
+
+
 def _malformed(reply: Reply) -> bool:
     """True for a refusal that names no request: it has no id to answer to."""
     return reply is not None and "error" in reply and reply["id"] is None
@@ -222,7 +243,7 @@ def mcp() -> ResponseReturnValue:
         # transport says to assume the older version, which allows it.
         if version not in (None, BATCH_VERSION) or not body:
             return _refuse(INVALID_REQUEST, "A batch is not accepted here", 400)
-        replies = [reply for message in body if (reply := _answer(message, in_batch=True))]
+        replies = [reply for message in body if (reply := _answer_in_batch(message))]
         return (jsonify(replies), 200) if replies else ("", 202)
 
     reply = _answer(body)

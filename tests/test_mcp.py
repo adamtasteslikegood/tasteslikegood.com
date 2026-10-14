@@ -324,3 +324,34 @@ def test_a_batch_is_refused_under_the_version_that_removed_it(make_client):
 
     assert response.status_code == 400
     assert response.get_json()["error"]["code"] == -32600
+
+
+def test_a_failing_message_does_not_cost_the_rest_of_the_batch_their_replies(make_client):
+    from unittest.mock import patch
+
+    batch = [
+        {"jsonrpc": "2.0", "id": 1, "method": "ping"},
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {}},
+        },
+        {"jsonrpc": "2.0", "id": 3, "method": "ping"},
+    ]
+    with patch("blueprints.mcp_bp.run_tool", side_effect=RuntimeError("database away")):
+        replies = make_client().post("/mcp", json=batch).get_json()
+
+    assert [reply["id"] for reply in replies] == [1, 2, 3]
+    assert replies[0]["result"] == {} and replies[2]["result"] == {}
+    assert replies[1]["error"] == {"code": -32603, "message": "Internal error"}
+
+
+def test_port_zero_is_not_the_default_port(make_client, monkeypatch):
+    monkeypatch.setenv("FRONTEND_URL", "https://www.tasteslikegood.org")
+
+    response = _rpc(
+        make_client(), "tools/list", headers={"Origin": "https://www.tasteslikegood.org:0"}
+    )
+
+    assert response.status_code == 403
