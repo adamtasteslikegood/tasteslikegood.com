@@ -347,6 +347,86 @@ def test_a_failing_message_does_not_cost_the_rest_of_the_batch_their_replies(mak
     assert replies[1]["error"] == {"code": -32603, "message": "Internal error"}
 
 
+def test_a_batch_runs_one_tool_call_and_refuses_the_rest(make_client):
+    """The rate limit in front of /mcp counts requests; a batch must not multiply tool work."""
+    import importlib
+    from unittest.mock import patch
+
+    mcp_module = importlib.import_module("blueprints.mcp_bp")
+
+    def call(message_id):
+        return {
+            "jsonrpc": "2.0",
+            "id": message_id,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {"query": "tofu"}},
+        }
+
+    batch = [call(1), {"jsonrpc": "2.0", "id": 2, "method": "ping"}, call(3), call(4)]
+    with patch.object(mcp_module, "run_tool", wraps=mcp_module.run_tool) as run:
+        replies = make_client().post("/mcp", json=batch).get_json()
+
+    assert run.call_count == 1
+    assert [reply["id"] for reply in replies] == [1, 2, 3, 4]
+    assert replies[0]["result"]["isError"] is False
+    assert replies[1]["result"] == {}
+    for reply in replies[2:]:
+        assert reply["error"] == {"code": -32600, "message": "One tool call per request"}
+
+
+def test_a_malformed_tool_call_does_not_use_up_the_batch_tool_call(make_client):
+    batch = [
+        {"jsonrpc": "1.0", "id": 1, "method": "tools/call", "params": {}},
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {"query": "tofu"}},
+        },
+    ]
+
+    replies = make_client().post("/mcp", json=batch).get_json()
+
+    assert replies[0] == {
+        "jsonrpc": "2.0",
+        "id": None,
+        "error": {"code": -32600, "message": "Not a JSON-RPC 2.0 message"},
+    }
+    assert replies[1]["id"] == 2
+    assert replies[1]["result"]["isError"] is False
+
+
+@pytest.mark.parametrize(
+    "refused",
+    [
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": "not an object"},
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "nope"}},
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {"query": 5}},
+        },
+    ],
+)
+def test_a_tool_call_refused_before_running_does_not_use_up_the_batch(make_client, refused):
+    batch = [
+        refused,
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {"query": "tofu"}},
+        },
+    ]
+
+    replies = make_client().post("/mcp", json=batch).get_json()
+
+    assert replies[0]["error"]["code"] == -32602
+    assert replies[1]["id"] == 2
+    assert replies[1]["result"]["isError"] is False
+
+
 def test_a_failing_single_message_is_an_internal_error_not_an_html_500(make_client):
     """A JSON-RPC client must receive a JSON-RPC error, never Flask's HTML 500."""
     from unittest.mock import patch

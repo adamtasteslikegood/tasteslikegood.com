@@ -165,6 +165,9 @@ Arguments are checked against the tool's published schema before the tool
 runs; ones that do not fit get JSON-RPC error `-32602`. A batch (a JSON array
 of messages) is answered for protocol version `2025-03-26`, which allows it,
 and refused with `400` when the `MCP-Protocol-Version` header says `2025-06-18`.
+A batch runs at most one `tools/call`; each further one is answered with
+JSON-RPC error `-32600` ("One tool call per request"), so the per-IP request
+limit in front of `/mcp` also bounds tool work.
 
 A request with an `Origin` header is refused with `403` unless the origin is
 `FRONTEND_URL` or a loopback address. The request's own `Host` is not

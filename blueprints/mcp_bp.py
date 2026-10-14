@@ -54,6 +54,19 @@ LOOPBACK_HOSTS = {"localhost", "127.0.0.1", "::1"}
 Reply = dict[str, Any] | None
 
 
+class _ToolBudget:
+    """How many tools one HTTP request may still run.
+
+    One: the rate limit in front of /mcp counts requests, so a batch must not
+    run more tool work than a single message (KAN-399 review). Spent only
+    when a tool is about to run, so a call refused for any other reason costs
+    nothing.
+    """
+
+    def __init__(self) -> None:
+        self.remaining = 1
+
+
 def _result(message_id: Any, result: dict[str, Any]) -> dict[str, Any]:
     return {"jsonrpc": "2.0", "id": message_id, "result": result}
 
@@ -130,7 +143,7 @@ def _list_tools() -> dict[str, Any]:
     }
 
 
-def _call_tool(message_id: Any, params: dict[str, Any]) -> dict[str, Any]:
+def _call_tool(message_id: Any, params: dict[str, Any], budget: _ToolBudget) -> dict[str, Any]:
     name = params.get("name")
     arguments = params.get("arguments", {})
     if not isinstance(name, str) or not isinstance(arguments, dict):
@@ -145,6 +158,9 @@ def _call_tool(message_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     problem = next(_VALIDATORS[tool.name].iter_errors(arguments), None)
     if problem is not None:
         return _error(message_id, INVALID_PARAMS, f"Invalid arguments: {problem.message}")
+    if budget.remaining < 1:
+        return _error(message_id, INVALID_REQUEST, "One tool call per request")
+    budget.remaining -= 1
 
     response = current_app.make_response(run_tool(name, arguments, None))
     payload = response.get_json(silent=True)
@@ -164,7 +180,7 @@ def _call_tool(message_id: Any, params: dict[str, Any]) -> dict[str, Any]:
     )
 
 
-def _answer(message: Any, *, in_batch: bool = False) -> Reply:
+def _answer(message: Any, budget: _ToolBudget, *, in_batch: bool = False) -> Reply:
     """The reply to one message, or None when it asks for none."""
     if not isinstance(message, dict) or message.get("jsonrpc") != "2.0":
         return _error(None, INVALID_REQUEST, "Not a JSON-RPC 2.0 message")
@@ -196,14 +212,14 @@ def _answer(message: Any, *, in_batch: bool = False) -> Reply:
     if method == "tools/list":
         return _result(message_id, _list_tools())
     if method == "tools/call":
-        return _call_tool(message_id, params)
+        return _call_tool(message_id, params, budget)
     return _error(message_id, METHOD_NOT_FOUND, f"Method not found: {method}")
 
 
-def _answer_safely(message: Any, *, in_batch: bool) -> Reply:
+def _answer_safely(message: Any, budget: _ToolBudget, *, in_batch: bool) -> Reply:
     """One message's reply. A failure answers that message, not the whole request."""
     try:
-        return _answer(message, in_batch=in_batch)
+        return _answer(message, budget, in_batch=in_batch)
     except Exception:
         current_app.logger.exception("MCP message failed")
         # Leave the session usable for any messages that follow.
@@ -243,10 +259,13 @@ def mcp() -> ResponseReturnValue:
         # transport says to assume the older version, which allows it.
         if version not in (None, BATCH_VERSION) or not body:
             return _refuse(INVALID_REQUEST, "A batch is not accepted here", 400)
-        replies = [reply for message in body if (reply := _answer_safely(message, in_batch=True))]
+        budget = _ToolBudget()
+        replies = [
+            reply for message in body if (reply := _answer_safely(message, budget, in_batch=True))
+        ]
         return (jsonify(replies), 200) if replies else ("", 202)
 
-    reply = _answer_safely(body, in_batch=False)
+    reply = _answer_safely(body, _ToolBudget(), in_batch=False)
     if reply is None:
         return "", 202
     return jsonify(reply), 400 if _malformed(reply) else 200
