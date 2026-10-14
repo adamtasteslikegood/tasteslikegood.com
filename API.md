@@ -141,3 +141,25 @@ recipe write pause as `/api/generate`.
 - `404 Not Found`: the tool does not exist or is switched off, or the recipe was not found.
 - `413 Content Too Large`: the body is over 10 KB.
 - `415 Unsupported Media Type`: the body is not sent as `application/json`.
+
+---
+
+## MCP endpoint
+
+### POST `/mcp`
+A Model Context Protocol server over the published recipes (Streamable HTTP,
+protocol versions `2025-06-18` and `2025-03-26`). One JSON-RPC message per
+request, one JSON response; no session and no event stream, so `GET` and
+`DELETE` answer `405`.
+
+Methods: `initialize`, `ping`, `tools/list`, `tools/call`. Notifications are
+accepted with `202`.
+
+The tools are the agent tools above that need no sign-in (`search_recipes`,
+`get_recipe`), called through the same access check. The site session is not
+read here, so a tool that needs an account is not listed and cannot be called,
+whatever the generation switches say. With `AGENT_TOOLS_READ` off the list is
+empty.
+
+A request with an `Origin` header from another site is refused with `403`.
+

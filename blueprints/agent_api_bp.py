@@ -202,21 +202,19 @@ def list_agent_tools() -> ResponseReturnValue:
     )
 
 
-@agent_api_bp.route("/tools/<name>", methods=["POST"])
-def call_agent_tool(name: str) -> ResponseReturnValue:
-    """Call one tool. The JSON body is the tool's arguments object."""
-    user_id = session.get("user_id")
-    tool = check_access(name, current_app.config, user_id)
-    if isinstance(tool, Refusal):
-        return _error(tool.status, tool.error)
+def read_arguments() -> tuple[dict[str, Any], ResponseReturnValue | None]:
+    """The request body as a JSON object, or the refusal to send back.
 
+    Shared with the MCP endpoint (``blueprints/mcp_bp.py``), which reads its
+    JSON-RPC message through the same checks.
+    """
     # Read one byte past the limit and count, so a body sent without a
     # Content-Length (chunked) is refused too, not cut short and parsed.
     if (request.content_length or 0) > MAX_BODY_BYTES:
-        return _error(413, "The request body is too large")
+        return {}, _error(413, "The request body is too large")
     body = request.stream.read(MAX_BODY_BYTES + 1)
     if len(body) > MAX_BODY_BYTES:
-        return _error(413, "The request body is too large")
+        return {}, _error(413, "The request body is too large")
     # No body means no arguments. A body that is present must be a JSON
     # object: a malformed one must not run the tool with defaults.
     arguments: Any = {}
@@ -224,7 +222,7 @@ def call_agent_tool(name: str) -> ResponseReturnValue:
         # A JSON media type, as /api/generate requires: a browser cannot send
         # one across origins without a preflight.
         if not request.is_json:
-            return _error(415, "The request body must be sent as application/json")
+            return {}, _error(415, "The request body must be sent as application/json")
         try:
             arguments = json.loads(body)
             # A lone surrogate (an escape such as \ud800) parses, then fails
@@ -232,11 +230,34 @@ def call_agent_tool(name: str) -> ResponseReturnValue:
             json.dumps(arguments, ensure_ascii=False).encode("utf-8")
         except (ValueError, RecursionError):
             # RecursionError: a body nested a few hundred levels deep.
-            return _error(400, "The request body must be a JSON object")
+            return {}, _error(400, "The request body must be a JSON object")
     if not isinstance(arguments, dict):
-        return _error(400, "The request body must be a JSON object")
+        return {}, _error(400, "The request body must be a JSON object")
+    return arguments, None
+
+
+def run_tool(name: str, arguments: dict[str, Any], user_id: int | None) -> ResponseReturnValue:
+    """Check access, then call the tool. Every caller of a tool comes through here."""
+    tool = check_access(name, current_app.config, user_id)
+    if isinstance(tool, Refusal):
+        return _error(tool.status, tool.error)
     # PostgreSQL refuses a NUL in a string parameter (also a 500). Every tool
     # argument is a top-level value, so nothing nested reaches a query.
     if any(isinstance(value, str) and "\x00" in value for value in arguments.values()):
         return _error(400, "Arguments must not contain NUL characters")
     return _HANDLERS[tool.name](arguments, user_id)
+
+
+@agent_api_bp.route("/tools/<name>", methods=["POST"])
+def call_agent_tool(name: str) -> ResponseReturnValue:
+    """Call one tool. The JSON body is the tool's arguments object."""
+    user_id = session.get("user_id")
+    # Access first: a caller who may not use the tool learns nothing about
+    # its body.
+    tool = check_access(name, current_app.config, user_id)
+    if isinstance(tool, Refusal):
+        return _error(tool.status, tool.error)
+    arguments, refusal = read_arguments()
+    if refusal is not None:
+        return refusal
+    return run_tool(name, arguments, user_id)
