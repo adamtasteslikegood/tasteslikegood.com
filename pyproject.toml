@@ -163,7 +163,7 @@ constraint-dependencies = [
 ]
 
 [tool.uv.sources]
-md4a-fastapi = { url = "https://github.com/adamtasteslikegood/md4a-fastapi/archive/ff52c693d510458521b6ac139945c1489e4829d3.tar.gz" }
+md4a-fastapi = { url = "https://github.com/adamtasteslikegood/md4a-fastapi/archive/572c9becd9b9e1e41348b25606d20657354fe91f.tar.gz" }
 
 [dependency-groups]
 dev = [

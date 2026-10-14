@@ -44,7 +44,16 @@ class PublicPagesMarkdown:
 
     def __init__(self, app: WSGIApp) -> None:
         self.app = app
-        self.markdown = MarkdownForAgentsWSGIMiddleware(app, cache_responses=False)
+        self.markdown = MarkdownForAgentsWSGIMiddleware(
+            app,
+            cache_responses=False,
+            # Convert the page content, not the site header and footer around
+            # it. Inside it, drop what only a browser needs: the breadcrumb and
+            # the browse page's label (the eyebrow), the sort and tag form, and
+            # the template's step numbers, which the Markdown list repeats.
+            content_selector="main",
+            strip_selectors=(".public-eyebrow", ".public-browse-filter", ".public-step-number"),
+        )
 
     def __call__(self, environ: dict[str, Any], start_response: StartResponse) -> Iterable[bytes]:
         if not _is_public_page(environ.get("PATH_INFO", "")):

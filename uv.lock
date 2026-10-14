@@ -1041,19 +1041,21 @@ wheels = [
 [[package]]
 name = "md4a-fastapi"
 version = "0.1.0"
-source = { url = "https://github.com/adamtasteslikegood/md4a-fastapi/archive/ff52c693d510458521b6ac139945c1489e4829d3.tar.gz" }
+source = { url = "https://github.com/adamtasteslikegood/md4a-fastapi/archive/572c9becd9b9e1e41348b25606d20657354fe91f.tar.gz" }
 dependencies = [
     { name = "anyio" },
+    { name = "beautifulsoup4" },
     { name = "fastapi" },
     { name = "httpx" },
     { name = "markdownify" },
     { name = "uvicorn", extra = ["standard"] },
 ]
-sdist = { hash = "sha256:e4e76e34051fc756fd3679c7d5b7bfa9739f166c39a8c800fc2cf82b3c734226" }
+sdist = { hash = "sha256:20781c80d78fdc5f6458add2a8fede1b209ca9509c75eec9eb6e6a10227914ae" }
 
 [package.metadata]
 requires-dist = [
     { name = "anyio", specifier = ">=3.6.2,<5" },
+    { name = "beautifulsoup4", specifier = ">=4.12,<5" },
     { name = "fastapi", specifier = ">=0.115,<1" },
     { name = "httpx", specifier = ">=0.27,<1" },
     { name = "markdownify", specifier = ">=0.13,<2" },
@@ -1762,7 +1764,7 @@ requires-dist = [
     { name = "itsdangerous", specifier = "==2.2.0" },
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "jsonschema", specifier = "==4.26.0" },
-    { name = "md4a-fastapi", url = "https://github.com/adamtasteslikegood/md4a-fastapi/archive/ff52c693d510458521b6ac139945c1489e4829d3.tar.gz" },
+    { name = "md4a-fastapi", url = "https://github.com/adamtasteslikegood/md4a-fastapi/archive/572c9becd9b9e1e41348b25606d20657354fe91f.tar.gz" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.3.0" },
     { name = "pandas", specifier = ">=3.0.5" },
     { name = "pillow", specifier = "==12.3.0" },

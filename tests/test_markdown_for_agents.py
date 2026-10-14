@@ -95,6 +95,24 @@ def test_recipe_page_is_markdown_when_asked(app, client):
     assert response.content_length == len(response.get_data())
 
 
+def test_markdown_is_the_page_content_without_the_page_furniture(app, client):
+    _add_recipe(app)
+
+    recipe = client.get("/r/thai-peanut-noodles", headers=MARKDOWN).get_data(as_text=True)
+    browse = client.get("/browse", headers=MARKDOWN).get_data(as_text=True)
+
+    # One title, the steps numbered once, no breadcrumb, header or footer.
+    assert recipe.count("# Thai Peanut Noodles") == 1
+    assert "1. Boil the noodles." in recipe
+    assert "1. 1." not in recipe
+    assert "[Home]" not in recipe
+    assert "Privacy" not in recipe
+    # The browse page keeps its recipe links but not its form or label.
+    assert "(/r/thai-peanut-noodles)" in browse
+    assert "Newest first" not in browse
+    assert "Anti-recipe browse" not in browse
+
+
 def test_recipe_page_is_still_html_for_a_browser(app, client):
     _add_recipe(app)
 
