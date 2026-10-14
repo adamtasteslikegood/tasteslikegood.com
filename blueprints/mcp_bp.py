@@ -53,6 +53,15 @@ def _tools() -> list[AgentTool]:
     return [tool for tool in enabled_tools(current_app.config) if not tool.requires_sign_in]
 
 
+def _canonical_netloc(scheme: str, netloc: str) -> str:
+    """Lowercase netloc with the scheme's default port stripped."""
+    netloc = netloc.lower()
+    default = {"http": ":80", "https": ":443"}.get(scheme.lower())
+    if default and netloc.endswith(default):
+        return netloc[: -len(default)]
+    return netloc
+
+
 def _foreign_origin() -> bool:
     """True for a browser page on another site.
 
@@ -62,10 +71,15 @@ def _foreign_origin() -> bool:
     origin = request.headers.get("Origin")
     if origin is None:
         return False
-    return urlsplit(origin).netloc.lower() not in {
-        urlsplit(_public_base_url()).netloc.lower(),
-        request.host.lower(),
+    origin_parts = urlsplit(origin)
+    public_parts = urlsplit(_public_base_url())
+    # Default ports differ between the Origin header (bare host) and
+    # request.host when a proxy forwards an explicit :80/:443; strip both.
+    allowed = {
+        _canonical_netloc(public_parts.scheme, public_parts.netloc),
+        _canonical_netloc(request.scheme, request.host),
     }
+    return _canonical_netloc(origin_parts.scheme, origin_parts.netloc) not in allowed
 
 
 def _initialize(params: dict[str, Any]) -> dict[str, Any]:
@@ -134,7 +148,10 @@ def mcp() -> ResponseReturnValue:
     message, refusal = read_arguments()
     if refusal is not None:
         status = current_app.make_response(refusal).status_code
-        return _rpc_error(None, PARSE_ERROR, "The body must be one JSON-RPC message", status)
+        # 400 is a real JSON parse failure; 413/415 are transport-level
+        # refusals that JSON-RPC classifies as invalid-request, not parse.
+        code = PARSE_ERROR if status == 400 else INVALID_REQUEST
+        return _rpc_error(None, code, "The body must be one JSON-RPC message", status)
     if message.get("jsonrpc") != "2.0":
         return _rpc_error(None, INVALID_REQUEST, "Not a JSON-RPC 2.0 message", 400)
 
