@@ -396,6 +396,37 @@ def test_a_malformed_tool_call_does_not_use_up_the_batch_tool_call(make_client):
     assert replies[1]["result"]["isError"] is False
 
 
+@pytest.mark.parametrize(
+    "refused",
+    [
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": "not an object"},
+        {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "nope"}},
+        {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {"query": 5}},
+        },
+    ],
+)
+def test_a_tool_call_refused_before_running_does_not_use_up_the_batch(make_client, refused):
+    batch = [
+        refused,
+        {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "tools/call",
+            "params": {"name": "search_recipes", "arguments": {"query": "tofu"}},
+        },
+    ]
+
+    replies = make_client().post("/mcp", json=batch).get_json()
+
+    assert replies[0]["error"]["code"] == -32602
+    assert replies[1]["id"] == 2
+    assert replies[1]["result"]["isError"] is False
+
+
 def test_a_failing_single_message_is_an_internal_error_not_an_html_500(make_client):
     """A JSON-RPC client must receive a JSON-RPC error, never Flask's HTML 500."""
     from unittest.mock import patch
