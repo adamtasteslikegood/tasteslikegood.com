@@ -20,7 +20,7 @@ from blueprints.public_bp import (
     NEWEST_RECIPES_MAX,
     _public_base_url,
 )
-from services.agent_tools import ATTRIBUTION, enabled_tools
+from services.agent_tools import enabled_tools
 
 openapi_bp = Blueprint("openapi", __name__)
 
@@ -102,6 +102,13 @@ def public_openapi() -> ResponseReturnValue:
                 ],
                 "responses": {
                     "200": _json_response("The recipe."),
+                    "302": {
+                        "description": (
+                            "The recipe was renamed: `Location` is this endpoint "
+                            "under the recipe's current slug."
+                        ),
+                        "headers": {"Location": {"schema": {"type": "string"}}},
+                    },
                     "404": _ERROR,
                     "410": _json_response("The recipe was removed."),
                 },
@@ -129,7 +136,9 @@ def public_openapi() -> ResponseReturnValue:
                 "version": API_VERSION,
                 "description": (
                     "Read access to the published vegan recipes on Tasteslikegood.org. "
-                    "No account or key is needed. " + ATTRIBUTION
+                    "The recipes and their photos are generated with Google Gemini. "
+                    "No account or key is needed. Credit Tasteslikegood.org and link to "
+                    "a recipe's page when you show it."
                 ),
             },
             "servers": [{"url": _public_base_url()}],

@@ -101,3 +101,17 @@ def test_limit_bounds_match_the_endpoint(document):
 
     assert schema["maximum"] == NEWEST_RECIPES_MAX
     assert schema["default"] == NEWEST_RECIPES_DEFAULT
+
+
+def test_each_tool_describes_only_the_errors_it_returns(document):
+    paths = document()["paths"]
+
+    assert "404" in paths["/api/agent/tools/get_recipe"]["post"]["responses"]
+    assert "404" not in paths["/api/agent/tools/search_recipes"]["post"]["responses"]
+
+
+def test_the_recipe_endpoint_describes_the_redirect_for_a_renamed_slug(document):
+    responses = document()["paths"]["/api/recipes/public/{slug}"]["get"]["responses"]
+
+    assert set(responses) == {"200", "302", "404", "410"}
+    assert "Location" in responses["302"]["headers"]
