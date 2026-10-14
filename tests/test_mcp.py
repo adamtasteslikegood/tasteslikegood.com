@@ -347,6 +347,28 @@ def test_a_failing_message_does_not_cost_the_rest_of_the_batch_their_replies(mak
     assert replies[1]["error"] == {"code": -32603, "message": "Internal error"}
 
 
+def test_a_failing_single_message_is_an_internal_error_not_an_html_500(make_client):
+    """A JSON-RPC client must receive a JSON-RPC error, never Flask's HTML 500."""
+    from unittest.mock import patch
+
+    message = {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "method": "tools/call",
+        "params": {"name": "search_recipes", "arguments": {}},
+    }
+    with patch("blueprints.mcp_bp.run_tool", side_effect=RuntimeError("database away")):
+        response = make_client().post("/mcp", json=message)
+
+    assert response.status_code == 200
+    assert response.mimetype == "application/json"
+    assert response.get_json() == {
+        "jsonrpc": "2.0",
+        "id": 7,
+        "error": {"code": -32603, "message": "Internal error"},
+    }
+
+
 def test_port_zero_is_not_the_default_port(make_client, monkeypatch):
     monkeypatch.setenv("FRONTEND_URL", "https://www.tasteslikegood.org")
 

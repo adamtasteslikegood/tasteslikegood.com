@@ -200,13 +200,13 @@ def _answer(message: Any, *, in_batch: bool = False) -> Reply:
     return _error(message_id, METHOD_NOT_FOUND, f"Method not found: {method}")
 
 
-def _answer_in_batch(message: Any) -> Reply:
-    """One message of a batch. A failure answers that message, not the batch."""
+def _answer_safely(message: Any, *, in_batch: bool) -> Reply:
+    """One message's reply. A failure answers that message, not the whole request."""
     try:
-        return _answer(message, in_batch=True)
+        return _answer(message, in_batch=in_batch)
     except Exception:
-        current_app.logger.exception("MCP batch message failed")
-        # Leave the session usable for the messages that follow.
+        current_app.logger.exception("MCP message failed")
+        # Leave the session usable for any messages that follow.
         db.session.rollback()
         message_id = message.get("id") if isinstance(message, dict) else None
         if isinstance(message_id, bool) or not isinstance(message_id, (str, int)):
@@ -243,10 +243,10 @@ def mcp() -> ResponseReturnValue:
         # transport says to assume the older version, which allows it.
         if version not in (None, BATCH_VERSION) or not body:
             return _refuse(INVALID_REQUEST, "A batch is not accepted here", 400)
-        replies = [reply for message in body if (reply := _answer_in_batch(message))]
+        replies = [reply for message in body if (reply := _answer_safely(message, in_batch=True))]
         return (jsonify(replies), 200) if replies else ("", 202)
 
-    reply = _answer(body)
+    reply = _answer_safely(body, in_batch=False)
     if reply is None:
         return "", 202
     return jsonify(reply), 400 if _malformed(reply) else 200
