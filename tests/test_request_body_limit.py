@@ -45,6 +45,23 @@ def test_body_over_limit_with_content_length_is_413_json(app):
     assert response.get_json() == {"error": "The request body is too large"}
 
 
+def test_declared_oversize_body_is_413_even_when_the_route_never_reads_it(app):
+    calls = []
+
+    @app.route("/__test_no_read", methods=["POST"])
+    def no_read():
+        calls.append(True)
+        return {"ok": True}
+
+    response = app.test_client().post(
+        "/__test_no_read", data=b"x" * (MAX_CONTENT_LENGTH + 1), content_type="application/json"
+    )
+
+    assert response.status_code == 413
+    assert response.get_json() == {"error": "The request body is too large"}
+    assert calls == []
+
+
 def test_chunked_body_is_never_read_past_the_limit(app):
     """A chunked body has no Content-Length to refuse on. Werkzeug stops reading
     at MAX_CONTENT_LENGTH, so a route never holds more than the limit. Express's
