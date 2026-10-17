@@ -69,6 +69,11 @@ def _register_image_cache_hygiene(app):
         return response
 
 
+def request_too_large(error):
+    """A body over MAX_CONTENT_LENGTH (KAN-408): a JSON refusal, not an HTML page."""
+    return {"error": "The request body is too large"}, 413
+
+
 def create_app(**config_overrides):
     """
     Application factory for creating the Flask app.
@@ -135,6 +140,10 @@ def create_app(**config_overrides):
     from config import MARKDOWN_FOR_AGENTS
 
     app.config["MARKDOWN_FOR_AGENTS"] = MARKDOWN_FOR_AGENTS
+
+    from config import MAX_CONTENT_LENGTH
+
+    app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
 
     if config_overrides:
         app.config.update(config_overrides)
@@ -343,6 +352,8 @@ def create_app(**config_overrides):
     def not_found(error):
         """Handle 404 errors with a friendly message."""
         return render_template("404.html"), 404
+
+    app.register_error_handler(413, request_too_large)
 
     @app.errorhandler(410)
     def gone(error):

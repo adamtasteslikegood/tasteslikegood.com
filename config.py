@@ -81,6 +81,12 @@ AGENT_TOOLS_GENERATE_IMAGE = _env_switch("AGENT_TOOLS_GENERATE_IMAGE", False)
 # sends Accept: text/markdown gets the page as Markdown. Off serves HTML only.
 MARKDOWN_FOR_AGENTS = _env_switch("MARKDOWN_FOR_AGENTS", True)
 
+# Request body ceiling (KAN-408). Express caps proxied bodies at 1 MB and
+# answers 413 for both declared and chunked bodies; this is Flask's backstop.
+# A Content-Length over it gets 413. A chunked body is never read past it
+# (Werkzeug stops at the limit), so a route sees at most this many bytes.
+MAX_CONTENT_LENGTH = 2 * 1024 * 1024
+
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
 
