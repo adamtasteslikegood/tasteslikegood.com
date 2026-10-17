@@ -78,8 +78,6 @@ recipes/            # Storage for generated recipes (JSON files)
 - `GET /api/models` - Lists available Gemini models
 - `POST /api/migrate` - Migrates old recipe JSONs to the latest schema
 
-The three `<filename>` routes belong to the legacy HTML UI and work on recipe files. They answer `404` when `FLASK_ENV=production`.
-
 ### Authentication Routes (`/auth`)
 - `GET /auth/login` - Initiate Google OAuth flow
 - `GET /auth/callback` - OAuth callback handler
