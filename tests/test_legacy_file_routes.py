@@ -17,6 +17,7 @@ LEGACY_ROUTES = [
     "/api/generate_image/some_recipe.json",
     "/api/regenerate_image/some_recipe.json",
     "/api/report_recipe/some_recipe.json",
+    "/api/models/refresh",
 ]
 
 
@@ -43,5 +44,17 @@ def test_legacy_route_is_404_in_every_environment(client, monkeypatch, path, fla
 def test_legacy_routes_are_not_registered():
     app = create_app()
     rules = {rule.rule for rule in app.url_map.iter_rules()}
+    assert "/api/models/refresh" not in rules
     for prefix in ("/api/generate_image/", "/api/regenerate_image/", "/api/report_recipe/"):
         assert not any(rule.startswith(prefix) for rule in rules), prefix
+
+
+def test_disabled_model_refresh_never_calls_service(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "blueprints.api_bp.refresh_models_from_api",
+        lambda credentials: calls.append(credentials) or ([], "api_key", None),
+    )
+    response = client.post("/api/models/refresh", json={})
+    assert response.status_code == 404
+    assert calls == []
