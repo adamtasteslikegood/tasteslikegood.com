@@ -15,7 +15,7 @@ Refactored into a modular architecture with:
 
 import os
 
-from flask import Flask, render_template, request
+from flask import Flask, current_app, render_template, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -67,6 +67,23 @@ def _register_image_cache_hygiene(app):
             ):
                 response.headers.pop(header, None)
         return response
+
+
+def request_too_large(error):
+    """A body over MAX_CONTENT_LENGTH (KAN-408): a JSON refusal, not an HTML page."""
+    return {"error": "The request body is too large"}, 413
+
+
+def refuse_declared_oversize_body():
+    """Refuse a declared oversize body before any route runs (KAN-408).
+
+    Werkzeug checks MAX_CONTENT_LENGTH only when a route reads the body, so a
+    route that never reads it (logout, say) would otherwise run as normal.
+    """
+    limit = current_app.config.get("MAX_CONTENT_LENGTH")
+    if limit is not None and (request.content_length or 0) > limit:
+        return request_too_large(None)
+    return None
 
 
 def create_app(**config_overrides):
@@ -135,6 +152,12 @@ def create_app(**config_overrides):
     from config import MARKDOWN_FOR_AGENTS
 
     app.config["MARKDOWN_FOR_AGENTS"] = MARKDOWN_FOR_AGENTS
+
+    from config import MAX_CONTENT_LENGTH
+
+    app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
+    # First before_request hook, so an oversize request does no other work.
+    app.before_request(refuse_declared_oversize_body)
 
     if config_overrides:
         app.config.update(config_overrides)
@@ -343,6 +366,8 @@ def create_app(**config_overrides):
     def not_found(error):
         """Handle 404 errors with a friendly message."""
         return render_template("404.html"), 404
+
+    app.register_error_handler(413, request_too_large)
 
     @app.errorhandler(410)
     def gone(error):

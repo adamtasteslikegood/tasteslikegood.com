@@ -3,57 +3,30 @@ API blueprint for Tastes Like Good application.
 
 Handles API routes for:
 - Model listing and refresh
-- AI image generation and regeneration
-- Recipe reporting
 - System status
 - Data migration
 - Jokes endpoint
 """
 
 import csv
-import functools
 import logging
 import os
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, session
 from sqlalchemy import text
 
 from config import CONFIG, DEFAULT_MODEL, GOOGLE_API_KEY
-from repositories.recipe_repository import (
-    get_recipe,
-    validate_recipe_filepath,
-)
-from services.image_service import generate_ai_image
 from services.migration_service import MigrationService
 from services.model_service import (
     filter_and_sort_models,
     load_models_from_cache,
     refresh_models_from_api,
 )
-from services.reporting_service import ReportingService
 from utils.admin_auth import require_admin
-from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
-
-
-def legacy_ui_only(view):
-    """Answer 404 in production for a route only the legacy HTML UI calls.
-
-    The legacy UI (templates/recipe.html) is for local development. Its routes
-    work on recipe files, not database rows, and take no account, so they are
-    not part of the production API.
-    """
-
-    @functools.wraps(view)
-    def wrapper(*args, **kwargs):
-        if os.environ.get("FLASK_ENV") == "production":
-            return jsonify({"error": "Not found"}), 404
-        return view(*args, **kwargs)
-
-    return wrapper
 
 
 @api_bp.route("/models", methods=["GET"])
@@ -99,102 +72,6 @@ def refresh_models():
             "message": f"Successfully fetched {total_fetched} models using {auth_method}",
         }
     )
-
-
-@api_bp.route("/generate_image/<filename>", methods=["POST"])
-@legacy_ui_only
-def generate_recipe_image(filename):
-    """
-    Generates an AI image for a recipe asynchronously.
-
-    Note: Uses file locking in the repository layer to prevent race conditions
-    during concurrent read/write operations.
-    """
-    try:
-        filepath = validate_recipe_filepath(filename)
-    except ValueError:
-        return jsonify({"error": "Invalid filename"}), 400
-
-    try:
-        # Load recipe with file locking
-        recipe_data = get_recipe(filename)
-
-        # Generate image (force_regenerate=False checks if image exists)
-        image_url, error = generate_ai_image(
-            filepath, recipe_data, filename, force_regenerate=False
-        )
-
-        if error:
-            return jsonify(error), error["status"]
-
-        return jsonify({"image_url": image_url})
-
-    except FileNotFoundError:
-        return jsonify({"error": "Recipe not found"}), 404
-    except Exception as e:
-        logger.error(
-            "Image generation error for %s: %s",
-            sanitize_log_value(filename),
-            sanitize_log_value(e),
-        )
-        return jsonify({"error": "Image generation failed"}), 500
-
-
-@api_bp.route("/regenerate_image/<filename>", methods=["POST"])
-@legacy_ui_only
-def regenerate_recipe_image(filename):
-    """Force regeneration of an AI image, even if one already exists."""
-    try:
-        filepath = validate_recipe_filepath(filename)
-    except ValueError:
-        return jsonify({"error": "Invalid filename"}), 400
-
-    try:
-        # Load recipe with file locking
-        recipe_data = get_recipe(filename)
-
-        # Generate image (force_regenerate=True overwrites existing)
-        image_url, error = generate_ai_image(filepath, recipe_data, filename, force_regenerate=True)
-
-        if error:
-            return jsonify(error), error["status"]
-
-        return jsonify({"image_url": image_url})
-
-    except FileNotFoundError:
-        return jsonify({"error": "Recipe not found"}), 404
-    except Exception as e:
-        logger.error(
-            "Regeneration error for %s: %s",
-            sanitize_log_value(filename),
-            sanitize_log_value(e),
-        )
-        return jsonify({"error": "Image regeneration failed"}), 500
-
-
-@api_bp.route("/report_recipe/<filename>", methods=["POST"])
-@legacy_ui_only
-def report_recipe(filename):
-    """Log a user report about a recipe or image."""
-    try:
-        # Validate filename to prevent path traversal
-        validate_recipe_filepath(filename)
-
-        data = request.get_json()
-        reason = data.get("reason", "No reason provided")
-
-        result = ReportingService.report_recipe(filename, reason)
-        return jsonify(result)
-
-    except ValueError:
-        return jsonify({"error": "Invalid filename"}), 400
-    except Exception as e:
-        logger.error(
-            "Error logging report for %s: %s",
-            sanitize_log_value(filename),
-            sanitize_log_value(e),
-        )
-        return jsonify({"error": "Failed to submit report"}), 500
 
 
 @api_bp.route("/status", methods=["GET"])

@@ -1,8 +1,11 @@
-"""The legacy UI's file-based API routes are not served in production (KAN-403)."""
+"""The legacy UI's file-based API routes are gone in every environment (KAN-403, KAN-409).
+
+KAN-403 closed them only when FLASK_ENV was "production"; staging sets no
+FLASK_ENV, so they still ran there. KAN-409 deletes them outright.
+"""
 
 import sys
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 
@@ -24,32 +27,21 @@ def client():
     return app.test_client()
 
 
+@pytest.mark.parametrize("flask_env", [None, "production", "development"])
 @pytest.mark.parametrize("path", LEGACY_ROUTES)
-def test_legacy_route_is_404_in_production(client, monkeypatch, path):
-    monkeypatch.setenv("FLASK_ENV", "production")
-    with (
-        patch("blueprints.api_bp.get_recipe") as get_recipe,
-        patch("blueprints.api_bp.generate_ai_image") as generate_ai_image,
-        patch("blueprints.api_bp.ReportingService.report_recipe") as report_recipe,
-    ):
-        response = client.post(path, json={"reason": "test"})
+def test_legacy_route_is_404_in_every_environment(client, monkeypatch, path, flask_env):
+    if flask_env is None:
+        monkeypatch.delenv("FLASK_ENV", raising=False)
+    else:
+        monkeypatch.setenv("FLASK_ENV", flask_env)
+
+    response = client.post(path, json={"reason": "test"})
 
     assert response.status_code == 404
-    get_recipe.assert_not_called()
-    generate_ai_image.assert_not_called()
-    report_recipe.assert_not_called()
 
 
-def test_legacy_image_route_still_works_outside_production(client, monkeypatch):
-    monkeypatch.delenv("FLASK_ENV", raising=False)
-    with (
-        patch("blueprints.api_bp.get_recipe", return_value={"name": "Soup"}),
-        patch(
-            "blueprints.api_bp.generate_ai_image", return_value=("/static/x.png", None)
-        ) as generate_ai_image,
-    ):
-        response = client.post("/api/regenerate_image/some_recipe.json")
-
-    assert response.status_code == 200
-    assert response.get_json() == {"image_url": "/static/x.png"}
-    generate_ai_image.assert_called_once()
+def test_legacy_routes_are_not_registered():
+    app = create_app()
+    rules = {rule.rule for rule in app.url_map.iter_rules()}
+    for prefix in ("/api/generate_image/", "/api/regenerate_image/", "/api/report_recipe/"):
+        assert not any(rule.startswith(prefix) for rule in rules), prefix
