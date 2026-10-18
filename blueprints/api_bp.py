@@ -46,7 +46,8 @@ def get_models():
         return jsonify({"error": "Failed to fetch models"}), 500
 
 
-@api_bp.route("/models/refresh", methods=["POST"])
+# KAN-403 / RCP-166: deliberately not registered as an HTTP route.
+# Keep the implementation for future internal model-availability checks.
 def refresh_models():
     """Fetches fresh models from Gemini API and updates the cache."""
     # Get session credentials if available

@@ -120,7 +120,7 @@
     <form id="generate-form" action="{{ url_for('generation.generate_recipe') }}" method="post">
         <div class="model-controls">
             <label for="model-select"><strong>Select Model:</strong></label>
-            <button type="button" id="refresh-models-btn" title="Fetch latest models from Gemini API">Refresh Models</button>
+            <button type="button" id="refresh-models-btn" disabled title="Model refresh is currently disabled">Refresh Models</button>
         </div>
         <div id="model-loading">Loading additional models...</div>
         <div id="refresh-status" class="refresh-status" style="display: none;"></div>
@@ -233,7 +233,7 @@
                     modelSelect.add(fallback);
                 }
 
-                modelError.textContent = "Could not load models from cache. Click 'Refresh Models' to fetch from API.";
+                modelError.textContent = "Could not load models from cache. Using the default model; public model refresh is disabled.";
             }
         }
 

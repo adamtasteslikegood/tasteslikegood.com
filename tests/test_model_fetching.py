@@ -8,7 +8,7 @@ import json
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
 from app import app
-from services.model_service import filter_and_sort_models
+from services.model_service import filter_and_sort_models, refresh_models_from_api
 
 
 class TestModelFetching(unittest.TestCase):
@@ -179,7 +179,7 @@ class TestFilterAndSortModels(unittest.TestCase):
 
 
 class TestRefreshModels(unittest.TestCase):
-    """Test the /api/models/refresh endpoint."""
+    """Preserve internal model refresh without exposing an HTTP endpoint."""
 
     def setUp(self):
         self.app = app.test_client()
@@ -199,21 +199,20 @@ class TestRefreshModels(unittest.TestCase):
 
         with patch("services.model_service.GOOGLE_API_KEY", "fake-key"):
             with patch("builtins.open", mock_open()):
-                response = self.app.post("/api/models/refresh")
+                models, auth_method, error = refresh_models_from_api()
 
-                self.assertEqual(response.status_code, 200)
-                data = json.loads(response.data)
-                self.assertIn("models", data)
-                self.assertIn("message", data)
+                self.assertIsNone(error)
+                self.assertEqual(auth_method, "api_key")
+                self.assertEqual(models[0]["id"], "models/gemini-2.5-flash")
 
     def test_refresh_models_no_auth(self):
         """Test that refresh fails without API key or credentials."""
         with patch("services.model_service.GOOGLE_API_KEY", None):
-            response = self.app.post("/api/models/refresh")
+            models, auth_method, error = refresh_models_from_api()
 
-            self.assertEqual(response.status_code, 401)
-            data = json.loads(response.data)
-            self.assertIn("error", data)
+            self.assertIsNone(models)
+            self.assertIsNone(auth_method)
+            self.assertIn("No valid authentication", error)
 
 
 if __name__ == "__main__":
