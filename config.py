@@ -57,6 +57,36 @@ REDIS_URL = _VALKEY.redis_url
 DEFAULT_MODEL = os.getenv("GEMINI_DEFAULT_MODEL") or "gemini-3.8-flash"
 IMAGE_MODEL = os.getenv("GEMINI_IMAGE_MODEL") or "gemini-3-pro-image"
 
+
+def _env_switch(name: str, default: bool) -> bool:
+    """Read an on/off environment variable. Unset or empty means ``default``."""
+    value = os.getenv(name, "").strip().lower()
+    if not value:
+        return default
+    return value in {"1", "true", "yes", "on"}
+
+
+# Agent tools (KAN-401): what AI agents may call through /api/agent/tools.
+# One switch per offering, so text and image generation turn on and off
+# independently. These never affect /api/generate, which the web app uses.
+AGENT_TOOLS_READ = _env_switch("AGENT_TOOLS_READ", True)
+# Before turning a generation switch on: the cookbook's Express proxy must be
+# the version that applies the generation rate limit and the recipe write
+# pause to /api/agent/tools/generate_* (cookbook server/agent-tools.ts). Flask
+# has neither guard of its own.
+AGENT_TOOLS_GENERATE_TEXT = _env_switch("AGENT_TOOLS_GENERATE_TEXT", False)
+AGENT_TOOLS_GENERATE_IMAGE = _env_switch("AGENT_TOOLS_GENERATE_IMAGE", False)
+
+# Markdown for agents (KAN-397): a GET for /r/<slug>, /browse or a hub that
+# sends Accept: text/markdown gets the page as Markdown. Off serves HTML only.
+MARKDOWN_FOR_AGENTS = _env_switch("MARKDOWN_FOR_AGENTS", True)
+
+# Request body ceiling (KAN-408). Express caps proxied bodies at 1 MB and
+# answers 413 for both declared and chunked bodies; this is Flask's backstop.
+# A Content-Length over it gets 413. A chunked body is never read past it
+# (Werkzeug stops at the limit), so a route sees at most this many bytes.
+MAX_CONTENT_LENGTH = 2 * 1024 * 1024
+
 # Cache settings
 _RECIPES_CACHE_TTL = int(os.getenv("RECIPES_CACHE_TTL", "60"))
 

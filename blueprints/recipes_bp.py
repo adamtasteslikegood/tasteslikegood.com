@@ -89,8 +89,8 @@ def show_recipe(filename):  # noqa: C901
             print(f"DEBUG: Ultimate fallback to curated image: {recipe_data['stock_image_url']}")
             updated = True
 
-        # 2. AI Image - REMOVED synchronous generation
-        # Generation is now handled asynchronously via /api/generate_image/<filename>
+        # 2. AI Image: not generated here. The file-based image routes were
+        # removed (KAN-409); recipe images come from the database-backed API.
 
         if updated:
             # Save the updated recipe with file locking

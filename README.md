@@ -76,9 +76,6 @@ recipes/            # Storage for generated recipes (JSON files)
 
 ### API Routes (`/api`)
 - `GET /api/models` - Lists available Gemini models
-- `POST /api/generate_image/<filename>` - Triggers async AI image generation
-- `POST /api/regenerate_image/<filename>` - Forces regeneration of the AI image
-- `POST /api/report_recipe/<filename>` - Logs user reports
 - `POST /api/migrate` - Migrates old recipe JSONs to the latest schema
 
 ### Authentication Routes (`/auth`)

@@ -742,3 +742,100 @@ def test_a_failed_metadata_check_never_fails_the_save(app, monkeypatch):
     monkeypatch.setattr(engine, "_versions", down)
 
     engine.queue_if_missing(recipe)
+
+
+BAD_ANSWER = json.dumps({"title": "Cornbread", "description": "Too short."})
+
+
+def _counting_model(monkeypatch, answer):
+    calls = []
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+
+    def generate(_client, _model, _prompt):
+        calls.append(1)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    monkeypatch.setattr(engine, "attempt_generation", generate)
+    return calls
+
+
+def test_content_whose_model_answer_was_rejected_is_not_sent_to_the_model_again(app, monkeypatch):
+    # KAN-393
+    recipe = _recipe()
+    calls = _counting_model(monkeypatch, BAD_ANSWER)
+
+    first = engine.build_metadata(recipe)
+    again = engine.build_metadata(db.session.get(Recipe, recipe.id))
+
+    assert calls == [1]
+    assert first.source == again.source == "rule"
+    assert [v.source for v in _versions(recipe)] == ["rule"]
+    assert _versions(recipe)[0].scores["model_rejections"] == engine.MAX_MODEL_REJECTIONS
+
+
+def test_a_model_outage_is_not_counted_as_a_rejection(app, monkeypatch):
+    recipe = _recipe()
+    calls = _counting_model(monkeypatch, RuntimeError("model unavailable"))
+
+    for _ in range(2):
+        with pytest.raises(RuntimeError):
+            engine.build_metadata(db.session.get(Recipe, recipe.id))
+
+    assert calls == [1, 1]
+    assert not _versions(recipe)[0].scores
+    monkeypatch.setattr(engine, "attempt_generation", lambda _c, _m, _p: GOOD_ANSWER)
+    assert engine.build_metadata(db.session.get(Recipe, recipe.id)).source == "model"
+
+
+def test_changed_content_gets_a_fresh_model_attempt_after_a_rejection(app, monkeypatch):
+    recipe = _recipe()
+    calls = _counting_model(monkeypatch, BAD_ANSWER)
+    engine.build_metadata(recipe)
+
+    recipe = db.session.get(Recipe, recipe.id)
+    recipe.data = {**recipe.data, "description": LONG_SENTENCE + " Serve it warm."}
+    db.session.commit()
+    monkeypatch.setattr(
+        engine, "attempt_generation", lambda _c, _m, _p: calls.append(1) or GOOD_ANSWER
+    )
+
+    assert engine.build_metadata(recipe).source == "model"
+    assert calls == [1, 1]
+
+
+def test_a_page_whose_model_answer_was_rejected_does_not_queue_a_retry(
+    app, client, no_metadata_queue, monkeypatch
+):
+    recipe = _recipe()
+    _counting_model(monkeypatch, BAD_ANSWER)
+    engine.build_metadata(recipe)
+
+    client.get(f"/r/{recipe.slug}")
+    cache.clear()
+    client.get(f"/r/{recipe.slug}")
+
+    assert no_metadata_queue == []
+
+
+def test_worker_acknowledges_a_delivery_for_rejected_content_without_waiting_on_a_claim(
+    app, client, monkeypatch
+):
+    recipe = _recipe()
+    calls = _counting_model(monkeypatch, BAD_ANSWER)
+
+    assert _push(client, recipe.id).status_code == 200
+    # The rejected build released its claim, and a delivery queued before the
+    # rejection was recorded is finished work even when no claim can be made.
+    assert (
+        cache.get(
+            engine.recipe_metadata_building_key(
+                recipe.id, engine.inputs_hash(engine.metadata_inputs(recipe))
+            )
+        )
+        is None
+    )
+    monkeypatch.setattr(engine, "safe_add", lambda _key, _value, timeout=None: False)
+    assert _push(client, recipe.id).status_code == 200
+    assert calls == [1]

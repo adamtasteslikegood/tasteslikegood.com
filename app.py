@@ -15,18 +15,21 @@ Refactored into a modular architecture with:
 
 import os
 
-from flask import Flask, render_template, request
+from flask import Flask, current_app, render_template, request
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 # Import blueprints
 from auth import auth_bp
+from blueprints.agent_api_bp import agent_api_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
 from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
+from blueprints.mcp_bp import mcp_bp
+from blueprints.openapi_bp import openapi_bp
 from blueprints.public_bp import public_bp
 from blueprints.recipes_api_bp import recipes_api_bp
 from blueprints.recipes_bp import recipes_bp
@@ -64,6 +67,23 @@ def _register_image_cache_hygiene(app):
             ):
                 response.headers.pop(header, None)
         return response
+
+
+def request_too_large(error):
+    """A body over MAX_CONTENT_LENGTH (KAN-408): a JSON refusal, not an HTML page."""
+    return {"error": "The request body is too large"}, 413
+
+
+def refuse_declared_oversize_body():
+    """Refuse a declared oversize body before any route runs (KAN-408).
+
+    Werkzeug checks MAX_CONTENT_LENGTH only when a route reads the body, so a
+    route that never reads it (logout, say) would otherwise run as normal.
+    """
+    limit = current_app.config.get("MAX_CONTENT_LENGTH")
+    if limit is not None and (request.content_length or 0) > limit:
+        return request_too_large(None)
+    return None
 
 
 def create_app(**config_overrides):
@@ -119,10 +139,34 @@ def create_app(**config_overrides):
     app.config["SQLALCHEMY_DATABASE_URI"] = SQLALCHEMY_DATABASE_URI
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = SQLALCHEMY_TRACK_MODIFICATIONS
 
+    # Agent tool switches (KAN-401). Held in app.config, not read from the
+    # module at request time, so a test can set them per app.
+    from config import AGENT_TOOLS_GENERATE_IMAGE, AGENT_TOOLS_GENERATE_TEXT, AGENT_TOOLS_READ
+
+    app.config["AGENT_TOOLS_READ"] = AGENT_TOOLS_READ
+    app.config["AGENT_TOOLS_GENERATE_TEXT"] = AGENT_TOOLS_GENERATE_TEXT
+    app.config["AGENT_TOOLS_GENERATE_IMAGE"] = AGENT_TOOLS_GENERATE_IMAGE
+
     # Apply caller-supplied overrides (e.g. test fixtures binding to
     # sqlite:///:memory:) before extensions latch on to the URI.
+    from config import MARKDOWN_FOR_AGENTS
+
+    app.config["MARKDOWN_FOR_AGENTS"] = MARKDOWN_FOR_AGENTS
+
+    from config import MAX_CONTENT_LENGTH
+
+    app.config["MAX_CONTENT_LENGTH"] = MAX_CONTENT_LENGTH
+    # First before_request hook, so an oversize request does no other work.
+    app.before_request(refuse_declared_oversize_body)
+
     if config_overrides:
         app.config.update(config_overrides)
+
+    if app.config["MARKDOWN_FOR_AGENTS"] is True:
+        from utils.markdown_for_agents import PublicPagesMarkdown
+
+        # Outside ProxyFix, so it adds one frame to the public pages only.
+        app.wsgi_app = PublicPagesMarkdown(app.wsgi_app)
 
     # Initialize extensions
     from extensions import cache, db, migrate
@@ -310,6 +354,9 @@ def create_app(**config_overrides):
     app.register_blueprint(generation_bp)  # No prefix - includes '/generate_recipe'
     app.register_blueprint(generation_api_bp)  # Prefix '/api' - Angular JSON endpoints
     app.register_blueprint(api_bp)  # Prefix '/api' set in blueprint
+    app.register_blueprint(agent_api_bp)  # Prefix '/api/agent' set in blueprint
+    app.register_blueprint(openapi_bp)  # /api/public/openapi.json
+    app.register_blueprint(mcp_bp)  # /mcp
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
     app.register_blueprint(worker_api_bp)  # Prefix '/api/worker' set in blueprint
@@ -319,6 +366,8 @@ def create_app(**config_overrides):
     def not_found(error):
         """Handle 404 errors with a friendly message."""
         return render_template("404.html"), 404
+
+    app.register_error_handler(413, request_too_large)
 
     @app.errorhandler(410)
     def gone(error):

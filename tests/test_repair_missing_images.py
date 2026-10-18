@@ -68,6 +68,32 @@ class TestSelectCandidates:
 
         assert [r.id for r in picked] == [canonical.id, public.id, plain.id]
 
+    def test_leaves_a_recipe_generated_as_text_only(self, app):
+        # KAN-401: no image was asked for, so there is nothing to repair.
+        _recipe(
+            "text-only",
+            data={"name": "t", "ai_metadata": {"image_enqueue": {"status": "skipped"}}},
+        )
+        failed = _recipe(
+            "failed",
+            data={"name": "f", "ai_metadata": {"image_enqueue": {"status": "complete"}}},
+        )
+        # The owner asked for a photo and the request never reached the worker
+        # (publish failed): the marker is still "skipped", but it was asked for.
+        asked = _recipe(
+            "asked",
+            data={
+                "name": "a",
+                "ai_metadata": {
+                    "image_enqueue": {"status": "skipped"},
+                    "image_request": {"id": "r1", "status": "pending"},
+                },
+            },
+        )
+        db.session.commit()
+
+        assert {r.id for r in select_candidates(10)} == {failed.id, asked.id}
+
     def test_respects_limit(self, app):
         for i in range(5):
             _recipe(f"r{i}")

@@ -54,6 +54,11 @@ QUEUE_PUBLISH_TIMEOUT_SECONDS = 2
 QUEUE_FAILED_BACKOFF_SECONDS = 300
 # One worker at a time calls the model for a recipe and content version.
 BUILD_CLAIM_SECONDS = 600
+# Model answers that may fail validation for one content version before the
+# rule version is final. One: the same content mostly gets the same answer
+# (6 of 7 on production), and each further try is another chance for a bad
+# answer to pass the keyword guard. Changed content is a new version.
+MAX_MODEL_REJECTIONS = 1
 # Page renders hand queueing to one background thread; beyond this many
 # waiting jobs a render drops its own (a later render asks again).
 MAX_BACKGROUND_JOBS = 50
@@ -234,6 +239,33 @@ def _usable(rows: list[RecipeMetadata], digest: str) -> Optional[RecipeMetadata]
     )
 
 
+def _model_rejections(row: RecipeMetadata) -> int:
+    """How many model answers failed validation for this rule version's content."""
+    scores = row.scores if isinstance(row.scores, dict) else {}
+    count = scores.get("model_rejections")
+    return count if isinstance(count, int) and not isinstance(count, bool) else 0
+
+
+def _model_exhausted(row: Optional[RecipeMetadata]) -> bool:
+    """True for a rule version whose content the model has had its tries at."""
+    return (
+        row is not None and row.source == "rule" and _model_rejections(row) >= MAX_MODEL_REJECTIONS
+    )
+
+
+def _record_model_rejection(recipe_id: str, digest: str) -> None:
+    """Count a failed-validation answer on the rule version it was meant to replace."""
+    row = next((r for r in _versions(recipe_id, digest) if r.source == "rule"), None)
+    if row is None:
+        return
+    # A new dict: a JSON column does not notice a change made in place.
+    row.scores = {
+        **(row.scores if isinstance(row.scores, dict) else {}),
+        "model_rejections": _model_rejections(row) + 1,
+    }
+    db.session.commit()
+
+
 def _current(recipe: Recipe) -> Optional[RecipeMetadata]:
     """The version a page may use: a person's, or one built from today's content."""
     digest = inputs_hash(metadata_inputs(recipe))
@@ -277,12 +309,13 @@ def metadata_for_page(recipe: Recipe) -> Optional[RecipeMetadata]:
     """Current metadata for a public page, queueing a build when one is owed.
 
     None owes a build now. A rule version owes another try at the model
-    rewrite, at most once a day. The queueing runs in the background, so the
-    render never waits on the cache or the queue.
+    rewrite, at most once a day, unless the model's answer for this content
+    was already rejected. The queueing runs in the background, so the render
+    never waits on the cache or the queue.
     """
     digest = inputs_hash(metadata_inputs(recipe))
     current = _usable(_versions(recipe.id, digest), digest)
-    if current is None or current.source == "rule":
+    if current is None or (current.source == "rule" and not _model_exhausted(current)):
         recipe_id, retry = recipe.id, current is not None
         _run_in_background(lambda: queue_metadata(recipe_id, digest, model_retry=retry))
     return current
@@ -403,8 +436,9 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
 
     The rule output is always saved first when it is new, so a failed model
     call still leaves the page better than truncation. A model call that raises
-    is re-raised after that save, so the queue retries it; an answer that fails
-    validation is not retried.
+    is re-raised after that save, so the queue retries it. An answer that fails
+    validation is counted on the rule version, and once the count reaches
+    ``MAX_MODEL_REJECTIONS`` the model is not asked again for that content.
     """
     inputs = metadata_inputs(recipe)
     digest = inputs_hash(inputs)
@@ -447,7 +481,9 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
             "rule",
             None,
         )
-    if not use_model:
+    if not use_model or _model_exhausted(latest):
+        # Also what answers a message queued before the rejection was
+        # recorded: finished work, not a claim to wait on.
         return latest
     client = get_genai_client(None)
     if client is None:
@@ -480,8 +516,11 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
                 "Model metadata for recipe %s failed validation; keeping the rule version",
                 sanitize_log_value(recipe_id),
             )
-            # Keep the claim: the same content would get the same answer.
-            return latest
+            # Recorded where the next page read and the next delivery look,
+            # so neither asks the model for this content again.
+            _record_model_rejection(recipe_id, digest)
+            release()
+            return _usable(_versions(recipe_id, digest), digest)
         # The model call takes seconds. Whatever was written meanwhile wins: a
         # person's version, or a build from content the recipe has since moved to.
         db.session.refresh(recipe)

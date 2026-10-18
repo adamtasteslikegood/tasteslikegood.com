@@ -78,3 +78,97 @@ Displays or returns the raw JSON for a recipe.
 - `200 OK`: HTML viewer (default) or JSON content (if `raw=true`).
 - `404 Not Found`: If the recipe does not exist.
 - `500 Internal Server Error`: If the recipe file is corrupt.
+
+---
+
+## Public API description
+
+### GET `/api/public/openapi.json`
+An OpenAPI 3.1 description of what a caller with no account may use:
+`/api/public/newest-recipes`, `/api/recipes/public/<slug>`, and the agent
+tools that read published recipes. The tool entries are built from
+`services/agent_tools.py` on each request, so a tool that is switched off or
+needs sign-in is not described.
+
+**Response:**
+- `200 OK`: the OpenAPI document.
+
+---
+
+## Agent tools (`/api/agent`)
+
+Tools for AI agents. Three switches decide which tools are offered:
+`AGENT_TOOLS_READ` (default on), `AGENT_TOOLS_GENERATE_TEXT` and
+`AGENT_TOOLS_GENERATE_IMAGE` (both default off). The tool definitions and the
+access check are in `services/agent_tools.py`.
+
+### GET `/api/agent/tools`
+Lists the tools that are switched on.
+
+**Response:**
+- `200 OK`: `{"tools": [{"name", "description", "inputSchema", "requiresSignIn"}], "attribution"}`.
+
+### POST `/api/agent/tools/<name>`
+Calls a tool. The body is a JSON object of the tool's arguments.
+
+| Tool | Switch | Sign-in | Arguments |
+| ---- | ------ | ------- | --------- |
+| `search_recipes` | read | no | `query` (optional, at most 100 characters), `limit` (1 to 20, default 10) |
+| `get_recipe` | read | no | `slug` |
+| `generate_recipe` | text | yes | `prompt` |
+| `generate_recipe_image` | image | yes | `recipe_id` |
+| `get_generation_status` | text or image | yes | `recipe_id` |
+
+Generation is asynchronous: the tool returns `202` with a `recipe_id`, and the
+caller polls `get_generation_status`. A generated recipe is saved to the
+signed-in account. Results carry the recipe's URL and an attribution line.
+
+`get_generation_status` answers for any recipe the signed-in account owns. It
+always returns `status` and `image_url`. It returns `recipe` only when the text
+switch is on, and then with the fields a published recipe shows, not the
+stored row.
+
+`generate_recipe` makes the text only. It does not queue a photo, whatever the
+image switch says; a photo is a separate `generate_recipe_image` call.
+
+The Express proxy holds every `generate_*` tool to the same rate limit and
+recipe write pause as `/api/generate`.
+
+**Response:**
+- `200 OK` or `202 Accepted`: the tool's result.
+- `400 Bad Request`: the body is present but is not a JSON object, or an argument is missing or invalid. An empty body means no arguments.
+- `401 Unauthorized`: the tool needs a signed-in account.
+- `404 Not Found`: the tool does not exist or is switched off, or the recipe was not found.
+- `413 Content Too Large`: the body is over 10 KB.
+- `415 Unsupported Media Type`: the body is not sent as `application/json`.
+
+---
+
+## MCP endpoint
+
+### POST `/mcp`
+A Model Context Protocol server over the published recipes (Streamable HTTP,
+protocol versions `2025-06-18` and `2025-03-26`). One request body in, one
+JSON response out; no session and no event stream, so `GET` and
+`DELETE` answer `405`.
+
+Methods: `initialize`, `ping`, `tools/list`, `tools/call`. Notifications are
+accepted with `202`.
+
+The tools are the agent tools above that need no sign-in (`search_recipes`,
+`get_recipe`), called through the same access check. The site session is not
+read here, so a tool that needs an account is not listed and cannot be called,
+whatever the generation switches say. With `AGENT_TOOLS_READ` off the list is
+empty.
+
+Arguments are checked against the tool's published schema before the tool
+runs; ones that do not fit get JSON-RPC error `-32602`. A batch (a JSON array
+of messages) is answered for protocol version `2025-03-26`, which allows it,
+and refused with `400` when the `MCP-Protocol-Version` header says `2025-06-18`.
+A batch runs at most one `tools/call`; each further one is answered with
+JSON-RPC error `-32600` ("One tool call per request"), so the per-IP request
+limit in front of `/mcp` also bounds tool work.
+
+A request with an `Origin` header is refused with `403` unless the origin is
+`FRONTEND_URL` or a loopback address. The request's own `Host` is not
+consulted.

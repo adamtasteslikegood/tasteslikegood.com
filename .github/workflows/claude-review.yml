@@ -86,6 +86,11 @@ jobs:
           ref: ${{ github.head_ref }}
           fetch-depth: 0 # full history — /code-review --comment needs PR context
           submodules: recursive
+          # Leave no GITHUB_TOKEN in the git config (KAN-420). The action sets up its
+          # own Claude App token for the push, but checkout v7 keeps this token in an
+          # included credentials file that the action's header cleanup misses, so
+          # fix pushes went out as GITHUB_TOKEN and their runs waited for approval.
+          persist-credentials: false
 
       - name: Checkout dispatched PR
         if: github.event_name == 'workflow_dispatch'
@@ -95,6 +100,7 @@ jobs:
           # shell source — otherwise a crafted `pr` value is a command-injection
           # sink (this job has contents/pull-requests/id-token: write).
           PR_NUMBER: ${{ github.event.inputs.pr }}
+        # Works without persisted credentials: gh authenticates with GH_TOKEN.
         run: gh pr checkout "$PR_NUMBER"
 
       - name: Pick a cost-optimized, independent review model
@@ -138,7 +144,7 @@ jobs:
 
       - name: Review + fix + comment
         if: steps.auth.outputs.present == 'true'
-        uses: anthropics/claude-code-action@58985842b834ed26087302ba27d07bc24ca8697a # ratchet:anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@1d6de8cb0c237e7c15e9e1bdf973826ebae490cc # ratchet:anthropics/claude-code-action@v1
         with:
           # OAuth token (subscription) is primary; the action prefers it when set and
           # falls back to the API key when the OAuth secret is empty/unset.
