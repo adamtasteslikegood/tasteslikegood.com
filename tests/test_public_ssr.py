@@ -1696,6 +1696,12 @@ def test_step_name_falls_back_to_the_first_sentence(text, name):
     assert _step_name(text) == name
 
 
+@pytest.mark.parametrize("abbreviation", ["tbsp.", "tsp.", "oz.", "approx.", "Tbsp."])
+def test_step_name_keeps_cooking_abbreviations_in_the_first_sentence(abbreviation):
+    first_sentence = f"Add 1 {abbreviation} olive oil and stir until combined"
+    assert _step_name(f"{first_sentence}. Then serve.") == first_sentence
+
+
 def test_recipe_keywords_drop_category_and_cuisine_tags(app, client):
     with app.app_context():
         db.session.add(

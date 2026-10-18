@@ -948,9 +948,25 @@ PIN_DESCRIPTION_TAGS = 3
 # so name + separators + tail always fit and the tail is never cut. Tags are
 # unbounded strings (recipe_schema.json), so one that does not fit is skipped.
 MAX_PIN_TAIL_LENGTH = 200
-# Common title/word abbreviations must not terminate the pin's first sentence.
+# Common title/cooking abbreviations must not terminate the first sentence.
 # Multi-initial abbreviations such as "e.g." and "U.S." are recognized separately.
-_PIN_ABBREVIATIONS = frozenset({"dr.", "jr.", "mr.", "mrs.", "ms.", "prof.", "sr.", "st.", "vs."})
+_PIN_ABBREVIATIONS = frozenset(
+    {
+        "approx.",
+        "dr.",
+        "jr.",
+        "mr.",
+        "mrs.",
+        "ms.",
+        "oz.",
+        "prof.",
+        "sr.",
+        "st.",
+        "tbsp.",
+        "tsp.",
+        "vs.",
+    }
+)
 _SENTENCE_END = re.compile(r"[.!?](?=\s|$)")
 _PIN_INITIALISM = re.compile(r"(?:[a-z]\.){2,}")
 
