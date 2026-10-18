@@ -573,11 +573,17 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         ),
         "recipeIngredient": ingredient_lines or None,
         "recipeInstructions": [
-            {"@type": "HowToStep", "position": index + 1, "text": text}
+            {
+                "@type": "HowToStep",
+                "position": index + 1,
+                "name": _step_name(text),
+                "text": text,
+                "url": f"{canonical_url}#step-{index + 1}",
+            }
             for index, text in enumerate(instructions)
         ]
         or None,
-        "keywords": ", ".join(_recipe_tags(data)) or None,
+        "keywords": _recipe_keywords(data),
         "recipeCategory": _tag_labels(data, RECIPE_CATEGORY_BY_TAG) or None,
         "recipeCuisine": _tag_labels(data, RECIPE_CUISINE_BY_TAG) or None,
         "suitableForDiet": "https://schema.org/VeganDiet",
@@ -641,6 +647,43 @@ RECIPE_CUISINE_BY_TAG: dict[str, str] = {
     "caribbean": "Caribbean",
     "ethiopian": "Ethiopian",
 }
+
+
+def _recipe_keywords(data: dict[str, Any]) -> str | None:
+    """Tags minus the ones already sent as ``recipeCategory`` or ``recipeCuisine`` (KAN-320).
+
+    Google: don't use a tag that's actually a recipeCategory or recipeCuisine.
+    """
+    already_typed = RECIPE_CATEGORY_BY_TAG.keys() | RECIPE_CUISINE_BY_TAG.keys()
+    seen: set[str] = set()
+    keywords: list[str] = []
+    for tag in _recipe_tags(data):
+        key = tag.lower()
+        if key in already_typed or key in seen:
+            continue
+        seen.add(key)
+        keywords.append(tag)
+    return ", ".join(keywords) or None
+
+
+STEP_NAME_LIMIT = 60
+
+
+def _step_name(text: str) -> str:
+    """A short ``HowToStep.name`` from the step's first clause (KAN-320).
+
+    A step that opens with a heading (``"Make the batter: Whisk…"``) is named by
+    the heading; any other step by its first sentence, cut at a word boundary.
+    """
+    heading, colon, _ = text.partition(": ")
+    if (
+        colon
+        and len(heading) <= STEP_NAME_LIMIT
+        and not heading[-1:].isdigit()
+        and not _SENTENCE_END.search(heading)
+    ):
+        return heading.strip()
+    return _trim_to_words(_first_pin_sentence(text).rstrip(".!?"), STEP_NAME_LIMIT)
 
 
 def _tag_labels(data: dict[str, Any], mapping: Mapping[str, str]) -> list[str]:
