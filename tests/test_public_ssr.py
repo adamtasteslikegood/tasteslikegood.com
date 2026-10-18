@@ -10,6 +10,7 @@ Covers:
 """
 
 import base64
+import json
 import html
 import re
 import sys
@@ -27,6 +28,7 @@ sys.path.append(str(Path(__file__).resolve().parent.parent))
 from app import create_app  # noqa: E402
 from blueprints.public_bp import (  # noqa: E402
     DEFAULT_RECIPE_DESCRIPTION,
+    SITE_SOCIAL_PROFILES,
     _format_ingredient,
     _pin_description,
     _pin_image_url,
@@ -1564,3 +1566,74 @@ def test_recipe_page_pins_with_keyword_description(app, client):
     expected = "Keyword Curry — A coconut curry with chickpeas. Vegan recipe: curry, dinner."
     assert _pinterest_description_param(body) == expected
     assert f'data-pin-description="{html.escape(expected)}"' in body
+
+
+# ── KAN-433: the site Organization and its social profiles ─────────────────
+
+SITE_PROFILES = [
+    "https://www.facebook.com/tasteslikegood.org",
+    "https://www.instagram.com/tasteslikegooddotorg/",
+    "https://www.pinterest.com/tasteslikegood/",
+]
+
+
+def _json_ld_blocks(body: str) -> list[dict]:
+    return [
+        json.loads(html.unescape(block))
+        for block in re.findall(
+            r'<script type="application/ld\+json">(.*?)</script>', body, re.DOTALL
+        )
+    ]
+
+
+def _json_ld_of_type(body: str, ld_type: str) -> dict:
+    (found,) = [block for block in _json_ld_blocks(body) if block.get("@type") == ld_type]
+    return found
+
+
+def test_site_social_profiles_match_the_cookbook_list():
+    assert list(SITE_SOCIAL_PROFILES) == SITE_PROFILES
+
+
+def test_recipe_json_ld_names_the_site_as_publisher_and_fallback_author(app, client):
+    with app.app_context():
+        db.session.add(_make_recipe("Lentil Soup", "lentil-soup"))
+        db.session.commit()
+
+    body = client.get("/r/lentil-soup").get_data(as_text=True)
+    recipe = _json_ld_of_type(body, "Recipe")
+
+    site = {
+        "@type": "Organization",
+        "name": "Tasteslikegood.org",
+        "url": "http://localhost/",
+        "sameAs": SITE_PROFILES,
+    }
+    assert recipe["publisher"] == site
+    # No owner name, so the site is the author too.
+    assert recipe["author"] == site
+
+
+def test_recipe_json_ld_keeps_a_named_owner_as_author(app, client):
+    with app.app_context():
+        owner = User(email="owner-433@example.com", name="Sam Cook")
+        db.session.add(owner)
+        db.session.flush()
+        db.session.add(_make_recipe("Owner Stew", "owner-stew", owner=owner))
+        db.session.commit()
+
+    body = client.get("/r/owner-stew").get_data(as_text=True)
+    recipe = _json_ld_of_type(body, "Recipe")
+
+    assert recipe["author"] == {"@type": "Person", "name": "Sam Cook"}
+    assert recipe["publisher"]["sameAs"] == SITE_PROFILES
+
+
+@pytest.mark.parametrize("path", ["/browse", "/browse/tag/dessert"])
+def test_collection_pages_name_the_site_as_publisher(app, client, path):
+    body = client.get(path).get_data(as_text=True)
+    page = _json_ld_of_type(body, "CollectionPage")
+
+    assert page["publisher"]["@type"] == "Organization"
+    assert page["publisher"]["url"] == "http://localhost/"
+    assert page["publisher"]["sameAs"] == SITE_PROFILES

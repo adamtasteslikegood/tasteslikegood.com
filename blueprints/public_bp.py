@@ -86,6 +86,26 @@ def _public_base_url() -> str:
     return request.url_root.rstrip("/")
 
 
+# KAN-433: the site's own social profiles. Keep this list identical to the
+# cookbook's (index.html and server/public/about.html), which name the same
+# Organization on the Express pages.
+SITE_SOCIAL_PROFILES = (
+    "https://www.facebook.com/tasteslikegood.org",
+    "https://www.instagram.com/tasteslikegooddotorg/",
+    "https://www.pinterest.com/tasteslikegood/",
+)
+
+
+def _site_organization() -> dict[str, Any]:
+    """The site as a schema.org ``Organization``, with its social profiles."""
+    return {
+        "@type": "Organization",
+        "name": "Tasteslikegood.org",
+        "url": f"{_public_base_url()}/",
+        "sameAs": list(SITE_SOCIAL_PROFILES),
+    }
+
+
 def _absolute_url(value: str | None) -> str | None:
     if not value:
         return None
@@ -540,10 +560,9 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         "mainEntityOfPage": canonical_url,
         "image": [image_url] if image_url else None,
         "author": (
-            {"@type": "Person", "name": author_name}
-            if author_name
-            else {"@type": "Organization", "name": "Tasteslikegood.org"}
+            {"@type": "Person", "name": author_name} if author_name else _site_organization()
         ),
+        "publisher": _site_organization(),
         "datePublished": recipe.created_at.date().isoformat() if recipe.created_at else None,
         "dateModified": recipe.updated_at.date().isoformat() if recipe.updated_at else None,
         "prepTime": _minutes_to_iso_duration(prep_minutes),
@@ -863,6 +882,7 @@ def _collection_json_ld(
         "name": name,
         "description": description,
         "url": canonical_url,
+        "publisher": _site_organization(),
         "mainEntity": {
             "@type": "ItemList",
             "numberOfItems": len(recipes),
