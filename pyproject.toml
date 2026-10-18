@@ -83,7 +83,7 @@ dependencies = [
     "pandas>=3.0.5",
     "ddtrace>=4.13.0",
     "gunicorn>=26.0.0",
-    "md4a-fastapi",
+    "md4a-fastapi>=0.1.0,<0.2",
 ]
 
 [project.optional-dependencies]
@@ -161,9 +161,6 @@ constraint-dependencies = [
     "click>=8.3.3",          # via flask
     "httplib2>=0.32.0",      # via google-api-python-client
 ]
-
-[tool.uv.sources]
-md4a-fastapi = { url = "https://github.com/adamtasteslikegood/md4a-fastapi/archive/572c9becd9b9e1e41348b25606d20657354fe91f.tar.gz" }
 
 [dependency-groups]
 dev = [
