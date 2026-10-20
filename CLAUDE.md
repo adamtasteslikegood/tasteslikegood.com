@@ -156,6 +156,12 @@ pytest (`uv run pytest`). Reference test setup pattern: `tests/test_public_ssr.p
 - **Two migration heads** — `flask db upgrade` runs but schema is incomplete; `recipe.status missing` style errors at runtime.
 - **`config.py` reads `DATABASE_URL` at import time** — overriding via shell after import does nothing.
 - **Flask SQLite paths resolve under `instance/`** — `sqlite:///foo.db` writes to `instance/foo.db`, not the cwd.
+- **Tests must hit the right DB engine** — pass `TESTING=True` and the test
+  `SQLALCHEMY_DATABASE_URI` into `create_app(...)` before SQLAlchemy initializes.
+  Changing the URI after `create_app()` leaves `db.create_all()` bound to the
+  original engine. Run schema setup/teardown inside the app context; use
+  `tests/test_public_ssr.py` or `tests/test_collections_api.py` as the fixture pattern
+  (the stale-engine regression was issue #118).
 - **Gemini model names in the list API include `models/` prefix** (e.g., `models/gemini-3.8-flash`), whereas `config.py` defaults (`GEMINI_DEFAULT_MODEL`, `GEMINI_IMAGE_MODEL`) and generation call sites use bare IDs; filter `list_models()` responses by `'generateContent' in supported_generation_methods`.
 - **No `requirements.txt`** — `uv.lock` is the single source of truth; Dockerfile runs `uv export --frozen` at build time.
 - **mypy config lives only in `pyproject.toml`** — a `setup.cfg` `[mypy]` section is silently shadowed. `explicit_package_bases = true` required because `scripts/` has no `__init__.py`.
