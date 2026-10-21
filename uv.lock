@@ -1019,16 +1019,16 @@ wheels = [
 
 [[package]]
 name = "md4a-fastapi"
-version = "0.1.0"
+version = "0.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "beautifulsoup4" },
     { name = "fastapi" },
     { name = "markdownify" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c0/bc/6b9c772fde3b89026b73275df8dd21d037a34c09f2de898cd5646c405f95/md4a_fastapi-0.1.0.tar.gz", hash = "sha256:14cd670f45af50048cdef0a27da0f22ac54a46e8869cdcaee08b3462952e7598", size = 40711, upload-time = "2026-10-17T19:36:31.252Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/1a/aa/ec11782e7d7f17039533e6fdf0683dfcd8bba0a75a79cea52db27fb2c1cd/md4a_fastapi-0.2.0.tar.gz", hash = "sha256:935bf46cf5631f7acbcfa93757c173de0b3e636c7e752bc514e5e8c5babfd778", size = 49933, upload-time = "2026-10-18T18:09:08.031Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/cc/46/188f53c504523f04a8ba98b9cc5f72d7de34466973863f5cb0839125a466/md4a_fastapi-0.1.0-py3-none-any.whl", hash = "sha256:af376f58143843a98e65d901be7e5c1c016df1bf8fd419cc9263c3824b91dbf6", size = 26569, upload-time = "2026-10-17T19:36:29.772Z" },
+    { url = "https://files.pythonhosted.org/packages/cf/e6/8fddcb0be4904486dded52957b3e5ee806d0c2f660e9bcc8dcb8c6a86686/md4a_fastapi-0.2.0-py3-none-any.whl", hash = "sha256:47bc47342df4ad78ddfde9d87a378e445aa334e3dae18f1e216df41e2c657b28", size = 30923, upload-time = "2026-10-18T18:09:06.054Z" },
 ]
 
 [[package]]
@@ -1711,7 +1711,7 @@ requires-dist = [
     { name = "itsdangerous", specifier = "==2.2.0" },
     { name = "jinja2", specifier = "==3.1.6" },
     { name = "jsonschema", specifier = "==4.26.0" },
-    { name = "md4a-fastapi", specifier = ">=0.1.0,<0.2" },
+    { name = "md4a-fastapi", specifier = ">=0.2.0,<0.3" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=2.3.0" },
     { name = "pandas", specifier = ">=3.0.5" },
     { name = "pillow", specifier = "==12.3.0" },
