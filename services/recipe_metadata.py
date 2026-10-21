@@ -22,7 +22,7 @@ from flask import current_app
 from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 
-from config import DEFAULT_MODEL
+from config import DEFAULT_MODEL, GENAI_HTTP_TIMEOUT_MS
 from extensions import db
 from models.recipe import Recipe
 from models.recipe_metadata import RecipeMetadata
@@ -52,8 +52,21 @@ MODEL_RETRY_THROTTLE_SECONDS = 86400
 QUEUE_PUBLISH_TIMEOUT_SECONDS = 2
 # After a publish that failed, the next attempt waits this long, not the full window.
 QUEUE_FAILED_BACKOFF_SECONDS = 300
+
+
+def claim_seconds(model_timeout_ms: int) -> int:
+    """A build claim that outlasts the model call it guards (KAN-406).
+
+    The claim is the only thing keeping a second worker off the same model call
+    and the same unlocked rejection count. The client makes one attempt bounded
+    by ``GENAI_HTTP_TIMEOUT_MS``, so a claim a minute longer than that cannot
+    expire while the call is still running, whatever that setting is raised to.
+    """
+    return max(600, -(-model_timeout_ms // 1000) + 60)
+
+
 # One worker at a time calls the model for a recipe and content version.
-BUILD_CLAIM_SECONDS = 600
+BUILD_CLAIM_SECONDS = claim_seconds(GENAI_HTTP_TIMEOUT_MS)
 # Model answers that may fail validation for one content version before the
 # rule version is final. One: the same content mostly gets the same answer
 # (6 of 7 on production), and each further try is another chance for a bad
@@ -90,6 +103,14 @@ _TITLE_FILLER = frozenset({"recipe", "recipes", "vegan", "and", "with", "the", "
 
 class MetadataBuildBusy(Exception):
     """The model call for this recipe is claimed, or the claim could not be made."""
+
+
+class EmptyModelAnswer(RuntimeError):
+    """The model returned no text: empty, cut off or safety-blocked (KAN-405).
+
+    Not an answer, so it is not counted as the one permitted rejection. It
+    raises instead, and the queue redelivers (five attempts, then dead letter).
+    """
 
 
 # A time or quantity in words is as invented as one in digits.
@@ -435,8 +456,9 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     """Write a new metadata version for ``recipe`` when its current one is missing or weaker.
 
     The rule output is always saved first when it is new, so a failed model
-    call still leaves the page better than truncation. A model call that raises
-    is re-raised after that save, so the queue retries it. An answer that fails
+    call still leaves the page better than truncation. A model call that raises,
+    or answers with no text, is re-raised after that save, so the queue retries
+    it. An answer that fails
     validation is counted on the rule version, and once the count reaches
     ``MAX_MODEL_REJECTIONS`` the model is not asked again for that content.
     """
@@ -508,9 +530,10 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
         safe_compare_delete(claim, token)
 
     try:
-        answer = _parse_model_output(
-            attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs)), inputs
-        )
+        text = attempt_generation(client, DEFAULT_MODEL, _model_prompt(inputs))
+        if not text.strip():
+            raise EmptyModelAnswer(recipe_id)
+        answer = _parse_model_output(text, inputs)
         if answer is None:
             logger.info(
                 "Model metadata for recipe %s failed validation; keeping the rule version",

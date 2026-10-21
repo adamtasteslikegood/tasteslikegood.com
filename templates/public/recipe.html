@@ -185,7 +185,7 @@
             <div class="public-recipe-panel-body">
                 <ol class="public-recipe-steps">
                     {% for step in instructions %}
-                    <li class="public-recipe-step">
+                    <li class="public-recipe-step" id="step-{{ loop.index }}">
                         <span class="public-step-number">{{ loop.index }}.</span>
                         <span class="public-step-text">{{ step }}</span>
                     </li>
