@@ -43,6 +43,8 @@ from sqlalchemy.orm import joinedload
 from extensions import db
 from models import Recipe, RetiredSlug
 from services.recipe_metadata import (
+    CUISINE_BY_TAG,
+    CUISINE_NONE,
     MAX_TITLE_LENGTH,
     SITE_TITLE_SUFFIX,
     metadata_for_page,
@@ -533,7 +535,9 @@ def _clean_json(value: Any) -> Any:
     return value
 
 
-def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -> dict[str, Any]:
+def _recipe_json_ld(
+    recipe: Recipe, canonical_url: str, image_url: str | None, cuisine: str | None = None
+) -> dict[str, Any]:
     data = recipe.data or {}
     prep_minutes = _safe_minutes(data.get("prepTime"))
     cook_minutes = _safe_minutes(data.get("cookTime"))
@@ -585,7 +589,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         or None,
         "keywords": _recipe_keywords(data),
         "recipeCategory": _tag_labels(data, RECIPE_CATEGORY_BY_TAG) or None,
-        "recipeCuisine": _tag_labels(data, RECIPE_CUISINE_BY_TAG) or None,
+        "recipeCuisine": _recipe_cuisine(data, cuisine),
         "suitableForDiet": "https://schema.org/VeganDiet",
     }
     cleaned: dict[str, Any] = _clean_json(json_ld)
@@ -624,29 +628,22 @@ RECIPE_CATEGORY_BY_TAG: dict[str, str] = {
     "smoothie": "Drink",
 }
 
-RECIPE_CUISINE_BY_TAG: dict[str, str] = {
-    "american": "American",
-    "southern": "Southern",
-    "cajun": "Cajun",
-    "tex-mex": "Tex-Mex",
-    "mexican": "Mexican",
-    "italian": "Italian",
-    "french": "French",
-    "spanish": "Spanish",
-    "greek": "Greek",
-    "mediterranean": "Mediterranean",
-    "middle eastern": "Middle Eastern",
-    "british": "British",
-    "english": "British",
-    "indian": "Indian",
-    "thai": "Thai",
-    "vietnamese": "Vietnamese",
-    "korean": "Korean",
-    "japanese": "Japanese",
-    "chinese": "Chinese",
-    "caribbean": "Caribbean",
-    "ethiopian": "Ethiopian",
-}
+# The cuisine map lives with the metadata engine (KAN-423): the same tags that
+# decide a recipe's stored cuisine are the ones dropped from ``keywords``.
+RECIPE_CUISINE_BY_TAG: Mapping[str, str] = CUISINE_BY_TAG
+
+
+def _recipe_cuisine(data: dict[str, Any], stored: str | None) -> list[str] | None:
+    """``recipeCuisine``: the stored decision (KAN-423), or the tags' until there is one.
+
+    A stored ``none`` is a decision too: the recipe has no single cuisine, and
+    the property is left out rather than guessed from a tag.
+    """
+    if stored == CUISINE_NONE:
+        return None
+    if stored:
+        return [stored]
+    return _tag_labels(data, RECIPE_CUISINE_BY_TAG) or None
 
 
 def _recipe_keywords(data: dict[str, Any]) -> str | None:
@@ -1166,7 +1163,9 @@ def show_public_recipe(slug):
         ingredient_groups=_recipe_ingredient_groups(data),
         instructions=instructions,
         tags=tags,
-        recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
+        recipe_json_ld=_recipe_json_ld(
+            recipe, canonical_url, image_url, cuisine=metadata.cuisine if metadata else None
+        ),
         pinterest_share_url=(
             _pinterest_share_url(canonical_url, pinterest_image_url, pin_description)
             if pinterest_image_url

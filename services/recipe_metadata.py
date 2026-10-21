@@ -7,6 +7,10 @@ model rewrite replaces it when its output passes the same limits.
 
 Pages read the newest version whose inputs still match the recipe, and fall
 back to plain truncation when there is none.
+
+The version in use also carries the recipe's cuisine for ``recipeCuisine``
+(KAN-423): decided once, from a tag when one names a cuisine and otherwise by
+a separate model question, and stored rather than inferred on every render.
 """
 
 import hashlib
@@ -99,6 +103,116 @@ _NEGATION = re.compile(
 )
 _WORD = re.compile(r"[a-z]+")
 _TITLE_FILLER = frozenset({"recipe", "recipes", "vegan", "and", "with", "the", "for", "style"})
+
+# The cuisines a recipe may be given (KAN-423): a closed list, so every stored
+# value is one a search engine groups on. ``CUISINE_NONE`` is the explicit
+# answer that no single cuisine fits; NULL means not decided yet.
+CUISINES: tuple[str, ...] = (
+    "American",
+    "Southern",
+    "Cajun",
+    "Tex-Mex",
+    "Southwestern",
+    "Mexican",
+    "Latin American",
+    "Caribbean",
+    "Italian",
+    "French",
+    "Spanish",
+    "Greek",
+    "Mediterranean",
+    "Middle Eastern",
+    "North African",
+    "African",
+    "Ethiopian",
+    "British",
+    "Irish",
+    "German",
+    "Eastern European",
+    "Indian",
+    "Thai",
+    "Vietnamese",
+    "Korean",
+    "Japanese",
+    "Chinese",
+    "Filipino",
+    "Indonesian",
+    "Southeast Asian",
+    "Asian",
+    "Hawaiian",
+)
+CUISINE_NONE = "none"
+_CUISINE_BY_ANSWER = {c.lower(): c for c in CUISINES}
+
+# Tags the generator writes that name a cuisine, lower-cased. Every tag also
+# counts in its "x-inspired" and "x style" forms and with hyphens for spaces.
+_CUISINE_TAGS: dict[str, str] = {
+    "american": "American",
+    "southern": "Southern",
+    "soul food": "Southern",
+    "cajun": "Cajun",
+    "tex-mex": "Tex-Mex",
+    "southwestern": "Southwestern",
+    "southwest": "Southwestern",
+    "mexican": "Mexican",
+    "latin american": "Latin American",
+    "latin": "Latin American",
+    "caribbean": "Caribbean",
+    "jamaican": "Caribbean",
+    "cuban": "Caribbean",
+    "italian": "Italian",
+    "italian-american": "Italian",
+    "tuscan": "Italian",
+    "sicilian": "Italian",
+    "french": "French",
+    "spanish": "Spanish",
+    "greek": "Greek",
+    "mediterranean": "Mediterranean",
+    "middle eastern": "Middle Eastern",
+    "lebanese": "Middle Eastern",
+    "turkish": "Middle Eastern",
+    "north african": "North African",
+    "moroccan": "North African",
+    "african": "African",
+    "ethiopian": "Ethiopian",
+    "british": "British",
+    "english": "British",
+    "english breakfast": "British",
+    "irish": "Irish",
+    "german": "German",
+    "eastern european": "Eastern European",
+    "polish": "Eastern European",
+    "hungarian": "Eastern European",
+    "indian": "Indian",
+    "thai": "Thai",
+    "thai cuisine": "Thai",
+    "vietnamese": "Vietnamese",
+    "korean": "Korean",
+    "korean bbq": "Korean",
+    "japanese": "Japanese",
+    "chinese": "Chinese",
+    "chinese takeout": "Chinese",
+    "filipino": "Filipino",
+    "indonesian": "Indonesian",
+    "southeast asian": "Southeast Asian",
+    "south-east asian": "Southeast Asian",
+    "asian": "Asian",
+    "hawaiian": "Hawaiian",
+}
+
+
+def _tag_forms(tag: str) -> list[str]:
+    spellings = {tag, tag.replace(" ", "-"), tag.replace("-", " ")}
+    forms = set(spellings)
+    for spelling in spellings:
+        for suffix in ("-inspired", " inspired", "-style", " style"):
+            forms.add(f"{spelling}{suffix}")
+    return sorted(forms)
+
+
+CUISINE_BY_TAG: dict[str, str] = {
+    form: cuisine for tag, cuisine in _CUISINE_TAGS.items() for form in _tag_forms(tag)
+}
 
 
 class MetadataBuildBusy(Exception):
@@ -331,12 +445,17 @@ def metadata_for_page(recipe: Recipe) -> Optional[RecipeMetadata]:
 
     None owes a build now. A rule version owes another try at the model
     rewrite, at most once a day, unless the model's answer for this content
-    was already rejected. The queueing runs in the background, so the render
-    never waits on the cache or the queue.
+    was already rejected; so does a version with no cuisine decided yet
+    (KAN-423). The queueing runs in the background, so the render never waits
+    on the cache or the queue.
     """
     digest = inputs_hash(metadata_inputs(recipe))
     current = _usable(_versions(recipe.id, digest), digest)
-    if current is None or (current.source == "rule" and not _model_exhausted(current)):
+    if (
+        current is None
+        or (current.source == "rule" and not _model_exhausted(current))
+        or current.cuisine is None
+    ):
         recipe_id, retry = recipe.id, current is not None
         _run_in_background(lambda: queue_metadata(recipe_id, digest, model_retry=retry))
     return current
@@ -363,6 +482,84 @@ def queue_if_missing(recipe: Recipe) -> None:
             sanitize_log_value(recipe_id),
             sanitize_log_value(e),
         )
+
+
+def cuisine_from_tags(tags: list[str]) -> Optional[str]:
+    """The cuisine the first cuisine-naming tag maps to, else None."""
+    return next((CUISINE_BY_TAG[t.lower()] for t in tags if t.lower() in CUISINE_BY_TAG), None)
+
+
+def _cuisine_prompt(inputs: dict[str, Any]) -> str:
+    return (
+        "Name the cuisine of this vegan recipe.\n"
+        f"Recipe name: {inputs.get('name', '')}\n"
+        f"Recipe description: {inputs.get('description', '')}\n"
+        f"Tags: {', '.join(inputs.get('tags') or [])}\n"
+        f"Answer with exactly one of these, spelled as written: {', '.join(CUISINES)}.\n"
+        f"Answer {CUISINE_NONE} when the recipe does not clearly belong to one cuisine on the "
+        "list: most everyday baking, snacks, smoothies and comfort food do not. Do not guess "
+        "from a single ingredient.\n"
+        "Return only the answer, no other words."
+    )
+
+
+def parse_model_cuisine(text: str) -> Optional[str]:
+    """A ``CUISINES`` member or ``CUISINE_NONE`` when the answer names one, else None."""
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = cleaned.split("\n", 1)[-1].rsplit("```", 1)[0]
+    answer = " ".join(cleaned.strip().strip("`\"'*.").lower().split())
+    if answer == CUISINE_NONE:
+        return CUISINE_NONE
+    return _CUISINE_BY_ANSWER.get(answer) or _CUISINE_BY_ANSWER.get(answer.replace(" ", "-"))
+
+
+def fill_cuisine(
+    row: RecipeMetadata, inputs: dict[str, Any], *, use_model: bool = True
+) -> Optional[str]:
+    """Decide the cuisine from the recipe's ``inputs`` and store it on ``row`` (KAN-423).
+
+    Returns the cuisine, or None when it is still undecided. The inputs are the
+    recipe's current content, not the version's own: a person's version carries
+    none, and the cuisine is the recipe's whichever version is in use.
+
+    A tag that names a cuisine decides it without a model call. Otherwise one
+    short model question, separate from the title rewrite so the title prompt
+    and ``ENGINE_VERSION`` stay as they are and no title is rebuilt for this.
+    An answer outside the list leaves the cuisine undecided; the next page read
+    asks again, at most once a day. A model call that raises propagates, so the
+    queue redelivers.
+    """
+    tags = [t for t in inputs.get("tags") or [] if isinstance(t, str)]
+    cuisine = cuisine_from_tags(tags)
+    if cuisine is None:
+        if not use_model:
+            return None
+        client = get_genai_client(None)
+        if client is None:
+            return None
+        row_id, recipe_id = row.id, row.recipe_id
+        # End the read transaction: the model call must not hold a pooled connection.
+        db.session.commit()
+        text = attempt_generation(client, DEFAULT_MODEL, _cuisine_prompt(inputs))
+        cuisine = parse_model_cuisine(text)
+        if cuisine is None:
+            logger.info(
+                "Model cuisine for recipe %s failed validation; left undecided",
+                sanitize_log_value(recipe_id),
+            )
+            return None
+        fresh = db.session.get(RecipeMetadata, row_id)
+        if fresh is None:
+            return None
+        row = fresh
+        if row.cuisine is not None:
+            # Written meanwhile, by another delivery or a person: theirs stands.
+            stored: str = row.cuisine
+            return stored
+    row.cuisine = cuisine
+    db.session.commit()
+    return cuisine
 
 
 def _model_prompt(inputs: dict[str, Any]) -> str:
@@ -461,7 +658,19 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
     it. An answer that fails
     validation is counted on the rule version, and once the count reaches
     ``MAX_MODEL_REJECTIONS`` the model is not asked again for that content.
+
+    The version returned also gets its cuisine decided when it has none yet
+    (KAN-423), including a model version written before cuisines were stored.
     """
+    row = _build_title_and_description(recipe, use_model=use_model)
+    if row is not None and row.cuisine is None:
+        fill_cuisine(row, metadata_inputs(recipe), use_model=use_model)
+    return row
+
+
+def _build_title_and_description(
+    recipe: Recipe, *, use_model: bool = True
+) -> Optional[RecipeMetadata]:
     inputs = metadata_inputs(recipe)
     digest = inputs_hash(inputs)
     latest = _usable(_versions(recipe.id, digest), digest)
@@ -481,6 +690,8 @@ def build_metadata(recipe: Recipe, *, use_model: bool = True) -> Optional[Recipe
                 model=model,
                 inputs_hash=digest,
                 inputs=inputs,
+                # The cuisine is the recipe's, decided once: a new version keeps it.
+                cuisine=newest.cuisine if newest else None,
             )
             db.session.add(row)
             try:

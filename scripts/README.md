@@ -83,6 +83,15 @@ Failed: 0
 
 ---
 
+### 🍽️ Recipe cuisine report (KAN-423)
+
+`recipe_cuisine_report.py` lists the public recipes whose cuisine the metadata
+engine has not decided yet and exits 1 while any remain. `db` mode (default)
+reads the configured database; its docstring carries the equivalent SQL for
+Cloud SQL Studio, since production's database is reachable only from inside
+the VPC. `site <url>` reads a live site's sitemap and recipe pages from
+outside, which also makes the site queue the fill for the undecided recipes.
+
 ## Adding New Scripts
 
 When adding utility scripts to this directory:

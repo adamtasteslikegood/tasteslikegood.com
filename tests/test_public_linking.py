@@ -179,6 +179,45 @@ def test_unmapped_tags_omit_category_and_cuisine(app, client):
     assert "recipeCuisine" not in recipe_ld
 
 
+def _store_cuisine(recipe_id, cuisine):
+    """A person's metadata version carrying a decided cuisine (KAN-423)."""
+    from models.recipe_metadata import RecipeMetadata
+    from services.recipe_metadata import inputs_hash, metadata_inputs
+
+    recipe = db.session.get(Recipe, recipe_id)
+    inputs = metadata_inputs(recipe)
+    db.session.add(
+        RecipeMetadata(
+            recipe_id=recipe_id,
+            version=1,
+            seo_title=recipe.name,
+            meta_description=inputs["description"],
+            source="human",
+            inputs_hash=inputs_hash(inputs),
+            inputs=inputs,
+            cuisine=cuisine,
+        )
+    )
+    db.session.commit()
+
+
+def test_a_stored_cuisine_is_the_recipe_cuisine_whatever_the_tags_say(app, client):
+    with app.app_context():
+        _store_cuisine(_add("ramen-night", tags=["Dinner", "noodles"]), "Japanese")
+
+    recipe_ld = _json_ld(client.get("/r/ramen-night").get_data(as_text=True), "Recipe")
+    assert recipe_ld["recipeCuisine"] == ["Japanese"]
+
+
+def test_a_stored_none_leaves_recipe_cuisine_out_even_with_a_cuisine_tag(app, client):
+    with app.app_context():
+        _store_cuisine(_add("fusion-bowl", tags=["Mexican", "bowl"]), "none")
+
+    recipe_ld = _json_ld(client.get("/r/fusion-bowl").get_data(as_text=True), "Recipe")
+    assert "recipeCuisine" not in recipe_ld
+    assert recipe_ld["keywords"] == "bowl"
+
+
 # ── titles + descriptions ────────────────────────────────────────────────────
 
 

@@ -71,13 +71,20 @@ def _model_answers(monkeypatch, answer):
     monkeypatch.setattr(engine, "attempt_generation", generate)
 
 
-def _recipe(name="Vegan Polenta Fries", description=LONG_SENTENCE, is_public=True):
+def _recipe(
+    name="Vegan Polenta Fries",
+    description=LONG_SENTENCE,
+    is_public=True,
+    # A cuisine tag, so the cuisine is decided without a model call (KAN-423)
+    # and the model call counts below stay about the title engine.
+    tags=("vegan", "cornbread", "southern"),
+):
     recipe = Recipe(
         id=str(uuid.uuid4()),
         name=name,
         slug=f"r-{uuid.uuid4().hex[:8]}",
         is_public=is_public,
-        data={"name": name, "description": description, "tags": ["vegan", "cornbread"]},
+        data={"name": name, "description": description, "tags": list(tags)},
     )
     db.session.add(recipe)
     db.session.commit()
@@ -886,3 +893,142 @@ def test_the_configured_claim_outlasts_the_configured_model_timeout():
     from config import GENAI_HTTP_TIMEOUT_MS
 
     assert engine.BUILD_CLAIM_SECONDS * 1000 > GENAI_HTTP_TIMEOUT_MS
+
+
+# ── KAN-423: the recipe's cuisine is decided once and stored ─────────────────
+
+
+def test_every_cuisine_tag_maps_to_a_listed_cuisine():
+    assert set(engine.CUISINE_BY_TAG.values()) <= set(engine.CUISINES)
+    assert engine.CUISINE_NONE not in engine.CUISINES
+
+
+@pytest.mark.parametrize(
+    ("tags", "expected"),
+    [
+        (["vegan", "Mexican-inspired", "tacos"], "Mexican"),
+        (["Thai style", "curry"], "Thai"),
+        (["South-East Asian"], "Southeast Asian"),
+        (["comfort food", "baking"], None),
+    ],
+)
+def test_cuisine_from_tags_reads_the_first_cuisine_tag(tags, expected):
+    assert engine.cuisine_from_tags(tags) == expected
+
+
+@pytest.mark.parametrize(
+    ("answer", "expected"),
+    [
+        ("Italian", "Italian"),
+        ('"Tex Mex."', "Tex-Mex"),
+        ("```\nKorean\n```", "Korean"),
+        ("none", "none"),
+        ("None.", "none"),
+        ("Cuisine: Italian", None),
+        ("Fusion", None),
+        ("", None),
+    ],
+)
+def test_parse_model_cuisine_accepts_only_the_list(answer, expected):
+    assert engine.parse_model_cuisine(answer) == expected
+
+
+def test_a_cuisine_tag_decides_the_cuisine_without_a_model_call(app, no_model):
+    recipe = _recipe(tags=["vegan", "Southern", "cornbread"])
+
+    assert engine.build_metadata(recipe).cuisine == "Southern"
+
+
+def _title_and_cuisine_model(monkeypatch, cuisine_answer):
+    """A model answering the title prompt with GOOD_ANSWER and the cuisine one as given."""
+    prompts = []
+    monkeypatch.setattr(engine, "get_genai_client", lambda _credentials: object())
+
+    def generate(_client, _model, prompt):
+        prompts.append(prompt)
+        return cuisine_answer if prompt.startswith("Name the cuisine") else GOOD_ANSWER
+
+    monkeypatch.setattr(engine, "attempt_generation", generate)
+    return prompts
+
+
+def _asked_cuisine(prompts):
+    return [p.startswith("Name the cuisine") for p in prompts]
+
+
+def test_without_a_cuisine_tag_the_model_decides_in_a_separate_question(app, monkeypatch):
+    recipe = _recipe(tags=["vegan", "cornbread"])
+    prompts = _title_and_cuisine_model(monkeypatch, "Southern")
+
+    row = engine.build_metadata(recipe)
+
+    assert row.source == "model"
+    assert row.cuisine == "Southern"
+    assert _asked_cuisine(prompts) == [False, True]
+    # The title prompt is as it was: no title is rebuilt for the cuisine.
+    assert "cuisine" not in prompts[0].lower()
+    assert prompts[1].endswith("Return only the answer, no other words.")
+
+
+def test_a_model_version_written_before_cuisines_gets_one_on_the_next_build(app, monkeypatch):
+    recipe = _recipe(tags=["vegan", "cornbread"])
+    # The title answer is not a cuisine: the version is saved with none decided,
+    # as every model version written before KAN-423 was.
+    _model_answers(monkeypatch, GOOD_ANSWER)
+    row = engine.build_metadata(recipe)
+    assert row.source == "model" and row.cuisine is None
+
+    prompts = _title_and_cuisine_model(monkeypatch, "none")
+    again = engine.build_metadata(db.session.get(Recipe, recipe.id))
+
+    assert again.id == row.id
+    assert again.cuisine == "none"
+    assert _asked_cuisine(prompts) == [True]
+
+
+def test_an_answer_outside_the_list_leaves_the_cuisine_undecided_and_the_page_asks_again(
+    app, client, no_metadata_queue, monkeypatch
+):
+    recipe = _recipe(tags=["vegan", "cornbread"])
+    _title_and_cuisine_model(monkeypatch, "Fusion")
+    row = engine.build_metadata(recipe)
+    assert row.source == "model" and row.cuisine is None
+
+    client.get(f"/r/{recipe.slug}")
+
+    assert no_metadata_queue == [("recipe-metadata", {"recipe_id": recipe.id})]
+
+
+def test_a_page_whose_cuisine_is_decided_queues_nothing(
+    app, client, no_metadata_queue, monkeypatch
+):
+    recipe = _recipe(tags=["vegan", "cornbread"])
+    _title_and_cuisine_model(monkeypatch, "none")
+    engine.build_metadata(recipe)
+
+    client.get(f"/r/{recipe.slug}")
+
+    assert no_metadata_queue == []
+
+
+def test_a_new_version_for_changed_content_keeps_the_decided_cuisine(app, monkeypatch):
+    recipe = _recipe(tags=["vegan", "cornbread"])
+    prompts = _title_and_cuisine_model(monkeypatch, "Southern")
+    first = engine.build_metadata(recipe)
+    assert first.cuisine == "Southern"
+
+    recipe = db.session.get(Recipe, recipe.id)
+    recipe.data = {**recipe.data, "description": LONG_SENTENCE + " Serve it warm."}
+    db.session.commit()
+    prompts.clear()
+    second = engine.build_metadata(recipe)
+
+    assert second.version > first.version
+    assert second.cuisine == "Southern"
+    assert _asked_cuisine(prompts) == [False]
+
+
+def test_without_a_model_the_cuisine_stays_undecided_until_one_is_available(app, no_model):
+    recipe = _recipe(tags=["vegan", "cornbread"])
+
+    assert engine.build_metadata(recipe).cuisine is None
