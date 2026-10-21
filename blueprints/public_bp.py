@@ -683,7 +683,12 @@ def _step_name(text: str) -> str:
         and not _SENTENCE_END.search(heading)
     ):
         return heading.strip()
-    return _trim_to_words(_first_pin_sentence(text).rstrip(".!?"), STEP_NAME_LIMIT)
+    # Strip at most one terminator: a step ending in a cooking abbreviation
+    # ("Add 1 tsp.") still needs its abbreviation period kept.
+    sentence = _first_pin_sentence(text)
+    if sentence[-1:] in ".!?":
+        sentence = sentence[:-1]
+    return _trim_to_words(sentence, STEP_NAME_LIMIT)
 
 
 def _tag_labels(data: dict[str, Any], mapping: Mapping[str, str]) -> list[str]:

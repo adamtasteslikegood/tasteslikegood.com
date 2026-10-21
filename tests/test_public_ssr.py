@@ -1702,6 +1702,12 @@ def test_step_name_keeps_cooking_abbreviations_in_the_first_sentence(abbreviatio
     assert _step_name(f"{first_sentence}. Then serve.") == first_sentence
 
 
+@pytest.mark.parametrize("step", ["Mix in 1 tsp.", "Add 1 oz.", "Stir in approx."])
+def test_step_name_keeps_a_trailing_cooking_abbreviation(step):
+    # A terse one-sentence step ending in an abbreviation keeps its period.
+    assert _step_name(step) == step
+
+
 def test_recipe_keywords_drop_category_and_cuisine_tags(app, client):
     with app.app_context():
         db.session.add(
