@@ -839,3 +839,50 @@ def test_worker_acknowledges_a_delivery_for_rejected_content_without_waiting_on_
     monkeypatch.setattr(engine, "safe_add", lambda _key, _value, timeout=None: False)
     assert _push(client, recipe.id).status_code == 200
     assert calls == [1]
+
+
+# ── KAN-405: an answer with no text is an error, not the one rejection ──────
+
+
+@pytest.mark.parametrize("answer", ["", "   \n"])
+def test_an_empty_model_answer_raises_and_is_not_counted(app, monkeypatch, answer):
+    recipe = _recipe()
+    calls = _counting_model(monkeypatch, answer)
+
+    for _ in range(2):
+        with pytest.raises(engine.EmptyModelAnswer):
+            engine.build_metadata(db.session.get(Recipe, recipe.id))
+
+    # Asked again on the redelivery, and nothing counted against the content.
+    assert calls == [1, 1]
+    assert [v.source for v in _versions(recipe)] == ["rule"]
+    assert not _versions(recipe)[0].scores
+    monkeypatch.setattr(engine, "attempt_generation", lambda _c, _m, _p: GOOD_ANSWER)
+    assert engine.build_metadata(db.session.get(Recipe, recipe.id)).source == "model"
+
+
+def test_worker_asks_for_redelivery_when_the_model_answer_is_empty(app, client, monkeypatch):
+    # A safety-blocked answer arrives as "" (``response.text or ""``).
+    recipe = _recipe()
+    _model_answers(monkeypatch, "")
+
+    assert _push(client, recipe.id).status_code == 500
+    assert not _versions(recipe)[0].scores
+
+
+# ── KAN-406: the build claim outlasts the model call ─────────────────────────
+
+
+@pytest.mark.parametrize(
+    ("timeout_ms", "claim"),
+    [(540_000, 600), (60_000, 600), (900_000, 960), (900_001, 961)],
+)
+def test_the_build_claim_outlasts_the_model_timeout(timeout_ms, claim):
+    assert engine.claim_seconds(timeout_ms) == claim
+    assert engine.claim_seconds(timeout_ms) * 1000 > timeout_ms
+
+
+def test_the_configured_claim_outlasts_the_configured_model_timeout():
+    from config import GENAI_HTTP_TIMEOUT_MS
+
+    assert engine.BUILD_CLAIM_SECONDS * 1000 > GENAI_HTTP_TIMEOUT_MS

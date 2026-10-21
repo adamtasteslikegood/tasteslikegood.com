@@ -33,6 +33,7 @@ from blueprints.public_bp import (  # noqa: E402
     _pin_description,
     _pin_image_url,
     _safe_minutes,
+    _step_name,
 )
 from extensions import db  # noqa: E402
 from models.recipe import Recipe  # noqa: E402
@@ -431,7 +432,8 @@ def test_public_recipe_filters_malformed_tags_from_json_ld(app, client):
 
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
-    assert '"keywords": "vegan, soup"' in body
+    # "soup" is the recipeCategory, so keywords keeps only "vegan" (KAN-320).
+    assert _json_ld_of_type(body, "Recipe")["keywords"] == "vegan"
     assert '<span class="public-tag">vegan</span>' in body
     assert '<span class="public-tag">soup</span>' in body
     assert '<span class="public-tag">7</span>' not in body
@@ -1637,3 +1639,102 @@ def test_collection_pages_name_the_site_as_publisher(app, client, path):
     assert page["publisher"]["@type"] == "Organization"
     assert page["publisher"]["url"] == "http://localhost/"
     assert page["publisher"]["sameAs"] == SITE_PROFILES
+
+
+# ── KAN-320: step names, step anchors, keywords without category/cuisine ────
+
+
+def test_recipe_json_ld_steps_carry_a_name_and_an_anchor_url(app, client):
+    steps = [
+        "Make the Injera batter: Whisk teff flour and water until thin.",
+        "Preheat the oven to 350°F. Line a baking sheet with parchment paper.",
+        "Serve immediately",
+    ]
+    with app.app_context():
+        db.session.add(
+            _make_recipe(
+                "Step Stew",
+                "step-stew",
+                data={"name": "Step Stew", "instructions": steps},
+            )
+        )
+        db.session.commit()
+
+    body = client.get("/r/step-stew").get_data(as_text=True)
+    recipe = _json_ld_of_type(body, "Recipe")
+
+    assert [step["name"] for step in recipe["recipeInstructions"]] == [
+        "Make the Injera batter",
+        "Preheat the oven to 350°F",
+        "Serve immediately",
+    ]
+    assert [step["url"] for step in recipe["recipeInstructions"]] == [
+        f"{recipe['url']}#step-{n}" for n in (1, 2, 3)
+    ]
+    assert [step["text"] for step in recipe["recipeInstructions"]] == steps
+    # Every step url points at an element that exists on the page.
+    for n in (1, 2, 3):
+        assert f'id="step-{n}"' in body
+
+
+@pytest.mark.parametrize(
+    ("text", "name"),
+    [
+        # A long first sentence is cut at a word boundary.
+        (
+            "Cook the vegan bacon in a skillet over medium heat according to "
+            "package instructions until crispy.",
+            "Cook the vegan bacon in a skillet over medium heat…",
+        ),
+        # A ratio is not a heading.
+        ("Mix at 1:2 ratio. Then rest.", "Mix at 1:2 ratio"),
+        # A colon after the first sentence is not a heading either.
+        ("Rest the dough. Then add: flour and salt.", "Rest the dough"),
+    ],
+)
+def test_step_name_falls_back_to_the_first_sentence(text, name):
+    assert _step_name(text) == name
+
+
+@pytest.mark.parametrize("abbreviation", ["tbsp.", "tsp.", "oz.", "approx.", "Tbsp."])
+def test_step_name_keeps_cooking_abbreviations_in_the_first_sentence(abbreviation):
+    first_sentence = f"Add 1 {abbreviation} olive oil and stir until combined"
+    assert _step_name(f"{first_sentence}. Then serve.") == first_sentence
+
+
+def test_recipe_keywords_drop_category_and_cuisine_tags(app, client):
+    with app.app_context():
+        db.session.add(
+            _make_recipe(
+                "Thai Curry",
+                "thai-curry",
+                data={
+                    "name": "Thai Curry",
+                    "tags": ["vegan", "Thai", "dinner", "curry", "Vegan", "coconut"],
+                },
+            )
+        )
+        db.session.commit()
+
+    recipe = _json_ld_of_type(client.get("/r/thai-curry").get_data(as_text=True), "Recipe")
+
+    assert recipe["recipeCuisine"] == ["Thai"]
+    assert recipe["recipeCategory"] == ["Dinner"]
+    assert recipe["keywords"] == "vegan, curry, coconut"
+
+
+def test_recipe_without_a_cuisine_tag_has_no_recipe_cuisine(app, client):
+    with app.app_context():
+        db.session.add(
+            _make_recipe(
+                "Plain Oats",
+                "plain-oats",
+                data={"name": "Plain Oats", "tags": ["vegan", "oats", "breakfast"]},
+            )
+        )
+        db.session.commit()
+
+    recipe = _json_ld_of_type(client.get("/r/plain-oats").get_data(as_text=True), "Recipe")
+
+    assert "recipeCuisine" not in recipe
+    assert recipe["keywords"] == "vegan, oats"

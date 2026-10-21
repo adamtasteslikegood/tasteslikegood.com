@@ -265,8 +265,11 @@ def run_tool(name: str, arguments: dict[str, Any], user_id: int | None) -> Respo
 def call_agent_tool(name: str) -> ResponseReturnValue:
     """Call one tool. The JSON body is the tool's arguments object."""
     user_id = session.get("user_id")
-    # Access first: a caller who may not use the tool learns nothing about
-    # its body.
+    # A declared oversize body is refused before the access check, so it costs
+    # no access work and is answered the same for every caller (KAN-407). The
+    # body itself is still read only after access, by read_arguments().
+    if (request.content_length or 0) > MAX_BODY_BYTES:
+        return _error(413, "The request body is too large")
     tool = check_access(name, current_app.config, user_id)
     if isinstance(tool, Refusal):
         return _error(tool.status, tool.error)

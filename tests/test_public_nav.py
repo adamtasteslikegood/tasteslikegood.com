@@ -164,7 +164,7 @@ def test_neighbour_nav_does_not_share_a_class_with_the_method_steps(app, client)
     db.session.commit()
 
     body = client.get("/r/with-steps").get_data(as_text=True)
-    assert '<li class="public-recipe-step">' in body
+    assert '<li class="public-recipe-step" id="step-1">' in body
     assert '<nav class="public-recipe-step"' not in body
     css = (Path(__file__).resolve().parent.parent / "static/css/recipe-site.css").read_text()
     assert ".public-recipe-neighbors {" in css
