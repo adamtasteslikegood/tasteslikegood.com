@@ -18,7 +18,10 @@ class RecipeMetadata(db.Model):  # type: ignore[name-defined]
     from, so a later edit to the recipe makes it stale instead of wrong.
     ``scores`` holds what is recorded about a version after it is written: so
     far, on a rule version, how many model answers for the same content failed
-    validation (``model_rejections``, KAN-393).
+    validation (``model_rejections``, KAN-393). ``cuisine`` is the recipe's
+    cuisine for ``recipeCuisine`` (KAN-423): a name from the closed list in
+    ``services.recipe_metadata.CUISINES``, the word ``none`` when no single
+    cuisine fits, or NULL while it has not been decided.
     """
 
     __tablename__ = "recipe_metadata"
@@ -41,6 +44,7 @@ class RecipeMetadata(db.Model):  # type: ignore[name-defined]
     inputs_hash = db.Column(db.String(64), nullable=False)
     inputs = db.Column(db.JSON, nullable=False)
     scores = db.Column(db.JSON, nullable=True)
+    cuisine = db.Column(db.String(64), nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
 
