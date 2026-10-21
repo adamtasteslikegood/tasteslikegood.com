@@ -406,6 +406,25 @@ def test_tool_call_refuses_a_body_over_the_size_limit(make_client):
     assert streamed.status_code == 413
 
 
+@pytest.mark.parametrize(
+    "switches",
+    [{}, {"AGENT_TOOLS_GENERATE_TEXT": True}],
+    ids=["switched-off", "signed-out"],
+)
+def test_a_declared_oversize_body_is_refused_before_the_access_check(make_client, switches):
+    """413, not 404 or 401: the size is checked before access (KAN-407)."""
+    from blueprints.agent_api_bp import MAX_BODY_BYTES
+
+    client = make_client(**switches)
+    with patch("services.pubsub_service.publish_message") as publish:
+        response = client.post(
+            "/api/agent/tools/generate_recipe",
+            json={"prompt": "Pasta", "pad": "x" * MAX_BODY_BYTES},
+        )
+    assert response.status_code == 413
+    publish.assert_not_called()
+
+
 def test_search_refuses_a_query_over_the_length_limit(make_client):
     from blueprints.agent_api_bp import SEARCH_QUERY_MAX_CHARS
 
