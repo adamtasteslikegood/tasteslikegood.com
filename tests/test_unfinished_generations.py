@@ -72,6 +72,26 @@ def test_list_and_count_leave_out_unfinished_generations(app, client):
     assert client.get("/api/recipes/stats").get_json()["total_recipes"] == len(LISTED)
 
 
+def test_list_reports_each_row_status(app, client):
+    """KAN-459 / #3758: the SPA needs to tell "photo on its way" from "no photo".
+
+    Both listed statuses reach the client, so a client that reloaded while an
+    image was generating can rejoin that request instead of rendering an
+    "Image not available" placeholder until the next reload.
+    """
+    user = User(email="cook@example.com", name="Cook")
+    db.session.add(user)
+    db.session.commit()
+    for status in STATUSES:
+        _row(status, user_id=user.id)
+    db.session.commit()
+    _login(client, user_id=user.id)
+
+    listed = client.get("/api/recipes").get_json()["recipes"]
+
+    assert {recipe["status"] for recipe in listed} == LISTED
+
+
 def test_guest_list_leaves_them_out_too(app):
     for status in STATUSES:
         _row(status, guest_session_id="guest-1")
