@@ -99,6 +99,16 @@ def list_recipes(user_id, guest_session_id):
                             "source_slug": recipe.source_slug,
                             "source_recipe_id": recipe.source_recipe_id,
                             "origin": recipe.origin,
+                            # KAN-459 / #3758: the only listed statuses are
+                            # "ready" and "generating_image" (KAN-381 filters
+                            # the rest out), so this says whether a row's photo
+                            # is still being generated. Without it a client that
+                            # reloaded mid-generation could not tell a recipe
+                            # waiting on its image from one that simply has
+                            # none, and showed "Image not available" until the
+                            # next reload. There is no blob copy to disagree
+                            # with: status is a column only.
+                            "status": recipe.status,
                             "first_published_at": (
                                 recipe.first_published_at.isoformat()
                                 if recipe.first_published_at
