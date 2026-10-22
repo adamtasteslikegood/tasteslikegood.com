@@ -324,8 +324,7 @@ class ValkeyRateLimitMixin:
         if client is None:
             return None
         key = f"{self.OAUTH_STATE_PREFIX}{state}"
-        raw = client.get(key)
+        raw = client.getdel(key)
         if raw is None:
             return None
-        client.delete(key)
         return raw.decode("utf-8") if isinstance(raw, (bytes, bytearray)) else str(raw)

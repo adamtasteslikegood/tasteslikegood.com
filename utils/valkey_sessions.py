@@ -260,11 +260,20 @@ class ValkeySessionMixin:
         ttl_seconds: int = 3600,
     ) -> bool:
         """Atomically store a replacement session token and revoke the previous key."""
-        if not self.store_session_token(new_session_id, payload, ttl_seconds=ttl_seconds):
+        client = self._resolve_session_client()
+        if client is None:
             return False
-        if old_session_id and old_session_id != new_session_id:
-            self.revoke_session_token(old_session_id)
-        return True
+        raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        new_key = self._session_key(new_session_id)
+        ttl = max(1, int(ttl_seconds))
+        if not old_session_id or old_session_id == new_session_id:
+            client.setex(new_key, ttl, raw)
+            return True
+        pipeline = client.pipeline(transaction=True)
+        results = (
+            pipeline.setex(new_key, ttl, raw).delete(self._session_key(old_session_id)).execute()
+        )
+        return bool(results and results[0])
 
     def revoke_session_token(self, session_id: str) -> bool:
         """Delete a session token from Valkey immediately."""
