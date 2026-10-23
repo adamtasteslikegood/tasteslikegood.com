@@ -379,6 +379,8 @@ def _hydrate_hub_page(hub: TagHub, members: list[Any], page: int) -> list[Recipe
 
 def _sitemap_hub_entries(recipes: list[Any]) -> list[dict[str, Any]]:
     """Build sitemap entry dicts for indexable hubs from the catalog scan."""
+    # KAN-274: indexable hubs, lastmod from their newest-changed member. Reuses
+    # the ``recipes`` rows ``sitemap_xml`` already fetched.
     hub_members = _hub_members(recipes)
     counts = _counts_from_members(hub_members)
     entries: list[dict[str, Any]] = []

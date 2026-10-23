@@ -234,12 +234,28 @@ def create_recipe(
                 # wrong is that returning bare None made it indistinguishable
                 # from an internal failure, so the route answered 500 and the UI
                 # blamed the user's connection for a deliberate refusal.
+                #
+                # The code narrows which refusal this is. Order matters: check
+                # the row's user_id first, because "existing.user_id is None"
+                # means something different depending on whether the CALLER is
+                # authenticated (unclaimed guest row the caller may well own) or
+                # a guest (someone else's live guest session).
                 if existing.user_id is not None:
                     code = OWNERSHIP_CODE_OTHER_ACCOUNT
                 elif user_id is not None:
                     code = OWNERSHIP_CODE_ORPHANED_GUEST_ROW
                 else:
                     code = OWNERSHIP_CODE_OTHER_GUEST_SESSION
+                # Classify BEFORE logging, so the log carries the discriminator.
+                # This is not just ops garnish: KAN-155's remaining open item is
+                # the ownership-repair policy (reassign orphaned guest rows at
+                # login-merge vs a one-off backfill), and choosing between those
+                # depends on how often ORPHANED_GUEST_ROW actually fires against
+                # OTHER_ACCOUNT in production. There is no staging environment
+                # (KAN-182), so this log line is the only place that question can
+                # be answered. Without the code every refusal reads identically
+                # and the data does not exist. `code` is a module constant, so it
+                # needs no sanitizing — unlike the caller-supplied values below.
                 logger.warning(
                     "Recipe ID collision (%s) for id=%s (user_id=%s, guest_session_id=%s)",
                     code,
@@ -257,7 +273,12 @@ def create_recipe(
             merged = {**(existing.data or {}), **recipe_data, "id": recipe_id}
             _preserve_worker_metadata(existing.data or {}, merged)
             # KAN-215: a payload echo must not re-pin a saved copy to a stock
-            # image inherited from its source.
+            # image inherited from its source. Same reasoning as is_canonical
+            # below — enforced on every write path, not just create. Guard on
+            # the RESULTING state, not the pre-update state: a payload that
+            # first-turns a non-copy row into a saved copy (by supplying
+            # ``sourceSlug``) would otherwise slip past a pre-update check and
+            # persist the inherited URL on the very write that made it a copy.
             if _is_saved_copy(existing) or recipe_data.get("sourceSlug"):
                 _strip_inherited_stock_image(merged)
             # The is_canonical column is never writable through the API; pin
@@ -308,7 +329,9 @@ def create_recipe(
         # A client cannot mint its own canonical lock.
         recipe_data_with_id.pop("is_canonical", None)
         # KAN-329: a new row has no worker text behind it, so it is never
-        # created public.
+        # created public. Saved private rather than refused: old bundles POST
+        # new rows with the flag set, and a 400 would leave them a local
+        # "published" ghost the server never had.
         if recipe_data_with_id.get("is_public") is True:
             logger.info(
                 "New recipe %s asked to be public; saved private",
@@ -326,14 +349,26 @@ def create_recipe(
             # on create.
             source_slug = data.get("sourceSlug")
             if source_slug is not None:
+                # Saved copy: look up the source recipe — its owner is the
+                # author, its id is the immutable provenance key. Only public
+                # sources resolve (matches migration backfill predicate).
                 source = Recipe.query.filter(
                     Recipe.slug == source_slug, Recipe.is_public.is_(True)
                 ).first()
                 author_id = source.user_id if source else None
                 source_recipe_id = source.id if source else None
                 saved_to_id = user_id
+                # KAN-215: the SPA's saved-copy payload mirrors the source's
+                # stock_image_url. Strip that inherited value at the server
+                # boundary so it cannot masquerade as an image the copy owns.
+                # Otherwise _recipe_image_url returns it before resolving the
+                # source and pins the copy to the stock image even after the
+                # source gains an AI image. The immutable source_recipe_id
+                # retains provenance; public_bp resolves current source media
+                # at render time instead.
                 _strip_inherited_stock_image(data)
             else:
+                # Original recipe: author = owner, no saver, no source.
                 author_id = user_id
                 source_recipe_id = None
                 saved_to_id = None
@@ -427,6 +462,10 @@ def update_recipe(
         recipe_data = _lock_client_payload(recipe, recipe_data)
         _guard_canonical(recipe, recipe_data)
 
+        # Merge the payload into the persisted blob (and pin the id): PUT
+        # accepts partial payloads such as {"is_public": true}, and replacing
+        # the blob wholesale would delete ingredients/instructions at the
+        # moment of publishing. Keys the payload does supply always win.
         merged = {**(recipe.data or {}), **recipe_data, "id": recipe_id}
         _preserve_worker_metadata(recipe.data or {}, merged)
         if _is_saved_copy(recipe) or recipe_data.get("sourceSlug"):
@@ -435,6 +474,9 @@ def update_recipe(
         merged["is_canonical"] = recipe.is_canonical
 
         if "is_public" not in recipe_data:
+            # The is_public column is authoritative, like slug below: a
+            # partial PUT must not publish or unpublish a recipe off a
+            # stale blob value.
             merged["is_public"] = recipe.is_public
 
         # Pin BEFORE the gate, so the gate never reads a stale blob value the
@@ -444,9 +486,19 @@ def update_recipe(
         recipe_data_with_id = _gate_is_public(merged, user_id, recipe)
 
         if "name" not in recipe_data_with_id and recipe.name:
+            # Publish-only partial updates keep the persisted name (see
+            # stage_update), so slug derivation must see it too — otherwise
+            # {"is_public": true} on a slug-less row is wrongly rejected.
+            # Writing it into the blob also keeps blob and column agreeing.
+            # Key presence, not truthiness: an explicit falsy name is the
+            # caller's value and goes to both blob and column unchanged.
             recipe_data_with_id["name"] = recipe.name
 
         if "slug" not in recipe_data:
+            # The slug column is authoritative — scripts/backfill_slugs.py
+            # rewrites it without touching the blob — so a partial PUT that
+            # omits slug must not revert the column to a stale blob value.
+            # Syncing the merged dict also realigns the blob with the column.
             if recipe.slug is not None:
                 recipe_data_with_id["slug"] = recipe.slug
             else:
@@ -519,6 +571,11 @@ def delete_recipe(
         True if deleted successfully, False otherwise
     """
     try:
+        # Serialize deletion with publish/rename updates.  In addition to the
+        # row lock, ``populate_existing`` is important here: this scoped
+        # session may already hold a stale private Recipe while a concurrent
+        # transaction has just published it.  Rechecking the locked database
+        # row keeps the 409 guard authoritative.
         recipe = cast(
             Optional[Recipe],
             _apply_recipe_scope(
