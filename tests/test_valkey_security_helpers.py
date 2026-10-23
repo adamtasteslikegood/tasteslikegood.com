@@ -52,8 +52,9 @@ def test_oauth_state_nonce_is_consumed_exactly_once_under_concurrency():
 
 
 class _Pipeline:
-    def __init__(self, client):
+    def __init__(self, client, *, transaction=True):
         self.client = client
+        self.transaction = transaction
         self.commands = []
 
     def setex(self, key, ttl, value):
@@ -65,6 +66,17 @@ class _Pipeline:
         return self
 
     def execute(self):
+        if not self.transaction:
+            results = []
+            for command in self.commands:
+                if command[0] == "setex":
+                    _, key, ttl, value = command
+                    results.append(self.client.setex(key, ttl, value))
+                else:
+                    _, key = command
+                    results.append(self.client.delete(key))
+            return results
+
         results = []
         with self.client.lock:
             for command in self.commands:
@@ -75,6 +87,7 @@ class _Pipeline:
                 else:
                     _, key = command
                     results.append(int(self.client.values.pop(key, None) is not None))
+        self.client.partial_visible.set()
         return results
 
 
@@ -97,8 +110,7 @@ class _RotationClient:
             return int(self.values.pop(key, None) is not None)
 
     def pipeline(self, transaction=True):
-        assert transaction is True
-        return _Pipeline(self)
+        return _Pipeline(self, transaction=transaction)
 
     def snapshot(self):
         with self.lock:
@@ -119,10 +131,12 @@ def test_session_rotation_never_exposes_old_and_new_tokens_together():
     )
     thread.start()
 
-    saw_partial = client.partial_visible.wait(timeout=0.25)
+    saw_partial = client.partial_visible.wait(timeout=1.0)
     observed = client.snapshot()
     client.release_delete.set()
     thread.join(timeout=2)
 
-    assert not (saw_partial and {"tlg:session:old", "tlg:session:new"}.issubset(observed))
+    assert saw_partial is True
+    assert not {"tlg:session:old", "tlg:session:new"}.issubset(observed)
+    assert observed == {"tlg:session:new"}
     assert client.snapshot() == {"tlg:session:new"}
