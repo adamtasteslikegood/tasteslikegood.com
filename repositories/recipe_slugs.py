@@ -316,7 +316,7 @@ def _pin_source_slug_to_column(
 ) -> None:
     """Keep ``sourceSlug`` in the merged blob honest when the payload omits it.
 
-    Exactly the rule already applied to ``slug`` above, for the same reason.
+    Exactly the rule ``update_recipe`` applies to ``slug``, for the same reason.
     ``source_slug`` is a column mirroring ``data['sourceSlug']``, and writes
     rebuild the blob as ``{**(existing.data or {}), **recipe_data}`` before
     restaging ``recipe.source_slug = data.get("sourceSlug")``. So anything that
@@ -331,7 +331,13 @@ def _pin_source_slug_to_column(
     reproduced by ``test_clearing_the_column_survives_a_later_partial_update``).
     And when the payload sends ANY value (null or non-null) against a row
     whose column is already non-NULL, the persisted value wins: provenance
-    is NOT client-mutable once set.
+    is NOT client-mutable once set. Before this rule, one
+    ``PUT {"is_public": true, "sourceSlug": null}`` wiped the provenance and
+    published the copy in a single call (Copilot B1 on PR #279); and a
+    ``PUT {"sourceSlug": "other-slug"}`` repointed the copy, creating a
+    disagreement between ``source_slug`` and the immutable
+    ``source_recipe_id`` (Copilot/claude review round 2). Only server-side
+    paths (login-merge legacy guard, migration pre-passes) clear the column.
     """
     if "sourceSlug" in recipe_data:
         if existing.source_slug is not None:
@@ -351,7 +357,10 @@ def _resolve_source_recipe_id(
     KAN-221: the stable provenance key. Set from the source row whose slug the
     copy points at, exactly once — a later payload cannot re-point a copy at a
     different source (the same immutability rule as ``origin``), and no client
-    value ever reaches this column.
+    value ever reaches this column. An unresolvable pointer (source deleted, or
+    a slug that never existed) stays NULL; the row still carries source_slug,
+    so it stays a saved copy for the publish guard and falls back to the slug
+    key in the identity indexes.
     """
     if current is not None:
         return current
@@ -378,8 +387,12 @@ def _duplicate_source_slug_owner(
     """Did this write lose to an existing row on (owner, source_slug)? (KAN-213)
 
     Called only after a rollback. Constraint names in the IntegrityError are
-    backend-specific (SQLite vs PostgreSQL), so — exactly as with the slug race
-    above — the portable signal is to ask the database who owns the key now.
+    backend-specific (SQLite vs PostgreSQL), so — exactly as with the slug race in
+    ``_commit_publish_retrying`` — the portable signal is to ask the database who owns the key now.
+
+    Scoped to the acting owner on purpose: two different people saving the same
+    public recipe is the product working, not a duplicate, and the partial
+    indexes are per-owner for that reason.
     """
     if owner_scope is None:
         return False
@@ -389,6 +402,9 @@ def _duplicate_source_slug_owner(
     source = recipe_data.get("sourceSlug")
     if source is None:
         return False
+    # The staged row's identity is the resolved source id, or the slug pointer
+    # when the source does not resolve — the same resolution the stage
+    # functions apply before commit.
     source_row = Recipe.query.filter(
         Recipe.slug == source, Recipe.is_public.is_(True), Recipe.id != recipe_id
     ).first()
@@ -425,6 +441,18 @@ def _commit_publish_retrying(
     losing slug, and re-stage with the next suffix. ``stage(data)`` applies
     ``data`` to the ORM (building or mutating the row) and returns the row —
     it is re-invoked on every attempt because rollback discards staged state.
+
+    Resolution always starts from the caller's original payload, not the
+    previous attempt's result: resolving from a once-suffixed slug would
+    compound the suffix (chili-2-2 after two races instead of chili-3).
+
+    Only genuine slug races are retried: after rollback, a query must confirm
+    another recipe now owns the attempted slug. Constraint names in the
+    IntegrityError are backend-specific (SQLite vs PostgreSQL), so ownership
+    of the slug is the portable signal. Every other integrity failure —
+    PK/not-null violations, or errors from unrelated objects staged on the
+    shared session — re-raises immediately rather than being retried into a
+    commit that silently drops that other work.
     """
     resolver_input = dict(recipe_data)
     skip: set = set()
@@ -466,7 +494,9 @@ def _commit_publish_retrying(
                 # KAN-213: the (owner, source_slug) index refused a second save
                 # of the same public recipe. Distinguish it from a genuine
                 # integrity failure BEFORE re-raising, so it can reach the
-                # client as a 409 refusal instead of a 500 (R1).
+                # client as a 409 refusal instead of a 500 (R1). Checked only
+                # on the non-slug-race path, so the slug retry above is
+                # untouched.
                 if dup_fn(recipe_data, recipe_id, owner_scope):
                     logger.info(
                         "Recipe %s refused: owner already has source_slug %r",
@@ -492,8 +522,21 @@ def _gate_is_public(
 ) -> Dict[str, Any]:
     """Only authenticated users may publish: guests get is_public forced False.
 
+    A guest_session_id is a throwaway browser token — there is no accountable
+    owner to moderate or ban behind a guest-published /r/<slug> page. The flag
+    is normalized in the data blob itself so the JSON payload and the
+    is_public column can never disagree.
+
     RCP-74 / KAN-221: saved copies cannot be published — the source page owns
-    publication, permanently, with no author exception.
+    publication, permanently, with no author exception. For an existing row
+    the refusal keys on the PERSISTED provenance columns (``source_slug``,
+    ``source_recipe_id``), never on what the payload claims: a payload is the
+    caller's story, and ``PUT {"is_public": true, "sourceSlug": null}`` was a
+    working bypass while the guard trusted it (Copilot B1 on PR #279). For a
+    row being created, the staged blob IS what will be persisted, so the check
+    on it is a check on the columns being written. Raises
+    SavedCopyPublishError (403 at the API) so the SPA's revert-and-toast path
+    fires.
     """
     wants_public = recipe_data.get("is_public") is True
     if wants_public and user_id is None:

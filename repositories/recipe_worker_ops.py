@@ -263,6 +263,8 @@ def update_recipe_for_worker(
     # placeholder survives — and the model's output is projected away from
     # media, publication and provenance keys before the stamp lands. The one
     # client-owned private field, personalNotes, is carried forward explicitly.
+    # Ownership and visibility come from the row's columns, never from either
+    # payload.
     existing_data = recipe.data if isinstance(recipe.data, dict) else {}
     merged = {k: v for k, v in recipe_data.items() if k not in _WORKER_TEXT_DROP_FIELDS}
     if "personalNotes" in existing_data:
