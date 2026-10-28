@@ -281,9 +281,13 @@ class ValkeyRateLimitMixin:
         if client is None:
             return True, 0
         key = f"{self.RATELIMIT_KEY_PREFIX}{bucket}"
-        count = int(client.incr(key))
-        if count == 1:
-            client.expire(key, max(1, int(window_seconds)))
+        ttl = max(1, int(window_seconds))
+        # Initialize counter+TTL atomically so a crash between INCR and EXPIRE
+        # cannot leave the key TTL-less and permanently over the limit.
+        if client.set(key, 1, ex=ttl, nx=True):
+            count = 1
+        else:
+            count = int(client.incr(key))
         return count <= limit, count
 
     def record_auth_backoff_failure(
@@ -294,9 +298,13 @@ class ValkeyRateLimitMixin:
         if client is None:
             return 1, _RETRY_BASE
         key = f"{self.LOCKOUT_KEY_PREFIX}{subject}"
-        failures = int(client.incr(key))
-        if failures == 1:
-            client.expire(key, max(1, int(window_seconds)))
+        ttl = max(1, int(window_seconds))
+        # Initialize counter+TTL atomically; otherwise a crash before EXPIRE
+        # pins the subject in permanent lockout.
+        if client.set(key, 1, ex=ttl, nx=True):
+            failures = 1
+        else:
+            failures = int(client.incr(key))
         backoff = int(min(_RETRY_BASE * (2 ** max(0, failures - 1)), _RETRY_MAX))
         return failures, backoff
 

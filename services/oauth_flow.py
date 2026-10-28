@@ -294,7 +294,10 @@ def upsert_authenticated_user(user_info: Mapping[str, Any]) -> tuple[Any, str | 
     email = user_info.get("email")
     name = user_info.get("name")
 
-    user = User.query.filter_by(google_id=google_id).first()
+    # Guard the google_id lookup: filter_by(google_id=None) matches any
+    # pre-OAuth user whose google_id column is NULL, which would log the
+    # live Google session into an unrelated account.
+    user = User.query.filter_by(google_id=google_id).first() if google_id else None
     if not user and email:
         user = User.query.filter_by(email=email).first()
 
