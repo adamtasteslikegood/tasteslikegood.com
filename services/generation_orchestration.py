@@ -280,7 +280,7 @@ def _image_cache_version(recipe) -> str:
     legacy fallback payload when both exist. Hash the raw identity to retain
     the established 16-character internal cache-key strength.
     """
-    from blueprints.public_bp import _image_version_source
+    from services.public_images import _image_version_source
 
     source = _image_version_source(recipe) or ""
     return hashlib.sha256(source.encode("utf-8")).hexdigest()[:16]
