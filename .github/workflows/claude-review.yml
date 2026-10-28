@@ -1,31 +1,40 @@
-# Independent Claude review — advisory, cost-optimized, fail-open.
+# Independent Claude review — advisory, bounded, fail-open.
 #
 # Runs a SECOND, INDEPENDENT review of a PR in its own CI session, on a DIFFERENT
 # and CHEAPER model than the authoring session (author works in Opus 4.8 / Fable 5;
-# this reviewer uses an Opus 4.x < 4.8). It reasons about scope, picks the review
-# skill + reasoning effort, applies fixes, and leaves a comment per fix.
+# this reviewer uses an Opus 4.x < 4.8). Full review on open/ready/label/dispatch;
+# on a push, only the commits since the last completed review (KAN-420 scope,
+# ported to Backend by KAN-489).
 #
-# ADVISORY ONLY — never a required status check. `continue-on-error: true` so a
-# flaky/absent key never blocks a merge, and the review step is SKIPPED entirely
-# when no Claude credential is configured. Complements (does not replace) the
-# label-gated gemini-review.yml.
+# BOUNDED (KAN-489, ported from 10110TasteslikegoodPlaza 61a5f33/21b11d5): every
+# run has a job time limit, and the review step has per-mode limits on time, turns,
+# effort and estimated cost (see `env:` on the job). Before KAN-489 a review had no
+# limit and GitHub's 6-hour default applied; promotion #458 waited 20+ minutes.
+#
+# ADVISORY ONLY — never a required merge gate. Complements (does not replace) the
+# label-gated gemini-review.yml. The job is `continue-on-error: true`, and the review step is SKIPPED
+# when no Claude credential is configured. A final step always posts a status
+# comment saying whether the review completed, ran out of a limit, or was skipped.
 #
 # AUTH: prefers a Claude Pro/Max subscription OAuth token, falls back to an API key.
 #   * CLAUDE_CODE_OAUTH_TOKEN (primary) — long-lived token from `claude setup-token`;
 #     draws on your subscription's usage/rate limits.
-#   * ANTHROPIC_API_KEY (fallback) — metered API billing; used when the OAuth secret
-#     is absent. If BOTH are set, the action prefers the OAuth token.
+#   * ANTHROPIC_API_KEY (fallback) — metered API billing; used only when the OAuth
+#     secret is absent. Whether Backend goes OAuth-only like the cookbook (KAN-445)
+#     is an open question on KAN-489; this port leaves auth as it was.
 # `id-token: write` (below) is required so the action can mint the official Claude
 # GitHub App token via OIDC to post comments / push fixes — it is GitHub-side auth,
 # independent of which Claude credential you use.
 #
+# A PR that changes this file is not reviewed by its own version: GitHub runs the
+# workflow from the default branch for that check, and the action may skip workflow
+# validation and still go green. The status comment reports that as incomplete.
+# Review such PRs by hand or with Codex.
+#
 # PREREQUISITES (one-time, by a maintainer):
-#   1. Add at least one Claude credential secret (Settings → Secrets → Actions):
-#      CLAUDE_CODE_OAUTH_TOKEN (preferred) and/or ANTHROPIC_API_KEY. With neither,
-#      the review step skips cleanly (advisory, no failure).
-#   2. (recommended) Add repo variable  CLAUDE_REVIEW_MODEL  = the exact Opus 4.x<8
-#      model id you want (verify at console.anthropic.com). Default below is a
-#      placeholder — CONFIRM the id before relying on it.
+#   1. Add CLAUDE_CODE_OAUTH_TOKEN (preferred) and/or ANTHROPIC_API_KEY
+#      (Settings → Secrets → Actions). With neither, the review step skips cleanly.
+#   2. (optional) Repo variable CLAUDE_REVIEW_MODEL = an Opus 4.x < 4.8 model id.
 #   3. Create the `claude-review` label (used to request/re-request a review).
 #
 # Design doc lives in the cookbook superproject:
@@ -37,12 +46,9 @@ name: Claude Review (independent model)
 on:
   pull_request:
     # Auto on PR open / un-draft AND on every push (`synchronize`) so commits
-    # pushed after the first review are reviewed too (TAS-3006 / KAN-183) — the PR
-    # lifecycle in CLAUDE.md ("monitor it, answer every comment, loop until
-    # merged") depends on the review loop covering later pushes, not just the first.
-    # Also on-demand via the `claude-review` label. The bot's own `--fix` pushes do
-    # NOT re-trigger (the `if:` guard below skips `github.event.sender.type == 'Bot'`),
-    # and `concurrency: cancel-in-progress` collapses rapid pushes to one review.
+    # pushed after the first review are reviewed too (TAS-3006 / KAN-183).
+    # Also on-demand via the `claude-review` label. The bot's own fix pushes do
+    # NOT re-trigger (the `if:` guard below skips `github.event.sender.type == 'Bot'`).
     types: [opened, ready_for_review, labeled, synchronize]
     branches: [main, dev, 'dev/**']
   workflow_dispatch:
@@ -54,18 +60,16 @@ on:
 permissions:
   contents: write # apply + push fixes to the PR branch
   pull-requests: write # post review comments
-  issues: write # fallback / summary comment
+  issues: write # status / summary comment
   id-token: write # OIDC → official Claude GitHub App token (post comments / push fixes)
-
-concurrency:
-  group: claude-review-${{ github.event.pull_request.number || github.event.inputs.pr }}
-  cancel-in-progress: true
+  actions: read # find the head the last completed review saw (push-delta scope)
 
 jobs:
   review:
     name: Independent Claude review
     # Same-repo only (forks/Dependabot have no secrets → skip cleanly), non-bot,
     # non-draft; on `labeled` events only fire for the `claude-review` label.
+    # Dispatch targets are validated in the first step, before checkout.
     if: >-
       github.event_name == 'workflow_dispatch' ||
       (
@@ -75,16 +79,59 @@ jobs:
         github.event.sender.type != 'Bot' &&
         (github.event.action != 'labeled' || github.event.label.name == 'claude-review')
       )
+    # Job-level, so it is evaluated after `if:`: a skipped bot fix push or an
+    # unrelated label must not cancel the review that is running.
+    concurrency:
+      group: claude-review-${{ github.event.pull_request.number || github.event.inputs.pr }}
+      cancel-in-progress: true
     runs-on: ubuntu-latest
     continue-on-error: true # advisory — never blocks the merge
+    timeout-minutes: 14
+    # Per-mode bounds. The cost limit is the SDK's own estimate: it can overshoot
+    # and is not a billing cap. The job limit leaves time for the status report.
+    env:
+      FULL_EFFORT: high
+      FULL_TURNS: '20'
+      FULL_MINUTES: '8'
+      FULL_BUDGET_USD: '3'
+      DELTA_EFFORT: low
+      DELTA_TURNS: '8'
+      DELTA_MINUTES: '4'
+      DELTA_BUDGET_USD: '1'
 
     steps:
+      - name: Resolve and validate PR context
+        id: pr
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Untrusted dispatch input via env, never templated into shell source.
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.inputs.pr }}
+          EVENT_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          [[ "$PR_NUMBER" =~ ^[1-9][0-9]*$ ]] || { echo '::error::Expected a positive PR number'; exit 1; }
+          PR_JSON=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$PR_NUMBER")
+          jq -e --arg repo "$GITHUB_REPOSITORY" '
+            .state == "open" and .draft == false and
+            .head.repo.full_name == $repo and .user.login != "dependabot[bot]"
+          ' <<< "$PR_JSON" > /dev/null || { echo '::error::PR is not eligible for review'; exit 1; }
+          BASE_REF=$(jq -r '.base.ref' <<< "$PR_JSON")
+          case "$BASE_REF" in main|dev|dev/*) ;; *) echo '::error::Unexpected PR base'; exit 1 ;; esac
+          HEAD_SHA=$(jq -r '.head.sha' <<< "$PR_JSON")
+          if [ -n "$EVENT_HEAD" ] && [ "$EVENT_HEAD" != "$HEAD_SHA" ]; then
+            echo '::notice::PR head moved; the newer event must review it.'
+            exit 1
+          fi
+          echo "number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          jq -r '"head_ref=\(.head.ref)\nbase_ref=\(.base.ref)\nbase_sha=\(.base.sha)"' \
+            <<< "$PR_JSON" >> "$GITHUB_OUTPUT"
+
       - name: Checkout PR head
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # ratchet:actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # For pull_request events this is the PR branch, so --fix can push back.
-          ref: ${{ github.head_ref }}
-          fetch-depth: 0 # full history — /code-review --comment needs PR context
+          ref: ${{ steps.pr.outputs.head_sha }}
+          fetch-depth: 0 # full history — the scope step walks ancestry
           submodules: recursive
           # Leave no GITHUB_TOKEN in the git config (KAN-420). The action sets up its
           # own Claude App token for the push, but checkout v7 keeps this token in an
@@ -92,28 +139,81 @@ jobs:
           # fix pushes went out as GITHUB_TOKEN and their runs waited for approval.
           persist-credentials: false
 
-      - name: Checkout dispatched PR
-        if: github.event_name == 'workflow_dispatch'
+      - name: Attach the checked-out commit to its PR branch
+        env:
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          git check-ref-format --branch "$HEAD_REF"
+          git switch -C "$HEAD_REF" "$HEAD_SHA"
+
+      - name: Scope the review (whole PR, or the push delta)
+        id: scope
         env:
           GH_TOKEN: ${{ github.token }}
-          # Pass the untrusted dispatch input via env, never templated into the
-          # shell source — otherwise a crafted `pr` value is a command-injection
-          # sink (this job has contents/pull-requests/id-token: write).
-          PR_NUMBER: ${{ github.event.inputs.pr }}
-        # Works without persisted credentials: gh authenticates with GH_TOKEN.
-        run: gh pr checkout "$PR_NUMBER"
+          ACTION: ${{ github.event.action }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ steps.pr.outputs.head_sha }}
+          HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
+        run: |
+          # KAN-420: open, ready_for_review, label and dispatch runs review the
+          # whole PR. A push (`synchronize`) reviews only what changed since the
+          # last COMPLETED review, at low effort. That review's head, not the
+          # event's `before`: cancel-in-progress drops the run for an earlier
+          # push, and its commits would otherwise never be reviewed. "Completed"
+          # means the "Record completed review" step ran, which happens only
+          # when the status report says the model run finished inside its
+          # limits; a run that hit a limit, errored or skipped never counts.
+          # A base that is missing or not an ancestor (a force-push) falls back
+          # to the whole PR, and so does a range holding a merge (an update from
+          # the base branch), whose diff would carry the base branch's changes.
+          MODE=full RANGE="" LAST="" REASON=explicit_full_review
+          if [ "$ACTION" = synchronize ]; then
+            REASON=no_completed_review_base
+            for RUN in $(gh run list --workflow claude-review.yml --branch "$HEAD_REF" \
+                           --limit 10 --json databaseId \
+                           --jq '.[].databaseId' 2>/dev/null); do
+              # Branch names can be reused and PRs can be retargeted. Only a
+              # completed run for this PR and base is a valid delta anchor.
+              RUN_PRS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/pull_requests" 2>/dev/null || echo "")
+              if ! jq -e --argjson pr "$PR_NUMBER" --arg base "$BASE_REF" \
+                   'any(.[]; .number == $pr and .base.ref == $base)' \
+                   <<< "$RUN_PRS" > /dev/null 2>&1; then
+                continue
+              fi
+              LAST=$(gh run view "$RUN" --json headSha,jobs --jq \
+                'if any(.jobs[].steps[]; .name == "Record completed review" and .conclusion == "success")
+                 then .headSha else "" end' 2>/dev/null || echo "")
+              [ -z "$LAST" ] || break
+            done
+            if [ -n "$LAST" ]; then
+              if [ "$LAST" = "$AFTER" ]; then
+                MODE=skip REASON=already_reviewed_head
+              elif ! git cat-file -e "$LAST^{commit}" 2>/dev/null \
+                   || ! git merge-base --is-ancestor "$LAST" "$AFTER"; then
+                REASON=base_not_ancestor
+              elif [ -n "$(git rev-list --merges "$LAST..$AFTER")" ]; then
+                REASON=merge_in_range
+              else
+                MODE=delta RANGE="$LAST..$AFTER" REASON=since_last_completed_review
+              fi
+            fi
+          fi
+          echo "mode=$MODE" >> "$GITHUB_OUTPUT"
+          echo "range=$RANGE" >> "$GITHUB_OUTPUT"
+          echo "reason=$REASON" >> "$GITHUB_OUTPUT"
+          echo "::notice::Review scope: $MODE $RANGE ($REASON)"
 
       - name: Pick a cost-optimized, independent review model
         id: pick
         env:
-          # Via env, not templated into the shell source (same injection-safety
-          # rule as the dispatch input above; a stray quote/backtick in the var
-          # value would otherwise break or inject the script).
+          # Via env, not templated into the shell source (injection safety).
           CLAUDE_REVIEW_MODEL: ${{ vars.CLAUDE_REVIEW_MODEL }}
         run: |
-          # Deterministic, always-cheaper-than-author selection:
-          #   default = highest Opus 4.x below 4.8 (cheaper than Opus 4.8 / Fable 5
-          #   AND a different model, for genuinely independent perspective).
+          # Default = highest Opus 4.x below 4.8 (cheaper than Opus 4.8 / Fable 5
+          # AND a different model, for a genuinely independent perspective).
           MODEL="${CLAUDE_REVIEW_MODEL:-claude-opus-4-7}"
           case "$MODEL" in
             claude-opus-4-8*|claude-fable-5*)
@@ -123,14 +223,34 @@ jobs:
           echo "model=$MODEL" >> "$GITHUB_OUTPUT"
           echo "::notice::Independent review model: $MODEL"
 
+      - name: Prepare isolated bounded reviewer
+        id: policy
+        env:
+          MODE: ${{ steps.scope.outputs.mode }}
+        run: |
+          set -euo pipefail
+          umask 077
+          CONFIG_DIR=$(mktemp -d "$RUNNER_TEMP/claude-review-config.XXXXXX")
+          chmod 0700 "$CONFIG_DIR"
+          rm -f -- "$RUNNER_TEMP/claude-execution-output.json"
+          echo "config_dir=$CONFIG_DIR" >> "$GITHUB_OUTPUT"
+          if [ "$MODE" = delta ]; then
+            EFFORT=$DELTA_EFFORT TURNS=$DELTA_TURNS MINUTES=$DELTA_MINUTES BUDGET=$DELTA_BUDGET_USD
+          else
+            EFFORT=$FULL_EFFORT TURNS=$FULL_TURNS MINUTES=$FULL_MINUTES BUDGET=$FULL_BUDGET_USD
+          fi
+          echo "effort=$EFFORT" >> "$GITHUB_OUTPUT"
+          echo "turns=$TURNS" >> "$GITHUB_OUTPUT"
+          echo "minutes=$MINUTES" >> "$GITHUB_OUTPUT"
+          echo "budget=$BUDGET" >> "$GITHUB_OUTPUT"
+
       - name: Check for a Claude credential
         id: auth
         env:
           OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          # Advisory workflow: if no credential is configured, skip cleanly instead
-          # of failing (forks/Dependabot also land here — they have no secrets).
+          # Advisory workflow: if no credential is configured, skip cleanly.
           if [ -n "$OAUTH_TOKEN" ]; then
             echo "::notice::Authenticating with CLAUDE_CODE_OAUTH_TOKEN (subscription)."
             echo "present=true" >> "$GITHUB_OUTPUT"
@@ -142,47 +262,335 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Review + fix + comment
-        if: steps.auth.outputs.present == 'true'
-        uses: anthropics/claude-code-action@e4a6faad497d33dbc7144135c75e41f82f0bf6c0 # ratchet:anthropics/claude-code-action@v1
-        with:
-          # OAuth token (subscription) is primary; the action prefers it when set and
-          # falls back to the API key when the OAuth secret is empty/unset.
-          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          prompt: |
-            You are an INDEPENDENT code reviewer running in CI, on a different and
-            cheaper model than the author's session. This is the Flask backend
-            (adamtasteslikegood/tasteslikegood.com). Review THIS pull request's diff
-            against its base branch. Be rigorous but do not fabricate issues.
+      - name: Restore trusted startup configuration for dispatch
+        id: trusted
+        if: >-
+          github.event_name == 'workflow_dispatch' &&
+          steps.auth.outputs.present == 'true' && steps.scope.outputs.mode != 'skip'
+        env:
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+        run: |
+          # Match the pinned action's restore-config.ts for PR events. Dispatch
+          # lacks PR event context, so do this before Claude can load hooks/MCP.
+          # These are fixed paths in a fresh CI checkout; rm unlinks a PR symlink
+          # itself rather than following it. The index/HEAD stay the PR's versions.
+          for CONFIG in .claude .mcp.json .claude.json .gitmodules .ripgreprc CLAUDE.md CLAUDE.local.md .husky; do
+            rm -rf -- "$CONFIG"
+            if git cat-file -e "$BASE_SHA:$CONFIG" 2>/dev/null; then
+              git restore --source="$BASE_SHA" --worktree -- "$CONFIG"
+            fi
+          done
 
-            1. Inspect the changed files (diff vs the base branch).
-            2. REASON about scope and risk, then CHOOSE:
-               - a reasoning effort level for the review — `low` or `medium` for
-                 small / low-risk diffs; `high` or `max` for large diffs or changes
-                 to core logic, auth / OAuth (auth.py, blueprints/auth_api_bp.py),
-                 the Pub/Sub worker (blueprints/worker_api_bp.py), config.py,
-                 request validators (validators/), the Gemini/Imagen services
-                 (services/), database migrations (migrations/), the Dockerfile,
-                 dependency manifests (pyproject.toml, uv.lock),
-                 or CI workflows (.github/).
-               - the review skill(s): always run the built-in `/code-review`;
-                 ADDITIONALLY run `/security-review` when the diff touches auth,
-                 secrets, the Pub/Sub worker, request validators, migrations, the
-                 Dockerfile, or dependency manifests.
-            3. Run the review so it BOTH applies fixes and posts comments, e.g.
-               `/code-review <effort> --comment --fix` (substitute the effort you
-               chose). `--fix` edits the working tree (this action commits & pushes
-               to the PR branch); `--comment` posts each finding as an inline PR
-               comment.
-            4. Ensure EVERY fix you apply has a corresponding PR comment saying what
-               changed and why (inline on the changed line where possible). Finish
-               with ONE summary comment listing each fix as a bullet and noting the
-               model + effort you used, signed:
-               `— Independent Claude review (<model>, effort <level>)`.
-            5. If nothing is worth fixing, post a single short "no changes needed"
-               comment. This review is ADVISORY — never block the merge.
+      - name: Review + fix + comment
+        id: review
+        if: steps.auth.outputs.present == 'true' && steps.scope.outputs.mode != 'skip'
+        continue-on-error: true
+        timeout-minutes: ${{ fromJSON(steps.policy.outputs.minutes) }}
+        uses: anthropics/claude-code-action@a26b07d8c778b0c43f64618e5fd29fd0f8af72e8 # v1
+        env:
+          CLAUDE_BRANCH: ${{ steps.pr.outputs.head_ref }}
+          CLAUDE_CONFIG_DIR: ${{ steps.policy.outputs.config_dir }}
+          CLAUDE_CODE_DISABLE_ADVISOR_TOOL: '1'
+        with:
+          base_branch: ${{ steps.pr.outputs.base_ref }}
+          # OAuth token (subscription) is primary; the API key is passed only when
+          # the OAuth secret is empty, as before.
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          anthropic_api_key: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN == '' && secrets.ANTHROPIC_API_KEY || '' }}
+          prompt: |
+            Review PR #${{ steps.pr.outputs.number }} in ${{ github.repository }}.
+            Head: ${{ steps.pr.outputs.head_sha }} on branch ${{ steps.pr.outputs.head_ref }}.
+            Base: ${{ steps.pr.outputs.base_sha }} (${{ steps.pr.outputs.base_ref }}).
+            Scope: ${{ steps.scope.outputs.mode }} ${{ steps.scope.outputs.range }}.
+
+            You are an INDEPENDENT reviewer in CI, on a different and cheaper
+            model than the author's session. This is the Flask backend
+            (adamtasteslikegood/tasteslikegood.com). Read CLAUDE.md first. Verify findings
+            against files and real command output; never claim a tool or test ran
+            when it is unavailable on this runner. Do not fabricate issues.
+
+            On a delta review, inspect ONLY git diff ${{ steps.scope.outputs.range }}
+            (the commits since the last completed review). Earlier PR changes are
+            context only: do not fix, repeat or raise findings outside this range.
+            A full review inspects the entire PR diff against its base;
+            pre-existing unrelated defects are not scope.
+
+            Use effort ${{ steps.policy.outputs.effort }} with at most
+            ${{ steps.policy.outputs.turns }} turns, approximately
+            ${{ steps.policy.outputs.budget }} USD of SDK-estimated cost and
+            ${{ steps.policy.outputs.minutes }} minutes. Finalize before these
+            limits. Publish concise verified findings early; prioritize a useful
+            final report over optional fixes or tests.
+            Review directly: no review skills, recursive reviews, subagents,
+            advisors, or model/agent CLI calls. Do not rerun checks CI already
+            runs (pytest, black, flake8) without a specific scoped reason.
+            Include focused security analysis when the scope touches auth / OAuth
+            (auth.py, blueprints/auth_api_bp.py), the Pub/Sub worker
+            (blueprints/worker_api_bp.py), config.py, request validators
+            (validators/), the Gemini services (services/), migrations
+            (migrations/), the Dockerfile, dependency manifests (pyproject.toml,
+            uv.lock) or CI workflows (.github/). Do not widen scope based on old
+            comments. Do not automatically retry after a time, turn or budget limit.
+
+            Small verified, scoped fixes are allowed; explain each in a PR comment
+            (inline on the changed line where possible). Avoid speculative
+            refactors. Do not edit existing Alembic migration revisions; report
+            problems in them instead.
+
+            Stage only your intended fixes, commit them and explicitly git push
+            HEAD to the PR branch using the action's Claude App authentication.
+            The action does not automatically commit/push prompt-driven fixes.
+            Startup config is restored from the trusted base: .claude, .mcp.json,
+            .claude.json, .gitmodules, .ripgreprc, CLAUDE.md, CLAUDE.local.md and
+            .husky. Never stage/commit those restoration differences or edit those
+            paths. Review their PR versions with git show/diff and report findings.
+            Do not force-push or push if the PR head moved since checkout; report
+            that race instead.
+
+            Post findings and fix explanations using gh api on PR
+            #${{ steps.pr.outputs.number }}; finish with ONE summary comment
+            listing each fix, checks actually run, and the model and effort used.
+            If nothing needs changing, post one short "no changes needed" summary.
+            Do not open issues or invent Jira keys.
+            Sign: — Independent Claude review (<model>, effort <level>).
+            This review is ADVISORY; never block the merge.
           claude_args: |
             --model ${{ steps.pick.outputs.model }}
-            --max-turns 60
+            --effort ${{ steps.policy.outputs.effort }}
+            --max-turns ${{ steps.policy.outputs.turns }}
+            --max-budget-usd ${{ steps.policy.outputs.budget }}
+            --setting-sources user
+            --settings '{"disableAllHooks":true,"syncClaudeAiPlugins":false,"syncClaudeAiSkills":false}'
+            --strict-mcp-config
+            --tools 'Bash,Read,Write,Edit,Glob,Grep'
             --dangerously-skip-permissions
+
+      - name: Always report scoped review outcome
+        id: report
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          BASE_SHA: ${{ steps.pr.outputs.base_sha }}
+          MODE: ${{ steps.scope.outputs.mode }}
+          RANGE: ${{ steps.scope.outputs.range }}
+          SCOPE_REASON: ${{ steps.scope.outputs.reason }}
+          MODEL: ${{ steps.pick.outputs.model }}
+          AUTH_PRESENT: ${{ steps.auth.outputs.present }}
+          REVIEW_OUTCOME: ${{ steps.review.outcome }}
+          REVIEW_CONCLUSION: ${{ steps.review.outputs.conclusion }}
+          EXECUTION_FILE: ${{ steps.review.outputs.execution_file }}
+        run: |
+          python3 -I - <<'PYTHON'
+          import json
+          import math
+          import os
+          from pathlib import Path
+          import re
+          import subprocess
+          import tempfile
+
+
+          def enum(value, choices, default="unknown"):
+              return value if isinstance(value, str) and value in choices else default
+
+
+          def numeric_fields(source, keys):
+              if not isinstance(source, dict):
+                  return {}
+              return {key: value for key in keys if type(value := source.get(key)) in (int, float)
+                      and 0 <= value <= 10**15 and math.isfinite(value)}
+
+
+          def model(value):
+              if isinstance(value, str) and re.fullmatch(r"claude-(?:opus|sonnet|haiku|fable)-[0-9]+(?:-[0-9]+){0,3}(?:-[0-9]{8})?", value) and len(value) < 80:
+                  return value
+              return "unknown"
+
+
+          def sha(value):
+              return value if re.fullmatch(r"[0-9a-f]{40}", value) else "unknown"
+
+
+          # Deliberate allowlists: no text, inputs, results, errors, session IDs or arbitrary keys.
+          usage_keys = ("input_tokens", "output_tokens", "cache_read_input_tokens", "cache_creation_input_tokens")
+          stat_keys = ("num_turns", "duration_ms", "duration_api_ms", "total_cost_usd")
+          subtypes = {"success", "error_max_turns", "error_max_budget_usd", "error_during_execution", "error_max_structured_output_retries", "init"}
+          message_types = {"system", "assistant", "user", "result", "tool_progress", "tool_use_summary", "stream_event", "rate_limit_event"}
+          # The action may use these MCP names; unknown tool names are deliberately redacted.
+          tool_names = {"Bash", "Read", "Write", "Edit", "Glob", "Grep", "Agent", "Skill", "Advisor", "Task", "TodoWrite",
+                        "mcp__github__create_pull_request_review", "mcp__github__add_issue_comment",
+                        "mcp__github_inline_comment__create_inline_comment", "mcp__github_comment__update_claude_comment",
+                        "mcp__github_file_ops__commit_files", "mcp__github_file_ops__delete_files",
+                        "mcp__github_ci__get_ci_status", "mcp__github_ci__get_workflow_run_details", "mcp__github_ci__download_job_log"}
+          runner_temp = Path(os.environ["RUNNER_TEMP"]).resolve()
+          artifact = Path(tempfile.mkdtemp(prefix="claude-review-report.", dir=runner_temp))
+          artifact.chmod(0o700)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"artifact_dir={artifact}\n")
+          execution = "missing"
+          messages = []
+          # Accept only runner-temp files, never a repository-controlled report script/file.
+          for candidate in (os.environ.get("EXECUTION_FILE", ""), str(runner_temp / "claude-execution-output.json")):
+              if not candidate:
+                  continue
+              path = Path(candidate)
+              try:
+                  if path.is_symlink() or not path.resolve().is_relative_to(runner_temp) or not path.is_file():
+                      continue
+                  if path.stat().st_size > 20 * 1024 * 1024:
+                      execution = "too_large"
+                      continue
+                  parsed = json.loads(path.read_text())
+                  if not isinstance(parsed, list) or not all(isinstance(item, dict) for item in parsed):
+                      execution = "malformed"
+                      continue
+                  messages = parsed
+                  execution = "available"
+                  break
+              except (OSError, ValueError, UnicodeError):
+                  execution = "malformed"
+
+          trace = []
+          terminal = {}
+          for item in messages:
+              entry = {"type": enum(item.get("type"), message_types)}
+              if "subtype" in item:
+                  entry["subtype"] = enum(item.get("subtype"), subtypes)
+              message = item.get("message") if isinstance(item.get("message"), dict) else {}
+              if "model" in message or "model" in item:
+                  entry["model"] = model(message.get("model", item.get("model")))
+              content = message.get("content", [])
+              if isinstance(content, list):
+                  tools = [enum(block.get("name"), tool_names) for block in content
+                           if isinstance(block, dict) and block.get("type") == "tool_use"]
+                  if tools:
+                      entry["tools"] = tools[:100]
+              if "tool_name" in item:
+                  entry["tools"] = [enum(item.get("tool_name"), tool_names)]
+              usage = numeric_fields(message.get("usage", item.get("usage")), usage_keys)
+              if usage:
+                  entry["usage"] = usage
+              if item.get("type") == "result":
+                  terminal = {"subtype": enum(item.get("subtype"), subtypes),
+                              "is_error": item.get("is_error") if type(item.get("is_error")) is bool else None,
+                              **numeric_fields(item, stat_keys)}
+                  terminal["usage"] = numeric_fields(item.get("usage"), usage_keys)
+                  model_usage = item.get("modelUsage")
+                  if isinstance(model_usage, dict):
+                      terminal["model_usage"] = {
+                          model(key): numeric_fields(value, ("inputTokens", "outputTokens", "cacheReadInputTokens", "cacheCreationInputTokens", "costUSD"))
+                          for key, value in list(model_usage.items())[:30] if model(key) != "unknown"
+                      }
+                  entry.update(terminal)
+              if len(trace) < 2000:
+                  trace.append(entry)
+
+          pr = os.environ.get("PR_NUMBER", "")
+          head = sha(os.environ.get("HEAD_SHA", ""))
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          valid_context = bool(re.fullmatch(r"[1-9][0-9]{0,9}", pr) and head != "unknown" and re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repo))
+          mode = enum(os.environ.get("MODE"), {"full", "delta", "skip"})
+          outcome = enum(os.environ.get("REVIEW_OUTCOME"), {"success", "failure", "cancelled", "skipped"})
+          conclusion = enum(os.environ.get("REVIEW_CONCLUSION"), {"success", "failure"})
+          status = "incomplete"
+          if not valid_context:
+              status = "skipped_invalid_context"
+          elif mode == "skip":
+              status = "skipped_identical_head"
+          elif os.environ.get("AUTH_PRESENT") == "false":
+              status = "skipped_missing_credentials"
+          elif (mode in {"full", "delta"} and outcome == "success" and conclusion == "success"
+                and terminal.get("subtype") == "success" and terminal.get("is_error") is False):
+              status = "completed"
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write(f"status={status}\n")
+          range_value = os.environ.get("RANGE", "")
+          if mode != "delta" or not re.fullmatch(r"[0-9a-f]{40}\.\.[0-9a-f]{40}", range_value):
+              range_value = "unknown" if mode == "delta" else "whole PR against base " + sha(os.environ.get("BASE_SHA", ""))
+          reason = enum(os.environ.get("SCOPE_REASON"), {"explicit_full_review", "no_completed_review_base", "already_reviewed_head", "base_not_ancestor", "merge_in_range", "since_last_completed_review"})
+          run_id = os.environ.get("GITHUB_RUN_ID", "")
+          run_url = f"https://github.com/{repo}/actions/runs/{run_id}" if valid_context and run_id.isdigit() else "unavailable"
+          data = {"status": status, "scope": mode, "range": range_value, "scope_reason": reason,
+                  "head": head, "model": model(os.environ.get("MODEL")), "action_outcome": outcome,
+                  "action_conclusion": conclusion, "execution": execution, "terminal": terminal,
+                  "trace": trace, "trace_truncated": len(messages) > len(trace), "run_url": run_url}
+          summary = "\n".join([
+              "<!-- claude-review-workflow-status -->", "### Claude review workflow status",
+              f"Status: **{status}**. Scope: **{mode}** ({reason}).",
+              f"Range: `{range_value}`. Head: `{head}`.", f"Model: `{data['model']}`.",
+              f"Action outcome: {outcome}; conclusion: {conclusion}; SDK terminal subtype: {terminal.get('subtype', 'unknown')}.",
+              f"Turns: {terminal.get('num_turns', 'unknown')}; duration (ms): {terminal.get('duration_ms', 'unknown')}; estimated SDK cost (USD): {terminal.get('total_cost_usd', 'unknown')}.",
+              "Cost is an approximate client estimate, may overshoot, and is not a billing cap.",
+              "A delta covers only the commits since the last completed review. Dispatch a full review (or add the claude-review label) for whole-PR coverage.",
+              "Completed means the scoped model run finished, not that the PR is defect-free; agent findings are separate.",
+              f"Execution metadata: {execution}. Missing data can follow hard timeout/cancellation/setup failure; measurements remain unknown.",
+              "A green action without terminal success is incomplete (including workflow validation skips until workflow changes reach the default branch). No automatic retry.",
+              "Artifacts contain sanitized message/tool metadata and numeric statistics only; no raw execution trace.",
+              f"[Workflow run]({run_url})", "",
+          ])
+          (artifact / "summary.md").write_text(summary)
+          (artifact / "diagnostics.json").write_text(json.dumps(data, indent=2, allow_nan=False) + "\n")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as step_summary:
+              step_summary.write(summary)
+          # Use a JSON file so exact newlines and all quoting survive transport safely.
+          payload = runner_temp / (artifact.name + "-comment.json")
+          payload.write_text(json.dumps({"body": summary}))
+          if valid_context:
+              try:
+                  current = subprocess.run(["gh", "api", f"repos/{repo}/pulls/{pr}"],
+                                           capture_output=True, text=True, check=True, timeout=25)
+                  current = json.loads(current.stdout)
+                  if not isinstance(current, dict):
+                      raise ValueError("Unexpected PR response shape")
+                  current_head = current.get("head", {})
+                  if (current.get("state") != "open" or not isinstance(current_head, dict)
+                      or current_head.get("sha") != head or not isinstance(current_head.get("repo"), dict)
+                      or current_head["repo"].get("full_name") != repo):
+                      with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as step_summary:
+                          step_summary.write("\nPublic status skipped: PR head moved, closed, or repository changed. This report retains the original reviewed head.\n")
+                      raise SystemExit(0)
+                  result = subprocess.run(["gh", "api", "--paginate", "--slurp", f"repos/{repo}/issues/{pr}/comments"],
+                                          capture_output=True, text=True, check=True, timeout=25)
+                  pages = json.loads(result.stdout)
+                  comments = [comment for page in pages for comment in page] if pages and isinstance(pages[0], list) else pages
+                  matches = [comment for comment in comments if isinstance(comment, dict)
+                             and isinstance(comment.get("body"), str) and comment["body"].startswith("<!-- claude-review-workflow-status -->")
+                             and isinstance(comment.get("user"), dict) and comment["user"].get("login") == "github-actions[bot]"
+                             and type(comment.get("id")) is int and comment["id"] > 0]
+                  endpoint = f"repos/{repo}/issues/comments/{matches[0]['id']}" if matches else f"repos/{repo}/issues/{pr}/comments"
+                  subprocess.run(["gh", "api", "--method", "PATCH" if matches else "POST", endpoint, "--input", str(payload)],
+                                 capture_output=True, text=True, check=True, timeout=25)
+              except (OSError, ValueError, TypeError, subprocess.SubprocessError):
+                  print("::warning::Could not publish workflow status; summary and sanitized diagnostics remain in the run.")
+                  with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as step_summary:
+                      step_summary.write("\nWarning: workflow status comment could not be published.\n")
+          PYTHON
+
+      # The push-delta scope step looks for this step by name. It runs only when
+      # the status report says the scoped model run finished inside its limits.
+      - name: Record completed review
+        if: always() && steps.report.outputs.status == 'completed'
+        env:
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: echo "::notice::Completed review of $HEAD_SHA"
+
+      - name: Preserve sanitized review diagnostics
+        id: upload
+        if: always() && steps.report.outputs.artifact_dir != ''
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: claude-review-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            ${{ steps.report.outputs.artifact_dir }}/summary.md
+            ${{ steps.report.outputs.artifact_dir }}/diagnostics.json
+          retention-days: 7
+          if-no-files-found: error
+
+      - name: Report diagnostic upload failure
+        if: always() && steps.upload.outcome == 'failure'
+        run: |
+          echo '::warning::Sanitized diagnostic upload failed; consult the workflow step summary.'
+          echo 'Warning: sanitized diagnostic upload failed.' >> "$GITHUB_STEP_SUMMARY"
