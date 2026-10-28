@@ -155,6 +155,8 @@ jobs:
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ steps.pr.outputs.head_sha }}
           HEAD_REF: ${{ steps.pr.outputs.head_ref }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
+          BASE_REF: ${{ steps.pr.outputs.base_ref }}
         run: |
           # KAN-420: open, ready_for_review, label and dispatch runs review the
           # whole PR. A push (`synchronize`) reviews only what changed since the
@@ -173,6 +175,14 @@ jobs:
             for RUN in $(gh run list --workflow claude-review.yml --branch "$HEAD_REF" \
                            --limit 10 --json databaseId \
                            --jq '.[].databaseId' 2>/dev/null); do
+              # Branch names can be reused and PRs can be retargeted. Only a
+              # completed run for this PR and base is a valid delta anchor.
+              RUN_PRS=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/pull_requests" 2>/dev/null || echo "")
+              if ! jq -e --argjson pr "$PR_NUMBER" --arg base "$BASE_REF" \
+                   'any(.[]; .number == $pr and .base.ref == $base)' \
+                   <<< "$RUN_PRS" > /dev/null 2>&1; then
+                continue
+              fi
               LAST=$(gh run view "$RUN" --json headSha,jobs --jq \
                 'if any(.jobs[].steps[]; .name == "Record completed review" and .conclusion == "success")
                  then .headSha else "" end' 2>/dev/null || echo "")
@@ -180,7 +190,7 @@ jobs:
             done
             if [ -n "$LAST" ]; then
               if [ "$LAST" = "$AFTER" ]; then
-                REASON=already_reviewed_head
+                MODE=skip REASON=already_reviewed_head
               elif ! git cat-file -e "$LAST^{commit}" 2>/dev/null \
                    || ! git merge-base --is-ancestor "$LAST" "$AFTER"; then
                 REASON=base_not_ancestor
