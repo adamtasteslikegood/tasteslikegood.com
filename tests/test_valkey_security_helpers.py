@@ -76,6 +76,8 @@ class _ScriptClient:
                     self.ttls[key] = int(argv[0])
                 return self.values[key]
             old_key, new_key = keys
+            if new_key in self.values:
+                return 0
             if self.values.pop(old_key, None) is None:
                 return 0
             self.ttls.pop(old_key, None)
@@ -160,6 +162,12 @@ def test_revoked_or_missing_session_cannot_rotate():
     assert client.values == {}
 
 
+def test_rotation_never_overwrites_another_live_session():
+    client = _ScriptClient(values={"tlg:session:old": b"old", "tlg:session:other": b"other"})
+    assert _SessionManager(client).rotate_session_token("old", "other", {"sub": "user"}) is False
+    assert client.values == {"tlg:session:old": b"old", "tlg:session:other": b"other"}
+
+
 def test_same_id_rotation_refreshes_live_session():
     client = _ScriptClient(values={"tlg:session:s": b"old"})
     assert _SessionManager(client).rotate_session_token("s", "s", {"sub": "user"}, 120) is True
@@ -182,6 +190,10 @@ def test_lua_scripts_against_live_server():
     assert 0 < client.ttl("tlg:ratelimit:live") <= 60
 
     sessions.store_session_token("a", {"sub": "u"})
+    sessions.store_session_token("c", {"sub": "other"})
+    assert sessions.rotate_session_token("a", "c", {"sub": "u"}) is False
+    assert sessions.get_session_token("c") == {"sub": "other"}
+    client.delete("tlg:session:c")
     assert sessions.rotate_session_token("a", "b", {"sub": "u"}, 90) is True
     assert sessions.rotate_session_token("a", "c", {"sub": "u"}) is False
     assert client.exists("tlg:session:a", "tlg:session:c") == 0

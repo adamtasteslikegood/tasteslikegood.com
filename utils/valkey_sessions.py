@@ -230,7 +230,12 @@ def _traced_refresh(trigger: str) -> bool:
 
 # Deleting the old key and writing the new one run as one server-side command,
 # and the write happens only if the delete removed a live session (KAN-484).
+# An existing destination key is never overwritten: rotation fails and the
+# old session stays live.
 _ROTATE_SESSION_SCRIPT = """
+if redis.call('EXISTS', KEYS[2]) == 1 then
+    return 0
+end
 if redis.call('DEL', KEYS[1]) == 1 then
     redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[1])
     return 1
@@ -289,6 +294,8 @@ class ValkeySessionMixin:
         Returns False, and stores nothing, when the old session no longer
         exists: a revoked, expired or already-rotated id cannot be rotated,
         and replaying one id cannot produce several live sessions (KAN-484).
+        Also returns False, changing nothing, when ``new_session_id`` already
+        names a live session, so rotation never overwrites another session.
         Use ``store_session_token`` to create a session.
         """
         client = self._resolve_session_client()
