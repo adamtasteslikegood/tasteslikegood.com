@@ -38,6 +38,22 @@ _REFRESH_ROOT_SPAN = "valkey.token_refresh"
 _T = TypeVar("_T")
 
 
+def _get_iam_token() -> tuple[str | None, str, datetime | None]:
+    """Obtain an IAM access token from the default service account.
+
+    Returns ``(sa_email, token, expiry)``. ``expiry`` is what google-auth
+    reports after the refresh — a naive UTC datetime, or None if unknown. On
+    Cloud Run it can be well under 60 min away (KAN-268).
+    """
+    from google.auth import default
+    from google.auth.transport.requests import Request
+
+    creds, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
+    creds.refresh(Request())
+    sa_email = getattr(creds, "service_account_email", None)
+    return sa_email, creds.token, getattr(creds, "expiry", None)
+
+
 def _auth_mod() -> Any:
     """Return the loaded ``utils.valkey_auth`` module for dynamic state/monkeypatch resolution."""
     return sys.modules.get("utils.valkey_auth")
@@ -92,9 +108,7 @@ def _build_client(host: str, port: int) -> tuple[redis.StrictRedis, datetime | N
 
     Returns the client and the token's reported expiry.
     """
-    from utils.valkey_auth import _get_iam_token as default_get_iam_token
-
-    get_token_fn = _auth_attr("_get_iam_token", default_get_iam_token)
+    get_token_fn = _auth_attr("_get_iam_token", _get_iam_token)
     email, token, expiry = get_token_fn()
     if email:
         logger.info("Creating Valkey client with fresh IAM token (sa=%s)", email)

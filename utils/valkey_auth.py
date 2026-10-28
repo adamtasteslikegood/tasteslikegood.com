@@ -47,6 +47,7 @@ from utils.valkey_sessions import (
     _REFRESH_ROOT_SPAN,
     ValkeySessionMixin,
     _build_client,
+    _get_iam_token,
     _NoAuthRetry,
     _pool_lock,
     _redis_retry,
@@ -56,22 +57,6 @@ from utils.valkey_sessions import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _get_iam_token() -> tuple[str | None, str, datetime | None]:
-    """Obtain an IAM access token from the default service account.
-
-    Returns ``(sa_email, token, expiry)``. ``expiry`` is what google-auth
-    reports after the refresh — a naive UTC datetime, or None if unknown. On
-    Cloud Run it can be well under 60 min away (KAN-268).
-    """
-    from google.auth import default
-    from google.auth.transport.requests import Request
-
-    creds, _ = default(scopes=["https://www.googleapis.com/auth/cloud-platform"])
-    creds.refresh(Request())
-    sa_email = getattr(creds, "service_account_email", None)
-    return sa_email, creds.token, getattr(creds, "expiry", None)
 
 
 # ── Module-level state for token refresh ──────────────────────────

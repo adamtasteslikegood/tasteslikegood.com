@@ -1,9 +1,9 @@
 """
-Valkey token-refresh rate limiting, debounce/backoff scheduling, and sliding-window rate limiters.
+Valkey token-refresh rate limiting, debounce/backoff scheduling, and fixed-window rate limiters.
 
 Extracted from ``utils.valkey_auth`` (KAN-463) so expiry-margin scheduling,
 auth-failure debounce gates, single-flight inline refresh throttling,
-exponential retry backoff loops, and Valkey sliding-window / OAuth-nonce
+exponential retry backoff loops, and Valkey fixed-window / OAuth-nonce
 helpers live in a dedicated module while ``utils.valkey_auth`` remains the
 backwards-compatible facade.
 """
@@ -228,7 +228,8 @@ def _refresh_loop() -> None:
     while True:
         with auth._refresh_condition:
             if consecutive_failures == 0:
-                delay = auth._refresh_delay(auth._token_expiry, margin=auth._IDLE_SAFETY_MARGIN)
+                idle_margin = getattr(auth, "_IDLE_SAFETY_MARGIN", _IDLE_SAFETY_MARGIN)
+                delay = auth._refresh_delay(auth._token_expiry, margin=idle_margin)
             else:
                 delay = min(
                     auth._RETRY_BASE * (2 ** (consecutive_failures - 1)),
@@ -259,7 +260,7 @@ def _refresh_loop() -> None:
 
 
 class ValkeyRateLimitMixin:
-    """Sliding-window rate-limiting, lockout/backoff counters, and OAuth state/nonce helpers."""
+    """Fixed-window rate-limiting, lockout/backoff counters, and OAuth state/nonce helpers."""
 
     RATELIMIT_KEY_PREFIX = "tlg:ratelimit:"
     LOCKOUT_KEY_PREFIX = "tlg:lockout:"
@@ -272,10 +273,10 @@ class ValkeyRateLimitMixin:
         auth = _auth_mod()
         return getattr(auth, "_current_client", None) if auth is not None else None
 
-    def check_sliding_window_rate_limit(
+    def check_fixed_window_rate_limit(
         self, bucket: str, limit: int, window_seconds: int = 60
     ) -> tuple[bool, int]:
-        """Increment a fixed/sliding window counter in Valkey and return ``(allowed, count)``."""
+        """Increment a fixed-window counter in Valkey and return ``(allowed, count)``."""
         client = self._resolve_ratelimit_client()
         if client is None:
             return True, 0
