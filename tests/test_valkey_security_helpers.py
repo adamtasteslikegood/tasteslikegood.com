@@ -1,5 +1,8 @@
-import threading
+import os
 import sys
+import threading
+
+import pytest
 from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
@@ -51,70 +54,67 @@ def test_oauth_state_nonce_is_consumed_exactly_once_under_concurrency():
     assert sorted(results, key=lambda value: value is not None) == [None, "verifier"]
 
 
-class _Pipeline:
-    def __init__(self, client, *, transaction=True):
-        self.client = client
-        self.transaction = transaction
-        self.commands = []
+class _ScriptClient:
+    """In-memory stand-in that runs the two Lua scripts' logic under one lock.
 
-    def setex(self, key, ttl, value):
-        self.commands.append(("setex", key, ttl, value))
-        return self
+    It checks the Python side (keys, arguments, return handling). The scripts
+    themselves run against a real server in the live test below.
+    """
 
-    def delete(self, key):
-        self.commands.append(("delete", key))
-        return self
-
-    def execute(self):
-        if not self.transaction:
-            results = []
-            for command in self.commands:
-                if command[0] == "setex":
-                    _, key, ttl, value = command
-                    results.append(self.client.setex(key, ttl, value))
-                else:
-                    _, key = command
-                    results.append(self.client.delete(key))
-            return results
-
-        results = []
-        with self.client.lock:
-            for command in self.commands:
-                if command[0] == "setex":
-                    _, key, _ttl, value = command
-                    self.client.values[key] = value
-                    results.append(True)
-                else:
-                    _, key = command
-                    results.append(int(self.client.values.pop(key, None) is not None))
-        self.client.partial_visible.set()
-        return results
-
-
-class _RotationClient:
-    def __init__(self):
-        self.values = {"tlg:session:old": b"old"}
+    def __init__(self, values=None, ttls=None):
+        self.values = dict(values or {})
+        self.ttls = dict(ttls or {})
         self.lock = threading.Lock()
-        self.partial_visible = threading.Event()
-        self.release_delete = threading.Event()
 
-    def setex(self, key, _ttl, value):
+    def eval(self, script, numkeys, *args):
+        keys, argv = args[:numkeys], args[numkeys:]
         with self.lock:
+            if "INCR" in script:
+                key = keys[0]
+                self.values[key] = int(self.values.get(key, 0)) + 1
+                if self.ttls.get(key, -1) < 0:
+                    self.ttls[key] = int(argv[0])
+                return self.values[key]
+            old_key, new_key = keys
+            if self.values.pop(old_key, None) is None:
+                return 0
+            self.ttls.pop(old_key, None)
+            self.values[new_key] = argv[1]
+            self.ttls[new_key] = int(argv[0])
+            return 1
+
+    def set(self, key, value, ex=None, xx=False):
+        with self.lock:
+            if xx and key not in self.values:
+                return None
             self.values[key] = value
-        self.partial_visible.set()
-        self.release_delete.wait(timeout=2)
-        return True
+            self.ttls[key] = ex
+            return True
 
-    def delete(self, key):
-        with self.lock:
-            return int(self.values.pop(key, None) is not None)
 
-    def pipeline(self, transaction=True):
-        return _Pipeline(self, transaction=transaction)
+class _RateManager(ValkeyRateLimitMixin):
+    def __init__(self, client):
+        self.client = client
 
-    def snapshot(self):
-        with self.lock:
-            return set(self.values)
+
+def test_fixed_window_counter_sets_ttl_on_first_hit_and_keeps_it():
+    client = _ScriptClient()
+    manager = _RateManager(client)
+
+    assert manager.check_fixed_window_rate_limit("b", limit=2, window_seconds=60) == (True, 1)
+    client.ttls["tlg:ratelimit:b"] = 30  # time passes; window must not restart
+    assert manager.check_fixed_window_rate_limit("b", limit=2, window_seconds=60) == (True, 2)
+    assert manager.check_fixed_window_rate_limit("b", limit=2, window_seconds=60) == (False, 3)
+    assert client.ttls["tlg:ratelimit:b"] == 30
+
+
+def test_counter_without_ttl_is_repaired():
+    # KAN-483: a key that exists with no expiry must not stay exhausted forever.
+    client = _ScriptClient(values={"tlg:lockout:u": 5}, ttls={"tlg:lockout:u": -1})
+    failures, _backoff = _RateManager(client).record_auth_backoff_failure("u", window_seconds=300)
+
+    assert failures == 6
+    assert client.ttls["tlg:lockout:u"] == 300
 
 
 class _SessionManager(ValkeySessionMixin):
@@ -122,21 +122,67 @@ class _SessionManager(ValkeySessionMixin):
         self.client = client
 
 
-def test_session_rotation_never_exposes_old_and_new_tokens_together():
-    client = _RotationClient()
+def test_rotation_replaces_live_session():
+    client = _ScriptClient(values={"tlg:session:old": b"old"})
+    assert _SessionManager(client).rotate_session_token("old", "new", {"sub": "user"}) is True
+    assert set(client.values) == {"tlg:session:new"}
+
+
+def test_replayed_old_session_cannot_rotate_twice():
+    # KAN-484: replaying one old id must not yield several live sessions.
+    client = _ScriptClient(values={"tlg:session:old": b"old"})
+    manager = _SessionManager(client)
+    results = []
+    threads = [
+        threading.Thread(
+            target=lambda n=n: results.append(
+                manager.rotate_session_token("old", f"new{n}", {"sub": "user"})
+            )
+        )
+        for n in range(5)
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join(timeout=2)
+
+    assert sorted(results) == [False, False, False, False, True]
+    assert len(client.values) == 1
+
+
+def test_revoked_or_missing_session_cannot_rotate():
+    client = _ScriptClient()
     manager = _SessionManager(client)
 
-    thread = threading.Thread(
-        target=lambda: manager.rotate_session_token("old", "new", {"sub": "user"})
-    )
-    thread.start()
+    assert manager.rotate_session_token("gone", "new", {"sub": "user"}) is False
+    assert manager.rotate_session_token("", "new", {"sub": "user"}) is False
+    assert manager.rotate_session_token("gone", "gone", {"sub": "user"}) is False
+    assert client.values == {}
 
-    saw_partial = client.partial_visible.wait(timeout=1.0)
-    observed = client.snapshot()
-    client.release_delete.set()
-    thread.join(timeout=2)
 
-    assert saw_partial is True
-    assert not {"tlg:session:old", "tlg:session:new"}.issubset(observed)
-    assert observed == {"tlg:session:new"}
-    assert client.snapshot() == {"tlg:session:new"}
+def test_same_id_rotation_refreshes_live_session():
+    client = _ScriptClient(values={"tlg:session:s": b"old"})
+    assert _SessionManager(client).rotate_session_token("s", "s", {"sub": "user"}, 120) is True
+    assert client.ttls["tlg:session:s"] == 120
+
+
+@pytest.mark.skipif(not os.environ.get("VALKEY_TEST_URL"), reason="needs VALKEY_TEST_URL")
+def test_lua_scripts_against_live_server():
+    import redis
+
+    client = redis.Redis.from_url(os.environ["VALKEY_TEST_URL"])
+    client.delete("tlg:ratelimit:live", "tlg:session:a", "tlg:session:b", "tlg:session:c")
+    rate = _RateManager(client)
+    sessions = _SessionManager(client)
+
+    assert rate.check_fixed_window_rate_limit("live", limit=5, window_seconds=60) == (True, 1)
+    assert 0 < client.ttl("tlg:ratelimit:live") <= 60
+    client.persist("tlg:ratelimit:live")  # simulate a key left with no expiry
+    assert rate.check_fixed_window_rate_limit("live", limit=5, window_seconds=60) == (True, 2)
+    assert 0 < client.ttl("tlg:ratelimit:live") <= 60
+
+    sessions.store_session_token("a", {"sub": "u"})
+    assert sessions.rotate_session_token("a", "b", {"sub": "u"}, 90) is True
+    assert sessions.rotate_session_token("a", "c", {"sub": "u"}) is False
+    assert client.exists("tlg:session:a", "tlg:session:c") == 0
+    assert 0 < client.ttl("tlg:session:b") <= 90

@@ -228,6 +228,17 @@ def _traced_refresh(trigger: str) -> bool:
             span.set_metric("wall_ms", (time_mod.monotonic() - wall_start) * 1000)
 
 
+# Deleting the old key and writing the new one run as one server-side command,
+# and the write happens only if the delete removed a live session (KAN-484).
+_ROTATE_SESSION_SCRIPT = """
+if redis.call('DEL', KEYS[1]) == 1 then
+    redis.call('SET', KEYS[2], ARGV[2], 'EX', ARGV[1])
+    return 1
+end
+return 0
+"""
+
+
 class ValkeySessionMixin:
     """Session token storage, refresh-token rotation, revocation, and TTL helpers."""
 
@@ -273,21 +284,32 @@ class ValkeySessionMixin:
         payload: dict[str, Any],
         ttl_seconds: int = 3600,
     ) -> bool:
-        """Atomically store a replacement session token and revoke the previous key."""
+        """Replace a live session token with a new one in a single atomic step.
+
+        Returns False, and stores nothing, when the old session no longer
+        exists: a revoked, expired or already-rotated id cannot be rotated,
+        and replaying one id cannot produce several live sessions (KAN-484).
+        Use ``store_session_token`` to create a session.
+        """
         client = self._resolve_session_client()
-        if client is None:
+        if client is None or not old_session_id:
             return False
         raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
         new_key = self._session_key(new_session_id)
         ttl = max(1, int(ttl_seconds))
-        if not old_session_id or old_session_id == new_session_id:
-            client.setex(new_key, ttl, raw)
-            return True
-        pipeline = client.pipeline(transaction=True)
-        results = (
-            pipeline.setex(new_key, ttl, raw).delete(self._session_key(old_session_id)).execute()
+        if old_session_id == new_session_id:
+            # Refresh in place, only if the session still exists.
+            return bool(client.set(new_key, raw, ex=ttl, xx=True))
+        return bool(
+            client.eval(
+                _ROTATE_SESSION_SCRIPT,
+                2,
+                self._session_key(old_session_id),
+                new_key,
+                ttl,
+                raw,
+            )
         )
-        return bool(results and results[0])
 
     def revoke_session_token(self, session_id: str) -> bool:
         """Delete a session token from Valkey immediately."""
