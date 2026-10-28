@@ -259,6 +259,23 @@ def _refresh_loop() -> None:
             )
 
 
+# INCR and the expiry run as one server-side command. Setting the TTL whenever
+# the key has none (not only when the count is 1) also repairs a key left
+# without one, so a counter can never pin a bucket or a lockout forever
+# (KAN-483). A key that already has a TTL keeps it: the window stays fixed.
+_INCR_WITH_TTL_SCRIPT = """
+local count = redis.call('INCR', KEYS[1])
+if redis.call('TTL', KEYS[1]) < 0 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return count
+"""
+
+
+def _incr_with_ttl(client: Any, key: str, window_seconds: int) -> int:
+    return int(client.eval(_INCR_WITH_TTL_SCRIPT, 1, key, max(1, int(window_seconds))))
+
+
 class ValkeyRateLimitMixin:
     """Fixed-window rate-limiting, lockout/backoff counters, and OAuth state/nonce helpers."""
 
@@ -281,13 +298,7 @@ class ValkeyRateLimitMixin:
         if client is None:
             return True, 0
         key = f"{self.RATELIMIT_KEY_PREFIX}{bucket}"
-        ttl = max(1, int(window_seconds))
-        # Initialize counter+TTL atomically so a crash between INCR and EXPIRE
-        # cannot leave the key TTL-less and permanently over the limit.
-        if client.set(key, 1, ex=ttl, nx=True):
-            count = 1
-        else:
-            count = int(client.incr(key))
+        count = _incr_with_ttl(client, key, window_seconds)
         return count <= limit, count
 
     def record_auth_backoff_failure(
@@ -298,13 +309,7 @@ class ValkeyRateLimitMixin:
         if client is None:
             return 1, _RETRY_BASE
         key = f"{self.LOCKOUT_KEY_PREFIX}{subject}"
-        ttl = max(1, int(window_seconds))
-        # Initialize counter+TTL atomically; otherwise a crash before EXPIRE
-        # pins the subject in permanent lockout.
-        if client.set(key, 1, ex=ttl, nx=True):
-            failures = 1
-        else:
-            failures = int(client.incr(key))
+        failures = _incr_with_ttl(client, key, window_seconds)
         backoff = int(min(_RETRY_BASE * (2 ** max(0, failures - 1)), _RETRY_MAX))
         return failures, backoff
 
