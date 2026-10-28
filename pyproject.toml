@@ -35,7 +35,7 @@ dependencies = [
     # ships psycopg2-binary (postgres extra), so 2.1.1 broke the migrate job.
     "sqlalchemy>=2.0.51,<2.1", # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
-    "google-genai==2.30.1",
+    "google-genai==2.31.0",
     "google-generativeai==0.8.6",
     "google-ai-generativelanguage==0.6.15",
     "google-auth==2.62.0",
@@ -47,7 +47,7 @@ dependencies = [
     # the uv.lock -> requirements.txt export carries them (July 2026 incident:
     # a Dependabot uv-group bump regenerated requirements.txt without them and
     # the production image lost half its runtime deps).
-    "google-cloud-storage==3.17.0",
+    "google-cloud-storage==3.17.1",
     "google-cloud-pubsub>=2.19.0",
     "redis==8.1.0",
     # Data Validation
@@ -60,7 +60,7 @@ dependencies = [
     "requests==2.34.2",
     "requests-oauthlib==2.0.0",
     "urllib3==2.8.0",
-    "certifi==2026.7.22",
+    "certifi==2026.10.19",
     "charset-normalizer==3.5.2",
     "idna==3.20",
     # Utilities
@@ -72,9 +72,9 @@ dependencies = [
     "typing-extensions==4.16.0",
     "tenacity==9.1.4",
     "websockets==16.1.1",
-    "cachetools==7.2.1",
+    "cachetools==7.2.4",
     # Imaging — sized WebP variants of recipe photos (KAN-271)
-    "pillow==12.3.0",
+    "pillow==13.0.0",
     # Cryptography & Security
     "pyasn1==0.6.4",
     "pyasn1-modules==0.4.2",

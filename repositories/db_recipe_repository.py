@@ -5,160 +5,97 @@ Handles recipe CRUD operations with SQLAlchemy ORM:
 - Create, read, update, delete recipes
 - User-scoped queries (recipes belong to users)
 - Support for anonymous recipes (user_id = NULL)
+
+Slug resolution, retired-slug tombstones, and publication gates live in
+``repositories.recipe_slugs``; async worker lease/status/patch operations and
+content locking live in ``repositories.recipe_worker_ops``; image-generation
+queueing and legacy file migration live in ``repositories.recipe_image_queue``.
+All public and private helpers remain re-exported here for backward
+compatibility.
 """
 
 import logging
 import uuid
-from dataclasses import dataclass
-from datetime import datetime, timedelta
-from typing import Any, Callable, Dict, List, Optional, Tuple, cast
-
-from sqlalchemy import and_, func, or_
-from sqlalchemy.exc import IntegrityError
+from datetime import datetime
+from typing import Any, Dict, List, Optional, cast
 
 from extensions import db
 from models import Recipe, RetiredSlug
 from models.retired_slug import lock_slug
+from repositories.recipe_image_queue import (
+    ImageGenerationQueue,
+    RecipeImageQueueMixin,
+    _strip_inherited_stock_image,
+    migrate_file_to_db,
+    queue_image_generation,
+    release_image_generation_queue,
+)
+from repositories.recipe_slugs import (
+    _SLUG_COMMIT_RETRIES,
+    _SLUG_MAX_LENGTH,
+    CANONICAL_RECIPE_LOCKED_ERROR,
+    DUPLICATE_CODE_ALREADY_SAVED,
+    MANUAL_RECIPE_UNPUBLISHABLE_ERROR,
+    PUBLIC_SLUG_REQUIRED_ERROR,
+    PUBLISHABLE_RECIPE_STATUSES,
+    PUBLISHED_RECIPE_DELETE_ERROR,
+    RECIPE_DUPLICATE_ERROR,
+    SAVED_COPY_PUBLISH_ERROR,
+    CanonicalRecipeError,
+    ManualRecipeError,
+    PublishGateError,
+    PublishedRecipeDeleteError,
+    RecipeConflictError,
+    RecipeDuplicateError,
+    RecipeSlugError,
+    RetiredSlugMixin,
+    SavedCopyPublishError,
+    _clear_unowned_retired_slug_from_private,
+    _commit_publish_retrying,
+    _duplicate_source_slug_owner,
+    _gate_is_public,
+    _gate_publish_transition,
+    _guard_canonical,
+    _is_saved_copy,
+    _pin_source_slug_to_column,
+    _resolve_public_slug,
+    _resolve_source_recipe_id,
+    _slug_occupied_against,
+    _slug_retired_against,
+    _slugify,
+)
+from repositories.recipe_worker_ops import (
+    _ACTIVE_RECIPE_STATUSES,
+    _CLIENT_ORIGINS,
+    _LOCKED_CLIENT_FIELDS,
+    _TEXT_GENERATION_STATUSES,
+    _WORKER_METADATA_KEYS,
+    _WORKER_TEXT_DROP_FIELDS,
+    UNFINISHED_GENERATION_STATUSES,
+    RecipeWorkerOpsMixin,
+    WorkerRecipeUpdate,
+    _apply_recipe_scope,
+    _dedup_rows,
+    _is_content_locked,
+    _listed_recipes,
+    _lock_client_payload,
+    _preserve_worker_metadata,
+    _resolve_origin,
+    claim_recipe_for_worker,
+    get_recipe_for_worker,
+    patch_recipe_for_worker,
+    set_recipe_status_for_worker,
+    update_recipe_for_worker,
+    update_recipe_status,
+)
 from services.recipe_metadata import queue_if_missing
 from utils.log_sanitizer import sanitize_log_value
 from utils.slug_utils import normalize_slug
 
 logger = logging.getLogger(__name__)
 
-# Matches models/recipe.py: slug = db.Column(db.String(255), ...)
-_SLUG_MAX_LENGTH = 255
-# Commit retries when a concurrent publication wins the slug race.
-_SLUG_COMMIT_RETRIES = 3
-_WORKER_METADATA_KEYS = ("image_enqueue", "image_request")
-_ACTIVE_RECIPE_STATUSES = frozenset({"generating", "processing", "generating_image"})
-
-# Also returned verbatim by the API routes (a fixed string, so no exception
-# internals can leak into responses — CodeQL py/stack-trace-exposure).
-PUBLIC_SLUG_REQUIRED_ERROR = (
-    "A public recipe needs a slug, and neither the provided slug nor "
-    "the recipe name yields a usable one."
-)
-
-
-class RecipeSlugError(ValueError):
-    """A recipe cannot be published without a usable /r/<slug> address."""
-
-
 # Also returned verbatim by the API routes (fixed string, same rationale as
-# PUBLIC_SLUG_REQUIRED_ERROR above).
-CANONICAL_RECIPE_LOCKED_ERROR = (
-    "This is a canonical public recipe: its publish state, slug, and row are "
-    "locked. Content edits are still allowed."
-)
-
-
-class CanonicalRecipeError(ValueError):
-    """Publish-state, slug, or delete changes to a canonical recipe are locked."""
-
-
-# Also returned verbatim by the API routes (fixed string, same rationale as
-# PUBLIC_SLUG_REQUIRED_ERROR above).
-PUBLISHED_RECIPE_DELETE_ERROR = (
-    "This recipe is published. Unpublish it before deleting it: deleting "
-    "permanently retires its public page."
-)
-
-
-class PublishedRecipeDeleteError(ValueError):
-    """KAN-288: a published recipe cannot be deleted until it is unpublished."""
-
-
-# Also returned verbatim by the API routes (fixed string, same rationale as
-# PUBLIC_SLUG_REQUIRED_ERROR above).
-MANUAL_RECIPE_UNPUBLISHABLE_ERROR = (
-    "Only recipes generated here can have a public page. Manually entered, "
-    "imported or still-generating recipes cannot be published."
-)
-
-# KAN-329: only these states prove the text worker finished. An allowlist keeps
-# a typo or a future workflow state from silently becoming publishable. The
-# cutover audit imports this so its eligibility rule cannot drift from the API.
-PUBLISHABLE_RECIPE_STATUSES = frozenset({"ready", "generating_image"})
-
-# RCP-74: saved copies inherit their public page from the source recipe.
-SAVED_COPY_PUBLISH_ERROR = "Cannot publish a saved copy."
-
-# KAN-329: 'generated' is written only by update_recipe_for_worker, at the
-# moment the model's text lands. A payload may still label its own row
-# 'manual' or 'saved'; a client-supplied 'generated' is dropped, because that
-# label is what the publish gate trusts.
-_CLIENT_ORIGINS = frozenset({"manual", "saved"})
-
-# KAN-328: on a generated row (or a placeholder the worker still owns) a
-# client write can change only these keys. Everything else in the payload is
-# ignored rather than refused: the SPA echoes the whole recipe on every save,
-# so refusing would break the publish toggle on every old bundle.
-_LOCKED_CLIENT_FIELDS = frozenset({"id", "is_public", "personalNotes"})
-
-# The statuses between POST /api/generate and the worker's text write.
-_TEXT_GENERATION_STATUSES = frozenset({"generating", "processing"})
-
-# KAN-329: the text model's JSON is prompt-mediated, and a prompt can ask it
-# to echo an image URL or bytes. Only the image worker may populate media,
-# and only the columns may say anything about publication or provenance, so
-# these keys are dropped from the text worker's output before it is stamped.
-_WORKER_TEXT_DROP_FIELDS = frozenset(
-    {
-        "ai_image_url",
-        "ai_image_data",
-        "ai_image_gcs",
-        "stock_image_url",
-        "is_public",
-        "slug",
-        "origin",
-        "sourceSlug",
-        "sourceRecipeId",
-        "is_canonical",
-        "first_published_at",
-        "slug_reserved",
-        "personalNotes",
-    }
-)
-
-
-def _is_content_locked(recipe: Recipe) -> bool:
-    """True when a client write may change nothing but the locked-field set.
-
-    A generated row's content is the worker's; a placeholder the worker still
-    owns (no origin yet, TEXT generation in flight) must stay empty so the
-    stamp never lands on client text. Image generation on an origin-less row
-    does not lock it: that row is not generated, cannot be published, and its
-    owner may keep editing it while the image worker runs.
-    """
-    if recipe.origin == "generated":
-        return True
-    return recipe.origin is None and recipe.status in _TEXT_GENERATION_STATUSES
-
-
-def _lock_client_payload(recipe: Recipe, recipe_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Drop every payload key but the locked-field set on a locked row."""
-    if not _is_content_locked(recipe):
-        return recipe_data
-    dropped = sorted(k for k in recipe_data if k not in _LOCKED_CLIENT_FIELDS)
-    if dropped:
-        logger.info(
-            "Ignored %d client field(s) on locked recipe %s",
-            len(dropped),
-            sanitize_log_value(recipe.id),
-        )
-    return {k: v for k, v in recipe_data.items() if k in _LOCKED_CLIENT_FIELDS}
-
-
-class ManualRecipeError(ValueError):
-    """Manually entered recipes cannot be published (KAN-140)."""
-
-
-class SavedCopyPublishError(ValueError):
-    """Saved copies cannot be published — the source page owns publication (RCP-74)."""
-
-
-# Also returned verbatim by the API routes (fixed string, same rationale as
-# PUBLIC_SLUG_REQUIRED_ERROR above).
+# PUBLIC_SLUG_REQUIRED_ERROR in recipe_slugs).
 RECIPE_OWNERSHIP_ERROR = (
     "This recipe belongs to a different account or guest session, so it "
     "cannot be saved or published from here."
@@ -188,41 +125,7 @@ OWNERSHIP_CODE_OTHER_GUEST_SESSION = "OWNERSHIP_OTHER_GUEST_SESSION"
 OWNERSHIP_CODE_ORPHANED_GUEST_ROW = "OWNERSHIP_ORPHANED_GUEST_ROW"
 
 
-# Also returned verbatim by the API routes (fixed string, same rationale as
-# PUBLIC_SLUG_REQUIRED_ERROR above).
-RECIPE_DUPLICATE_ERROR = "You already have this recipe saved."
-
-# Machine-readable discriminator, sent alongside the message as `code` — same
-# contract as the OWNERSHIP_CODE_* constants. A duplicate is a *successful*
-# outcome from the user's point of view (the recipe they wanted is in their
-# cookbook), which is the opposite of the ownership refusals, so the SPA needs
-# to tell them apart to choose between an error toast and a benign one.
-DUPLICATE_CODE_ALREADY_SAVED = "RECIPE_ALREADY_SAVED"
-
-
-class RecipeDuplicateError(ValueError):
-    """This owner already has a row for this source_slug — refuse the write (KAN-213).
-
-    Raised when the database refuses the second save of the same public recipe
-    by the same owner. The refusal itself comes from a partial unique index
-    (uq_recipe_user_source_slug / uq_recipe_guest_source_slug, migration
-    c8f3b71d20a4), not from application code: a check-then-write test in the
-    SPA cannot close a two-tab race by construction, which is why six previous
-    fixes at six different layers did not hold.
-
-    This exception exists so that refusal reaches the client as a 409 rather
-    than a 500. Sprint 6 named that the dominant risk (R1): the repository
-    catches broadly and returns None, which the blueprint answers with 500, so
-    a working constraint would have looked like a server outage and told the
-    user to check their connection.
-    """
-
-    def __init__(self, message: str, code: str = DUPLICATE_CODE_ALREADY_SAVED):
-        super().__init__(message)
-        self.code = code
-
-
-class RecipeOwnershipError(ValueError):
+class RecipeOwnershipError(RecipeConflictError):
     """The row exists but is owned by someone else — refuse the write (KAN-155).
 
     This refusal is deliberate and load-bearing: it is what stops one account's
@@ -239,502 +142,6 @@ class RecipeOwnershipError(ValueError):
     def __init__(self, message: str, code: str) -> None:
         super().__init__(message)
         self.code = code
-
-
-def _resolve_origin(current_origin: Optional[str], recipe_data: Dict[str, Any]) -> Optional[str]:
-    """Column value for origin: settable while NULL, immutable once set.
-
-    Once a recipe is labeled, a later payload cannot relabel it — otherwise
-    a 'manual' recipe could launder itself into 'generated' and slip past
-    the publish gate. Unknown labels are dropped rather than stored.
-    """
-    if current_origin:
-        return current_origin
-    candidate = recipe_data.get("origin")
-    return candidate if candidate in _CLIENT_ORIGINS else None
-
-
-def _gate_publish_transition(existing: Recipe, recipe_data: Dict[str, Any]) -> None:
-    """Only a finished, worker-generated row may go private → public (KAN-329).
-
-    Generalises the KAN-140 manual gate: the label a client wrote never
-    counts, only the origin the worker stamped and a status that says the
-    text landed. The check is on the TRANSITION alone — a row that is
-    already public may be re-saved as public (image generation moves it
-    through ``generating_image`` without unpublishing it), and unpublishing
-    is always allowed. Raises (a 400 at the API) instead of silently forcing
-    the flag off, so the SPA's revert-and-toast path fires rather than
-    diverging from the server state.
-    """
-    if recipe_data.get("is_public") is not True or existing.is_public:
-        return
-    if existing.origin == "generated" and existing.status in PUBLISHABLE_RECIPE_STATUSES:
-        return
-    raise ManualRecipeError(MANUAL_RECIPE_UNPUBLISHABLE_ERROR)
-
-
-def _guard_canonical(recipe: Recipe, recipe_data: Dict[str, Any]) -> None:
-    """Reject payloads that would unpublish or re-slug a canonical recipe.
-
-    Canonical recipes (seeded from specs/canonical-recipes.json in the
-    cookbook repo) keep their /r/<slug> URL stable forever; content edits
-    pass through untouched. Checked against the caller's raw payload, not
-    the merged blob, so only explicit intent trips the guard.
-    """
-    if not recipe.is_canonical:
-        return
-    if recipe_data.get("is_public") is False or (
-        "slug" in recipe_data and recipe_data["slug"] != recipe.slug
-    ):
-        raise CanonicalRecipeError(CANONICAL_RECIPE_LOCKED_ERROR)
-
-
-@dataclass(frozen=True)
-class WorkerRecipeUpdate:
-    user_id: Optional[int]
-    guest_session_id: Optional[str]
-
-
-@dataclass(frozen=True)
-class ImageGenerationQueue:
-    request_id: str
-    force_regenerate: bool
-    should_publish: bool
-
-
-def _slugify(text: str) -> str:
-    """Normalize text to a route-safe slug.
-
-    Same normalization as scripts/backfill_slugs.py:generate_slug, except
-    that this returns "" for unusable input (the publish gate rejects it
-    with RecipeSlugError) where the backfill falls back to "recipe".
-    """
-    return normalize_slug(text)
-
-
-def _preserve_worker_metadata(current_data: Dict[str, Any], merged: Dict[str, Any]) -> None:
-    current_metadata = current_data.get("ai_metadata")
-    if not isinstance(current_metadata, dict):
-        return
-    incoming_metadata = merged.get("ai_metadata")
-    preserved_metadata = dict(incoming_metadata) if isinstance(incoming_metadata, dict) else {}
-    for key in _WORKER_METADATA_KEYS:
-        if key in current_metadata:
-            preserved_metadata[key] = current_metadata[key]
-    if preserved_metadata:
-        merged["ai_metadata"] = preserved_metadata
-
-
-def _strip_inherited_stock_image(data: Dict[str, Any]) -> None:
-    """Drop ``stock_image_url`` from a saved copy's blob, in place.
-
-    KAN-215.  A saved copy must not persist a stock image pointer that came
-    from its source.  Once persisted it is indistinguishable from an image the
-    copy genuinely owns, so ``public_bp._recipe_image_url`` returns it at the
-    own-image check and never resolves the source — pinning the copy to the
-    stock image permanently, including after the source gains an AI image (AI
-    generation preserves ``stock_image_url``, so a source carrying both is a
-    normal state).
-
-    Enforced at the **server boundary**, on every write path, because the
-    inherited URL does not only arrive from a server-side copy: the SPA posts
-    the recipe data it is displaying, which for a save *is* the source's blob,
-    stock URL included.  Stripping it on create alone would leave any later
-    PUT/POST that echoes the payload free to re-persist it — the same
-    regression, one request later.  Same idiom as ``is_canonical`` below:
-    a field the API is not allowed to write is pinned by the server, not
-    trusted from the payload.
-
-    The copy still renders the source's image; it is resolved live at render
-    time instead of being frozen at save time.
-    """
-    data.pop("stock_image_url", None)
-
-
-def _is_saved_copy(recipe: Recipe) -> bool:
-    """Whether a persisted row is a saved copy of another recipe."""
-    return bool(recipe.source_slug or recipe.source_recipe_id)
-
-
-def _slug_retired_against(slug: str, recipe_id: str) -> bool:
-    """Whether ``slug`` was retired by any recipe other than ``recipe_id`` (KAN-288).
-
-    A deleted recipe's retirement (``recipe_id`` NULL) blocks everyone,
-    including a restore that re-POSTs the same id.
-    """
-    retired = db.session.get(RetiredSlug, slug)
-    return retired is not None and retired.recipe_id != recipe_id
-
-
-def _slug_occupied_against(slug: str, recipe_id: str) -> bool:
-    """Recheck both live and retired ownership after locking ``slug``."""
-    live = Recipe.query.filter(Recipe.slug == slug, Recipe.id != recipe_id).first()
-    return live is not None or _slug_retired_against(slug, recipe_id)
-
-
-def _clear_unowned_retired_slug_from_private(recipe_data: Dict[str, Any], recipe_id: str) -> None:
-    """Do not let a private row occupy another recipe's retired alias.
-
-    Private slugs are not public URLs and may be payload-provided, but the
-    Recipe.slug uniqueness constraint would still prevent the retirement owner
-    from reclaiming its alias. Clear only slugs retired against this row; the
-    same recipe remains free to stage one of its own rename aliases.
-    """
-    slug = recipe_data.get("slug")
-    if recipe_data.get("is_public") is False and slug:
-        # Private rows share Recipe.slug's global uniqueness and can otherwise
-        # win the same release-versus-retirement race as a publisher.
-        lock_slug(db.session(), str(slug))
-    if (
-        recipe_data.get("is_public") is False
-        and slug
-        and _slug_retired_against(str(slug), recipe_id)
-    ):
-        recipe_data["slug"] = None
-
-
-def _resolve_public_slug(
-    recipe_data: Dict[str, Any],
-    recipe_id: str,
-    current_slug: Optional[str] = None,
-    skip: frozenset = frozenset(),
-) -> str:
-    """Pick a non-empty, route-safe, unique slug for a recipe being published.
-
-    Public rows with slug=NULL would appear in /browse (the sitemap already
-    filters them out) yet no /r/<slug> URL could resolve them, so
-    publication requires a usable slug:
-    the payload's slug if salvageable, else the row's existing slug, else one
-    derived from the name. Uniqueness collisions get a numeric suffix; the DB
-    unique constraint on Recipe.slug remains the final arbiter under races.
-
-    Every result fits the 255-char slug column: the base is truncated and
-    each collision suffix reserves its own room. ``skip`` holds slugs that
-    already lost a commit race and must not be offered again.
-
-    Slugs occupying the base are fetched in one LIKE query and the suffix is
-    chosen in Python, so publishing the nth "Chili" costs one round trip, not
-    n. The prefix over-matches (chili% also hits chili-con-carne); harmless,
-    since candidates are tested by exact membership.
-    """
-    provided_slug = recipe_data.get("slug")
-    if (
-        current_slug is not None
-        and current_slug.strip()
-        and "/" not in current_slug
-        and "\\" not in current_slug
-        and (provided_slug is None or str(provided_slug) == current_slug)
-        # KAN-288: a private row can hold any payload slug unvalidated, so the
-        # slug it carries into publication may be one another recipe retired.
-    ):
-        lock_slug(db.session(), current_slug)
-        if not _slug_occupied_against(current_slug, recipe_id):
-            return current_slug
-
-    for source in (recipe_data.get("slug"), current_slug, recipe_data.get("name")):
-        candidate = _slugify(str(source)) if source else ""
-        if candidate:
-            break
-    else:
-        raise RecipeSlugError(PUBLIC_SLUG_REQUIRED_ERROR)
-
-    base = candidate[:_SLUG_MAX_LENGTH].rstrip("-")
-    # Short enough that every truncated-for-suffix variant still matches.
-    # _slugify output has no LIKE metacharacters (%, _).
-    prefix = base[: _SLUG_MAX_LENGTH - 12].rstrip("-")
-    occupied = (
-        set(skip)
-        | {
-            slug
-            for (slug,) in db.session.query(Recipe.slug).filter(
-                Recipe.id != recipe_id, Recipe.slug.like(f"{prefix}%")
-            )
-        }
-        # KAN-288: a slug that once served a published page is never reassigned.
-        | {
-            slug
-            for (slug,) in db.session.query(RetiredSlug.slug).filter(
-                RetiredSlug.slug.like(f"{prefix}%"),
-                or_(RetiredSlug.recipe_id.is_(None), RetiredSlug.recipe_id != recipe_id),
-            )
-        }
-    )
-    candidate, suffix = base, 1
-    while True:
-        while candidate in occupied:
-            suffix += 1
-            tail = f"-{suffix}"
-            candidate = f"{base[: _SLUG_MAX_LENGTH - len(tail)].rstrip('-')}{tail}"
-
-        # The prefix probes above are intentionally optimistic. Serialize the
-        # final choice with retirement, then recheck exact ownership while the
-        # transaction holds the lock. This prevents a concurrent rename/delete
-        # from releasing Recipe.slug just before its tombstone becomes visible.
-        lock_slug(db.session(), candidate)
-        if not _slug_occupied_against(candidate, recipe_id):
-            return candidate
-        occupied.add(candidate)
-
-
-def _pin_source_slug_to_column(
-    merged: Dict[str, Any], recipe_data: Dict[str, Any], existing: Recipe
-) -> None:
-    """Keep ``sourceSlug`` in the merged blob honest when the payload omits it.
-
-    Exactly the rule already applied to ``slug`` above, for the same reason.
-    ``source_slug`` is a column mirroring ``data['sourceSlug']``, and writes
-    rebuild the blob as ``{**(existing.data or {}), **recipe_data}`` before
-    restaging ``recipe.source_slug = data.get("sourceSlug")``. So anything that
-    clears the column without also clearing the blob — the KAN-213 migration's
-    pre-pass, the guest-merge legacy guard — is silently undone by the next
-    partial PUT, which pulls the stale value out of the untouched blob and
-    writes it back to the column. That resurrects a cleared duplicate and then
-    trips the unique index on a write the user never meant as a save.
-
-    The column is authoritative — in BOTH directions. When the payload omits
-    the key, the column value is restored into the blob (the Codex #273 case,
-    reproduced by ``test_clearing_the_column_survives_a_later_partial_update``).
-    And when the payload sends ANY value (null or non-null) against a row
-    whose column is already non-NULL, the persisted value wins: provenance
-    is NOT client-mutable once set. Before this rule, one
-    ``PUT {"is_public": true, "sourceSlug": null}`` wiped the provenance and
-    published the copy in a single call (Copilot B1 on PR #279); and a
-    ``PUT {"sourceSlug": "other-slug"}`` repointed the copy, creating a
-    disagreement between ``source_slug`` and the immutable
-    ``source_recipe_id`` (Copilot/claude review round 2). Only server-side
-    paths (login-merge legacy guard, migration pre-passes) clear the column.
-    """
-    if "sourceSlug" in recipe_data:
-        if existing.source_slug is not None:
-            merged["sourceSlug"] = existing.source_slug
-        return
-    if existing.source_slug is not None:
-        merged["sourceSlug"] = existing.source_slug
-    else:
-        merged.pop("sourceSlug", None)
-
-
-def _resolve_source_recipe_id(
-    current: Optional[str], source_slug: Optional[str], recipe_id: str
-) -> Optional[str]:
-    """Column value for source_recipe_id: resolved while NULL, immutable once set.
-
-    KAN-221: the stable provenance key. Set from the source row whose slug the
-    copy points at, exactly once — a later payload cannot re-point a copy at a
-    different source (the same immutability rule as ``origin``), and no client
-    value ever reaches this column. An unresolvable pointer (source deleted, or
-    a slug that never existed) stays NULL; the row still carries source_slug,
-    so it stays a saved copy for the publish guard and falls back to the slug
-    key in the identity indexes.
-    """
-    if current is not None:
-        return current
-    if source_slug is None:
-        return None
-    # no_autoflush: this runs inside the stage functions with the row already
-    # dirty — a flush here would hit the unique indexes mid-stage, outside
-    # _commit_publish_retrying's IntegrityError handling. The lookup needs no
-    # pending state; it resolves against committed rows only.
-    with db.session.no_autoflush:
-        source = Recipe.query.filter(
-            Recipe.slug == source_slug,
-            Recipe.is_public.is_(True),
-            Recipe.id != recipe_id,
-        ).first()
-    return source.id if source is not None else None
-
-
-def _duplicate_source_slug_owner(
-    recipe_data: Dict[str, Any],
-    recipe_id: str,
-    owner_scope: Optional[Tuple[Optional[int], Optional[str]]],
-) -> bool:
-    """Did this write lose to an existing row on (owner, source_slug)? (KAN-213)
-
-    Called only after a rollback. Constraint names in the IntegrityError are
-    backend-specific (SQLite vs PostgreSQL), so — exactly as with the slug race
-    above — the portable signal is to ask the database who owns the key now.
-
-    Scoped to the acting owner on purpose: two different people saving the same
-    public recipe is the product working, not a duplicate, and the partial
-    indexes are per-owner for that reason.
-    """
-    if owner_scope is None:
-        return False
-    # Mirrors the index key COALESCE(source_recipe_id, source_slug, id)
-    # (KAN-221). Only a write that carries a source pointer can lose to the
-    # index: rows without one key on their own unique id, which cannot collide.
-    source = recipe_data.get("sourceSlug")
-    if source is None:
-        return False
-    # The staged row's identity is the resolved source id, or the slug pointer
-    # when the source does not resolve — the same resolution the stage
-    # functions apply before commit.
-    source_row = Recipe.query.filter(
-        Recipe.slug == source, Recipe.is_public.is_(True), Recipe.id != recipe_id
-    ).first()
-    identity = source_row.id if source_row is not None else source
-
-    user_id, guest_session_id = owner_scope
-    query = Recipe.query.filter(
-        func.coalesce(Recipe.source_recipe_id, Recipe.source_slug, Recipe.id) == identity,
-        Recipe.id != recipe_id,
-    )
-    if user_id is not None:
-        query = query.filter(Recipe.user_id == user_id)
-    elif guest_session_id is not None:
-        query = query.filter(Recipe.guest_session_id == guest_session_id)
-    else:
-        return False  # neither scope set — no partial index covers this row
-
-    return query.first() is not None
-
-
-def _commit_publish_retrying(
-    stage: Callable[[Dict[str, Any]], Recipe],
-    recipe_data: Dict[str, Any],
-    recipe_id: str,
-    current_slug: Optional[str] = None,
-    owner_scope: Optional[Tuple[Optional[int], Optional[str]]] = None,
-) -> Recipe:
-    """Stage and commit a recipe write, retrying slug collisions lost to races.
-
-    The uniqueness probe in _resolve_public_slug is check-then-write: two
-    concurrent publications can both observe a slug as free, and the loser's
-    commit then violates the unique index. Rather than letting that expected
-    IntegrityError surface as a failed create/update, roll back, exclude the
-    losing slug, and re-stage with the next suffix. ``stage(data)`` applies
-    ``data`` to the ORM (building or mutating the row) and returns the row —
-    it is re-invoked on every attempt because rollback discards staged state.
-
-    Resolution always starts from the caller's original payload, not the
-    previous attempt's result: resolving from a once-suffixed slug would
-    compound the suffix (chili-2-2 after two races instead of chili-3).
-
-    Only genuine slug races are retried: after rollback, a query must confirm
-    another recipe now owns the attempted slug. Constraint names in the
-    IntegrityError are backend-specific (SQLite vs PostgreSQL), so ownership
-    of the slug is the portable signal. Every other integrity failure —
-    PK/not-null violations, or errors from unrelated objects staged on the
-    shared session — re-raises immediately rather than being retried into a
-    commit that silently drops that other work.
-    """
-    resolver_input = dict(recipe_data)
-    skip: set = set()
-    attempts = 0
-    while True:
-        if recipe_data["is_public"]:
-            recipe_data["slug"] = _resolve_public_slug(
-                resolver_input, recipe_id, current_slug, skip=frozenset(skip)
-            )
-        else:
-            _clear_unowned_retired_slug_from_private(recipe_data, recipe_id)
-        recipe = stage(recipe_data)
-        try:
-            db.session.commit()
-            # KAN-388: a public recipe with no current search metadata gets a build.
-            queue_if_missing(recipe)
-            return recipe
-        except IntegrityError:
-            db.session.rollback()
-            attempts += 1
-            attempted_slug = recipe_data.get("slug")
-            lost_slug_race = (
-                recipe_data["is_public"]
-                and attempted_slug is not None
-                and Recipe.query.filter(
-                    Recipe.slug == attempted_slug, Recipe.id != recipe_id
-                ).first()
-                is not None
-            )
-            if not lost_slug_race:
-                # KAN-213: the (owner, source_slug) index refused a second save
-                # of the same public recipe. Distinguish it from a genuine
-                # integrity failure BEFORE re-raising, so it can reach the
-                # client as a 409 refusal instead of a 500 (R1). Checked only
-                # on the non-slug-race path, so the slug retry above is
-                # untouched.
-                if _duplicate_source_slug_owner(recipe_data, recipe_id, owner_scope):
-                    logger.info(
-                        "Recipe %s refused: owner already has source_slug %r",
-                        sanitize_log_value(recipe_id),
-                        sanitize_log_value(recipe_data.get("sourceSlug")),
-                    )
-                    raise RecipeDuplicateError(RECIPE_DUPLICATE_ERROR)
-                raise
-            if attempts > _SLUG_COMMIT_RETRIES:
-                raise
-            skip.add(attempted_slug)
-            logger.warning(
-                "Slug %r for recipe %s lost a publication race; retrying",
-                sanitize_log_value(attempted_slug),
-                sanitize_log_value(recipe_id),
-            )
-
-
-def _apply_recipe_scope(query, user_id: Optional[int], guest_session_id: Optional[str]):
-    """Scope queries to either authenticated user or anonymous session."""
-    if user_id is not None:
-        return query.filter_by(user_id=user_id)
-    if guest_session_id:
-        return query.filter_by(user_id=None, guest_session_id=guest_session_id)
-    return query.filter_by(user_id=None, guest_session_id=None)
-
-
-def _gate_is_public(
-    recipe_data: Dict[str, Any],
-    user_id: Optional[int],
-    existing: Optional[Recipe] = None,
-) -> Dict[str, Any]:
-    """Only authenticated users may publish: guests get is_public forced False.
-
-    A guest_session_id is a throwaway browser token — there is no accountable
-    owner to moderate or ban behind a guest-published /r/<slug> page. The flag
-    is normalized in the data blob itself so the JSON payload and the
-    is_public column can never disagree.
-
-    RCP-74 / KAN-221: saved copies cannot be published — the source page owns
-    publication, permanently, with no author exception. For an existing row
-    the refusal keys on the PERSISTED provenance columns (``source_slug``,
-    ``source_recipe_id``), never on what the payload claims: a payload is the
-    caller's story, and ``PUT {"is_public": true, "sourceSlug": null}`` was a
-    working bypass while the guard trusted it (Copilot B1 on PR #279). For a
-    row being created, the staged blob IS what will be persisted, so the check
-    on it is a check on the columns being written. Raises
-    SavedCopyPublishError (403 at the API) so the SPA's revert-and-toast path
-    fires.
-    """
-    wants_public = recipe_data.get("is_public") is True
-    if wants_public and user_id is None:
-        logger.warning(
-            "Guest attempted to publish recipe %s — forcing is_public=False",
-            sanitize_log_value(recipe_data.get("id", "<no id>")),
-        )
-        return {**recipe_data, "is_public": False}
-    # RCP-74: only authenticated users reach here with wants_public=True.
-    if wants_public:
-        is_saved_copy = recipe_data.get("sourceSlug") is not None
-        if existing is not None:
-            is_saved_copy = (
-                is_saved_copy
-                or existing.source_slug is not None
-                or existing.source_recipe_id is not None
-            )
-        if is_saved_copy:
-            raise SavedCopyPublishError(SAVED_COPY_PUBLISH_ERROR)
-    return {**recipe_data, "is_public": wants_public}
-
-
-# KAN-381: statuses of a row that has no recipe in it. POST /api/generate
-# writes a "Generating..." placeholder first; the worker fills it in and sets
-# "ready". A placeholder whose generation is still running, or died, is not a
-# recipe, so the owner's list and count leave it out. "generating_image" is a
-# finished recipe waiting for its picture and stays in.
-UNFINISHED_GENERATION_STATUSES = frozenset({"generating", "processing", "error"})
-
-
-def _listed_recipes(query):
-    return query.filter(Recipe.status.notin_(UNFINISHED_GENERATION_STATUSES))
 
 
 def get_user_recipes(
@@ -789,216 +196,6 @@ def get_recipe_by_id(
             sanitize_log_value(e),
         )
         return None
-
-
-def get_recipe_for_worker(recipe_id: str) -> Optional[Recipe]:
-    """Fetch a recipe without owner scoping for an OIDC-authenticated worker."""
-    return cast(
-        Optional[Recipe],
-        Recipe.query.populate_existing().filter_by(id=recipe_id).first(),
-    )
-
-
-def claim_recipe_for_worker(
-    recipe_id: str,
-    expected_status: str,
-    processing_status: str,
-    stale_after_seconds: int,
-) -> Optional[str]:
-    """Atomically claim one generation job and return its unique lease token."""
-    now = datetime.utcnow()
-    stale_before = now - timedelta(seconds=stale_after_seconds)
-    claim_token = str(uuid.uuid4())
-    unclaimed_status = Recipe.status == expected_status
-    if expected_status == processing_status:
-        unclaimed_status = and_(
-            unclaimed_status,
-            Recipe.worker_claim_token.is_(None),
-        )
-    claimed = cast(
-        int,
-        Recipe.query.filter(
-            Recipe.id == recipe_id,
-            or_(
-                unclaimed_status,
-                and_(
-                    Recipe.status == processing_status,
-                    Recipe.updated_at < stale_before,
-                ),
-            ),
-        ).update(
-            {
-                "status": processing_status,
-                "worker_claim_token": claim_token,
-                "updated_at": now,
-            },
-            synchronize_session=False,
-        ),
-    )
-    db.session.commit()
-    return claim_token if claimed == 1 else None
-
-
-def set_recipe_status_for_worker(
-    recipe_id: str,
-    status: str,
-    claim_token: str,
-    expected_status: Optional[str] = None,
-    release_claim: bool = False,
-) -> bool:
-    """Heartbeat or release worker state only while the caller owns the lease."""
-    query = Recipe.query.filter(
-        Recipe.id == recipe_id,
-        Recipe.worker_claim_token == claim_token,
-    )
-    if expected_status is not None:
-        query = query.filter(Recipe.status == expected_status)
-    updated = cast(
-        int,
-        query.update(
-            {
-                "status": status,
-                "worker_claim_token": None if release_claim else claim_token,
-                "updated_at": datetime.utcnow(),
-            },
-            synchronize_session=False,
-        ),
-    )
-    db.session.commit()
-    return updated == 1
-
-
-def update_recipe_for_worker(
-    recipe_id: str,
-    recipe_data: Dict[str, Any],
-    claim_token: str,
-    status: str,
-    expected_status: str,
-) -> Optional[WorkerRecipeUpdate]:
-    """Persist generated data only if the caller still owns the worker lease."""
-    recipe = (
-        Recipe.query.populate_existing()
-        .filter(
-            Recipe.id == recipe_id,
-            Recipe.status == expected_status,
-            Recipe.worker_claim_token == claim_token,
-        )
-        .first()
-    )
-    if recipe is None:
-        return None
-
-    result = WorkerRecipeUpdate(recipe.user_id, recipe.guest_session_id)
-    observed_updated_at = recipe.updated_at
-    # KAN-329: this write is what makes a recipe 'generated', so the blob is
-    # REPLACED, not merged — no public content a client managed to put in the
-    # placeholder survives — and the model's output is projected away from
-    # media, publication and provenance keys before the stamp lands. The one
-    # client-owned private field, personalNotes, is carried forward explicitly.
-    # Ownership and visibility come from the row's columns, never from either
-    # payload.
-    existing_data = recipe.data if isinstance(recipe.data, dict) else {}
-    merged = {k: v for k, v in recipe_data.items() if k not in _WORKER_TEXT_DROP_FIELDS}
-    if "personalNotes" in existing_data:
-        merged["personalNotes"] = existing_data["personalNotes"]
-    merged["id"] = recipe_id
-    merged["user_id"] = recipe.user_id
-    merged["is_public"] = recipe.is_public
-    merged["origin"] = "generated"
-    if recipe.slug is not None:
-        merged["slug"] = recipe.slug
-    else:
-        merged.pop("slug", None)
-
-    updated = cast(
-        int,
-        Recipe.query.filter(
-            Recipe.id == recipe_id,
-            Recipe.status == expected_status,
-            Recipe.worker_claim_token == claim_token,
-            Recipe.updated_at == observed_updated_at,
-        ).update(
-            {
-                "name": recipe_data.get("name", recipe.name),
-                "data": merged,
-                "origin": "generated",
-                "status": status,
-                "worker_claim_token": None,
-                "updated_at": datetime.utcnow(),
-            },
-            synchronize_session=False,
-        ),
-    )
-    db.session.commit()
-    if updated != 1:
-        return None
-    return result
-
-
-def patch_recipe_for_worker(
-    recipe_id: str,
-    recipe_patch: Dict[str, Any],
-    claim_token: str,
-    status: str,
-    expected_status: str,
-    remove_data_fields: tuple[str, ...] = (),
-) -> Optional[WorkerRecipeUpdate]:
-    """Patch worker-owned fields without overwriting concurrent user edits."""
-    for _ in range(3):
-        recipe = (
-            Recipe.query.populate_existing()
-            .filter(
-                Recipe.id == recipe_id,
-                Recipe.status == expected_status,
-                Recipe.worker_claim_token == claim_token,
-            )
-            .first()
-        )
-        if recipe is None:
-            return None
-
-        result = WorkerRecipeUpdate(recipe.user_id, recipe.guest_session_id)
-        observed_updated_at = recipe.updated_at
-        merged = dict(recipe.data or {})
-        patch = dict(recipe_patch)
-        metadata_patch = patch.pop("ai_metadata", None)
-        merged.update(patch)
-        if isinstance(metadata_patch, dict):
-            metadata = dict(merged.get("ai_metadata") or {})
-            metadata.update(metadata_patch)
-            merged["ai_metadata"] = metadata
-        for field in remove_data_fields:
-            merged.pop(field, None)
-
-        merged["id"] = recipe_id
-        merged["is_public"] = recipe.is_public
-        if recipe.slug is not None:
-            merged["slug"] = recipe.slug
-        else:
-            merged.pop("slug", None)
-
-        updated = cast(
-            int,
-            Recipe.query.filter(
-                Recipe.id == recipe_id,
-                Recipe.status == expected_status,
-                Recipe.worker_claim_token == claim_token,
-                Recipe.updated_at == observed_updated_at,
-            ).update(
-                {
-                    "data": merged,
-                    "status": status,
-                    "worker_claim_token": None,
-                    "updated_at": datetime.utcnow(),
-                },
-                synchronize_session=False,
-            ),
-        )
-        db.session.commit()
-        if updated == 1:
-            return result
-        db.session.expire_all()
-    return None
 
 
 def create_recipe(
@@ -1117,7 +314,7 @@ def create_recipe(
                 existing.data = data
                 existing.status = next_status
                 existing.updated_at = datetime.utcnow()
-                return existing  # type: ignore[no-any-return]
+                return existing
 
             return _commit_publish_retrying(
                 stage_existing,
@@ -1271,13 +468,6 @@ def update_recipe(
         # moment of publishing. Keys the payload does supply always win.
         merged = {**(recipe.data or {}), **recipe_data, "id": recipe_id}
         _preserve_worker_metadata(recipe.data or {}, merged)
-        # KAN-215: a payload echo must not re-pin a saved copy to a stock image
-        # inherited from its source. Same reasoning as is_canonical below —
-        # enforced on every write path, not just create. Guard on the RESULTING
-        # state, not the pre-update state: a payload that first-turns a
-        # non-copy row into a saved copy (by supplying ``sourceSlug``) would
-        # otherwise slip past a pre-update check and persist the inherited URL
-        # on the very write that made it a copy.
         if _is_saved_copy(recipe) or recipe_data.get("sourceSlug"):
             _strip_inherited_stock_image(merged)
         # Never writable through the API — pin the blob to the column.
@@ -1363,199 +553,6 @@ def update_recipe(
         )
         db.session.rollback()
         return None
-
-
-def update_recipe_status(
-    recipe_id: str,
-    status: str,
-    user_id: Optional[int] = None,
-    guest_session_id: Optional[str] = None,
-    expected_status: Optional[str] = None,
-    require_unclaimed: bool = False,
-    clear_worker_claim: bool = False,
-) -> bool:
-    """Conditionally update an owner-scoped recipe status."""
-    try:
-        query = _apply_recipe_scope(
-            Recipe.query.filter(Recipe.id == recipe_id),
-            user_id,
-            guest_session_id,
-        )
-        if expected_status is not None:
-            query = query.filter(Recipe.status == expected_status)
-        if require_unclaimed:
-            query = query.filter(Recipe.worker_claim_token.is_(None))
-
-        values = {
-            "status": status,
-            "updated_at": datetime.utcnow(),
-        }
-        if clear_worker_claim:
-            values["worker_claim_token"] = None
-        updated = cast(
-            int,
-            query.update(values, synchronize_session=False),
-        )
-        db.session.commit()
-        return updated == 1
-    except Exception as e:
-        logger.error(
-            "Error updating status for recipe %s: %s",
-            sanitize_log_value(recipe_id),
-            sanitize_log_value(e),
-        )
-        db.session.rollback()
-        return False
-
-
-def queue_image_generation(
-    recipe_id: str,
-    request_id: str,
-    force_regenerate: bool,
-    user_id: Optional[int] = None,
-    guest_session_id: Optional[str] = None,
-) -> Optional[ImageGenerationQueue]:
-    """Persist or recover one owner-scoped image request before publication."""
-    try:
-        for _ in range(3):
-            recipe = (
-                _apply_recipe_scope(
-                    Recipe.query.populate_existing().filter(Recipe.id == recipe_id),
-                    user_id,
-                    guest_session_id,
-                )
-                .filter(Recipe.status.in_(("ready", "generating_image")))
-                .first()
-            )
-            if recipe is None:
-                return None
-
-            recipe_data = dict(recipe.data or {})
-            raw_metadata = recipe_data.get("ai_metadata")
-            metadata = dict(raw_metadata) if isinstance(raw_metadata, dict) else {}
-            existing_request = metadata.get("image_request")
-            if not isinstance(existing_request, dict):
-                existing_request = {}
-
-            existing_request_id = existing_request.get("id")
-            existing_pending = (
-                isinstance(existing_request_id, str) and existing_request.get("status") == "pending"
-            )
-            existing_force = existing_request.get("force_regenerate") is True
-            reusable_request = existing_pending and (not force_regenerate or existing_force)
-            queued_request_id = cast(str, existing_request_id) if reusable_request else request_id
-            queued_force = existing_force if reusable_request else force_regenerate
-
-            if recipe.status == "generating_image" and recipe.worker_claim_token is not None:
-                return ImageGenerationQueue(
-                    request_id=queued_request_id,
-                    force_regenerate=queued_force,
-                    should_publish=False,
-                )
-
-            enqueue = metadata.get("image_enqueue")
-            if (
-                recipe.status == "generating_image"
-                and not reusable_request
-                and not force_regenerate
-                and isinstance(enqueue, dict)
-                and enqueue.get("status") == "pending"
-            ):
-                return ImageGenerationQueue(
-                    request_id=request_id,
-                    force_regenerate=force_regenerate,
-                    should_publish=False,
-                )
-
-            observed_updated_at = recipe.updated_at
-            metadata["image_request"] = {
-                "id": queued_request_id,
-                "status": "pending",
-                "force_regenerate": queued_force,
-                "timestamp": datetime.now().isoformat(),
-            }
-            recipe_data["ai_metadata"] = metadata
-            query = _apply_recipe_scope(
-                Recipe.query.filter(
-                    Recipe.id == recipe_id,
-                    Recipe.status == recipe.status,
-                    Recipe.worker_claim_token.is_(None),
-                    Recipe.updated_at == observed_updated_at,
-                ),
-                user_id,
-                guest_session_id,
-            )
-            updated = cast(
-                int,
-                query.update(
-                    {
-                        "data": recipe_data,
-                        "status": "generating_image",
-                        "worker_claim_token": None,
-                        "updated_at": datetime.utcnow(),
-                    },
-                    synchronize_session=False,
-                ),
-            )
-            db.session.commit()
-            if updated == 1:
-                return ImageGenerationQueue(
-                    request_id=queued_request_id,
-                    force_regenerate=queued_force,
-                    should_publish=True,
-                )
-            db.session.expire_all()
-        return None
-    except Exception as e:
-        logger.error(
-            "Error queueing image generation for recipe %s: %s",
-            sanitize_log_value(recipe_id),
-            sanitize_log_value(e),
-        )
-        db.session.rollback()
-        return None
-
-
-def release_image_generation_queue(
-    recipe_id: str,
-    request_id: str,
-    user_id: Optional[int] = None,
-    guest_session_id: Optional[str] = None,
-) -> bool:
-    """Return an unpublished request to ready while retaining its retry identity."""
-    try:
-        recipe = (
-            _apply_recipe_scope(
-                Recipe.query.populate_existing().filter(
-                    Recipe.id == recipe_id,
-                    Recipe.status == "generating_image",
-                    Recipe.worker_claim_token.is_(None),
-                ),
-                user_id,
-                guest_session_id,
-            )
-            .with_for_update()
-            .first()
-        )
-        if recipe is None:
-            return False
-        metadata = (recipe.data or {}).get("ai_metadata")
-        image_request = metadata.get("image_request") if isinstance(metadata, dict) else None
-        if not isinstance(image_request, dict) or image_request.get("id") != request_id:
-            return False
-
-        recipe.status = "ready"
-        recipe.updated_at = datetime.utcnow()
-        db.session.commit()
-        return True
-    except Exception as e:
-        logger.error(
-            "Error releasing image generation queue for recipe %s: %s",
-            sanitize_log_value(recipe_id),
-            sanitize_log_value(e),
-        )
-        db.session.rollback()
-        return False
 
 
 def delete_recipe(
@@ -1674,64 +671,101 @@ def count_user_recipes(user_id: Optional[int], guest_session_id: Optional[str] =
         return 0
 
 
-def migrate_file_to_db(
-    filename: str, recipe_data: Dict[str, Any], user_id: Optional[int] = None
-) -> Optional[Recipe]:
-    """
-    Migrate a file-based recipe to the database.
+class DbRecipeRepository(
+    RetiredSlugMixin,
+    RecipeWorkerOpsMixin,
+    RecipeImageQueueMixin,
+):
+    """Facade class combining recipe CRUD, slug resolution, worker ops, and image queue."""
 
-    Uses the filename (without .json) as the recipe ID to maintain consistency.
+    get_user_recipes = staticmethod(get_user_recipes)
+    get_recipe_by_id = staticmethod(get_recipe_by_id)
+    create_recipe = staticmethod(create_recipe)
+    update_recipe = staticmethod(update_recipe)
+    delete_recipe = staticmethod(delete_recipe)
+    get_all_recipes = staticmethod(get_all_recipes)
+    count_user_recipes = staticmethod(count_user_recipes)
 
-    Args:
-        filename: Original filename (e.g., "recipe-uuid.json")
-        recipe_data: Recipe JSON data
-        user_id: Optional user ID to assign ownership
 
-    Returns:
-        Created Recipe object, or None if creation failed
-    """
-    try:
-        # Extract UUID from filename
-        recipe_id = filename.replace(".json", "")
-        recipe_name = recipe_data.get("name", "Unnamed Recipe")
+PostgresRecipeRepository = DbRecipeRepository
 
-        # Check if already exists
-        existing = Recipe.query.filter_by(id=recipe_id).first()  # type: ignore[no-any-return]
-        if existing:
-            logger.warning(
-                "Recipe %s already exists in database, skipping",
-                sanitize_log_value(recipe_id),
-            )
-            return existing  # type: ignore[no-any-return]
-
-        # KAN-329: a file is client content; it never arrives public.
-        # File migrations are client-content imports. Do not preserve a
-        # forged worker-only provenance label inside the JSON blob.
-        migrated_data = {key: value for key, value in recipe_data.items() if key != "origin"}
-        recipe = Recipe(
-            id=recipe_id,
-            user_id=user_id,
-            name=recipe_name,
-            slug=recipe_data.get("slug"),
-            is_public=False,
-            data={**migrated_data, "is_public": False},
-        )
-
-        db.session.add(recipe)
-        db.session.commit()
-
-        logger.info(
-            "Migrated recipe %s from file %s",
-            sanitize_log_value(recipe_id),
-            sanitize_log_value(filename),
-        )
-        return recipe
-
-    except Exception as e:
-        logger.error(
-            "Error migrating recipe %s: %s",
-            sanitize_log_value(filename),
-            sanitize_log_value(e),
-        )
-        db.session.rollback()
-        return None
+__all__ = [
+    "DbRecipeRepository",
+    "PostgresRecipeRepository",
+    "RetiredSlugMixin",
+    "RecipeWorkerOpsMixin",
+    "RecipeImageQueueMixin",
+    "WorkerRecipeUpdate",
+    "ImageGenerationQueue",
+    "PublishGateError",
+    "RecipeConflictError",
+    "RecipeSlugError",
+    "CanonicalRecipeError",
+    "PublishedRecipeDeleteError",
+    "ManualRecipeError",
+    "SavedCopyPublishError",
+    "RecipeDuplicateError",
+    "RecipeOwnershipError",
+    "PUBLIC_SLUG_REQUIRED_ERROR",
+    "CANONICAL_RECIPE_LOCKED_ERROR",
+    "PUBLISHED_RECIPE_DELETE_ERROR",
+    "MANUAL_RECIPE_UNPUBLISHABLE_ERROR",
+    "PUBLISHABLE_RECIPE_STATUSES",
+    "SAVED_COPY_PUBLISH_ERROR",
+    "RECIPE_OWNERSHIP_ERROR",
+    "OWNERSHIP_CODE_OTHER_ACCOUNT",
+    "OWNERSHIP_CODE_OTHER_GUEST_SESSION",
+    "OWNERSHIP_CODE_ORPHANED_GUEST_ROW",
+    "RECIPE_DUPLICATE_ERROR",
+    "DUPLICATE_CODE_ALREADY_SAVED",
+    "UNFINISHED_GENERATION_STATUSES",
+    "_SLUG_MAX_LENGTH",
+    "_SLUG_COMMIT_RETRIES",
+    "_WORKER_METADATA_KEYS",
+    "_ACTIVE_RECIPE_STATUSES",
+    "_CLIENT_ORIGINS",
+    "_LOCKED_CLIENT_FIELDS",
+    "_TEXT_GENERATION_STATUSES",
+    "_WORKER_TEXT_DROP_FIELDS",
+    "_is_content_locked",
+    "_lock_client_payload",
+    "_resolve_origin",
+    "_gate_publish_transition",
+    "_guard_canonical",
+    "_slugify",
+    "_preserve_worker_metadata",
+    "_strip_inherited_stock_image",
+    "_is_saved_copy",
+    "_slug_retired_against",
+    "_slug_occupied_against",
+    "_clear_unowned_retired_slug_from_private",
+    "_resolve_public_slug",
+    "_pin_source_slug_to_column",
+    "_resolve_source_recipe_id",
+    "_duplicate_source_slug_owner",
+    "_commit_publish_retrying",
+    "_apply_recipe_scope",
+    "_gate_is_public",
+    "_listed_recipes",
+    "_dedup_rows",
+    "get_user_recipes",
+    "get_recipe_by_id",
+    "get_recipe_for_worker",
+    "claim_recipe_for_worker",
+    "set_recipe_status_for_worker",
+    "update_recipe_for_worker",
+    "patch_recipe_for_worker",
+    "create_recipe",
+    "update_recipe",
+    "update_recipe_status",
+    "queue_image_generation",
+    "release_image_generation_queue",
+    "delete_recipe",
+    "get_all_recipes",
+    "count_user_recipes",
+    "migrate_file_to_db",
+    "RetiredSlug",
+    "lock_slug",
+    "queue_if_missing",
+    "normalize_slug",
+]
