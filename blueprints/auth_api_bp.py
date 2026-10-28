@@ -143,8 +143,6 @@ def api_callback():
         # Persist user to database (Phase 3)
         from extensions import db
 
-        email = user_info.get("email")
-
         # Capture current anonymous session scope before assigning authenticated user.
         previous_guest_session_id = session.get("session_id")
 
@@ -154,7 +152,7 @@ def api_callback():
 
         try:
             db.session.commit()
-            logger.info(f"User {user.id} ({email}) authenticated successfully")
+            logger.info("User %s authenticated successfully", user.id)
         except Exception as e:
             db.session.rollback()
             logger.error(f"Database error during user creation: {e}")
