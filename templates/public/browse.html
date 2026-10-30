@@ -107,8 +107,9 @@
                         {% if data.get('cookTime') is not none %}
                         <li>Cook {{ data.cookTime }}m</li>
                         {% endif %}
-                        {% if recipe.user and recipe.user.name %}
-                        <li>By {{ recipe.user.name }}</li>
+                        {% set author_name = author_display_name(recipe.user) %}
+                        {% if author_name %}
+                        <li>By {{ author_name }}</li>
                         {% endif %}
                     </ul>
                     {% if data.description %}

@@ -129,6 +129,7 @@ from services.tag_hubs import (
     HUBS_BY_SLUG,
     MIN_INDEXABLE_RECIPES,
 )
+from utils.brand_author import author_display_name
 
 public_bp = Blueprint("public", __name__)
 
@@ -138,7 +139,7 @@ NEWEST_RECIPES_MAX = 12
 
 @public_bp.app_context_processor
 def _inject_footer_hubs() -> dict[str, Any]:
-    return {"footer_hubs": _footer_hubs}
+    return {"footer_hubs": _footer_hubs, "author_display_name": author_display_name}
 
 
 def _missing_recipe_response(

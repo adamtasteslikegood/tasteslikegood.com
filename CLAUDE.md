@@ -134,6 +134,7 @@ uv run flask db merge -m "..." A B  # unify branched heads
 | `GEMINI_IMAGE_MODEL`             | Overrides the image generation model. Defaults to `gemini-nano-banana-2.1` when unset/empty.     |
 | `AGENT_TOOLS_READ`, `AGENT_TOOLS_GENERATE_TEXT`, `AGENT_TOOLS_GENERATE_IMAGE` | Switches for the agent tools under `/api/agent/tools` (`services/agent_tools.py`). Read defaults on; both generation switches default off. On is `1`/`true`/`yes`/`on`; anything else is off. They do not affect `/api/generate`. |
 | `MARKDOWN_FOR_AGENTS`            | Serves `/r/<slug>`, `/browse` and the hubs as Markdown to a GET that sends `Accept: text/markdown` (`utils/markdown_for_agents.py`, md4a). Defaults on; same on/off values as the agent switches. Nothing is cached. |
+| `BRAND_AUTHOR_USER_IDS`, `BRAND_AUTHOR_SUFFIX` | The site account whose public recipes show `Tasteslikegood - {suffix}` as author (`utils/brand_author.py`, KAN-434). Default `1` and `classic`; an empty suffix gives plain `Tasteslikegood`. |
 | `FLASK_SECRET_KEY`               | Session signing. **Required in prod** — fails fast if missing.                                   |
 | `FLASK_ENV`                      | `production` activates guards + secret-key fail-fast.                                            |
 | `GCS_BUCKET_NAME`               | Recipe image storage (`tasteslikegood-recipe-images` in prod)                                    |

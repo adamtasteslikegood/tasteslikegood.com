@@ -114,7 +114,7 @@
                 {% if data.get('prepTime') is not none %}<li>Prep {{ data.prepTime }}m</li>{% endif %}
                 {% if data.get('cookTime') is not none %}<li>Cook {{ data.cookTime }}m</li>{% endif %}
                 {% if data.get('servings') is not none %}<li>Serves {{ data.servings }}</li>{% endif %}
-                {% if recipe.user and recipe.user.name %}<li>By {{ recipe.user.name }}</li>{% endif %}
+                {% set author_name = author_display_name(recipe.user) %}{% if author_name %}<li>By {{ author_name }}</li>{% endif %}
             </ul>
             <div class="public-recipe-actions">
                 {# Plain anchor: the SPA's ?save= flow fetches the recipe from
