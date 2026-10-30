@@ -53,6 +53,12 @@ class PublicPagesMarkdown:
             # the template's step numbers, which the Markdown list repeats.
             content_selector="main",
             strip_selectors=(".public-eyebrow", ".public-browse-filter", ".public-step-number"),
+            # KAN-356 (R16): cooks' feedback notes are user-written text. Escape
+            # stray Markdown across the page, and render each note (marked
+            # ``data-md="plain"`` in the template) as literal text, so a note
+            # can never become a live link, image or heading for an agent.
+            escape_misc=True,
+            literal_selectors=('[data-md="plain"]',),
         )
 
     def __call__(self, environ: dict[str, Any], start_response: StartResponse) -> Iterable[bytes]:
