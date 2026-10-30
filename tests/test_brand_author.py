@@ -123,6 +123,15 @@ def test_env_overrides_ids_and_suffix(monkeypatch):
     assert author_display_name(SimpleNamespace(id=9, name="X")) == "Tasteslikegood - admins"
 
 
+def test_mistyped_user_id_is_skipped_not_a_crash(monkeypatch, caplog):
+    monkeypatch.setenv("BRAND_AUTHOR_USER_IDS", "1, abc")
+
+    with caplog.at_level("WARNING"):
+        assert is_brand_author(1)
+        assert not is_brand_author(2)
+    assert "abc" in caplog.text
+
+
 def test_empty_suffix_is_plain_brand_name(monkeypatch):
     monkeypatch.setenv("BRAND_AUTHOR_SUFFIX", "")
 

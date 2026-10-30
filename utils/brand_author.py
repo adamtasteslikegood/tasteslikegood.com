@@ -21,8 +21,11 @@ override them:
   ``"Tasteslikegood"``.
 """
 
+import logging
 import os
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 BRAND_AUTHOR_NAME = "Tasteslikegood"
 DEFAULT_BRAND_AUTHOR_USER_IDS = "1"
@@ -32,7 +35,17 @@ DEFAULT_BRAND_AUTHOR_SUFFIX = "classic"
 def brand_author_user_ids() -> frozenset[int]:
     """The user ids whose recipes carry the brand name."""
     raw = os.getenv("BRAND_AUTHOR_USER_IDS", DEFAULT_BRAND_AUTHOR_USER_IDS)
-    return frozenset(int(part) for part in raw.split(",") if part.strip())
+    ids = set()
+    for part in raw.split(","):
+        token = part.strip()
+        if not token:
+            continue
+        if not token.isdigit():
+            # A typo in the env var must not take down every public page.
+            logger.warning("BRAND_AUTHOR_USER_IDS: skipping non-numeric id %r", token)
+            continue
+        ids.add(int(token))
+    return frozenset(ids)
 
 
 def is_brand_author(user_id: int | None) -> bool:
