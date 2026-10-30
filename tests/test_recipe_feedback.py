@@ -445,6 +445,34 @@ def test_moderation_lists(client, world, moderator):
     assert row["recipe"]["slug"] == target.slug
 
 
+
+def test_hidden_and_deleted_published_entries_do_not_duplicate_moderation_lists(
+    client, world, moderator
+):
+    _, target = world
+    deleted_cook = _cook_with_copy(target, "deleted-trusted@example.com")
+    hidden_cook = _cook_with_copy(target, "hidden-trusted@example.com")
+    deleted_cook.feedback_trusted = True
+    hidden_cook.feedback_trusted = True
+    db.session.commit()
+
+    _sign_in(client, deleted_cook)
+    deleted_id = _post(client, target, note="Published, then deleted").get_json()["entry"]["id"]
+    assert client.delete(f"/api/feedback/{target.id}").status_code == 200
+
+    _sign_in(client, hidden_cook)
+    hidden_id = _post(client, target, note="Published, then hidden").get_json()["entry"]["id"]
+    _sign_in(client, moderator)
+    assert _moderate(client, hidden_id, "hide-entry").status_code == 200
+
+    lists = client.get("/api/feedback/moderation").get_json()
+    assert lists["published_without_review"] == []
+    assert {row["id"] for row in lists["hidden_and_deleted"]} == {
+        deleted_id,
+        hidden_id,
+    }
+
+
 # --------------------------------------------------------------------------
 # Mail
 # --------------------------------------------------------------------------
