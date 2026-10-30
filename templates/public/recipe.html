@@ -115,6 +115,10 @@
                 {% if data.get('cookTime') is not none %}<li>Cook {{ data.cookTime }}m</li>{% endif %}
                 {% if data.get('servings') is not none %}<li>Serves {{ data.servings }}</li>{% endif %}
                 {% set author_name = author_display_name(recipe.user) %}{% if author_name %}<li>By {{ author_name }}</li>{% endif %}
+                {# KAN-356 (R9): shown only once a cook has an entry; links to the section. #}
+                {% if feedback and feedback.count %}
+                <li class="public-recipe-meta-feedback"><a href="#feedback">Cooked by {{ feedback.count }}{% if feedback.average is not none %} · {{ feedback.average }}<span aria-hidden="true"> ★</span><span class="public-visually-hidden"> out of 5</span>{% endif %}</a></li>
+                {% endif %}
             </ul>
             <div class="public-recipe-actions">
                 {# Plain anchor: the SPA's ?save= flow fetches the recipe from
@@ -206,6 +210,52 @@
         </div>
     </section>
     {% endif %}
+
+    {# KAN-356: feedback from people who cooked it (design R9, R10, R12, R14).
+       No entries: the link line only, no heading, no count, no empty box.
+       Note text is escaped by Jinja and marked data-md="plain" so the Markdown
+       view renders it as literal text (KAN-356 comment, 2026-10-18). #}
+    {% set has_feedback = feedback and (feedback.count or feedback.author) %}
+    <section id="feedback" class="public-recipe-feedback"{% if has_feedback %} aria-labelledby="feedback-heading"{% endif %}>
+        {% if has_feedback %}
+        <div class="public-recipe-panel">
+            <header class="public-recipe-panel-header">
+                <h2 id="feedback-heading">{% if feedback.count %}Cooked by {{ feedback.count }}{% else %}From the author{% endif %}</h2>
+            </header>
+            <div class="public-recipe-panel-body">
+                {% if feedback.average is not none %}
+                <p class="public-feedback-average"><span aria-hidden="true">{{ feedback.average }} ★ average from {{ feedback.count }} cooks</span><span class="public-visually-hidden">{{ feedback.average }} out of 5 from {{ feedback.count }} cooks</span></p>
+                {% endif %}
+                {% if feedback.author %}
+                <div class="public-feedback-author">
+                    {% if feedback.count %}<h3>From the author</h3>{% endif %}
+                    <p class="public-feedback-stars"><span aria-hidden="true">{{ "★" * feedback.author.stars }}{{ "☆" * (5 - feedback.author.stars) }}</span><span class="public-visually-hidden">{{ feedback.author.stars }} out of 5 stars</span></p>
+                    {% if feedback.author.note %}
+                    <blockquote class="public-feedback-note"><p data-md="plain">{{ feedback.author.note }}</p></blockquote>
+                    {% else %}
+                    <p>The author cooked this.</p>
+                    {% endif %}
+                    {% set feedback_author_name = author_display_name(recipe.user) %}{% if feedback_author_name %}<p class="public-feedback-byline">{{ feedback_author_name }}</p>{% endif %}
+                </div>
+                {% endif %}
+                {% if feedback.notes %}
+                <ul class="public-feedback-notes">
+                    {% for note in feedback.notes %}
+                    <li>
+                        <blockquote class="public-feedback-note"><p data-md="plain">{{ note.text }}</p></blockquote>
+                        <p class="public-feedback-byline">{{ note.name }} · {{ note.month }}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% if feedback.notes_truncated %}
+                <p class="public-feedback-byline">Showing the 50 newest notes.</p>
+                {% endif %}
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+        <p class="public-feedback-cta"><a href="{{ spa_feedback_url }}">Cooked this? Add your feedback</a></p>
+    </section>
 
     {% if tags %}
     <section class="public-recipe-tags">
