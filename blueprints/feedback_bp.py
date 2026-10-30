@@ -473,23 +473,48 @@ def moderation_reminder():
 
 
 def public_feedback_summary(recipe: Recipe, now: datetime | None = None) -> dict[str, Any] | None:
-    """What the public page shows, or None when the query fails (render no block).
+    """What the public page shows, or None when a query fails (render no block).
 
-    One query and one age predicate feed the count, the average, the notes and
-    ``aggregateRating`` together, so they cannot disagree at the 24-hour mark (E4).
+    One visibility predicate, built once with one ``now``, feeds the count, the
+    average, the notes and ``aggregateRating``, so they cannot disagree at the
+    24-hour mark (E4). The count and average are one SQL aggregate, and only
+    the newest notes are loaded, so a popular recipe costs no more per view.
     """
     now = now or datetime.utcnow()
+    visible = (
+        RecipeFeedback.recipe_id == recipe.id,
+        RecipeFeedback.deleted_at.is_(None),
+        RecipeFeedback.entry_hidden.is_(False),
+        User.created_at <= now - ACCOUNT_AGE_BEFORE_PUBLIC,
+    )
+    author_id = recipe.user_id
+    cook_only = (RecipeFeedback.user_id != author_id,) if author_id is not None else ()
     try:
-        rows = (
+        count, mean = (
+            db.session.query(db.func.count(RecipeFeedback.id), db.func.avg(RecipeFeedback.stars))
+            .join(User, User.id == RecipeFeedback.user_id)
+            .filter(*visible, *cook_only)
+            .one()
+        )
+        author: RecipeFeedback | None = None
+        if author_id is not None:
+            author = (
+                RecipeFeedback.query.join(User, User.id == RecipeFeedback.user_id)
+                .filter(*visible, RecipeFeedback.user_id == author_id)
+                .first()
+            )
+        note_rows = (
             db.session.query(RecipeFeedback, User)
             .join(User, User.id == RecipeFeedback.user_id)
             .filter(
-                RecipeFeedback.recipe_id == recipe.id,
-                RecipeFeedback.deleted_at.is_(None),
-                RecipeFeedback.entry_hidden.is_(False),
-                User.created_at <= now - ACCOUNT_AGE_BEFORE_PUBLIC,
+                *visible,
+                *cook_only,
+                RecipeFeedback.note.isnot(None),
+                RecipeFeedback.note != "",
+                RecipeFeedback.note_status.in_(PUBLIC_NOTE_STATUSES),
             )
             .order_by(RecipeFeedback.created_at.desc(), RecipeFeedback.id.desc())
+            .limit(PUBLIC_NOTES_CAP + 1)
             .all()
         )
     except Exception:  # noqa: BLE001 — the recipe page must not go down with this
@@ -497,19 +522,9 @@ def public_feedback_summary(recipe: Recipe, now: datetime | None = None) -> dict
         db.session.rollback()
         return None
 
-    author = None
-    cooks: list[tuple[RecipeFeedback, User]] = []
-    for entry, user in rows:
-        if recipe.user_id is not None and user.id == recipe.user_id:
-            author = entry
-        else:
-            cooks.append((entry, user))
-
-    count = len(cooks)
+    count = int(count or 0)
     average = (
-        round(sum(entry.stars for entry, _ in cooks) / count, 1)
-        if count >= AGGREGATE_RATING_MIN_COOKS
-        else None
+        round(float(mean), 1) if count >= AGGREGATE_RATING_MIN_COOKS and mean is not None else None
     )
     public_notes = [
         {
@@ -517,8 +532,7 @@ def public_feedback_summary(recipe: Recipe, now: datetime | None = None) -> dict
             "name": first_name(user),
             "month": entry.created_at.strftime("%B %Y"),
         }
-        for entry, user in cooks
-        if entry.note and entry.note_status in PUBLIC_NOTE_STATUSES
+        for entry, user in note_rows
     ]
     return {
         "count": count,
