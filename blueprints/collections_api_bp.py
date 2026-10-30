@@ -30,6 +30,7 @@ from utils.cache_utils import (
     safe_set,
 )
 from utils.log_sanitizer import sanitize_log_value
+from utils.request_utils import json_object_body
 from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
@@ -110,7 +111,9 @@ def create_collection(user_id, guest_session_id):
     Duplicate names within the caller's scope are rejected with 409.
     """
     try:
-        data = request.get_json()
+        data, bad_body = json_object_body()
+        if bad_body:
+            return bad_body
         if not data or not data.get("name"):
             return jsonify({"error": "name is required"}), 400
 
@@ -252,7 +255,9 @@ def add_recipe_to_collection(user_id, guest_session_id, collection_id):
     Request body: {"recipe_id": "<uuid>"}
     """
     try:
-        data = request.get_json()
+        data, bad_body = json_object_body()
+        if bad_body:
+            return bad_body
         recipe_id = data.get("recipe_id") if data else None
         if not recipe_id:
             return jsonify({"error": "recipe_id is required"}), 400
