@@ -46,6 +46,7 @@ from models.recipe_feedback import (
 )
 from services import feedback_mail
 from utils.admin_auth import require_admin
+from utils.log_sanitizer import sanitize_log_value
 
 logger = logging.getLogger(__name__)
 
@@ -359,7 +360,11 @@ def moderation_lists():
         .all()
     )
     unreviewed = (
-        base.filter(RecipeFeedback.note_status == NOTE_PUBLISHED)
+        base.filter(
+            RecipeFeedback.note_status == NOTE_PUBLISHED,
+            RecipeFeedback.deleted_at.is_(None),
+            RecipeFeedback.entry_hidden.is_(False),
+        )
         .order_by(RecipeFeedback.created_at.desc())
         .limit(MODERATION_LIST_CAP)
         .all()
@@ -439,7 +444,10 @@ def moderate(entry_id: int, action: str):
 
     db.session.commit()
     logger.info(
-        "feedback_moderated action=%s entry=%s moderator=%s", action, entry.id, moderator.id
+        "feedback_moderated action=%s entry=%s moderator=%s",
+        sanitize_log_value(action),
+        entry.id,
+        moderator.id,
     )
     return jsonify({"entry": _moderation_row(entry, now)})
 
