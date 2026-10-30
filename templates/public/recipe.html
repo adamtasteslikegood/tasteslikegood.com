@@ -229,7 +229,7 @@
                 {% if feedback.author %}
                 <div class="public-feedback-author">
                     {% if feedback.count %}<h3>From the author</h3>{% endif %}
-                    <p class="public-feedback-stars"><span aria-hidden="true">{{ "★" * feedback.author.stars }}{{ "☆" * (5 - feedback.author.stars) }}</span><span class="public-visually-hidden">{{ feedback.author.stars }} out of 5 stars</span></p>
+                    <p class="public-feedback-stars"><span aria-hidden="true">{% for _ in range(feedback.author.stars) %}★{% endfor %}{% for _ in range(5 - feedback.author.stars) %}☆{% endfor %}</span><span class="public-visually-hidden">{{ feedback.author.stars }} out of 5 stars</span></p>
                     {% if feedback.author.note %}
                     <blockquote class="public-feedback-note"><p data-md="plain">{{ feedback.author.note }}</p></blockquote>
                     {% else %}
