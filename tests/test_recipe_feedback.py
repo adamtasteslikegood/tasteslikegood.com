@@ -445,7 +445,6 @@ def test_moderation_lists(client, world, moderator):
     assert row["recipe"]["slug"] == target.slug
 
 
-
 def test_hidden_and_deleted_published_entries_do_not_duplicate_moderation_lists(
     client, world, moderator
 ):
