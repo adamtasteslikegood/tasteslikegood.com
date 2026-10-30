@@ -29,6 +29,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify, request, session
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import joinedload
 
 from extensions import db
 from models import Recipe, User
@@ -348,7 +349,9 @@ def moderation_lists():
     if refused:
         return refused
     now = datetime.utcnow()
-    base = RecipeFeedback.query
+    base = RecipeFeedback.query.options(
+        joinedload(RecipeFeedback.user), joinedload(RecipeFeedback.recipe)
+    )
     held = (
         base.filter(
             RecipeFeedback.note_status == NOTE_HELD,
