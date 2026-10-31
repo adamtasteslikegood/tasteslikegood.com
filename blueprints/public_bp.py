@@ -31,6 +31,7 @@ from flask.typing import ResponseReturnValue
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
 
+from blueprints.feedback_bp import aggregate_rating_json_ld, public_feedback_summary
 from extensions import db
 from models import Recipe, RetiredSlug
 from services.public_hubs import (
@@ -129,6 +130,7 @@ from services.tag_hubs import (
     HUBS_BY_SLUG,
     MIN_INDEXABLE_RECIPES,
 )
+from utils.brand_author import author_display_name
 
 public_bp = Blueprint("public", __name__)
 
@@ -138,7 +140,7 @@ NEWEST_RECIPES_MAX = 12
 
 @public_bp.app_context_processor
 def _inject_footer_hubs() -> dict[str, Any]:
-    return {"footer_hubs": _footer_hubs}
+    return {"footer_hubs": _footer_hubs, "author_display_name": author_display_name}
 
 
 def _missing_recipe_response(
@@ -221,6 +223,14 @@ def show_public_recipe(slug):
     # KAN-388: the title and description the metadata engine wrote, when it has
     # a version for this content; plain truncation until then.
     metadata = metadata_for_page(recipe)
+    # KAN-356: cooks' feedback. One query feeds the section, the toolbar line
+    # and aggregateRating, so they agree; None (query failed) renders the link
+    # line only and leaves the rest of the page as it was.
+    feedback = public_feedback_summary(recipe)
+    recipe_json_ld = _recipe_json_ld(recipe, canonical_url, image_url)
+    aggregate_rating = aggregate_rating_json_ld(feedback)
+    if aggregate_rating:
+        recipe_json_ld["aggregateRating"] = aggregate_rating
 
     return render_template(
         "public/recipe.html",
@@ -244,7 +254,9 @@ def show_public_recipe(slug):
         ingredient_groups=_recipe_ingredient_groups(data),
         instructions=instructions,
         tags=tags,
-        recipe_json_ld=_recipe_json_ld(recipe, canonical_url, image_url),
+        recipe_json_ld=recipe_json_ld,
+        feedback=feedback,
+        spa_feedback_url=f"{_public_base_url()}/?feedback={recipe.slug}",
         pinterest_share_url=(
             _pinterest_share_url(canonical_url, pinterest_image_url, pin_description)
             if pinterest_image_url and pin_description

@@ -7,6 +7,7 @@ Provides RESTful API endpoints for frontend authentication:
 - /api/auth/logout - Clear authentication session
 """
 
+import hmac
 import logging
 import os
 from functools import wraps
@@ -24,6 +25,7 @@ from services.oauth_flow import (
     _merge_guest_session_into_user,
     _recipe_identity_keys,
     _remap_recipe_ids,
+    build_frontend_auth_cancelled_url,
     build_frontend_auth_redirect_url,
     build_login_authorization_url,
     build_oauth_client_config,
@@ -123,6 +125,22 @@ def api_callback():
     with user credentials and info, then redirects to frontend.
     """
     state = session.get("state")
+
+    # KAN-356 (E2, O7): the cook refused or cancelled at Google, which returns
+    # here with ``error=``. Check the state first, exactly as the token exchange
+    # does: a missing, mismatched or replayed state is refused and nothing in
+    # the session is touched. A matching one clears the one-time OAuth values
+    # and sends the cook back to the app, which saves as a guest and offers
+    # sign-in again. The redirect target is fixed; nothing from the request
+    # goes into it.
+    if request.args.get("error") is not None:
+        returned_state = request.args.get("state") or ""
+        if not state or not hmac.compare_digest(str(state), returned_state):
+            return jsonify({"error": "State mismatch"}), 400
+        session.pop("state", None)
+        session.pop("code_verifier", None)
+        return redirect(build_frontend_auth_cancelled_url())
+
     if not state:
         return jsonify({"error": "State missing from session"}), 400
 
@@ -204,6 +222,7 @@ def api_me():
             "created_at": "2026-03-01T12:00:00"
         }
     """
+    from blueprints.feedback_bp import is_moderator
     from models import User
 
     user_id = session.get("user_id")
@@ -221,6 +240,9 @@ def api_me():
                     **user.to_dict(),
                     "picture": user_info.get("picture"),  # Picture not stored in DB
                     "authenticated": True,
+                    # KAN-356 (R2): the app shows the moderation view only when
+                    # the server says so; every action is checked again there.
+                    "is_moderator": is_moderator(user),
                 }
             ),
             200,
@@ -302,6 +324,7 @@ __all__ = [
     "api_logout",
     "api_me",
     "auth_api_bp",
+    "build_frontend_auth_cancelled_url",
     "build_frontend_auth_redirect_url",
     "build_login_authorization_url",
     "build_oauth_client_config",

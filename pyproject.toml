@@ -35,7 +35,7 @@ dependencies = [
     # ships psycopg2-binary (postgres extra), so 2.1.1 broke the migrate job.
     "sqlalchemy>=2.0.51,<2.1", # Use stable 2.0.x with Python 3.13 support
     # Google AI & Authentication
-    "google-genai==2.31.0",
+    "google-genai==2.33.0",
     "google-generativeai==0.8.6",
     "google-ai-generativelanguage==0.6.15",
     "google-auth==2.62.0",
@@ -60,7 +60,7 @@ dependencies = [
     "requests==2.34.2",
     "requests-oauthlib==2.0.0",
     "urllib3==2.8.0",
-    "certifi==2026.10.19",
+    "certifi==2026.10.23",
     "charset-normalizer==3.5.2",
     "idna==3.20",
     # Utilities
@@ -72,11 +72,11 @@ dependencies = [
     "typing-extensions==4.16.0",
     "tenacity==9.1.4",
     "websockets==16.1.1",
-    "cachetools==7.2.4",
+    "cachetools==7.2.6",
     # Imaging — sized WebP variants of recipe photos (KAN-271)
     "pillow==13.0.0",
     # Cryptography & Security
-    "pyasn1==0.6.4",
+    "pyasn1==0.6.5",
     "pyasn1-modules==0.4.2",
     "rsa==4.9.1",
     "flask-cors==6.0.5",
