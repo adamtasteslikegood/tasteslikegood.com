@@ -718,7 +718,7 @@ def test_fifty_newest_notes_then_the_line(client, world):
 def test_the_24_hours_apply_to_count_average_notes_and_rating_together(app, world):
     """E4: one age predicate. 23h59m absent from everything; 24h00m present."""
     _, target = world
-    created = datetime(2026, 10, 1, 12, 0, 0)
+    created = datetime.utcnow().replace(microsecond=0)
     for email in ["a@example.com", "b@example.com"]:
         _entry(target, _user(email), stars=5)
     newcomer = User(email="new@example.com", name="Nia New", created_at=created)
