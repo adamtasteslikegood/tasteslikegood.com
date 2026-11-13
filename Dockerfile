@@ -10,7 +10,7 @@ COPY pyproject.toml uv.lock ./
 RUN uv export --format requirements-txt --no-dev --extra postgres \
     --no-hashes --no-emit-project --frozen -o /requirements.txt
 
-FROM python:3.13-slim
+FROM python:3.15-slim
 COPY --from=datadog/serverless-init:1 /datadog-init /app/datadog-init
 
 ENV PYTHONDONTWRITEBYTECODE=1
