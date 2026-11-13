@@ -26,6 +26,7 @@ from blueprints.agent_api_bp import agent_api_bp
 from blueprints.api_bp import api_bp
 from blueprints.auth_api_bp import auth_api_bp
 from blueprints.collections_api_bp import collections_api_bp
+from blueprints.feedback_bp import feedback_bp
 from blueprints.generation_api_bp import generation_api_bp
 from blueprints.generation_bp import generation_bp
 from blueprints.mcp_bp import mcp_bp
@@ -360,6 +361,7 @@ def create_app(**config_overrides):
     app.register_blueprint(recipes_api_bp)  # Prefix '/api/recipes' set in blueprint
     app.register_blueprint(collections_api_bp)  # Prefix '/api/collections' set in blueprint
     app.register_blueprint(worker_api_bp)  # Prefix '/api/worker' set in blueprint
+    app.register_blueprint(feedback_bp)  # Prefix '/api/feedback' (KAN-356)
 
     # Error handlers
     @app.errorhandler(404)

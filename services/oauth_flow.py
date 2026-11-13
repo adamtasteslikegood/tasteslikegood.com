@@ -320,3 +320,9 @@ def build_frontend_auth_redirect_url() -> str:
     """Return the post-login frontend redirect URL (302 target, CSP-safe)."""
     frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
     return f"{frontend_url}?auth=success"
+
+
+def build_frontend_auth_cancelled_url() -> str:
+    """Where a sign-in the user cancelled at Google lands (KAN-356, E2)."""
+    frontend_url = os.environ.get("FRONTEND_URL", "http://localhost:3000")
+    return f"{frontend_url}?auth=cancelled"

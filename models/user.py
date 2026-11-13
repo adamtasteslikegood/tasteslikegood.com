@@ -9,6 +9,10 @@ class User(db.Model):  # type: ignore[name-defined, misc]
     name = db.Column(db.String(100), nullable=True)
     google_id = db.Column(db.String(100), unique=True, nullable=True)
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    # Recipe feedback (KAN-356, A1): true once a moderator has approved one of
+    # this account's notes; its later notes then publish without review. A
+    # moderator hiding any of its notes or entries clears it again.
+    feedback_trusted = db.Column(db.Boolean, nullable=False, default=False, server_default="0")
 
     def to_dict(self):
         return {

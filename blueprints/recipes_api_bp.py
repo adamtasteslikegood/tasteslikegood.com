@@ -11,7 +11,7 @@ Provides database-backed recipe CRUD operations:
 
 import logging
 
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, session
 
 from extensions import db
 from models import RetiredSlug
@@ -27,6 +27,7 @@ from utils.cache_utils import (
     safe_set,
 )
 from utils.log_sanitizer import sanitize_log_value
+from utils.request_utils import json_object_body
 from utils.session_utils import get_or_create_session_id
 
 logger = logging.getLogger(__name__)
@@ -155,7 +156,9 @@ def create_recipe(user_id, guest_session_id):
         Created recipe with ID
     """
     try:
-        recipe_data = request.get_json()
+        recipe_data, bad_body = json_object_body()
+        if bad_body:
+            return bad_body
 
         if not recipe_data:
             return jsonify({"error": "No recipe data provided"}), 400
@@ -266,7 +269,9 @@ def update_recipe(user_id, guest_session_id, recipe_id):
         }
     """
     try:
-        recipe_data = request.get_json()
+        recipe_data, bad_body = json_object_body()
+        if bad_body:
+            return bad_body
 
         if not recipe_data:
             return jsonify({"error": "No recipe data provided"}), 400

@@ -22,6 +22,7 @@ from services.recipe_metadata import (
     SITE_TITLE_SUFFIX,
     truncate_description,
 )
+from utils.brand_author import author_display_name
 
 _T = TypeVar("_T")
 
@@ -351,9 +352,7 @@ def _recipe_json_ld(recipe: Recipe, canonical_url: str, image_url: str | None) -
         if (formatted := _format_ingredient(ingredient))
     ]
 
-    author_name = None
-    if recipe.user and recipe.user.name:
-        author_name = recipe.user.name
+    author_name = author_display_name(recipe.user)
 
     json_ld = {
         "@context": "https://schema.org",

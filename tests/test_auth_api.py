@@ -163,3 +163,51 @@ def test_callback_returns_302_redirect_not_inline_script(db_app):
     # The failure mode we are guarding against: a 200 body containing an inline
     # script that the CSP would refuse to execute.
     assert b"<script" not in resp.data
+
+
+# --- KAN-356 (E2, O7): Google sign-in cancelled or refused -------------------
+
+
+def _seed_oauth_state(client, state="test-state"):
+    with client.session_transaction() as sess:
+        sess["state"] = state
+        sess["code_verifier"] = "test-verifier"
+
+
+def test_callback_error_with_matching_state_redirects_to_cancelled(db_app):
+    client = db_app.test_client()
+    _seed_oauth_state(client)
+    with patch.dict(os.environ, {"FRONTEND_URL": "https://tasteslikegood.org"}):
+        resp = client.get("/api/auth/callback?error=access_denied&state=test-state")
+    assert resp.status_code == 302
+    assert resp.headers["Location"] == "https://tasteslikegood.org?auth=cancelled"
+    with client.session_transaction() as sess:
+        assert "state" not in sess
+        assert "code_verifier" not in sess
+
+
+def test_callback_error_with_missing_state_is_refused(db_app):
+    client = db_app.test_client()
+    resp = client.get("/api/auth/callback?error=access_denied&state=test-state")
+    assert resp.status_code == 400
+    assert "Location" not in resp.headers
+
+
+def test_callback_error_with_mismatched_state_is_refused_and_keeps_session(db_app):
+    client = db_app.test_client()
+    _seed_oauth_state(client)
+    resp = client.get("/api/auth/callback?error=access_denied&state=forged")
+    assert resp.status_code == 400
+    assert "Location" not in resp.headers
+    with client.session_transaction() as sess:
+        assert sess["state"] == "test-state"
+        assert sess["code_verifier"] == "test-verifier"
+
+
+def test_callback_error_replayed_is_refused(db_app):
+    client = db_app.test_client()
+    _seed_oauth_state(client)
+    first = client.get("/api/auth/callback?error=access_denied&state=test-state")
+    assert first.status_code == 302
+    replay = client.get("/api/auth/callback?error=access_denied&state=test-state")
+    assert replay.status_code == 400
