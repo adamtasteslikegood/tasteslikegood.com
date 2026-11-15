@@ -403,6 +403,17 @@ img {
   padding: 0;
 }
 
+/* KAN-421: an 8x16 px digit is too small to tap. Every number, the current
+   one included so the row stays even, gets a 24x24 px box. */
+.public-page-compact a,
+.public-page-compact [aria-current='page'] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  min-height: 24px;
+}
+
 .public-page-compact a {
   color: inherit;
   text-decoration: underline;
