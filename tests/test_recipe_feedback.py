@@ -570,7 +570,7 @@ def _page(client, target):
 def test_no_entries_renders_the_link_line_only(client, world):
     _, target = world
     body = _page(client, target)
-    assert "Cooked this? Add your feedback" in body
+    assert "Cooked this? Sign in to add your feedback" in body
     assert f"/?feedback={target.slug}" in body
     assert "Cooked by" not in body
     assert "From the author" not in body
@@ -658,7 +658,10 @@ def test_three_cooks_show_average_and_matching_aggregate_rating(client, world):
     for email, stars in [("a@example.com", 5), ("b@example.com", 4), ("c@example.com", 4)]:
         _entry(target, _user(email), stars=stars)
     body = _page(client, target)
-    assert "Cooked by 3" in body
+    assert "Cooked by 3 people</h2>" in body
+    # The action is the panel's last row, not a line under the box.
+    panel = body[body.index('id="feedback"') :].split("</section>")[0]
+    assert panel.rindex("public-feedback-cta") < panel.rindex("</div>")
     assert "4.3 ★ average from 3 cooks" in body
     rating = _json_ld(body)["aggregateRating"]
     assert rating["ratingValue"] == 4.3
@@ -672,6 +675,7 @@ def test_hidden_entry_leaves_count_and_hidden_note_keeps_stars(client, world):
     _entry(target, _user("b@example.com"), stars=3, note="Hidden text", status="hidden")
     body = _page(client, target)
     assert "Cooked by 1" in body
+    assert "Cooked by 1 person</h2>" in body
     assert "Hidden text" not in body
 
 
@@ -753,7 +757,7 @@ def test_summary_failure_renders_the_page_with_the_link_only(client, world):
     _entry(target, _user("a@example.com"))
     with patch("blueprints.feedback_bp.db.session.query", side_effect=RuntimeError("db")):
         body = _page(client, target)
-    assert "Cooked this? Add your feedback" in body
+    assert "Cooked this? Sign in to add your feedback" in body
     assert "Cooked by" not in body
 
 

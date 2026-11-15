@@ -216,11 +216,13 @@
        Note text is escaped by Jinja and marked data-md="plain" so the Markdown
        view renders it as literal text (KAN-356 comment, 2026-10-18). #}
     {% set has_feedback = feedback and (feedback.count or feedback.author) %}
+    {# The link starts Google sign-in for a signed-out cook, so it says so. #}
+    {% macro feedback_cta() %}<p class="public-feedback-cta"><a href="{{ spa_feedback_url }}">Cooked this? Sign in to add your feedback</a></p>{% endmacro %}
     <section id="feedback" class="public-recipe-feedback"{% if has_feedback %} aria-labelledby="feedback-heading"{% endif %}>
         {% if has_feedback %}
         <div class="public-recipe-panel">
             <header class="public-recipe-panel-header">
-                <h2 id="feedback-heading">{% if feedback.count %}Cooked by {{ feedback.count }}{% else %}From the author{% endif %}</h2>
+                <h2 id="feedback-heading">{% if feedback.count %}Cooked by {{ feedback.count }} {{ "person" if feedback.count == 1 else "people" }}{% else %}From the author{% endif %}</h2>
             </header>
             <div class="public-recipe-panel-body">
                 {% if feedback.average is not none %}
@@ -252,9 +254,12 @@
                 {% endif %}
                 {% endif %}
             </div>
+            {# The action closes the panel it belongs to (Adam, 2026-11-15). #}
+            {{ feedback_cta() }}
         </div>
+        {% else %}
+        {{ feedback_cta() }}
         {% endif %}
-        <p class="public-feedback-cta"><a href="{{ spa_feedback_url }}" class="public-recipe-action-link">Cooked this? Add your feedback</a></p>
     </section>
 
     {% if tags %}
