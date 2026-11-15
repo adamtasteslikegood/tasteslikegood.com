@@ -739,6 +739,7 @@ img {
 .public-feedback-cta a {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   min-height: 44px;
 }
 
