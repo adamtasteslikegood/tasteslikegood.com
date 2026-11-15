@@ -663,10 +663,9 @@ img {
 }
 
 /* KAN-356: cooks' feedback (design R9, R12, R14). The plain panel, not the
-   yellow "Chef's notes" treatment; notes are a list split by the border rule. */
-.public-recipe-feedback {
-  max-width: 65ch;
-}
+   yellow "Chef's notes" treatment; notes are a list split by the border rule.
+   The section spans the content column like every other section on the page
+   (Adam, 2026-11-15); only the note text keeps a 65-character line. */
 
 .public-recipe-feedback .public-recipe-panel-body {
   font-family: var(--font-body);
@@ -710,6 +709,7 @@ img {
 
 .public-feedback-note p {
   margin: 0;
+  max-width: 65ch;
   overflow-wrap: anywhere;
   white-space: pre-line;
 }
@@ -724,7 +724,13 @@ img {
   margin: var(--space-4) 0 0;
 }
 
-.public-feedback-cta a,
+/* The add-feedback action is a button like the other recipe actions. */
+.public-feedback-cta a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+
 .public-recipe-meta-feedback a {
   color: inherit;
   display: inline-block;
