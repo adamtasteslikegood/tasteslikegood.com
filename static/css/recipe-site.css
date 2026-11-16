@@ -861,6 +861,7 @@ img {
 
   .public-nav-link,
   .public-recipe-action-link,
+  .public-feedback-cta a,
   .public-browse-pagination .public-page-step,
   .public-save-cta {
     width: 100%;
