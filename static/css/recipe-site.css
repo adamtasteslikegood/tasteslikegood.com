@@ -678,6 +678,11 @@ img {
    The section spans the content column like every other section on the page
    (Adam, 2026-11-15); only the note text keeps a 65-character line. */
 
+/* "Cooked by N" in the toolbar jumps here; keep the heading off the viewport edge. */
+.public-recipe-feedback {
+  scroll-margin-top: var(--space-6);
+}
+
 .public-recipe-feedback .public-recipe-panel-body {
   font-family: var(--font-body);
   font-size: var(--text-base);
@@ -725,6 +730,15 @@ img {
   white-space: pre-line;
 }
 
+/* A cook's own words: quotation marks, no card and no coloured edge (R14). */
+.public-feedback-note p::before {
+  content: open-quote;
+}
+
+.public-feedback-note p::after {
+  content: close-quote;
+}
+
 .public-feedback-byline {
   margin: var(--space-2) 0 0;
   color: var(--fg-secondary);
@@ -735,12 +749,36 @@ img {
   margin: var(--space-4) 0 0;
 }
 
-/* The add-feedback action is a button like the other recipe actions. */
+/* Inside the panel the action is its last row, under the same rule that
+   splits the notes. */
+.public-recipe-panel > .public-feedback-cta {
+  margin: 0;
+  border-top: var(--ar-border);
+  padding: var(--space-4);
+}
+
+/* The add-feedback action is the section's one action, so it takes the filled
+   style of "Save to your cookbook" (Adam, 2026-11-15). */
 .public-feedback-cta a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   min-height: 44px;
+  border: var(--ar-border);
+  padding: 0.75rem 1rem;
+  background: var(--ar-black);
+  color: var(--fg-inverted);
+  font-size: var(--text-xs);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-wider);
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.public-feedback-cta a:hover {
+  background: var(--bg-surface);
+  color: var(--ar-black);
 }
 
 .public-recipe-meta-feedback a {
@@ -752,7 +790,7 @@ img {
 
 .public-feedback-cta a:focus-visible,
 .public-recipe-meta-feedback a:focus-visible {
-  outline: 2px solid currentColor;
+  outline: 2px solid var(--ar-black);
   outline-offset: 2px;
 }
 
@@ -823,6 +861,7 @@ img {
 
   .public-nav-link,
   .public-recipe-action-link,
+  .public-feedback-cta a,
   .public-browse-pagination .public-page-step,
   .public-save-cta {
     width: 100%;
