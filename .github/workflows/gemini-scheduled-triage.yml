@@ -241,8 +241,11 @@ jobs:
             // Only touch issues that were in this batch, in case the issue
             // text prompt-injected other issue numbers.
             const batch = new Set(JSON.parse(process.env.ISSUE_NUMBERS || '[]'));
+            // Normalize issue_number first: the model may return "123".
             const triagedIssues = parsed
-              .filter((issue) => issue && batch.has(issue.issue_number))
+              .filter((issue) => issue && typeof issue === 'object')
+              .map((issue) => ({ ...issue, issue_number: Number(issue.issue_number) }))
+              .filter((issue) => Number.isInteger(issue.issue_number) && batch.has(issue.issue_number))
               .sort((a, b) => a.issue_number - b.issue_number)
 
             core.debug(`Triaged issues: ${JSON.stringify(triagedIssues)}`);
