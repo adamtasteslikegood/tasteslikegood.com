@@ -265,7 +265,10 @@ jobs:
 
               // Extract and reject invalid labels - we do this just in case
               // someone was able to prompt inject malicious labels.
-              let labelsToAdd = (issue.labels_to_set || [])
+              // Skip malformed entries instead of failing the whole batch.
+              const rawLabels = Array.isArray(issue.labels_to_set) ? issue.labels_to_set : [];
+              let labelsToAdd = rawLabels
+                .filter((label) => typeof label === 'string')
                 .map((label) => label.trim())
                 .filter((label) => availableLabels.includes(label))
                 .sort()
