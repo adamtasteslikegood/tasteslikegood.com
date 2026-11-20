@@ -23,6 +23,7 @@ from google.genai import types as genai_types
 from google.genai.errors import APIError, ServerError
 from google.oauth2 import id_token
 from httpx import TransportError
+from httpx2 import TransportError as Httpx2TransportError
 
 from blueprints.generation_bp import attempt_recipe_generation
 from config import (
@@ -341,6 +342,7 @@ def _is_retryable_image_error(error):
             RetryableImageError,
             ServerError,
             TransportError,
+            Httpx2TransportError,
             RuntimeError,
             TimeoutError,
             ConnectionError,
