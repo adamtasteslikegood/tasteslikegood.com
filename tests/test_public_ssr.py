@@ -1618,7 +1618,8 @@ def test_recipe_json_ld_names_the_site_as_publisher_and_fallback_author(app, cli
 
 def test_recipe_json_ld_keeps_a_named_owner_as_author(app, client):
     with app.app_context():
-        owner = User(email="owner-433@example.com", name="Sam Cook")
+        # Not user id 1: that is the site account, named by utils.brand_author (KAN-434).
+        owner = User(id=2, email="owner-433@example.com", name="Sam Cook")
         db.session.add(owner)
         db.session.flush()
         db.session.add(_make_recipe("Owner Stew", "owner-stew", owner=owner))
