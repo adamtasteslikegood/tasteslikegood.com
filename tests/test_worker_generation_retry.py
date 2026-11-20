@@ -427,9 +427,7 @@ def test_image_worker_records_terminal_generation_failure(app, client):
     ("timeout_type", "request_type"),
     [(ReadTimeout, Request), (Httpx2ReadTimeout, Httpx2Request)],
 )
-def test_image_worker_retries_http_transport_failure(
-    app, client, timeout_type, request_type
-):
+def test_image_worker_retries_http_transport_failure(app, client, timeout_type, request_type):
     recipe_id = str(uuid.uuid4())
     with app.app_context():
         _make_pending_recipe(recipe_id, status="ready")
