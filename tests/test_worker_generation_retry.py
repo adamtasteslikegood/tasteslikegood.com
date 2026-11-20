@@ -23,6 +23,8 @@ from unittest.mock import patch
 
 import pytest
 from httpx import ReadTimeout, Request
+from httpx2 import ReadTimeout as Httpx2ReadTimeout
+from httpx2 import Request as Httpx2Request
 
 sys.path.append(str(Path(__file__).resolve().parent.parent))
 
@@ -421,14 +423,21 @@ def test_image_worker_records_terminal_generation_failure(app, client):
         assert recipe.data["ai_metadata"]["image_generation"]["success"] is False
 
 
-def test_image_worker_retries_http_transport_failure(app, client):
+@pytest.mark.parametrize(
+    ("timeout_type", "request_type"),
+    [(ReadTimeout, Request), (Httpx2ReadTimeout, Httpx2Request)],
+)
+def test_image_worker_retries_http_transport_failure(app, client, timeout_type, request_type):
     recipe_id = str(uuid.uuid4())
     with app.app_context():
         _make_pending_recipe(recipe_id, status="ready")
 
     class FakeModels:
         def generate_content(self, **kwargs):
-            raise ReadTimeout("Imagen timed out", request=Request("POST", "https://example.test"))
+            raise timeout_type(
+                "Imagen timed out",
+                request=request_type("POST", "https://example.test"),
+            )
 
     class FakeClient:
         models = FakeModels()
