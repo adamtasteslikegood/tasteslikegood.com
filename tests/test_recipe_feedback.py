@@ -356,6 +356,21 @@ def test_approve_trusts_the_account_and_later_notes_publish(client, world, moder
     )
 
 
+def test_hidden_held_entry_cannot_be_approved_or_restore_trust(
+    client, world, moderator
+):
+    _, target = world
+    cook, entry_id = _held_entry(client, target, "cook@example.com")
+    _sign_in(client, moderator)
+    assert _moderate(client, entry_id, "hide-entry").status_code == 200
+
+    response = _moderate(client, entry_id, "approve")
+    assert response.status_code == 409
+    assert response.get_json()["code"] == "entry_hidden"
+    assert db.session.get(RecipeFeedback, entry_id).note_status == "held"
+    assert db.session.get(User, cook.id).feedback_trusted is False
+
+
 def test_reject_keeps_stars_and_account_stays_held(client, world, moderator):
     _, target = world
     cook, entry_id = _held_entry(client, target, "cook@example.com")
