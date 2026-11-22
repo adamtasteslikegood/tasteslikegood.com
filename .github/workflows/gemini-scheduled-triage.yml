@@ -44,7 +44,13 @@ jobs:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     outputs:
       available_labels: '${{ steps.get_labels.outputs.available_labels }}'
-      triaged_issues: '${{ env.TRIAGED_ISSUES }}'
+      # Gemini returns the triage JSON as its final response, which
+      # run-gemini-cli exposes as the `summary` output. (The bundled prompt
+      # wrote it to $GITHUB_ENV instead; gemini-cli now denies that shell
+      # redirection, so every batch ran out of turns and nothing was ever
+      # labelled.)
+      triaged_issues: '${{ steps.gemini_issue_analysis.outputs.summary }}'
+      issue_numbers: '${{ steps.find_issues.outputs.issue_numbers }}'
     steps:
       - name: 'Get repository labels'
         id: 'get_labels'
@@ -102,8 +108,40 @@ jobs:
           echo '📝 Setting output for GitHub Actions...'
           echo "issues_to_triage=${ISSUES}" >> "${GITHUB_OUTPUT}"
 
+          ISSUE_NUMBERS="$(echo "${ISSUES}" | jq -c '[.[].number]')"
+          echo "issue_numbers=${ISSUE_NUMBERS}" >> "${GITHUB_OUTPUT}"
+
           ISSUE_COUNT="$(echo "${ISSUES}" | jq 'length')"
           echo "✅ Found ${ISSUE_COUNT} issue(s) to triage! 🎯"
+
+      # Only the prompt directory: the triage job never needs the code.
+      - name: 'Checkout command prompts'
+        if: |-
+          ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
+        uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: 'false'
+          sparse-checkout: '.github/commands'
+          sparse-checkout-cone-mode: 'false'
+
+      # run-gemini-cli overwrites .gemini/commands/ with its own bundled
+      # prompts, so the repo prompt uses a unique tlg-* name (same pattern as
+      # gemini-invoke.yml). The issue data goes in a file the prompt embeds
+      # with @{...}, so Gemini needs no tools at all.
+      - name: 'Prepare prompt and context'
+        if: |-
+          ${{ steps.find_issues.outputs.issues_to_triage != '[]' }}
+        env:
+          ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+        run: |-
+          mkdir -p .gemini/commands
+          cp .github/commands/tlg-scheduled-triage.toml .gemini/commands/
+          jq -n \
+            --arg labels "${AVAILABLE_LABELS}" \
+            --arg issues "${ISSUES_TO_TRIAGE}" \
+            '{available_labels: $labels, issues_to_triage: ($issues | fromjson)}' \
+            > .gemini/context.json
 
       - name: 'Run Gemini Issue Analysis'
         id: 'gemini_issue_analysis'
@@ -112,9 +150,6 @@ jobs:
         uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0.1.22
         env:
           GITHUB_TOKEN: '' # Do not pass any auth token here since this runs on untrusted inputs
-          ISSUES_TO_TRIAGE: '${{ steps.find_issues.outputs.issues_to_triage }}'
-          REPOSITORY: '${{ github.repository }}'
-          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -139,14 +174,10 @@ jobs:
                 "outfile": ".gemini/telemetry.log"
               },
               "tools": {
-                "core": [
-                  "run_shell_command(echo)",
-                  "run_shell_command(jq)",
-                  "run_shell_command(printenv)"
-                ]
+                "core": []
               }
             }
-          prompt: '/gemini-scheduled-triage'
+          prompt: '/tlg-scheduled-triage'
 
   label:
     runs-on: 'ubuntu-latest'
@@ -178,6 +209,7 @@ jobs:
         env:
           AVAILABLE_LABELS: '${{ needs.triage.outputs.available_labels }}'
           TRIAGED_ISSUES: '${{ needs.triage.outputs.triaged_issues }}'
+          ISSUE_NUMBERS: '${{ needs.triage.outputs.issue_numbers }}'
         uses: 'actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3' # ratchet:actions/github-script@v9.0.0
         with:
           # Use the provided token so that the "gemini-cli" is the actor in the
@@ -189,8 +221,31 @@ jobs:
               .map((label) => label.trim())
               .sort()
 
-            // Parse out the triaged issues
-            const triagedIssues = (JSON.parse(process.env.TRIAGED_ISSUES || '{}'))
+            // Parse out the triaged issues. The model is told to answer with
+            // bare JSON, but tolerate a ```json fence around it.
+            const raw = (process.env.TRIAGED_ISSUES || '').trim()
+              .replace(/^```(?:json)?\s*/i, '')
+              .replace(/\s*```$/, '');
+            let parsed;
+            try {
+              parsed = JSON.parse(raw);
+            } catch (error) {
+              core.setFailed(`Gemini response is not valid JSON: ${error.message}`);
+              return;
+            }
+            if (!Array.isArray(parsed)) {
+              core.setFailed('Gemini response is not a JSON array.');
+              return;
+            }
+
+            // Only touch issues that were in this batch, in case the issue
+            // text prompt-injected other issue numbers.
+            const batch = new Set(JSON.parse(process.env.ISSUE_NUMBERS || '[]'));
+            // Normalize issue_number first: the model may return "123".
+            const triagedIssues = parsed
+              .filter((issue) => issue && typeof issue === 'object')
+              .map((issue) => ({ ...issue, issue_number: Number(issue.issue_number) }))
+              .filter((issue) => Number.isInteger(issue.issue_number) && batch.has(issue.issue_number))
               .sort((a, b) => a.issue_number - b.issue_number)
 
             core.debug(`Triaged issues: ${JSON.stringify(triagedIssues)}`);
@@ -210,7 +265,10 @@ jobs:
 
               // Extract and reject invalid labels - we do this just in case
               // someone was able to prompt inject malicious labels.
-              let labelsToAdd = (issue.labels_to_set || [])
+              // Skip malformed entries instead of failing the whole batch.
+              const rawLabels = Array.isArray(issue.labels_to_set) ? issue.labels_to_set : [];
+              let labelsToAdd = rawLabels
+                .filter((label) => typeof label === 'string')
                 .map((label) => label.trim())
                 .filter((label) => availableLabels.includes(label))
                 .sort()
