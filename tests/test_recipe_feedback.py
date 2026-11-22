@@ -69,9 +69,7 @@ def _user(email, name="Sam Rivera", age=OLD):
     return row
 
 
-def _recipe(
-    name="Classic Meringue Cookies", slug="classic-meringue-cookies", owner=None, **kw
-):
+def _recipe(name="Classic Meringue Cookies", slug="classic-meringue-cookies", owner=None, **kw):
     row = Recipe(
         id=str(uuid.uuid4()),
         user_id=owner.id if owner else None,
@@ -277,10 +275,7 @@ def test_trusted_account_note_publishes_without_review(client, world):
     cook.feedback_trusted = True
     db.session.commit()
     _sign_in(client, cook)
-    assert (
-        _post(client, target, note="Great").get_json()["entry"]["note_status"]
-        == "published"
-    )
+    assert _post(client, target, note="Great").get_json()["entry"]["note_status"] == "published"
 
 
 def test_new_account_posts_and_is_told_when_it_shows(client, world):
@@ -325,9 +320,7 @@ def test_non_moderator_is_refused_every_action(client, world, moderator):
         assert _moderate(client, entry_id, action).status_code == 403
 
 
-def test_missing_moderator_setting_refuses_everyone(
-    client, world, moderator, monkeypatch
-):
+def test_missing_moderator_setting_refuses_everyone(client, world, moderator, monkeypatch):
     _, target = world
     _, entry_id = _held_entry(client, target, "cook@example.com")
     monkeypatch.delenv("FEEDBACK_MODERATOR_EMAILS")
@@ -358,14 +351,12 @@ def test_approve_trusts_the_account_and_later_notes_publish(client, world, moder
     second = _recipe(name="Oat Cookies", slug="oat-cookies", owner=world[0])
     _copy(second, cook)
     _sign_in(client, cook)
-    assert _post(client, second, note="Also good").get_json()["entry"][
-        "note_status"
-    ] == ("published")
+    assert _post(client, second, note="Also good").get_json()["entry"]["note_status"] == (
+        "published"
+    )
 
 
-def test_hidden_held_entry_cannot_be_approved_or_restore_trust(
-    client, world, moderator
-):
+def test_hidden_held_entry_cannot_be_approved_or_restore_trust(client, world, moderator):
     _, target = world
     cook, entry_id = _held_entry(client, target, "cook@example.com")
     _sign_in(client, moderator)
@@ -389,9 +380,7 @@ def test_reject_keeps_stars_and_account_stays_held(client, world, moderator):
     assert _moderate(client, entry_id, "approve").status_code == 409
 
 
-def test_hide_note_returns_account_to_held_and_keeps_other_notes(
-    client, world, moderator
-):
+def test_hide_note_returns_account_to_held_and_keeps_other_notes(client, world, moderator):
     author, target = world
     cook, first_id = _held_entry(client, target, "cook@example.com")
     _sign_in(client, moderator)
@@ -419,9 +408,7 @@ def test_hide_note_returns_account_to_held_and_keeps_other_notes(
     assert db.session.get(User, cook.id).feedback_trusted is True
 
 
-def test_hide_entry_leaves_count_and_survives_delete_and_repost(
-    client, world, moderator
-):
+def test_hide_entry_leaves_count_and_survives_delete_and_repost(client, world, moderator):
     _, target = world
     cook, entry_id = _held_entry(client, target, "cook@example.com")
     _sign_in(client, moderator)
@@ -482,15 +469,11 @@ def test_hidden_and_deleted_published_entries_do_not_duplicate_moderation_lists(
     db.session.commit()
 
     _sign_in(client, deleted_cook)
-    deleted_id = _post(client, target, note="Published, then deleted").get_json()[
-        "entry"
-    ]["id"]
+    deleted_id = _post(client, target, note="Published, then deleted").get_json()["entry"]["id"]
     assert client.delete(f"/api/feedback/{target.id}").status_code == 200
 
     _sign_in(client, hidden_cook)
-    hidden_id = _post(client, target, note="Published, then hidden").get_json()[
-        "entry"
-    ]["id"]
+    hidden_id = _post(client, target, note="Published, then hidden").get_json()["entry"]["id"]
     _sign_in(client, moderator)
     assert _moderate(client, hidden_id, "hide-entry").status_code == 200
 
@@ -569,9 +552,7 @@ def test_reminder_needs_admin_token_and_counts_held(client, world):
 
 
 def _json_ld(body):
-    for block in re.findall(
-        r'<script type="application/ld\+json">(.*?)</script>', body, re.S
-    ):
+    for block in re.findall(r'<script type="application/ld\+json">(.*?)</script>', body, re.S):
         data = json.loads(block)
         if data.get("@type") == "Recipe":
             return data
@@ -659,9 +640,7 @@ def test_author_byline_uses_the_author_display_name(client, world, monkeypatch):
     assert "Ada Author" not in section
 
 
-def test_author_byline_is_the_account_name_for_other_authors(
-    client, world, monkeypatch
-):
+def test_author_byline_is_the_account_name_for_other_authors(client, world, monkeypatch):
     author, target = world
     _entry(target, author, stars=5)
     monkeypatch.setenv("BRAND_AUTHOR_USER_IDS", "")
@@ -777,9 +756,7 @@ def test_the_24_hours_apply_to_count_average_notes_and_rating_together(app, worl
     db.session.commit()
     _entry(target, newcomer, stars=2, note="Approved early", status="approved")
 
-    before = public_feedback_summary(
-        target, now=created + timedelta(hours=23, minutes=59)
-    )
+    before = public_feedback_summary(target, now=created + timedelta(hours=23, minutes=59))
     assert before["count"] == 2
     assert before["average"] is None
     assert before["notes"] == []
@@ -797,19 +774,14 @@ def test_authors_wait_the_24_hours_too(app):
     db.session.commit()
     target = _recipe(owner=author)
     _entry(target, author, stars=5)
-    assert (
-        public_feedback_summary(target, now=created + timedelta(hours=1))["author"]
-        is None
-    )
+    assert public_feedback_summary(target, now=created + timedelta(hours=1))["author"] is None
     assert public_feedback_summary(target, now=created + timedelta(hours=24))["author"]
 
 
 def test_summary_failure_renders_the_page_with_the_link_only(client, world):
     _, target = world
     _entry(target, _user("a@example.com"))
-    with patch(
-        "blueprints.feedback_bp.db.session.query", side_effect=RuntimeError("db")
-    ):
+    with patch("blueprints.feedback_bp.db.session.query", side_effect=RuntimeError("db")):
         body = _page(client, target)
     assert "Cooked this? Sign in to add your feedback" in body
     assert "Cooked by" not in body
@@ -826,9 +798,7 @@ def test_markdown_view_renders_notes_as_literal_text(client, world):
     response = client.get(f"/r/{target.slug}", headers={"Accept": "text/markdown"})
     assert response.status_code == 200
     markdown = response.get_data(as_text=True)
-    assert (
-        "[link](http://x.example)" in markdown
-    )  # present, but only inside a code span
+    assert "[link](http://x.example)" in markdown  # present, but only inside a code span
     line = next(row for row in markdown.splitlines() if "heading" in row)
     assert "`" in line
     code = line[line.index("`") : line.rindex("`") + 1]
