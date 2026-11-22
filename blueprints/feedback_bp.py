@@ -403,7 +403,14 @@ def moderate(entry_id: int, action: str):
         return refused
     if action not in _ACTIONS:
         return _error("Unknown action.", 404, "unknown_action")
-    entry = db.session.get(RecipeFeedback, entry_id)
+    # Serialize moderation transitions for this entry so concurrent actions cannot
+    # leave its visibility and the cook's trust flag out of sync.
+    entry = (
+        db.session.query(RecipeFeedback)
+        .filter(RecipeFeedback.id == entry_id)
+        .with_for_update()
+        .one_or_none()
+    )
     if entry is None:
         return _error("Feedback not found.", 404, "not_found")
     if entry.deleted_at is not None:
@@ -413,6 +420,12 @@ def moderate(entry_id: int, action: str):
     now = datetime.utcnow()
     cook: User = entry.user  # type: ignore[assignment]
     if action == "approve":
+        if entry.entry_hidden:
+            return _error(
+                "Show this feedback again before approving its note.",
+                409,
+                "entry_hidden",
+            )
         if entry.note_status != NOTE_HELD:
             return _error("Only a held note can be approved.", 409, "not_held")
         entry.note_status = NOTE_APPROVED
