@@ -286,7 +286,7 @@ jobs:
         if: steps.auth.outputs.present == 'true' && steps.scope.outputs.mode != 'skip'
         continue-on-error: true
         timeout-minutes: ${{ fromJSON(steps.policy.outputs.minutes) }}
-        uses: anthropics/claude-code-action@cc98b3ae241b0fcfb6a42a2690751afffecb4452 # v1
+        uses: anthropics/claude-code-action@eb56b6666facdbd501035f4a0269d8caee2e7a8b # v1
         env:
           CLAUDE_BRANCH: ${{ steps.pr.outputs.head_ref }}
           CLAUDE_CONFIG_DIR: ${{ steps.policy.outputs.config_dir }}
