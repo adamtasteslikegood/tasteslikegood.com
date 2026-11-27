@@ -45,7 +45,11 @@ jobs:
       GEMINI_CLI_TRUST_WORKSPACE: 'true'
     outputs:
       available_labels: '${{ steps.get_labels.outputs.available_labels }}'
-      selected_labels: '${{ env.SELECTED_LABELS }}'
+      # Gemini answers with the label CSV as its final response
+      # (run-gemini-cli's `summary` output). The bundled prompt appended it
+      # to $GITHUB_ENV instead, which gemini-cli now denies, so labels were
+      # never applied.
+      selected_labels: '${{ steps.gemini_analysis.outputs.summary }}'
       issue_number: '${{ steps.issue.outputs.number }}'
     steps:
       - name: 'Resolve issue'
@@ -106,6 +110,37 @@ jobs:
             core.info(`Found ${labelNames.length} labels: ${labelNames.join(', ')}`);
             return labelNames;
 
+      # Only the prompt directory: the triage job never needs the code.
+      - name: 'Checkout command prompts'
+        if: |-
+          ${{ steps.get_labels.outputs.available_labels != '' }}
+        uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # ratchet:actions/checkout@v7
+        with:
+          persist-credentials: 'false'
+          sparse-checkout: '.github/commands'
+          sparse-checkout-cone-mode: 'false'
+
+      # run-gemini-cli overwrites .gemini/commands/ with its bundled prompts,
+      # so the repo prompt uses a unique tlg-* name (as in gemini-invoke.yml).
+      # The issue goes in a file the prompt embeds with @{...}, so Gemini
+      # needs no tools.
+      - name: 'Prepare prompt and context'
+        if: |-
+          ${{ steps.get_labels.outputs.available_labels != '' }}
+        env:
+          ISSUE_TITLE: '${{ steps.issue.outputs.title }}'
+          ISSUE_BODY: '${{ steps.issue.outputs.body }}'
+          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
+        run: |-
+          mkdir -p .gemini/commands
+          cp .github/commands/tlg-triage.toml .gemini/commands/
+          jq -n \
+            --arg labels "${AVAILABLE_LABELS}" \
+            --arg title "${ISSUE_TITLE}" \
+            --arg body "${ISSUE_BODY}" \
+            '{available_labels: $labels, issue_title: $title, issue_body: $body}' \
+            > .gemini/context.json
+
       - name: 'Run Gemini issue analysis'
         id: 'gemini_analysis'
         if: |-
@@ -113,9 +148,6 @@ jobs:
         uses: 'google-github-actions/run-gemini-cli@f77273f4c914e4bf38440cf36a0369cb64a37489' # ratchet:google-github-actions/run-gemini-cli@v0.1.22
         env:
           GITHUB_TOKEN: '' # Do NOT pass any auth tokens here since this runs on untrusted inputs
-          ISSUE_TITLE: '${{ steps.issue.outputs.title }}'
-          ISSUE_BODY: '${{ steps.issue.outputs.body }}'
-          AVAILABLE_LABELS: '${{ steps.get_labels.outputs.available_labels }}'
         with:
           gcp_location: '${{ vars.GOOGLE_CLOUD_LOCATION }}'
           gcp_project_id: '${{ vars.GOOGLE_CLOUD_PROJECT }}'
@@ -140,12 +172,10 @@ jobs:
                 "outfile": ".gemini/telemetry.log"
               },
               "tools": {
-                "core": [
-                  "run_shell_command(echo)"
-                ]
+                "core": []
               }
             }
-          prompt: '/gemini-triage'
+          prompt: '/tlg-triage'
 
   label:
     runs-on: 'ubuntu-latest'
@@ -163,7 +193,7 @@ jobs:
         id: 'mint_identity_token'
         if: |-
           ${{ vars.APP_ID }}
-        uses: 'actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510' # ratchet:actions/create-github-app-token@v2
+        uses: 'actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc' # ratchet:actions/create-github-app-token@v2
         with:
           app-id: '${{ vars.APP_ID }}'
           private-key: '${{ secrets.APP_PRIVATE_KEY }}'
@@ -188,7 +218,9 @@ jobs:
 
             // Parse the labels as a CSV, reject invalid ones - we do this just
             // in case someone was able to prompt inject malicious labels.
-            const selectedLabels = (process.env.SELECTED_LABELS || '').split(',')
+            const selectedLabels = (process.env.SELECTED_LABELS || '')
+              .replace(/`/g, '')
+              .split(/[,\n]/)
               .map((label) => label.trim())
               .filter((label) => availableLabels.includes(label))
               .sort()
